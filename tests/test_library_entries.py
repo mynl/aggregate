@@ -98,12 +98,12 @@ VALIDATION_BASELINE = {
     'CurveInverseGamma': 'SEV_SKEW|AGG_SKEW',
     'CurveLogLogistic': 'SEV_CV|AGG_CV',
     'CurveLomax': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
-    'CurvePareto': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
+    'CurvePareto': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV|INFEASIBLE',
     'SevOneParameter': 'SEV_MEAN|AGG_MEAN',
     # --- Failure demonstrations ----------------------------------------
     # These exist *to* fail. HeavyTailValidation is the worked example of what
     # a failed validation looks like and what the explanation says.
-    'HeavyTailValidation': 'SEV_MEAN|AGG_MEAN|DEFECTIVE',
+    'HeavyTailValidation': 'SEV_MEAN|AGG_MEAN|DEFECTIVE|INFEASIBLE',
     'InverseGaussianMixed': 'AGG_MEAN|AGG_CV|AGG_SKEW|DEFECTIVE',
     # --- Picking leaves the declared moments, by design -----------------
     # See test_layer_picks_reproduces_every_pick: the picks are reproduced
@@ -127,12 +127,12 @@ VALIDATION_BASELINE = {
     # The cat model pins bs=2 on a billions-scale lognormal with cv 14.6, and
     # the thick portfolios are chosen to sit at the edge of what the grid can
     # carry. Both are the subject of their sections.
-    'GrossCatXOL': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW',
+    'GrossCatXOL': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|INFEASIBLE',
     'ExactGamma': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV',
     'BodoffFour': 'SEV_MEAN|SEV_CV|AGG_MEAN',
     'PIRCatNonCatGross': 'SEV_SKEW',
     'PropertyCasualty': 'SEV_MEAN|AGG_MEAN',
-    'ThickThickPortfolio': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV',
+    'ThickThickPortfolio': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|INFEASIBLE',
     'ThickThinPortfolio': 'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW',
 }
 

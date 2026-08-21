@@ -14,7 +14,7 @@ import scipy.stats as ss
 from scipy.optimize import NoConvergence  # noqa
 from .config import get_settings
 from .constants import (InfiniteVarianceError, DefectiveDistributionWarning,
-                        warn_once, warn_once_isolated)
+                        InfeasibleGridWarning, warn_once, warn_once_isolated)
 from . import _validation
 # Module scope is safe: _program imports only decl_writer, which imports nothing
 # from aggregate at module scope, and _program reaches back here for _fmt_bs
@@ -320,6 +320,57 @@ def grid_is_infeasible(feasibility) -> bool:
         return False
     return bool(feasibility['log2_required']
                 > feasibility['log2'] + FEASIBILITY_SLACK)
+
+
+def warn_infeasible_grid(agg) -> bool:
+    """Say once, out loud, that this severity and this grid cannot both be had.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        A sized aggregate carrying ``_bs_feasibility``.
+
+    Returns
+    -------
+    bool
+        Whether the warning was emitted.
+
+    Notes
+    -----
+    Keyed on the severity and the ``log2`` it was measured against, so a sweep
+    that rebuilds the same shape reports one fault rather than one per build,
+    while a genuinely different grid still speaks up. That is the
+    :class:`~aggregate.constants.ReflectedSeverityClampWarning` pattern.
+
+    The message is long on purpose. Bucket selection is one of the largest
+    hurdles an FFT method puts in front of a user, and the failure here does
+    not look like a numerical problem from the outside: it looks like a mean
+    that is simply wrong. Naming the bucket the body needs, the share of the
+    mean the first half bucket takes, and the reach the mean is not complete
+    without turns an unexplained 41.6% error into a modeling decision, and the
+    decision is an occurrence limit.
+    """
+    f = getattr(agg, '_bs_feasibility', None)
+    if not grid_is_infeasible(f):
+        return False
+    sev = agg.sevs[0]
+    who = f'{sev.long_name}'
+    lost = f['lost_at_zero']
+    lost_txt = (f' ({100 * lost:.4g}% of the mean is supplied below the first '
+                f'half bucket, and is placed at 0)' if np.isfinite(lost) else '')
+    return warn_once(
+        f"{agg.name}: severity '{who}' cannot be reproduced on this grid. "
+        f'The body needs bs <= {_fmt_bs(f["bs_max"])}{lost_txt}; the mean is '
+        f'not complete until the grid reaches {fmt_amount(f["reach"])}, so '
+        f'matching it to {f["eps"]:g} needs log2 = {f["log2_required"]:.0f}, '
+        f'and log2 = {f["log2"]} was used. A thick unlimited severity has this '
+        f'problem at any bucket size, because its mean is furnished far above '
+        f'its median and a finer bs only shortens the reach. Add an occurrence '
+        f'limit, or accept the reported moment errors.',
+        InfeasibleGridWarning,
+        key=('infeasible-grid', str(getattr(sev, 'sev_name', '')),
+             round(float(f['bs_max']), 12), int(f['log2'])),
+        stacklevel=3)
 
 
 def feasibility_describe(feasibility) -> str:
@@ -1357,6 +1408,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     # through ``bs_description`` / ``bs_explanation``. See
     # ``severity_feasibility`` and ``dev/done/plan-validation-punchup.md``.
     agg._bs_feasibility = severity_feasibility(agg, sel_bs, sel_l2, grid_x_max)
+    warn_infeasible_grid(agg)
 
     # ---- journey columns (bs-reporting item 1) ----------------------
     # Purely derived reporting -- no effect on the grid. ``log2_need`` is the

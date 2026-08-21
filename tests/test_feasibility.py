@@ -24,6 +24,8 @@ from aggregate import build
 from aggregate._bucket_window import (FEASIBILITY_SLACK, grid_is_infeasible,
                                       severity_feasibility)
 from aggregate._severity import feasible_bucket, size_biased_cdf
+from aggregate.constants import (InfeasibleGridWarning, Validation,
+                                 reset_warn_once)
 
 #: ``exp(19.595) * lognorm 2.581`` limited at 1e12: sigma 2.581, thicker than
 #: the cat model below, and feasible anyway because it is limited. The control
@@ -210,3 +212,122 @@ def test_severity_feasibility_declines_a_non_finite_grid_top():
     """Defensive: no grid top, no reading."""
     a = _built('agg OK3 10 claims sev lognorm 200 cv 2 poisson')
     assert severity_feasibility(a, a.bs, a.log2, np.inf) is None
+
+
+# ---------------------------------------------------------------------------
+# [Validation-Infeasible-Flag] and [Infeasible-Grid-Warning], part three
+# ---------------------------------------------------------------------------
+# The reading becomes a validation member and a warning. INFEASIBLE is a new
+# validation TYPE, not a failure: it is a statement about the grid rather than
+# about the outcome, so it fires whether or not the moments happen to fail and
+# it leads the explanation the way DEFECTIVE does, because it explains the
+# moment failures underneath it rather than adding to them.
+
+
+def test_infeasible_is_transparent_to_passes():
+    """The whole semantic, asserted on the enum where it lives."""
+    assert Validation.INFEASIBLE.passes
+    assert not (Validation.INFEASIBLE | Validation.SEV_MEAN).passes
+    assert Validation.NOT_UNREASONABLE.passes
+    # and it deliberately does NOT join the reinsurance arm, which would let
+    # the flag hide the very problem it names
+    assert (Validation.INFEASIBLE | Validation.REINSURANCE).passes
+
+
+def test_the_cat_model_sets_the_flag():
+    a = _built(CAT)
+    assert a.valid & Validation.INFEASIBLE
+    assert a.valid & Validation.SEV_MEAN          # and says why
+
+
+def test_a_limited_severity_of_the_same_thickness_does_not():
+    a = _built(HURRICANE)
+    assert not (a.valid & Validation.INFEASIBLE)
+
+
+def test_an_ordinary_lognormal_does_not_set_the_flag_or_warn():
+    reset_warn_once()
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', InfeasibleGridWarning)
+        a = build('agg OK4 10 claims sev lognorm 200 cv 2 poisson')
+    assert not (a.valid & Validation.INFEASIBLE)
+
+
+def test_the_flag_leads_the_short_form_outside_the_failure_list():
+    """It is a reading, so it sits before ``fails``, like ``reinsurance``."""
+    a = _built(CAT)
+    d = a.validation_description
+    assert d.startswith('grid infeasible for this severity;')
+    assert 'fails sev mean' in d
+
+
+def test_the_long_form_explains_the_moment_failures_under_it():
+    a = _built(CAT)
+    e = a.validation_explanation
+    assert 'cannot be reproduced on this grid at any bucket size' in e
+    assert 'what every moment failure above is measuring' in e
+    assert 'occurrence limit' in e
+    assert 'log2 25' in e
+
+
+def test_the_warning_fires_once_and_names_the_numbers():
+    reset_warn_once()
+    with pytest.warns(InfeasibleGridWarning) as rec:
+        build(CAT)
+    msg = str(rec[0].message)
+    assert 'cannot be reproduced on this grid' in msg
+    assert 'log2 = 25' in msg
+    assert '46.22' in msg                       # the share lost at zero
+    assert 'Add an occurrence limit' in msg
+    # once per session per (severity, grid): the second build is silent
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', InfeasibleGridWarning)
+        build(CAT)
+
+
+def test_a_different_grid_is_a_different_warning():
+    """The key carries log2, so a genuinely different grid still speaks up."""
+    reset_warn_once()
+    with pytest.warns(InfeasibleGridWarning):
+        build(CAT, log2=16)
+    with pytest.warns(InfeasibleGridWarning):
+        build(CAT, log2=18)
+
+
+def test_the_flag_joins_the_severity_row_of_an_exhibit():
+    """A property of the severity against the grid, so it emphasizes ``Sev``."""
+    from aggregate.exhibits import _core
+    assert _core._SEV_FAILURES & Validation.INFEASIBLE
+    assert not (_core._AGG_FAILURES & Validation.INFEASIBLE)
+
+
+def test_no_program_gains_the_flag_without_a_failing_severity_mean():
+    """The corpus gate, asserted as a count so a regression is a number.
+
+    Measured at 1.0.0a313 over the 255 building ``agg`` programs of
+    ``_test_suite.agg`` plus ``library.agg``: four set INFEASIBLE
+    (``CurvePareto``, ``GrossCatXOL``, ``HeavyTailValidation``,
+    ``USXOLTower``), every one of them already failing its severity mean, and
+    132 carry a reading at all. This test checks the invariant on the shipped
+    library, which is the half that is ours to keep clean.
+    """
+    from aggregate import Underwriter
+    uw = Underwriter(databases='library')
+    uw.load()
+    flagged = []
+    for kind, name in sorted(uw._recipes):
+        if kind != 'agg':
+            continue
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter('ignore')
+                a = uw.build(name, update=True)
+        except Exception:
+            continue
+        if a.valid & Validation.INFEASIBLE:
+            flagged.append(name)
+            assert a.valid & Validation.SEV_MEAN, (
+                f'{name}: INFEASIBLE without a failing severity mean, which '
+                'would mean the reading is firing on a grid that works')
+    assert set(flagged) == {'CurvePareto', 'GrossCatXOL', 'HeavyTailValidation',
+                            'USXOLTower'}, sorted(flagged)

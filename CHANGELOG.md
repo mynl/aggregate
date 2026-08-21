@@ -20,6 +20,34 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a313
+
+**[Validation-Infeasible-Flag] the feasibility reading becomes a validation member and a warning.** Part three, the last, of `dev/done/plan-validation-punchup.md`. a312 computed the reading and reported it through the grid narrative; this puts it where a user meets it, in `valid` and in a warning at build time.
+
+**`Validation.INFEASIBLE` is a new validation type, not a failure** (author ruling 2026-08-21). It is a statement about the grid rather than about the outcome, so it fires whether or not the moments happen to fail. `Validation.passes` therefore treats it as **transparent**: the expression masks it out of the first term, so an infeasible object whose moments fail still fails, and one whose moments hold still passes, carrying the reading. It deliberately does **not** join the `REINSURANCE` arm, which makes a reinsured object with failing moments pass, because doing so would let the flag hide the very problem it names. `USXOLTower` is exactly that case in the shipped library: reinsured, infeasible, and still passing.
+
+**It leads the explanation, and sits outside the failure list.** `DEFECTIVE` leads the moment flags because missing mass makes every moment comparison under it uninformative; `INFEASIBLE` leads even that, because the grid could not have reproduced the severity whatever else happened. The plan put the clause inside the `fails ...` list, which reads "fails grid infeasible for this severity"; it is instead placed ahead of the list, on the `reinsurance` idiom, so the short form reads `grid infeasible for this severity; fails sev mean, agg mean`, and for an object whose moments hold, `grid infeasible for this severity; not unreasonable`. The long `validation_explanation` carries the reasoning: what the size biased distribution is, why the mean and the tail want different resolutions, why a finer `bs` makes it worse, and why an occurrence limit is the fix. `exhibits/_core.py` puts it in `_SEV_FAILURES`, since it is a property of the severity against the grid.
+
+**`InfeasibleGridWarning`** fires once per session per severity and grid, through `warn_once`, on the `ReflectedSeverityClampWarning` pattern; the key carries `log2`, so a genuinely different grid still speaks up. The message is long on purpose. The author's framing is that bucket selection is one of the largest hurdles FFT methods put in front of a user, and this failure does not look numerical from the outside, it looks like a mean that is simply wrong. So it names the bucket the body needs, the share of the mean the first half bucket takes and where that mass is placed, the reach the mean is not complete without, the `log2` that would hold both, and the one action that resolves it:
+
+```
+Cat: severity 'lognorm' cannot be reproduced on this grid. The body needs
+bs <= 0.0302749 (46.22% of the mean is supplied below the first half bucket,
+and is placed at 0); the mean is not complete until the grid reaches
+1,025,760, so matching it to 0.0001 needs log2 = 25, and log2 = 16 was used.
+A thick unlimited severity has this problem at any bucket size, because its
+mean is furnished far above its median and a finer bs only shortens the
+reach. Add an occurrence limit, or accept the reported moment errors.
+```
+
+**Measured on the corpus: four programs of 255 set it, and every one was already failing its severity mean.** `CurvePareto` (needs 16.99 against 16, marginal and real), `GrossCatXOL` (25.01), `HeavyTailValidation` (46.55), `USXOLTower` (25.01). Zero programs gain the flag on a grid that works, which is the invariant the plan asked to be asserted as a count. `HeavyTailValidation` is the one worth noting: it is the library's worked example of what a failed validation looks like, and it now says **why** it failed rather than only that it did. 132 of the 255 carry a reading at all; the rest are severity kinds the closed forms cannot read exactly, and they claim nothing in either direction. `VALIDATION_BASELINE` gains `INFEASIBLE` on those four plus `ThickThickPortfolio`, which inherits it from a unit.
+
+**Docs.** `docs/2_aggregate_overview/pipeline-aggregate.rst` gains the flag in its `valid` list with the transparency rule spelled out, and `bucket-selection.rst`'s feasibility section gains the flag, the warning and the corpus count. Between them the two sections now carry the whole account, which is what the author asked for.
+
+With this the plan is complete and moves to `dev/done/`.
+
+---
+
 ## 1.0.0a312
 
 **[Severity-Feasibility-Reading] the library now says when the grid cannot reproduce the severity's mean at any bucket size.** Part two of `dev/done/plan-validation-punchup.md`, the computation and its narrative. No flag yet, so the blast radius is prose; `Validation.INFEASIBLE` follows in part three.
@@ -88,7 +116,7 @@ The rest is prose: `honoured`, `realised`, `discretises`, `neighbouring`, `colou
 
 **The sizer no longer computes a number it will not read, and no longer reaches `int()` on one it cannot.** `_size` skipped straight past `need` when `bs` is pinned: the user owns the grid, `log2` is honored verbatim, and the crash was in arithmetic whose result was discarded three lines later. The remaining computation moved into `_need_log2`, which returns `inf` for a non-finite span, step or ratio, reading as "more than any cap" at every branch. The old guard, `if span > 0`, did not catch the case, because `inf > 0` is `True`. Finally `_row` records a method whose window has an infinite edge as inapplicable rather than sizing it, the `exact_discrete` unreachable-support precedent, so selection falls through instead of raising, and an inapplicable `bounded_small` row can no longer be selected.
 
-**Ordinary aggregates are byte for byte unchanged**, which was the plan's regression bar. Every new branch is reached only by a signed severity carrying a layer clause, or by a window with a non-finite edge, and after the first fix the reported program never builds the bounded row at all. The reproduction now builds and reports itself **defective**: the raw `180 - lognormal` at `cv 10` has sigma about 2.15 and reaches roughly 14.5 million buckets over 50 claims, so the PMF deficit is 0.977 and the negative reach is clipped. That is honest, it is what the existing warnings are for, and it is the subject of `dev/plan-validation-punchup.md`, not of this fix.
+**Ordinary aggregates are byte for byte unchanged**, which was the plan's regression bar. Every new branch is reached only by a signed severity carrying a layer clause, or by a window with a non-finite edge, and after the first fix the reported program never builds the bounded row at all. The reproduction now builds and reports itself **defective**: the raw `180 - lognormal` at `cv 10` has sigma about 2.15 and reaches roughly 14.5 million buckets over 50 claims, so the PMF deficit is 0.977 and the negative reach is clipped. That is honest, it is what the existing warnings are for, and it is the subject of `dev/done/plan-validation-punchup.md`, not of this fix.
 
 ---
 

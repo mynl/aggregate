@@ -106,7 +106,8 @@ MAX_ROWS = 200
 #: Freq / Sev / Agg validation frame, and those that emphasize ``Agg``
 #: (aliasing is an aggregate level symptom). ``Freq`` is PGF exact and
 #: never flags.
-_SEV_FAILURES = Validation.SEV_MEAN | Validation.SEV_CV | Validation.SEV_SKEW
+_SEV_FAILURES = (Validation.SEV_MEAN | Validation.SEV_CV | Validation.SEV_SKEW
+                 | Validation.INFEASIBLE)
 _AGG_FAILURES = (Validation.AGG_MEAN | Validation.AGG_CV
                  | Validation.AGG_SKEW | Validation.ALIASING)
 

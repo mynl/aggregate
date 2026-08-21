@@ -2,7 +2,7 @@
 
 > **Status: EXECUTED at `1.0.0a309`, 2026-08-21.** A focused robustness fix in the bucket window sizer plus an honest metadata fix for a layer clause on a signed severity. Touches core grid sizing (`_bucket_window.py`, `_aggregate.py`, `_severity.py`), so the regression bar is "ordinary aggregates byte for byte unchanged". See the execution notes at the end for what landed and the three places the execution went beyond the plan's letter.
 >
-> **Rewritten 2026-08-21.** The original draft predates `[Reflected-Loss-Severity]` at `1.0.0a230`, and its line references, its reading of the build dispatch, and its central open decision are all superseded. The diagnostic work behind the rewrite also produced two general validation findings, which are now their own plan, `dev/plan-validation-punchup.md`. This plan is the bug fix only.
+> **Rewritten 2026-08-21.** The original draft predates `[Reflected-Loss-Severity]` at `1.0.0a230`, and its line references, its reading of the build dispatch, and its central open decision are all superseded. The diagnostic work behind the rewrite also produced two general validation findings, which are now their own plan, `dev/done/plan-validation-punchup.md`. This plan is the bug fix only.
 
 ## Reproduction
 
@@ -61,7 +61,7 @@ So `sev -lognorm 200 cv 10 + 180` is now an ordinary loss: it clamps at zero and
 
 The math is worth stating, because it explains why the reported case is not merely unsupported but contradictory. A layer `y xs a` is `min(y, max(X - a, 0))`. On `X = 180 - lognormal`, `25000 xs 0` is `min(25000, max(X, 0)) = [0, 180]`, which annihilates the negative half, that is, the entire reason for writing `ssev`. A **negative** attachment (`25000 xs -1000`, keeping the signed region down to `-1000`) is the meaningful general case, and implementing it is the deferred feature, not this bug fix.
 
-For completeness, fixing the window alone does not rescue the reported program. The raw `180 - lognorm(cv 10)` has sigma about 2.15, so over 50 claims it reaches roughly 14.5 million buckets and builds defective (pmf deficit 0.977, negative reach clipped). That is honest, and it is the subject of `dev/plan-validation-punchup.md`, not of this plan.
+For completeness, fixing the window alone does not rescue the reported program. The raw `180 - lognorm(cv 10)` has sigma about 2.15, so over 50 claims it reaches roughly 14.5 million buckets and builds defective (pmf deficit 0.977, negative reach clipped). That is honest, and it is the subject of `dev/done/plan-validation-punchup.md`, not of this plan.
 
 ## The fix
 
@@ -136,4 +136,4 @@ Full gate, `pytest -m 'slow or not slow'`. Twenty two new cases: five in `tests/
 
 Five failures in `tests/test_agg_libraries.py` and `tests/test_library_entries.py` are **pre-existing and unrelated**: the author's uncommitted `src/aggregate/agg/library.agg` edits (`ISOMixedExponential` renamed to `CommAutoMixedExponential`, new `LayerPicksMED`) have not reached the baselines or the canonical layout yet.
 
-The reproduction now builds and reports itself defective, exactly as the plan predicted, which is `dev/plan-validation-punchup.md`'s subject rather than this plan's.
+The reproduction now builds and reports itself defective, exactly as the plan predicted, which is `dev/done/plan-validation-punchup.md`'s subject rather than this plan's.

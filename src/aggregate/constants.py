@@ -33,7 +33,8 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'DISTORTION_DUAL_LABEL', 'DISTORTION_DUAL_TEX',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
-           'IgnoredDecLClauseWarning', 'ZeroModifiedExposureWarning',
+           'IgnoredDecLClauseWarning', 'InfeasibleGridWarning',
+           'ZeroModifiedExposureWarning',
            'ZeroPremiumCessionWarning',
            'CoarseJointGridWarning', 'DegenerateEvaluationWarning',
            'ReflectedSeverityClampWarning',
@@ -188,7 +189,11 @@ class Validation(Flag):
     skew) above the validation ``eps`` tolerance. ``ALIASING`` flags FFT
     wrap-around; ``DEFECTIVE`` flags a realized law that does not sum to 1;
     ``REINSURANCE`` flags reinsurance-induced moment drift; ``NOT_UPDATED``
-    signals the object hasn't been ``update``-d yet.
+    signals the object hasn't been ``update``-d yet. ``INFEASIBLE`` says the
+    severity cannot be reproduced on this grid at **any** bucket size, which
+    is a reading about the grid rather than a failure, and so is transparent
+    to :attr:`passes`; it explains the moment flags underneath it rather than
+    adding to them.
     """
 
     NOT_UNREASONABLE = 0
@@ -202,6 +207,7 @@ class Validation(Flag):
     REINSURANCE = auto()
     NOT_UPDATED = auto()
     DEFECTIVE = auto()
+    INFEASIBLE = auto()
 
     @property
     def passes(self):
@@ -211,8 +217,15 @@ class Validation(Flag):
         concern is ``REINSURANCE`` (the subject validated under the hood; the
         cession makes the realised moment audit n/a). Display surfaces (``qd``,
         the HTML reprs) read it to flag only a genuine failure.
+
+        ``INFEASIBLE`` is **transparent** here: it is a reading about the grid
+        rather than a verdict on the outcome, so it neither fails an object
+        whose moments hold nor rescues one whose moments do not. It is masked
+        out of the first term and deliberately does **not** join the
+        ``REINSURANCE`` arm, which would let the flag hide the very problem it
+        names. See ``dev/done/plan-validation-punchup.md``.
         """
-        return (self == Validation.NOT_UNREASONABLE
+        return ((self & ~Validation.INFEASIBLE) == Validation.NOT_UNREASONABLE
                 or bool(self & Validation.REINSURANCE))
 
 
@@ -246,6 +259,40 @@ class DefectiveDistributionWarning(UserWarning):
     Silence either with
     ``silence_warnings(DefectiveDistributionWarning)``; re-arm both with
     :func:`reset_warn_once`.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class InfeasibleGridWarning(UserWarning):
+    """Emitted when a severity cannot be reproduced on the grid at any bucket size.
+
+    The grid trades resolution against reach: at a fixed ``log2`` budget it
+    spans ``2**log2 * bs``, so a finer bucket buys detail at the bottom by
+    giving up extent at the top. A thick enough severity furnishes its mean so
+    far above its median that the two demands cannot both be met, and no
+    bucket size splits the difference. That is a statement about the model
+    rather than about the numerics, and the fix is an occurrence limit on the
+    severity, not a finer grid.
+
+    The message names the three numbers that make the situation legible, the
+    bucket the body needs, the share of the **mean** the first half bucket
+    takes (which under the ``round`` scheme is placed at exactly 0), and the
+    reach the mean is not complete without, then the one action that resolves
+    it. Bucket selection is one of the largest hurdles an FFT method puts in
+    front of a user, so the message is deliberately long: this is the moment
+    to be educational.
+
+    Reported through :func:`warn_once`, keyed on the severity and the ``log2``
+    it was measured against, so a sweep that rebuilds the same shape reports
+    one fault rather than one per build, and a genuinely different grid still
+    speaks up. Every object carries the same verdict silently in ``valid``
+    (:attr:`Validation.INFEASIBLE`) and in ``bs_description`` /
+    ``bs_explanation``, which is where to look for the rest.
+
+    Silence with ``silence_warnings(InfeasibleGridWarning)``; re-arm with
+    :func:`reset_warn_once`. See ``dev/done/plan-validation-punchup.md``.
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

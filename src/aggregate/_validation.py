@@ -158,10 +158,17 @@ def explain_validation(rv, deficit=None):
         parts.append('agg skew')
     explanation = ', '.join(parts)
     if rv & Validation.REINSURANCE:
-        if explanation:
-            return f'reinsurance; subject fails {explanation}'
-        return 'reinsurance; subject not unreasonable'
-    return f'fails {explanation}'
+        out = (f'reinsurance; subject fails {explanation}' if explanation
+               else 'reinsurance; subject not unreasonable')
+    else:
+        out = f'fails {explanation}' if explanation else 'not unreasonable'
+    # INFEASIBLE leads, and sits OUTSIDE the "fails" list on purpose. It is a
+    # reading about the grid, not a failure: an infeasible object whose
+    # moments hold still reads "not unreasonable" after the clause, and one
+    # whose moments fail is told why they did. Same idiom as ``reinsurance``.
+    if rv & Validation.INFEASIBLE:
+        return f'grid infeasible for this severity; {out}'
+    return out
 
 
 # ====================================================================
@@ -305,6 +312,20 @@ def valid_aggregate(agg):
     if np.isfinite(agg._deficit) and agg._deficit > DEFICIT_MATERIALITY:
         logger.info('FAIL: pmf deficit %.3e > materiality', agg._deficit)
         rv |= Validation.DEFECTIVE
+
+    # Infeasible: the severity cannot be reproduced on this grid at any bucket
+    # size. A reading about the grid rather than a verdict on the outcome, so
+    # it sets whether or not the moments happen to hold and is transparent to
+    # ``Validation.passes``. It explains the moment flags underneath it rather
+    # than adding to them, which is why it leads the explanation the way
+    # DEFECTIVE does. Deferred import: ``_bucket_window`` imports this module
+    # at module scope, and this is the only edge back.
+    from ._bucket_window import grid_is_infeasible
+    if grid_is_infeasible(getattr(agg, '_bs_feasibility', None)):
+        logger.info('READING: severity needs log2 %.2f, grid has %d',
+                    agg._bs_feasibility['log2_required'],
+                    agg._bs_feasibility['log2'])
+        rv |= Validation.INFEASIBLE
 
     # Reinsurance: the realised (after-reins) object has no independent
     # theoretical, so its sev/agg moments cannot be validated. The
@@ -633,6 +654,26 @@ def validation_explanation(obj):
            f'aggregate, and a relative error above {tol} fails; only the '
            f'lowest-order failure is reported, since a mean that is wrong makes '
            f'the higher moments uninformative.']
+    if rv & Validation.INFEASIBLE:
+        f = getattr(obj, '_bs_feasibility', None) or {}
+        lost = f.get('lost_at_zero', np.nan)
+        lost_txt = (f' {100 * lost:.4g}% of its mean is supplied below the '
+                    f'first half bucket, where the round scheme places it at '
+                    f'exactly 0.' if np.isfinite(lost) else '')
+        out.append(
+            f'The severity cannot be reproduced on this grid at any bucket '
+            f'size, which is what every moment failure above is measuring. '
+            f'The mean of a thick law is furnished far above its median, so '
+            f'the resolution its body needs and the reach its tail needs pull '
+            f'apart faster than a fixed bucket count can span: this one wants '
+            f'bs at or under {f.get("bs_max", float("nan")):.6g} and a grid '
+            f'reaching {f.get("reach", float("nan")):.6g}, which together need '
+            f'log2 {f.get("log2_required", float("nan")):.0f} against the '
+            f'{f.get("log2", "")} used.{lost_txt} A finer bs makes it worse, '
+            f'because it shortens the reach. The fix is an occurrence limit on '
+            f'the severity, which truncates the size biased tail and brings the '
+            f'two demands back together, or accepting the reported moment '
+            f'errors as the price of an unlimited model.')
     if rv & Validation.DEFECTIVE:
         d = getattr(obj, '_deficit', None)
         amount = f'{d:.3e}' if isinstance(d, float) and np.isfinite(d) \

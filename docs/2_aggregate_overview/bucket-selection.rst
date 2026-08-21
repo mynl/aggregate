@@ -19,18 +19,21 @@ The problem
 
 The tension is fundamental: at a fixed ``log2`` budget the grid spans ``N * bs``, so resolution and extent trade off directly. The sizer's job is to spend the budget where the mass and the priced tail actually live.
 
-Two failure modes: aliasing and off-grid loss
-----------------------------------------------
+Three failure modes: aliasing, off-grid loss, and a grid that cannot work
+-------------------------------------------------------------------------
 
-The lattice is finite and the FFT convolution is periodic. Two distinct failures follow, and they have different urgencies.
+The lattice is finite and the FFT convolution is periodic. Two failures follow from that, and they have different urgencies. A third is different in kind: it is a property of the severity, and no choice of grid within the budget fixes it.
 
 Aggregate aliasing, a refinement problem in the right tail
-    For a non-negative severity the discretized severity is bounded on ``[0, N*bs]``, but the aggregate, a sum of many claims, has support beyond ``N*bs``. The circular convolution folds that excess right-tail mass back to low buckets, or, with zero padding, clips it. The result is a sliver of misplaced mass, often :math:`10^{-7}` or less, and a small mean error; the bulk is intact. The library reports the condition as ``ALIASING``, or as a deficit. It is a quality issue, fixable by more extent, and never catastrophic.
+    For a non-negative severity the discretized severity is bounded on ``[0, N*bs]``, but the aggregate, a sum of many claims, has support beyond ``N*bs``. The circular convolution folds that excess right-tail mass back to low buckets, or, with zero padding, clips it. The two outcomes are worth separating, because the library now reports them separately. Wrap **conserves** mass and relocates it, so the realized law still sums to 1 while the mean moves: that is ``ALIASING``, and since ``padding=1`` runs the FFT on a doubled grid and discards the top half, real wrap needs the aggregate to reach past **twice** the grid, which makes it rare by construction. Clipping **drops** mass, so the law sums to less than 1: that is the pmf deficit and ``DEFECTIVE``. Either way the result is usually a sliver, often :math:`10^{-7}` or less, and a small mean error, with the bulk intact. It is a quality issue, fixable by more extent, and never catastrophic.
 
 Off-grid mass loss from a mis-placed ``x_min``, a correctness problem for a signed book
     Any severity or aggregate mass outside the grid ``[x_min, x_min + N*bs]`` is simply dropped: it is discretized and the off-grid probability is lost. The severity does not wrap. For a non-negative book this barely matters, because ``x_min = 0`` is forced and the upper edge is implicit at ``N * bs``, so only a thin right-tail sliver can fall off, which is the aliasing case above; you never compute ``x_max`` at all. For a signed severity the sizer must explicitly set ``x_min``, a negative origin, and the three-moment window can place it grossly wrong. A heavy-left severity like ``100 - lognorm 10 cv 2.5`` has positive aggregate skewness, because the :math:`+100^3` term dominates, so the moment window sits near :math:`[-749, 3557]` while the true left reach is about :math:`-110{,}000`. About half the mass falls below ``x_min`` and is lost, a measured 47%, and the law is garbage. Setting ``x_min`` to cover a signed severity's reach is therefore non-negotiable: the sizer will coarsen ``bs`` to do it, because coarse-but-correct beats fine-but-garbage.
 
-That asymmetry drives the single-big-jump floor described in :ref:`bs methods`. Positive and heavy is a refinement question, a sliver off the implicit top; signed is a correctness question, where ``x_min`` must be set to cover the reach.
+A severity no grid in the budget can resolve, a modeling problem
+    A thick enough severity furnishes its mean so far above its median that the resolution its body needs and the reach its tail needs cannot both fit in :math:`2^{\mathrm{log2}}` buckets, at any ``bs``. Refining ``bs`` shortens the reach and coarsening it loses the body, so there is nothing to trade. This is not a numerical accident and not something the sizer can fix; it is a statement about the model, and the fix is an occurrence limit. It is measured and reported as described in :ref:`bs feasibility`.
+
+That asymmetry between the first two drives the single-big-jump floor described in :ref:`bs methods`. Positive and heavy is a refinement question, a sliver off the implicit top; signed is a correctness question, where ``x_min`` must be set to cover the reach.
 
 The tail report
 ---------------
@@ -162,10 +165,88 @@ Controls
 
 The module constant ``WINDOW_LOG2_GROWTH = 4`` bounds how far a windowed integer-lattice book may grow ``log2`` past the cap to preserve an exact ``bs``, so a high-mean ``dsev`` keeps ``bs = 1`` rather than coarsening off its lattice. It never applies to continuous severities.
 
+.. _bs feasibility:
+
+Feasibility: when no bucket size works
+--------------------------------------
+
+Everything above is a choice among grids. This is the question of whether any grid in the budget will do, and it is answered separately, after the choice is made, because the answer does not depend on which method won.
+
+Start from what discretization actually costs the **mean**. Under the ``round`` scheme bucket zero collects every loss below ``bs/2`` and places it at exactly ``0``, so the mean supplied there is lost outright; above the grid top the mean is lost to truncation. Those are the only two first-order losses. Both are naturally measured under the **size biased** law :math:`P_1`, defined by :math:`dP_1/dP = y/\mathsf E[Y]`, which weights by the loss amount: the question is not how much *probability* sits below half a bucket but how much *mean* does. Its cdf comes straight out of quantities the library already computes exactly,
+
+.. math::
+
+    F_1(t) = \frac{1}{\mathsf E[Y]}\int_0^t y\,dF(y) = \frac{\mathrm{LEV}(t) - t\,S(t)}{\mathsf E[Y]},
+
+because :math:`\mathrm{LEV}(t) = \mathsf E[\min(Y,t)]` is that same integral plus the censored block :math:`t\,S(t)`. So a mean accurate to relative :math:`\delta` needs
+
+.. math::
+
+    \frac{bs}{2} \le q_{\delta/2}(P_1) \qquad\text{and}\qquad n \cdot bs \ge q_{1-\delta/2}(P_1),
+
+and dividing one by the other gives the requirement on the bucket count alone, with ``bs`` eliminated:
+
+.. math::
+
+    \log_2 n \ge \log_2 \frac{q_{1-\delta/2}(P_1)}{2\,q_{\delta/2}(P_1)}.
+
+For an **unlimited lognormal** this has a closed form, and the striking part is what drops out of it. :math:`P_1` is again lognormal, :math:`LN(\mu + \sigma^2, \sigma)`, so the quantile ratio is :math:`e^{2z\sigma}` with :math:`z = \Phi^{-1}(1-\delta/2)`, the mean cancels entirely, and only :math:`\sigma` survives:
+
+.. math::
+
+    \log_2 n \ge \frac{2z\sigma}{\log 2} - 1 \approx 11.23\,\sigma - 1 \qquad (\delta = 10^{-4}).
+
+Built on exactly the grid the formula prescribes, the realized error lands on the target:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 34 14 20 24
+
+   * - severity
+     - :math:`\sigma`
+     - ``log2`` required
+     - realized mean error
+   * - ``lognorm 200 cv 2``
+     - 1.269
+     - 13.2
+     - 2.0e-6
+   * - ``lognorm 200 cv 5``
+     - 1.805
+     - 19.3
+     - 2.6e-5
+   * - ``lognorm 200 cv 10``
+     - 2.148
+     - 23.1
+     - 1.9e-5
+   * - ``lognorm 8.501 cv 14.624``
+     - 2.317
+     - 25.0
+     - 1.8e-4
+
+Against a working ``log2 = 16`` the practical boundary sits near :math:`\sigma = 1.51`, a CV around 3. Below it an unlimited lognormal is routine; above it no bucket size works, and a finer one is worse. The connection to Mandelbrot's moment localization argument, which explains why this is a property of the lognormal rather than an accident of this grid, is written up in the monograph.
+
+**A limit is the fix, and thickness alone is not the problem.** ``N.US.Hurricane``, ``1e12 xs 0 sev exp(19.595) * lognorm 2.581``, has :math:`\sigma = 2.581`, thicker than the cat model in the table, and is perfectly feasible: the limit truncates :math:`P_1` so its upper quantile is the limit itself, the required ``log2`` is 15.7, and a 16 grid holds it. Its chosen ``bs`` is still ten times coarser than the body wants, which is why its mean is off by 0.089%, but that is a **coarse** grid, not an impossible one. The distinction is the whole point of the reading.
+
+The reading is computed after selection and stashed on the aggregate as ``_bs_feasibility``, beside ``_bs_clip`` and ``_bs_snap``. It carries ``bs_max`` (the coarsest bucket whose bottom bucket does not swallow more than :math:`\delta/2` of the mean), ``reach`` (how far the grid must extend to keep the same share at the top), ``log2_required``, ``lost_at_zero`` (the share of the mean the first half bucket takes, which is the number that makes the situation legible), and the grid it is measured against. ``log2_required`` is **not** ``_bs_window_df``'s ``log2_need`` column: that one is the exponent a candidate *window* needs at its own ``bs``, while this is the exponent the *severity* needs before its mean can be reproduced at all, and no choice of ``bs`` moves it. For a severity mixture the binding component, the one with the smallest ``bs_max``, is the one reported, because the shared grid has to serve all of them.
+
+``bs_description`` gains a clause and ``bs_explanation`` the full account whenever ``log2_required`` exceeds the realized ``log2`` by more than half an exponent:
+
+.. ipython:: python
+    :okwarning:
+
+    from aggregate import build
+    cat = build('agg CatDemo 1.74 claims sev lognorm 8.501 cv 14.624 poisson')
+    print(cat.bs_description)
+    print(cat.bs_explanation)
+
+The reading is exact or absent, never estimated. It is available for the severity kinds whose partial expected values are computed in closed form, ``lognorm``, ``gamma``, ``pareto`` and ``expon``, which covers mixed exponentials, and it reports nothing for a discrete or histogram severity (exact on its own lattice, so the question does not arise), a signed or reflected law, or any other continuous family. Not knowing is not the same as knowing the grid is fine, so a missing reading claims nothing in either direction.
+
+Deliberately **not** done, on the author's ruling of 2026-08-21: the sizer is not capped at the resolution requirement, because buying reach is the decision and it stays; and one-moment local moment matching, which would spread each bucket's mass across its two bounding lattice points and make the discretized mean exact at any ``bs``, is refused for a gross severity. It would repair the reported number while leaving the model's mean furnished by a region no one has an opinion about, which is worse than an obvious error because it is silent. The existing use of mean-preserving scatter for reinsurance rebucketing stands, where the grid is forced and the means have to work.
+
 Inspecting a choice
 -------------------
 
-After ``update``, or after ``build``, ``a._bs_window_df`` holds one row per method plus ``sbj`` and ``used``. The columns are ``applies`` (eligible, and the severity fits), ``x_min`` and ``x_max`` (the method's window), ``W`` (width), ``bs``, ``log2``, ``coverage`` (the nines used), ``note`` (provenance, for example ``; sbj floor`` when the floor bound), and ``selected``. Reading it answers, at a glance, why a grid was chosen and what the alternatives were:
+After ``update``, or after ``build``, ``a._bs_window_df`` holds one row per method plus ``sbj`` and ``used``. The columns are ``applies`` (eligible, the severity fits, and the window is finite), ``x_min`` and ``x_max`` (the method's window), ``W`` (width), ``bs``, ``log2``, ``coverage`` (the nines used), ``note`` (provenance, for example ``; sbj floor`` when the floor bound, or ``; non-finite window (rejected)`` for a method whose window had an infinite edge), and ``selected``. Reading it answers, at a glance, why a grid was chosen and what the alternatives were:
 
 .. ipython:: python
     :okwarning:
@@ -176,7 +257,7 @@ After ``update``, or after ``build``, ``a._bs_window_df`` holds one row per meth
 
 ``T5`` is the motivating case for the tail-aware work. Its ideal grid is roughly ``[400k, 1.2M]``, and it gets there: ``windowed`` applies and wins, lifting ``x_min`` off the floor and taking ``bs = 20``, coarse enough that a single heavy occurrence fits the band, while the upper edge is floored by the single-big-jump reach so the far tail is captured rather than clipped. The ``moment`` row shows the 0-based alternative, which at ``bs = 10`` would have topped out at 655,360, well below the ``sbj`` reach of 1,234,033, and clipped.
 
-The narrative properties say the same thing in prose. ``bs_description`` is the short summary, giving the winning method, ``(bs, log2, x_min)``, the grid top and any clip; ``bs_explanation`` is the verbose form, giving the aggregate tail one-liner, which methods applied and why the winner won, and how to widen a clipped tail.
+The narrative properties say the same thing in prose. ``bs_description`` is the short summary, giving the winning method, ``(bs, log2, x_min)``, the grid top, any clip, and any feasibility shortfall; ``bs_explanation`` is the verbose form, giving the aggregate tail one-liner, which methods applied and why the winner won, how to widen a clipped tail, and the full account when the severity cannot be reproduced on the grid at all (:ref:`bs feasibility`).
 
 .. ipython:: python
     :okwarning:

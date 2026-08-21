@@ -285,6 +285,81 @@ def _bs_grid_top(used) -> float:
     return float(used['x_min']) + (1 << int(used['log2'])) * float(used['bs'])
 
 
+#: Slack, in log2 units, allowed before a feasibility shortfall is reported.
+#: Half an exponent: ``log2_required`` is a continuous number and the grid is
+#: a power of two, so a shortfall inside half a step is a rounding artifact
+#: rather than a finding.
+FEASIBILITY_SLACK = 0.5
+
+
+def grid_is_infeasible(feasibility) -> bool:
+    """Whether the severity needs a bigger grid than any bucket size can give it.
+
+    Parameters
+    ----------
+    feasibility : dict or None
+        A :func:`severity_feasibility` reading.
+
+    Returns
+    -------
+    bool
+        ``False`` when there is no reading, which is the honest answer: not
+        knowing is not the same as knowing it is fine, and a flag raised on
+        ignorance is worse than no flag.
+
+    Notes
+    -----
+    The comparison is ``log2_required`` against the realized ``log2``, not
+    against ``bs``. A grid whose ``bs`` is coarser than ``bs_max`` is losing
+    mean at the bottom, which is a **coarse** grid; a grid whose ``log2`` is
+    under ``log2_required`` cannot resolve the body and reach the top at the
+    same time at any ``bs``, which is an **impossible** one. Only the second
+    is what this reports.
+    """
+    if feasibility is None:
+        return False
+    return bool(feasibility['log2_required']
+                > feasibility['log2'] + FEASIBILITY_SLACK)
+
+
+def feasibility_describe(feasibility) -> str:
+    """One clause naming the shortfall, or ``''`` when there is none."""
+    if not grid_is_infeasible(feasibility):
+        return ''
+    return (f'; severity needs log2 {feasibility["log2_required"]:.0f} '
+            f'at bs {_fmt_bs(feasibility["bs_max"])} and no bs works at '
+            f'log2 {feasibility["log2"]}')
+
+
+def feasibility_explain(feasibility) -> str:
+    """The full account of a grid that cannot reproduce the severity's mean.
+
+    Returns ``''`` when the grid is feasible or there is no reading. Written
+    to be read by someone meeting the problem for the first time: bucket
+    selection is one of the largest hurdles an FFT method puts in front of a
+    user, and this is the moment to be educational rather than terse.
+    """
+    if not grid_is_infeasible(feasibility):
+        return ''
+    lost = feasibility['lost_at_zero']
+    lost_txt = (f'{100 * lost:.4g}% of the mean is supplied below the first '
+                f'half bucket, and the round scheme places it at exactly 0'
+                if np.isfinite(lost) else
+                'the first half bucket takes a material share of the mean')
+    return (
+        f'This severity cannot be reproduced on this grid at any bucket size. '
+        f'Its body needs bs at or under {_fmt_bs(feasibility["bs_max"])} '
+        f'({lost_txt}), while its mean is not complete until the grid reaches '
+        f'{fmt_amount(feasibility["reach"])}, so holding both at once needs '
+        f'log2 {feasibility["log2_required"]:.0f} and log2 '
+        f'{feasibility["log2"]} was used. The two demands are the whole of it: '
+        f'the mean of a thick law is furnished far above its median, so the '
+        f'resolution the body wants and the reach the tail wants pull apart '
+        f'faster than a grid can span. A finer bs does not help, because it '
+        f'shortens the reach; the fix is an occurrence limit on the severity, '
+        f'or accepting the reported moment errors.')
+
+
 def bs_describe(agg, *, color: bool = False) -> str:
     """One-line summary of an aggregate's chosen bucket grid (``[bs-reporting]``).
 
@@ -318,6 +393,11 @@ def bs_describe(agg, *, color: bool = False) -> str:
         if color:
             msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
         text += msg
+    feas = feasibility_describe(getattr(agg, '_bs_feasibility', None))
+    if feas:
+        if color:
+            feas = f'{_tail._ANSI_THICK}{feas}{_tail._ANSI_RESET}'
+        text += feas
     return text
 
 
@@ -427,6 +507,11 @@ def bs_explain(agg, *, color: bool = False) -> str:
         if color:
             msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
         parts.append(msg)
+    feas = feasibility_explain(getattr(agg, '_bs_feasibility', None))
+    if feas:
+        if color:
+            feas = f'{_tail._ANSI_THICK}{feas}{_tail._ANSI_RESET}'
+        parts.append(feas)
     return ' '.join(parts)
 
 
@@ -477,6 +562,100 @@ def _need_log2(span, bs):
     if not np.isfinite(ratio):
         return np.inf
     return int(np.ceil(np.log2(max(ratio, 1.0))))
+
+
+def severity_feasibility(agg, bs, log2, grid_top):
+    """Whether the chosen grid can reproduce the severity's mean at all.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        Reads ``sevs`` and ``validation_eps``.
+    bs, log2 : float, int
+        The chosen grid.
+    grid_top : float
+        The realized grid top, ``x_min + 2**log2 * bs``.
+
+    Returns
+    -------
+    dict or None
+        ``None`` when no component can be read (see
+        :func:`aggregate._severity.feasible_bucket`). Otherwise the binding
+        component's reading:
+
+        ``bs_max``
+            Largest bucket size whose bottom bucket does not swallow more than
+            ``eps/2`` of the mean.
+        ``reach``
+            How far the grid must extend to keep the same share at the top.
+        ``log2_required``
+            ``log2(reach / bs_max)``, the smallest exponent at which a grid
+            fine enough for the body still reaches the top. This is the
+            severity's own requirement and depends on nothing else: for an
+            unlimited lognormal it is the closed form ``11.23 sigma - 1``.
+        ``grid_top``
+            The realized grid top, carried so the reading can say what the
+            grid actually reaches when it reports what is needed.
+        ``lost_at_zero``
+            Share of the mean supplied below ``bs/2``, which the ``round``
+            scheme places at exactly zero. This is the number that makes the
+            situation legible.
+        ``bs``, ``log2``, ``eps``
+            The grid the reading is against, and the target it is measured to.
+
+    Notes
+    -----
+    Purely derived reporting: it chooses nothing and changes no grid. The
+    sizer buys reach unconditionally and pays for it with ``bs`` (author
+    ruling 2026-08-21, keeping that decision), so on a thick enough severity
+    the bucket it lands on cannot resolve the body. Saying so out loud is the
+    whole of this reading.
+
+    ``log2_required`` is **not** ``_bs_window_df``'s ``log2_need`` column,
+    which is the exponent a candidate *window* needs at its own ``bs``. This
+    is the exponent the *severity* needs before its mean can be reproduced at
+    all, and no choice of ``bs`` moves it.
+
+    It is measured against the severity's own ``reach`` rather than against
+    the realized ``grid_top``, and the difference is what the reading is for.
+    ``grid_top`` is whatever the sizer bought to cover the **aggregate** tail,
+    so dividing by it answers "how big a grid would keep everything I have and
+    resolve the body too", which moves whenever the frequency does. Dividing
+    by ``reach`` answers "is there any grid at all", which is a property of
+    the severity alone and is the question a feasibility reading is asking.
+    ``N.US.Hurricane`` is the case that separates them: sigma 2.581, thicker
+    than the cat model, but limited at 1e12, so ``log2_required`` is 15.7 and
+    a 16 grid can hold it. Its chosen ``bs`` is still ten times coarser than
+    ``bs_max``, which is why its mean is off by 0.089%, and that is a coarse
+    grid rather than an impossible one. The plan drafted this as
+    ``log2(grid_top / bs_max)``; its own table, its message text and its tests
+    all say ``reach``, and the ``N.US.Hurricane`` control settles it.
+
+    For a mixture the binding component is the one with the smallest
+    ``bs_max``: the shared grid has to serve all of them.
+    """
+    from ._severity import feasible_bucket, size_biased_cdf
+
+    sevs = getattr(agg, 'sevs', None)
+    if sevs is None or len(sevs) == 0 or not np.isfinite(grid_top):
+        return None
+    eps = float(getattr(agg, 'validation_eps', 0.0) or 0.0)
+    best = None
+    for s in sevs:
+        read = feasible_bucket(s, eps)
+        if read is None:
+            continue
+        if best is None or read[0] < best[1][0]:
+            best = (s, read)
+    if best is None:
+        return None
+    sev, (bs_max, reach) = best
+    lost = size_biased_cdf(sev, 0.5 * float(bs))
+    return dict(bs_max=float(bs_max), reach=float(reach),
+                log2_required=float(np.log2(reach / bs_max)),
+                grid_top=float(grid_top),
+                lost_at_zero=(float(lost) if np.isfinite(lost) else np.nan),
+                bs=float(bs), log2=int(log2), eps=eps)
 
 
 def snap_bs_to_reference(agg, b0, pinned):
@@ -1170,6 +1349,14 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         W=float(grid_x_max - sel_x0), bs=sel_bs, log2=sel_l2,
         coverage=rows[selected]['coverage'],
         note=f'realized grid ({selected})', selected=False)
+
+    # ---- severity feasibility reading -------------------------------
+    # Derived reporting, like the journey columns below: it chooses nothing.
+    # Whether the grid just landed on can reproduce the severity's mean at
+    # any bucket size, which for a thick enough law it cannot. Read out
+    # through ``bs_description`` / ``bs_explanation``. See
+    # ``severity_feasibility`` and ``dev/done/plan-validation-punchup.md``.
+    agg._bs_feasibility = severity_feasibility(agg, sel_bs, sel_l2, grid_x_max)
 
     # ---- journey columns (bs-reporting item 1) ----------------------
     # Purely derived reporting -- no effect on the grid. ``log2_need`` is the

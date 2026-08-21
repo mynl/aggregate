@@ -287,6 +287,195 @@ def _moms_analytic(fz, limit, attachment, n, analytic=True):
     return ans
 
 
+#: Severity kinds whose partial expected values :func:`_partial_e` computes in
+#: closed form, and so the kinds :func:`feasible_bucket` can read. Everything
+#: else reports nothing rather than guessing; see that function's Notes.
+_FEASIBILITY_KINDS = ('lognorm', 'gamma', 'pareto', 'expon')
+
+
+def _layered_lev(severity, t):
+    """``E[min(Y, t)]`` for the layered severity ``Y = min(limit, (X - a)+)``.
+
+    Parameters
+    ----------
+    severity : Severity
+        Reads ``fz``, ``attachment`` and ``limit``.
+    t : float
+        Layer-space point, measured up from the attachment.
+
+    Returns
+    -------
+    float
+
+    Notes
+    -----
+    :func:`_moms_analytic` already computes exactly this, as the first moment
+    of the layer ``min(t, (X - a)+)``; index 1 of its answer is the first
+    moment (index 0 is the zeroth). The conditional adjustment is deliberately
+    NOT applied: every caller here uses this inside a ratio, where a common
+    ``pattach`` divisor cancels.
+    """
+    return float(_moms_analytic(severity.fz, min(t, severity.limit),
+                                severity.attachment, 1)[1])
+
+
+def size_biased_cdf(severity, t):
+    r"""``P_1(Y <= t)`` for the layered severity, the size biased distribution.
+
+    Parameters
+    ----------
+    severity : Severity
+        The component whose size biased law is wanted.
+    t : float
+        Layer-space point, measured up from the attachment.
+
+    Returns
+    -------
+    float
+        A probability in ``[0, 1]``, or ``nan`` when the severity has no
+        finite positive mean to bias by.
+
+    Notes
+    -----
+    The size biased law weights by the loss amount, :math:`dP_1/dP = y/E[Y]`,
+    which is the right lens for a question about the **mean**: what the
+    discretization loses at the bottom is not the probability below half a
+    bucket but the *mean* supplied there. Its cdf is
+
+    .. math::
+
+        F_1(t) = \frac{1}{E[Y]}\int_0^t y\,dF(y)
+               = \frac{\mathrm{LEV}(t) - t\,S(t)}{E[Y]},
+
+    because ``LEV(t) = E[min(Y, t)]`` is the same integral plus the censored
+    block ``t S(t)``. Both pieces are already available exactly, so no new
+    quadrature is introduced.
+
+    A finite layer limit puts an atom at the top of the layer, and this
+    returns 1 at and above it: everything at or beyond the limit is the limit.
+    """
+    ey = _layered_lev(severity, severity.limit)
+    if not (np.isfinite(ey) and ey > 0):
+        return np.nan
+    if t >= severity.limit:
+        return 1.0
+    if t <= 0:
+        return 0.0
+    sf = float(np.asarray(
+        severity.fz.sf(severity.attachment + t)).reshape(-1)[0])
+    return float(np.clip((_layered_lev(severity, t) - t * sf) / ey, 0.0, 1.0))
+
+
+def _size_biased_quantile(severity, p, lo, hi):
+    """``F_1^{-1}(p)``, found by bisection in log space over ``[lo, hi]``.
+
+    Bisection rather than a derivative method because ``F_1`` is monotone but
+    its derivative spans many decades on a thick law, and log space because
+    the two quantiles wanted here can be twenty orders of magnitude apart.
+    """
+    f_lo, f_hi = size_biased_cdf(severity, lo), size_biased_cdf(severity, hi)
+    if not (np.isfinite(f_lo) and np.isfinite(f_hi)):
+        return np.nan
+    if f_lo >= p:
+        return lo
+    if f_hi <= p:
+        return hi
+    u_lo, u_hi = np.log(lo), np.log(hi)
+    for _ in range(200):
+        u_mid = 0.5 * (u_lo + u_hi)
+        if size_biased_cdf(severity, np.exp(u_mid)) < p:
+            u_lo = u_mid
+        else:
+            u_hi = u_mid
+        if u_hi - u_lo < 1e-9:
+            break
+    return float(np.exp(0.5 * (u_lo + u_hi)))
+
+
+def feasible_bucket(severity, delta):
+    r"""The coarsest grid that can reproduce this severity's mean.
+
+    Parameters
+    ----------
+    severity : Severity
+        One severity component.
+    delta : float
+        Target relative accuracy on the discretized mean, normally the
+        object's ``validation_eps``.
+
+    Returns
+    -------
+    (bs_max, reach) : tuple of float, or None
+        ``bs_max`` is the largest bucket size whose bottom bucket does not
+        take more than ``delta/2`` of the mean, and ``reach`` is how far the
+        grid must extend to keep the same share at the top. ``None`` when the
+        reading is not available for this severity.
+
+    Notes
+    -----
+    Under the ``round`` discretization scheme bucket zero collects everything
+    below ``bs/2`` and places it at exactly zero, so the mean supplied there
+    is lost outright; above the grid top the mean is lost to truncation. In
+    size biased terms those are the only two first order losses, so a mean
+    accurate to relative ``delta`` needs ``bs/2`` below the ``delta/2``
+    quantile of :math:`P_1` and the grid top above its ``1 - delta/2``
+    quantile. That is the whole content of the reading: the mean wants
+    resolution at the bottom and reach at the top, and a thick enough law
+    puts those two demands further apart than any grid can span.
+
+    For an unlimited lognormal the requirement collapses to a closed form in
+    which the mean cancels and only ``sigma`` survives, because :math:`P_1` is
+    :math:`LN(\mu + \sigma^2, \sigma)` and the quantile ratio is
+    :math:`e^{2z\sigma}`:
+
+    .. math::
+
+        \log_2 n \ge \frac{2 z \sigma}{\log 2} - 1 \approx 11.23\,\sigma - 1
+        \qquad (\delta = 10^{-4})
+
+    so an unlimited lognormal with ``sigma`` above about 1.5, a CV around 3,
+    cannot be reproduced at ``log2 = 16`` at any bucket size. A **limit**
+    fixes it, and a finer grid does not. The connection to Mandelbrot's
+    moment localization argument, which explains why this is a property of
+    the lognormal rather than an accident of this grid, is written up in the
+    monograph, "Localization and the choice of bucket size".
+
+    Returns ``None`` rather than guessing for a severity this cannot read
+    exactly: a discrete or histogram kind (which is exact on its own lattice,
+    so the question does not arise), a signed or reflected law (whose ``fz``
+    is patched, and whose closed forms would answer for the unreflected
+    base), and any continuous kind outside :data:`_FEASIBILITY_KINDS`, the
+    four :func:`_partial_e` handles in closed form. The alternative was
+    quadrature inside a bisection at sizing time, which is both slow and
+    fragile on exactly the heavy tails the reading is for.
+    """
+    if getattr(severity, 'sev_kind', '') != 'scipy':
+        return None
+    if severity.signed or severity.sev_reflect:
+        return None
+    if not (isinstance(severity.sev_name, str)
+            and severity.sev_name in _FEASIBILITY_KINDS):
+        return None
+    if not (np.isfinite(delta) and 0 < delta < 1):
+        return None
+    try:
+        ey = _layered_lev(severity, severity.limit)
+        if not (np.isfinite(ey) and ey > 0):
+            return None
+        # Bracket in layer space. The top is the layer limit when there is
+        # one, else a mean multiple wide enough to hold any tail this reading
+        # is about; the bottom is far under any bucket size in use.
+        hi = severity.limit if np.isfinite(severity.limit) else ey * 1e12
+        lo = ey * 1e-15
+        q_lo = _size_biased_quantile(severity, delta / 2, lo, hi)
+        q_hi = _size_biased_quantile(severity, 1 - delta / 2, lo, hi)
+    except (NotImplementedError, ValueError, FloatingPointError):
+        return None
+    if not (np.isfinite(q_lo) and np.isfinite(q_hi) and q_lo > 0):
+        return None
+    return 2.0 * q_lo, float(q_hi)
+
+
 def validate_discrete_distribution(xs, ps, allow_negative=False):
     """
     Make sure that outcomes are distinct and sorted in ascending order, and

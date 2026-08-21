@@ -249,12 +249,12 @@ Panel by panel
      - Readings offered
    * - ``agg`` / density
      - ``outcome``, Loss, currency, linear or log, window ``q(0.001) or 0 .. q(0.999)`` padded 2%, full is the whole grid
-     - ``mass``, Probability mass, density, linear or log, ``(0, peak)``, no zoom-out
+     - ``mass``, Probability mass, density, linear or log, ``(0, peak)``, full is the tallest drawn mass so a clipped severity companion is one press away
      - Aggregate and Severity, role ``density``, atomic
      - mean, full weight
-     - log x, log y, full x
+     - log x, log y, full x, full y
    * - ``agg`` / lee
-     - ``p``, Non-exceeding probability, ``(0, 1)``, paired with ``return_period`` (log, ``1 .. 1e9``) and with ``survival``, Exceeding probability, linear or log, ``(0, 1)``
+     - ``p``, Non-exceeding probability, ``(0, 1)``, paired with ``return_period`` (linear or log, ladder ``1 .. 1e4``, full ``1 .. 1e9``) and with ``survival``, Exceeding probability, linear or log, ``(0, 1)``
      - ``outcome``, shared with the density panel
      - Aggregate and Severity, role ``cdf``
      - none
@@ -296,11 +296,11 @@ Panel by panel
      - none
      - log y, full y, reflect, return period, invert
    * - ``reins`` / occurrence
-     - ``claim``, Loss per claim, currency, **linear only**, window is the occurrence limit padded 2%, full is the grid
-     - ``sev_density``, Occurrence density, **log only**, no window
+     - ``claim``, Loss per claim, currency, linear or log, window is the occurrence limit padded 2%, full is the grid; an unlimited program has no limit to crop to and suggests the grid itself
+     - ``sev_density``, Occurrence density, log by default and readable linear, no window
      - Gross, Ceded, Net, roles ``gross``, ``ceded``, ``net``, net drawn last
      - none
-     - full x only
+     - log x, log y, full x
    * - ``reins`` / aggregate
      - ``p``, paired with ``return_period`` and ``survival``
      - ``annual``, Aggregate loss, currency, linear or log, window from the gross curve, full
@@ -347,7 +347,7 @@ More details
 Two panels, one axis, except once.
     On ``agg``, ``pnl`` and ``severity`` the outcome axis is a single :class:`~aggregate.charts.ir.ChartAxis` referenced as the density panel's x and the Lee panel's y, so a window set on it moves both. On ``port`` both panels take it as x. ``reins`` is the deliberate exception: its two panels share nothing, because a per-claim loss and an annual aggregate are different quantities and one window across both would claim they were the same.
 Three floors, all measured rather than chosen.
-    ``LOG_FLOOR = 1e-15`` turns float dust into ``None`` gaps that a renderer must break the line at, never bridge. ``SURVIVAL_FLOOR = 1e-9`` is the deepest survival worth a panel, and is what puts the return-period axis top at 1e9. ``KAPPA_FLOOR = 1e-14`` on the portfolio kappa panel is a decade above the dust floor because kappa divides by ``p_total``, and the residual of the sum-to-diagonal identity is what measured the cliff.
+    ``LOG_FLOOR = 1e-15`` turns float dust into ``None`` gaps that a renderer must break the line at, never bridge. ``SURVIVAL_FLOOR = 1e-9`` is the deepest survival worth a panel, and is what puts the return-period axis' full extent at 1e9; ``RETURN_PERIOD_TOP = 1e4`` is the ladder that axis suggests, so the deep tail is a press away rather than the opening view. ``KAPPA_FLOOR = 1e-14`` on the portfolio kappa panel is a decade above the dust floor because kappa divides by ``p_total``, and the residual of the sum-to-diagonal identity is what measured the cliff.
 Support is a fact about the law.
     ``support='atomic'`` says the points carry the whole distribution and there is nothing between them, which in this library is the normal case, because a discretized aggregate **is** the distribution rather than an approximation to some continuous ideal. ``'continuous'`` says the points sample a function that exists everywhere between them, which is a distortion, a kappa curve, and a severity that has a density.
 Three panels became two, twice.

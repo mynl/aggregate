@@ -41,7 +41,8 @@ from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
                          REINS_LABEL_NET)
 from . import register_chart, _emitter_base
 from ._payload import collapse_empty_runs, lattice_payload
-from ._two_panel import SURVIVAL_FLOOR, loss_window, quantile_curve
+from ._two_panel import (RETURN_PERIOD_TOP, SURVIVAL_FLOOR, loss_window,
+                         quantile_curve)
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_reins']
@@ -96,10 +97,12 @@ def _reins(agg):
     -------
     ChartDoc
         Two 'xy' panels with **no shared axis**: 'occurrence' (the gross,
-        ceded and net severity per claim, read on log) and 'aggregate' (the
-        same three for the year, as a Lee diagram). The aggregate panel
-        carries every reading: log on both axes, the paired return period,
-        and the inversion to the distribution function.
+        ceded and net severity per claim, drawn on log) and 'aggregate'
+        (the same three for the year, as a Lee diagram). Both panels offer
+        log on either axis and the zoom out to their full extent; the
+        aggregate panel adds the paired return period, the reflection to
+        the survival function, and the inversion to the distribution
+        function.
     """
     df = agg.reins_density_df
     x = df['loss'].to_numpy(dtype=float)
@@ -128,20 +131,31 @@ def _reins(agg):
                              bs=agg.bs, name=NAMES[0])
     annual = loss_window(gross.q, float(x[0]))
     claim = _claim_window(agg)
+    claim_extent = (min(0.0, float(x[0])), float(x[-1]))
 
     return complete_tex(ChartDoc(
         name='reins',
         title=f'{agg.label}: occurrence program, per claim and in total',
         axes=(
+            # An unlimited program has no occurrence limit to crop to, so
+            # _claim_window declines and the extent stands in as the
+            # suggestion: full_range requires a window, and without one
+            # the panel would lose the zoom out and the log reading too,
+            # though its extent is knowable either way. The button is then
+            # present and changes nothing, which is the honest reading of
+            # a program with no crop to undo.
             ChartAxis(id='claim', label='Loss per claim', unit='currency',
-                      suggested_range=claim,
-                      full_range=None if claim is None
-                      else (min(0.0, float(x[0])), float(x[-1]))),
-            # Log only. A layered severity is a spike and a tail, and the
-            # linear reading of it is a spike and nothing else, so there is
-            # no second reading to offer.
+                      scales=('linear', 'log'),
+                      suggested_range=claim or claim_extent,
+                      full_range=claim_extent),
+            # Log by default: the linear reading of a layered severity is
+            # usually a spike and nothing else. It is still a reading, and
+            # the reader can see for themselves that it is a spike, so
+            # declaring one scale would remove the control rather than the
+            # temptation.
             ChartAxis(id='sev_density', label='Occurrence density',
-                      unit='density', scale='log'),
+                      unit='density', scale='log',
+                      scales=('linear', 'log')),
             ChartAxis(id='p', label='Non-exceeding probability',
                       unit='probability', suggested_range=(0.0, 1.0)),
             # Named by no panel: the reflected reading of 'p', the survival
@@ -152,11 +166,16 @@ def _reins(agg):
             ChartAxis(id='annual', label='Aggregate loss', unit='currency',
                       scales=('linear', 'log'), suggested_range=annual,
                       full_range=(min(0.0, float(x[0])), max(tops))),
-            # Not named by any panel: the alternative reading of 'p'.
+            # Not named by any panel: the alternative reading of 'p',
+            # declared exactly as the aggregate and severity emitters
+            # declare it. Linear on the ladder to RETURN_PERIOD_TOP, log
+            # and the deep tail each one press away.
             ChartAxis(id='return_period', label='Return period',
-                      unit='return_period', scale='log', reciprocal_of='p',
-                      suggested_range=(1.0,
-                                       float(round(1.0 / SURVIVAL_FLOOR)))),
+                      unit='return_period', scales=('linear', 'log'),
+                      reciprocal_of='p',
+                      suggested_range=(1.0, RETURN_PERIOD_TOP),
+                      full_range=(1.0,
+                                  float(round(1.0 / SURVIVAL_FLOOR)))),
         ),
         panels=(
             Panel(id='occurrence', kind='xy', x_axis='claim',

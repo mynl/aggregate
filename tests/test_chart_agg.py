@@ -22,6 +22,9 @@ from aggregate.charts import (  # noqa: E402
     primary_chart,
 )
 from aggregate.charts._emit_aggregate import COMPANION_HEADROOM  # noqa: E402
+from aggregate.charts._two_panel import (  # noqa: E402
+    RETURN_PERIOD_TOP, SURVIVAL_FLOOR,
+)
 
 _CONT = 'agg CA.Cont 100 claims sev lognorm 50 cv 2 poisson'
 _DICE = 'agg CA.Dice dfreq [3] dsev [1:6]'
@@ -91,6 +94,13 @@ def test_the_probability_axis_offers_the_return_period(cont):
     doc = chart_agg(cont)
     ax = axes_of(doc)
     assert ax['return_period'].reciprocal_of == 'p'
+    # an ordinary axis: linear on the ladder, log and the deep tail each
+    # a press away, rather than a log axis over nine decades by decree
+    assert ax['return_period'].scale == 'linear'
+    assert ax['return_period'].scales == ('linear', 'log')
+    assert ax['return_period'].suggested_range == (1.0, RETURN_PERIOD_TOP)
+    assert ax['return_period'].full_range == (1.0,
+                                              round(1.0 / SURVIVAL_FLOOR))
     # a loss is interrogated from its upper tail: T = 1 / (1 - p)
     assert doc.meta['return_period_map'] == 'complement'
     # and the paired axis is not drawn, which ChartDoc itself enforces
@@ -116,9 +126,29 @@ def test_the_outcome_axis_offers_the_whole_grid(cont):
     assert ax.full_range[1] > ax.suggested_range[1]
 
 
-def test_the_ordinate_offers_nothing_else(cont):
-    """(0, the peak) is already the whole extent, so no zoom-out button."""
-    assert axes_of(chart_agg(cont))['mass'].full_range is None
+def test_the_ordinate_offers_the_companion_s_head(cont):
+    """The crop to the aggregate's own peak is a reading to undo.
+
+    ``ordinate_top`` clips a severity companion overtopping the aggregate
+    by more than :data:`COMPANION_HEADROOM`, so on a book where that
+    happens the mass axis' full extent is the taller of the two and the
+    zoom out is what puts the severity block's head back.
+    """
+    ax = axes_of(chart_agg(cont))['mass']
+    assert ax.suggested_range[0] == ax.full_range[0] == 0.0
+    assert ax.full_range[1] == pytest.approx(
+        float(cont.sev_density_df.p_sev.max()))
+    assert ax.full_range[1] > ax.suggested_range[1]
+
+
+def test_the_ordinate_button_is_idle_where_nothing_was_clipped(dice):
+    """Present and doing nothing, which is the honest reading.
+
+    A control that is missing cannot say "there is no crop to undo"; one
+    that is present and changes nothing can.
+    """
+    ax = axes_of(chart_agg(dice))['mass']
+    assert ax.full_range == ax.suggested_range
 
 
 # --------------------------------------------------------------- semantics
@@ -233,8 +263,11 @@ def test_the_readings_render(cont):
                       drawn(doc, return_period=True))
     assert plain.axes[0].get_xscale() == 'linear'
     assert log.axes[0].get_xscale() == log.axes[0].get_yscale() == 'log'
+    # the ladder is drawn linearly and the log reading is a press away
+    assert rp.axes[1].get_xscale() == 'linear'
+    assert drawn(doc, return_period=True, log=True).axes[1].get_xscale() \
+        == 'log'
     # the paired reading re-slices the panel, so the outcome axis follows
     # the data out to the deep tail rather than holding the p window
-    assert rp.axes[1].get_xscale() == 'log'
     assert rp.axes[1].get_ylim()[1] > plain.axes[1].get_ylim()[1]
     plt.close('all')

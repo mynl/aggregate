@@ -28,7 +28,8 @@ Pure numpy and pandas; no matplotlib.
 from .._aggregate import Aggregate
 from . import register_chart, _emitter_base
 from ._payload import collapse_empty_runs, lattice_payload
-from ._two_panel import SURVIVAL_FLOOR, loss_window, quantile_curve
+from ._two_panel import (RETURN_PERIOD_TOP, SURVIVAL_FLOOR, loss_window,
+                         quantile_curve)
 from .ir import ChartAxis, ChartDoc, ChartSeries, Mark, Panel, complete_tex
 
 __all__ = ['chart_agg']
@@ -73,7 +74,11 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
     window, full_range : tuple of float
         The outcome axis' suggested and full extents.
     ordinate_top : float
-        Upper end of the mass axis.
+        Upper end of the mass axis as suggested, which is the caller's
+        decision about whether to crop a companion that overtops the
+        subject (see :data:`COMPANION_HEADROOM`). The axis' full extent is
+        the tallest mass in ``subject`` and ``companion`` and is read off
+        them here, so the two numbers cannot drift apart.
     marks : iterable of Mark
     outcome_label : str
         What the outcome axis is called ('Loss', 'P&L').
@@ -99,12 +104,18 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
     ChartDoc
     """
     series = []
+    # The tallest mass actually drawn, which is the ordinate's honest
+    # extent. It is read here rather than taken as an argument because it
+    # is one rule over whatever series arrive, and the caller's
+    # ``ordinate_top`` is the separate question of whether to crop.
+    mass_extent = 0.0
     for label, x, mass in filter(None, (subject, companion)):
         drawn_x, drawn_mass = collapse_empty_runs(x, mass)
+        drawn_y = tuple(float(v) for v in drawn_mass)
+        mass_extent = max(mass_extent, max(drawn_y, default=0.0))
         series.append(ChartSeries(
             name=label, role='density', panel_id='density',
-            y=tuple(float(v) for v in drawn_mass),
-            **lattice_payload(drawn_x, step)))
+            y=drawn_y, **lattice_payload(drawn_x, step)))
     for label, x, mass in filter(None, (subject, companion)):
         p, outcome = quantile_curve(x, mass)
         series.append(ChartSeries(
@@ -118,11 +129,19 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
             ChartAxis(id='outcome', label=outcome_label, unit='currency',
                       scales=outcome_scales, suggested_range=window,
                       full_range=full_range),
-            # No full_range on the ordinate: (0, the peak) already IS the
-            # whole extent, and a zoom-out button on it would do nothing.
+            # The ordinate does declare its full extent, because the
+            # suggestion is not always the whole of it: a severity
+            # companion overtopping the aggregate by more than
+            # COMPANION_HEADROOM is clipped by ``ordinate_top``, and the
+            # zoom out is what puts its head back. Where nothing was
+            # clipped the two windows coincide and the control is present
+            # and idle, which says "there is no crop to undo" more clearly
+            # than a control that is missing.
             ChartAxis(id='mass', label='Probability mass', unit='density',
                       scales=('linear', 'log'),
-                      suggested_range=(0.0, float(ordinate_top))),
+                      suggested_range=(0.0, float(ordinate_top)),
+                      full_range=(0.0,
+                                  float(max(ordinate_top, mass_extent)))),
             ChartAxis(id='p', label='Non-exceeding probability',
                       unit='probability', suggested_range=(0.0, 1.0)),
             # Named by no panel either: the reflected reading of 'p'. The
@@ -132,14 +151,21 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
             ChartAxis(id='survival', label='Exceeding probability',
                       unit='probability', scales=('linear', 'log'),
                       complement_of='p', suggested_range=(0.0, 1.0)),
-            # Not named by any panel: the alternative reading of 'p'. Its
-            # window runs from the certain event to the deepest survival
-            # worth a panel, past which the curve is a line of float dust.
+            # Not named by any panel: the alternative reading of 'p'. It
+            # is an ordinary axis and declares itself as one: drawn on the
+            # ladder to RETURN_PERIOD_TOP, opening to the certain event
+            # against the deepest survival worth a panel, and readable on
+            # log either way. The default is linear because the log
+            # default was the axis deciding for the reader; the deep tail
+            # is one press away because past SURVIVAL_FLOOR the curve is a
+            # line of float dust, which is worth a button and is not worth
+            # the opening view.
             ChartAxis(id='return_period', label='Return period',
-                      unit='return_period', scale='log',
+                      unit='return_period', scales=('linear', 'log'),
                       reciprocal_of='p',
-                      suggested_range=(1.0,
-                                       float(round(1.0 / SURVIVAL_FLOOR)))),
+                      suggested_range=(1.0, RETURN_PERIOD_TOP),
+                      full_range=(1.0,
+                                  float(round(1.0 / SURVIVAL_FLOOR)))),
         ),
         panels=(
             Panel(id='density', kind='xy', x_axis='outcome', y_axis='mass',

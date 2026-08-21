@@ -15,12 +15,23 @@ import numpy as np
 
 from ..constants import LOG_FLOOR
 
-__all__ = ['SURVIVAL_FLOOR', 'WINDOW_PAD', 'gapped', 'loss_window',
-           'pad_window', 'quantile_curve', 'survival_window']
+__all__ = ['RETURN_PERIOD_TOP', 'SURVIVAL_FLOOR', 'WINDOW_PAD', 'gapped',
+           'loss_window', 'pad_window', 'quantile_curve', 'survival_window']
 
 #: The deepest survival worth a panel, one over the longest return period
 #: anyone reads off a picture. Past it the curve is a line of float dust.
 SURVIVAL_FLOOR = 1e-9
+
+#: Top of the return-period ladder an emitter suggests, against the whole
+#: extent of ``1 / SURVIVAL_FLOOR`` it declares as the alternative. The
+#: axis follows the button: left alone it reads 1 to 10,000, and the zoom
+#: out opens the deep tail. Nine decades is not a default reading, since
+#: read linearly it pins the curve to the left edge and read on log it is
+#: mostly the float dust past the floor; 1-in-10,000 clears the 1-in-100
+#: and 1-in-200 anchors a panel marks by two decades. Distinct from the
+#: renderer's :data:`aggregate.plots._chartdoc.MAX_RETURN_PERIOD`, which
+#: is the backstop for a document declaring no window at all.
+RETURN_PERIOD_TOP = 10000.0
 
 #: Fraction of the window added either side by the emitter, so a curve is
 #: not drawn hard against the end of its own data.

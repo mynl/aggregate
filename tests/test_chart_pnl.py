@@ -123,8 +123,10 @@ def test_the_readings_render(pnl):
     plain, rp = pnl.plot(), pnl.plot(return_period=True)
     assert len(plain.axes) == 2
     density, lee = rp.axes
-    assert lee.get_xscale() == 'log'
+    assert lee.get_xscale() == 'linear'                # the ladder, plainly
     assert density.get_xscale() == 'linear'            # signed, so untouched
+    assert pnl.plot(return_period=True,
+                    log=True).axes[1].get_xscale() == 'log'
     plt.close('all')
 
 

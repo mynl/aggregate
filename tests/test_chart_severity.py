@@ -27,6 +27,9 @@ from aggregate.charts import (  # noqa: E402
     primary_chart,
 )
 from aggregate.charts._emit_severity import GRID_POINTS  # noqa: E402
+from aggregate.charts._two_panel import (  # noqa: E402
+    RETURN_PERIOD_TOP, SURVIVAL_FLOOR,
+)
 
 _LN = 'sev CH.SevLN lognorm 100 cv 2'
 _BOUNDED = 'sev CH.SevB 500 * beta 2 3'
@@ -85,8 +88,15 @@ def test_the_lee_panel_inverts_to_the_distribution_function(sev):
 
 def test_the_probability_axis_offers_the_return_period(sev):
     doc = chart_severity(sev)
-    assert axes_of(doc)['return_period'].reciprocal_of == 'p'
+    ax = axes_of(doc)['return_period']
+    assert ax.reciprocal_of == 'p'
     assert doc.meta['return_period_map'] == 'complement'   # a severity is a loss
+    # declared exactly as the aggregate and reinsurance emitters declare
+    # it: one reading, three documents, no document reading differently
+    assert ax.scale == 'linear'
+    assert ax.scales == ('linear', 'log')
+    assert ax.suggested_range == (1.0, RETURN_PERIOD_TOP)
+    assert ax.full_range == (1.0, round(1.0 / SURVIVAL_FLOOR))
 
 
 def test_the_probability_axis_offers_its_reflection(sev):
@@ -177,8 +187,10 @@ def test_the_readings_render(sev):
     assert len(plain.axes) == 2
     assert plain.axes[0].get_xscale() == 'linear'
     assert log.axes[0].get_xscale() == log.axes[0].get_yscale() == 'log'
-    assert rp.axes[1].get_xscale() == 'log'
+    assert rp.axes[1].get_xscale() == 'linear'   # the ladder, read plainly
     assert rp.axes[1].get_xlabel() == 'Return period'
+    assert sev.plot(return_period=True,
+                    log=True).axes[1].get_xscale() == 'log'
     # continuous: a line, never the atomic ladder's steps
     assert {ln.get_drawstyle() for ln in plain.axes[0].get_lines()} == \
         {'default'}

@@ -41,7 +41,7 @@ import numpy as np
 
 from .._severity import Severity
 from . import register_chart, _emitter_base
-from ._two_panel import SURVIVAL_FLOOR, pad_window
+from ._two_panel import RETURN_PERIOD_TOP, SURVIVAL_FLOOR, pad_window
 from .ir import ChartAxis, ChartDoc, ChartSeries, Panel, complete_tex
 
 __all__ = ['chart_severity']
@@ -152,11 +152,16 @@ def _severity(sev, n=GRID_POINTS):
             ChartAxis(id='survival', label='Exceeding probability',
                       unit='probability', scales=('linear', 'log'),
                       complement_of='p', suggested_range=(0.0, 1.0)),
-            # Not named by any panel: the alternative reading of 'p'.
+            # Not named by any panel: the alternative reading of 'p',
+            # declared exactly as the aggregate and reinsurance emitters
+            # declare it. Linear on the ladder to RETURN_PERIOD_TOP, log
+            # and the deep tail each one press away.
             ChartAxis(id='return_period', label='Return period',
-                      unit='return_period', scale='log', reciprocal_of='p',
-                      suggested_range=(1.0,
-                                       float(round(1.0 / SURVIVAL_FLOOR)))),
+                      unit='return_period', scales=('linear', 'log'),
+                      reciprocal_of='p',
+                      suggested_range=(1.0, RETURN_PERIOD_TOP),
+                      full_range=(1.0,
+                                  float(round(1.0 / SURVIVAL_FLOOR)))),
         ),
         panels=(
             Panel(id='density', kind='xy', x_axis='loss', y_axis='pdf',

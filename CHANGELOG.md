@@ -20,6 +20,24 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a314
+
+**[Chart-2D-Punchups] three axes stop deciding for the reader.** The library half, in full, of the paired plan `dev/done/plan-2d-punchup-requirements.md` (the app half is `aggregate_api/dev/plan-2d-punchups.md`, which is canonical for the whole change and runs after this). Nothing in the wire format moves: no new field, no `CHART_IR_VERSION` bump, no reader change. Three existing `ChartAxis` fields take different values on four declarations, and every `agg`, `pnl`, `sev` and `reins` document hash changes with them.
+
+**The return period becomes an ordinary axis.** It was declared `scale='log'` over `1 .. 1e9`, which is the axis choosing the reading and the window on the reader's behalf: read linearly nine decades pin the curve to the left edge, and read on log most of what they show is the float dust past `SURVIVAL_FLOOR`. It now declares `scales=('linear', 'log')`, a suggested ladder of `1 .. 1e4` and a `full_range` of `1 .. 1e9`, so the axis follows the button. Left alone it draws the ladder; `full_range` opens the deep tail; `log` makes the opened tail readable. The ladder top is the new `charts._two_panel.RETURN_PERIOD_TOP`, and 1-in-10,000 clears the 1-in-100 and 1-in-200 anchors a panel marks by two decades (author ruling 2026-08-21).
+
+**This changes what `.plot(return_period=True)` draws.** The renderer takes an axis' drawn scale from its declaration, so the library's own return-period picture is now linear on the ladder rather than log over nine decades, and `a.plot(return_period=True, log=True, full_range=True)` is what recovers the old one. That is the intended reading and not a side effect: the document declares what is honest and the reader chooses among the declarations. Both readings were always drawable; only the default moved.
+
+**All three emitters that declare the axis moved together** (`_emit_aggregate.outcome_doc`, which serves `agg` and `pnl`, plus `_emit_reins` and `_emit_severity`). The plan named two; the severity emitter carried the same declaration character for character, and leaving it behind would have left one document reading differently from the other three with no way to fix it downstream. Author ruling 2026-08-21.
+
+**The `reins` occurrence panel gets two honest axes.** `sev_density` keeps log as its drawn scale and now declares `scales=('linear', 'log')`: a layered severity read linearly is usually a spike and nothing else, but that is still a reading, the reader can see for themselves that it is a spike, and declaring one scale removed the control rather than the temptation. `claim` gains the log reading and, more to the point, an unconditional full extent. An **unlimited** program has no occurrence limit to crop to, so `_claim_window` declined, and because `full_range` requires a `suggested_range` the panel lost the zoom out and the log reading as well, though its extent was knowable either way. The extent now stands in as the suggestion (author ruling 2026-08-21), so the zoom out is a button that changes nothing, which says "there is no crop to undo" more clearly than a control that is missing. Closes item 12 of `aggregate_api/dev/api-punchlist.md`.
+
+**The mass axis declares its full extent.** `outcome_doc` crops the ordinate to the subject's own peak whenever a severity companion overtops it by more than `COMPANION_HEADROOM`, then declined to publish the extent it had already computed, on the reasoning that `(0, the peak)` is the whole of it. True of the aggregate alone and false exactly when the crop bites, which is when the reader most wants the companion's head back. The extent is now read off the drawn series inside `outcome_doc`, so the suggestion and the extent cannot drift apart. Where nothing was clipped the two windows coincide, on the same "present and idle" reading as the unlimited `claim` axis. This was L3 of the plan, recorded there as open; ruled in on 2026-08-21.
+
+**Downstream.** The API must run `uv sync --extra dev` with its server stopped before any of this is believed, or `importlib.metadata` keeps reporting the old `aggregate` and the moved axes never arrive. It then re-captures `dev/fixtures/charts.json`, since every chart ETag moved.
+
+---
+
 ## 1.0.0a313
 
 **[Validation-Infeasible-Flag] the feasibility reading becomes a validation member and a warning.** Part three, the last, of `dev/done/plan-validation-punchup.md`. a312 computed the reading and reported it through the grid narrative; this puts it where a user meets it, in `valid` and in a warning at build time.

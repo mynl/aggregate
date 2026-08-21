@@ -23,7 +23,9 @@ from aggregate.charts import (  # noqa: E402
     available_charts, canonical_json, chart_reins, human_strings,
     primary_chart,
 )
-from aggregate.charts._emit_reins import AGG_COLUMNS, NAMES  # noqa: E402
+from aggregate.charts._emit_reins import (  # noqa: E402
+    AGG_COLUMNS, NAMES, _claim_window,
+)
 
 _OCC = ('agg CR.Occ 100 claims 1000 xs 0 sev lognorm 50 cv 2 '
         'occurrence net of 100 xs 100 poisson')
@@ -89,13 +91,40 @@ def test_the_left_panel_is_the_claim_and_the_right_the_year(occ):
     # the claim window is the occurrence limit, which bounds the cession
     assert ax['claim'].suggested_range[1] == pytest.approx(1000.0, rel=0.05)
     assert ax['annual'].suggested_range[1] > 1000.0
+    # and the crop off the limit is a real reading to undo
+    assert ax['claim'].scales == ('linear', 'log')
+    assert ax['claim'].full_range[1] > ax['claim'].suggested_range[1]
 
 
-def test_the_occurrence_panel_reads_on_log_and_only_on_log(occ):
-    """A layered severity is a spike and a tail; linear is a spike."""
+def test_an_unlimited_program_suggests_its_own_extent():
+    """No occurrence limit is no window, and no window was no controls.
+
+    ``_claim_window`` declines where the program is unlimited, and
+    ``full_range`` requires a ``suggested_range``, so the panel used to
+    lose the zoom out and the log reading as well, though its extent is
+    knowable either way. The extent now stands in as the suggestion, and
+    the zoom out is a button that changes nothing, which is the honest
+    reading of a program with no crop to undo.
+    """
+    unlimited = build('agg CR.Unl 100 claims sev gamma 100 cv 1 '
+                      'occurrence net of 50 xs 50 poisson')
+    ax = axes_of(chart_reins(unlimited))['claim']
+    assert _claim_window(unlimited) is None
+    assert ax.scales == ('linear', 'log')
+    assert ax.suggested_range is not None
+    assert ax.full_range == ax.suggested_range
+
+
+def test_the_occurrence_panel_reads_on_log_by_default(occ):
+    """A layered severity is a spike and a tail, so log opens it.
+
+    The linear reading is still a reading, and the reader can see for
+    themselves that it is a spike, so both are declared: declaring one
+    removes the control rather than the temptation.
+    """
     ax = axes_of(chart_reins(occ))['sev_density']
     assert ax.scale == 'log'
-    assert ax.scales == ('log',)
+    assert ax.scales == ('linear', 'log')
 
 
 def test_the_aggregate_panel_carries_every_reading(occ):
@@ -149,8 +178,10 @@ def test_the_readings_render(occ):
     assert annual.get_title() == 'Aggregate'
 
     rp = occ.reins_occ_plot(return_period=True)
-    assert rp.axes[1].get_xscale() == 'log'
-    assert rp.axes[0].get_yscale() == 'log'      # untouched, already log
+    assert rp.axes[1].get_xscale() == 'linear'   # the ladder, read plainly
+    assert rp.axes[0].get_yscale() == 'log'      # untouched, drawn on log
+    assert occ.reins_occ_plot(return_period=True,
+                              log=True).axes[1].get_xscale() == 'log'
 
     inverted = occ.reins_occ_plot(invert=True)
     assert inverted.axes[1].get_title() == 'Distribution function'

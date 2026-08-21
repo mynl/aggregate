@@ -220,7 +220,9 @@ agg PnL.SD   dfreq [3] dsev [-1 1]                                              
 agg PnL.Sym  20 claims dsev [-1 1] [.5 .5] poisson                                                           note{symmetric P&L; mean 0};
 agg PnL.Lump 1e6 claims dsev [-1 10] [15/16 1/16] poisson                                                    note{near-Gaussian lump at a negative mean ~ -312500; auto window};
 agg PnL.Norm 100 claims ssev 50 * norm + 10 poisson                                                          note{continuous signed (ssev) P&L severity; never clamps};
-agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                                                    note{premium minus loss: constant - dist reflects the severity (sev mean 20)}
+agg PnL.PmL  5 claims ssev 100 - lognorm 80 cv .2 poisson                                                    note{premium minus loss: constant - dist reflects the severity (sev mean 20)};
+agg PnL.SLay 5 claims 25000 xs 0 ssev 100 - lognorm 80 cv .2 poisson                                         note{layer clause on a signed severity: parses and round-trips, but the build drops it with an IgnoredDecLClauseWarning};
+agg PnL.DLay 1 claim 3 xs 0 dsev [-2 5] [.6 .4] fixed                                                        note{same on a dsev that auto-signs; the dropped clause restores limit to the atom support max 5}
 
 
 # Orient. The payoff/loss orientation suffix on an agg (1.0.0a102)

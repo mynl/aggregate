@@ -18,13 +18,17 @@ The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg``
 """
 from __future__ import annotations
 
+import warnings
+
 import numpy as np
 import pytest
 
 from aggregate import build
 from aggregate.constants import (DefectiveDistributionWarning,
+                                 IgnoredDecLClauseWarning,
                                  ReflectedSeverityClampWarning,
                                  reset_warn_once)
+from aggregate.tail import TailClass
 from aggregate.distributions import (
     estimate_agg_window, validate_discrete_distribution)
 
@@ -703,3 +707,99 @@ def test_ssev_unspliced_moments_stay_closed_form():
     """No splice means no quadrature: the exact ``fz.moment`` path is kept."""
     a = build('agg RSm 1 claims ssev 100 - lognorm 80 cv .2 fixed')
     assert a.sevs[0].sev1 == pytest.approx(20.0, rel=1e-13)
+
+
+# ---------------------------------------------------------------------------
+# [Signed-Layer-Clause-Ignored] a layer clause a signed severity cannot use
+# ---------------------------------------------------------------------------
+# ``_apply_signed`` installs identity layering, so the clamp never runs, but
+# ``__init__`` had already recorded ``limit`` / ``attachment`` /
+# ``detachment``, leaving the layer half applied and the metadata claiming a
+# bound the law does not have. See
+# ``dev/done/plan-signed-bounded-window-overflow.md``.
+
+
+def test_signed_layer_clause_is_dropped_and_warned():
+    """``ssev`` plus a layer clause: the clause goes, and says so."""
+    reset_warn_once()
+    with pytest.warns(IgnoredDecLClauseWarning, match=r'25,000 xs 0'):
+        a = build('agg SLa 5 claims 25000 xs 0 ssev 100 - lognorm 80 cv .2 '
+                  'poisson', update=False)
+    sev = a.sevs[0]
+    assert sev.signed is True
+    assert sev.limit == np.inf
+    assert sev.attachment == 0
+    assert sev.detachment == np.inf
+    assert sev.exp_attachment is None
+    # the point of the reset: the metadata no longer claims a bound.
+    assert sev.bounded is False
+    assert sev.tail_class is not TailClass.BOUNDED
+    # and the law is the unlayered signed one (E[100 - X] = 20).
+    assert sev.moms()[0] == pytest.approx(20.0, rel=1e-9)
+
+
+def test_signed_layer_clause_warning_names_the_alternatives():
+    """The message says what to do instead: drop the layer, or use ``sev``."""
+    reset_warn_once()
+    with pytest.warns(IgnoredDecLClauseWarning) as rec:
+        build('agg SLb 5 claims 25000 xs 0 ssev 100 - lognorm 80 cv .2 poisson',
+              update=False)
+    msg = str(rec[0].message)
+    assert 'signed' in msg and 'Drop the layer' in msg and "'sev'" in msg
+
+
+def test_signed_dsev_layer_clause_restores_the_atom_support():
+    """A histogram's unlayered ``limit`` is the atom support max, not ``inf``.
+
+    ``SeverityDHistogram._build`` sets ``limit = min(exp_limit, xs.max())``, so
+    with no clause it reports the support top. Resetting to ``inf`` would
+    replace one lie with another.
+    """
+    reset_warn_once()
+    with pytest.warns(IgnoredDecLClauseWarning, match=r'3 xs 0'):
+        a = build('agg SLc 1 claim 3 xs 0 dsev [-2 5] [.6 .4] fixed')
+    sev = a.sevs[0]
+    assert sev.signed is True          # discovered in ``_build``, not declared
+    assert sev.limit == 5.0
+    assert sev.attachment == 0
+    assert sev.detachment == 5.0
+    # unlayered atoms: 0.6 * -2 + 0.4 * 5 = 0.8. The layer would have given
+    # ``min(3, max(x, 0))``, i.e. 0.6 * 0 + 0.4 * 3 = 1.2.
+    assert sev.moms()[0] == pytest.approx(0.8, rel=1e-12)
+    assert a.est_m == pytest.approx(0.8, rel=1e-9)
+
+
+def test_signed_layer_warning_quotes_the_declared_clause():
+    """A histogram build truncates ``limit`` to the atoms; the message does not.
+
+    ``10 xs 0`` on ``dsev [-2 5]`` records ``limit = min(10, 5) = 5``. Quoting
+    ``5 xs 0`` back at someone who wrote ``10 xs 0`` reads as a different
+    complaint, so the message reads the clause as declared.
+    """
+    reset_warn_once()
+    with pytest.warns(IgnoredDecLClauseWarning, match=r'10 xs 0'):
+        build('agg SLf 1 claim 10 xs 0 dsev [-2 5] [.6 .4] fixed')
+
+
+def test_layer_clause_on_a_non_signed_severity_is_untouched():
+    """The contrast: the same clause on an ordinary severity still clamps."""
+    reset_warn_once()
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', IgnoredDecLClauseWarning)
+        a = build('agg SLd 1 claim 3 xs 0 dsev [2 5] [.6 .4] fixed')
+    sev = a.sevs[0]
+    assert sev.signed is False
+    assert sev.limit == 3.0
+    assert sev.detachment == 3.0
+    # min(3, max(x, 0)): 0.6 * 2 + 0.4 * 3 = 2.4.
+    assert sev.moms()[0] == pytest.approx(2.4, rel=1e-12)
+
+
+def test_unlayered_signed_severity_is_silent():
+    """Nothing to drop, so nothing to say: the ordinary signed declaration."""
+    reset_warn_once()
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', IgnoredDecLClauseWarning)
+        a = build('agg SLe 5 claims ssev 100 - lognorm 80 cv .2 poisson',
+                  update=False)
+    assert a.sevs[0].limit == np.inf

@@ -5775,8 +5775,14 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 hi = float(_estimate_agg_percentile(sev_m, sev_cv, sev_sk, p))
         except (ValueError, KeyError):
             hi = np.inf
+        # ``self.limit`` records the layer AS DECLARED. A signed severity never
+        # applies it (``Severity._drop_layer_clause`` warns and drops the
+        # clause), so the declared limit does not bound the law and must not
+        # cap its reach here: on a signed book this estimate sizes the grid,
+        # and capping at a layer that was never applied sizes it short.
         lim = (float(self.limit.max())
-               if self.limit is not None and len(self.limit) else np.inf)
+               if (self.limit is not None and len(self.limit)
+                   and not self._signed_severity()) else np.inf)
         return min(hi, lim) if np.isfinite(lim) else hi
 
     def _severity_low_estimate(self, tail):
@@ -6081,6 +6087,15 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         the aggregate far inside ``[0, N_hi·s_max]`` and the moment window is
         tighter -- the caller (``_bs_window``) only selects this method when it
         is at least as tight as the moment window.
+
+        Also returns ``None`` when the computed edges are not both finite. A
+        severity can pass the structural ``_severity_bounded`` test and still
+        produce an infinite edge here: a signed severity reads its lower edge
+        off ``fz.support()``, and a spliced or reflected law can report an
+        infinite support end that the recorded ``limit`` hides. A window with
+        an infinite edge is not a window, and it used to reach the sizer as
+        ``int(inf)``; see ``dev/done/plan-signed-bounded-window-overflow.md``
+        and the same hazard on the splice path in ``_severity.py``.
         """
         if self.sevs is None or len(self.sevs) == 0:
             return None
@@ -6098,6 +6113,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             s_his.append(hi)
             s_los.append(lo)
         s_max, s_min = max(s_his), min(s_los)
+        if not (np.isfinite(s_max) and np.isfinite(s_min)):
+            # Not boundedly windowable, whatever the structural test said:
+            # fall back to the moment window rather than hand the sizer an
+            # infinite span.
+            return None
         # ``freq_moms`` consumes the BASE mean (``n`` is the realized one, which
         # under zm / zt would apply the modification a second time).
         f1, f2, f3 = self.frequency.freq_moms(self.base_mean)

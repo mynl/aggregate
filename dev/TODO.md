@@ -146,18 +146,23 @@
 
 ### Correctness & bugs
 
-- **[Signed-Bounded-Window]** — robustness: kill the `int(inf)` `OverflowError`
-  in the bucket/window sizer and resolve the silently half-applied layer on a
-  signed severity. **Needs the author's D1 pick** (F3-A implement the clamp /
-  F3-B reject the contradictory clause (the plan's lean) / F3-C honest metadata)
-  before it can execute. Independent of everything else — do whenever; the
-  regression bar is "ordinary aggregates byte-for-byte unchanged". The repro
-  still crashes today. Plan: `dev/plan-signed-bounded-window-overflow.md`.
-  Smaller blast radius since a230 (`[Reflected-Loss-Severity]`): a bounded
-  reflection like `10 - lognorm 1.5 splice [0 10]` used to need `ssev`, and with
-  it the identity layering; it can now be declared with plain `sev`, where the
-  layer is a real layer. The half-applied layer remains for genuinely signed
-  severities, and is still silent.
+- ~~**[Signed-Bounded-Window]**~~ **DONE `1.0.0a309`**
+  (`dev/done/plan-signed-bounded-window-overflow.md`): the `int(inf)`
+  `OverflowError` in the bucket/window sizer and the silently half-applied
+  layer on a signed severity, both gone. Author ruled the plan's one confirm
+  2026-08-21: warn and drop, on the `IgnoredDecLClauseWarning` precedent, and
+  extend the same honesty to `_severity_high_estimate`, which was capping a
+  signed severity's reach by a layer the law never applied. Three labeled
+  fixes: `[Signed-Layer-Clause-Ignored]` (`Severity._drop_layer_clause` resets
+  `limit` / `attachment` / `detachment` to their unlayered values and warns
+  once, so `bounded` and `tail_class` stop lying),
+  `[Bounded-Window-Finite-Edge]` (`_bounded_severity_window` returns `None`
+  when a computed edge is not finite) and `[Non-Finite-Window-Guard]` (`need`
+  is not computed when `bs` is pinned and never read; `_need_log2` returns
+  `inf` rather than reaching `int()`; a method proposing a non-finite window
+  is recorded inapplicable rather than raised on). Ordinary aggregates are
+  byte-for-byte unchanged. Layering a signed base properly stays deferred,
+  as the successor to `dev/plan-negative-x-agg.md` section 6.
 - ~~**[Dfreq-One-Claim-Shortcut]**~~ **DONE `1.0.0a303`**
   (`dev/done/plan-dfreq-one-claim-shortcut.md`): `dfreq [1]` takes the same
   exact severity-copy path as `1 claim ... fixed`. New read-only

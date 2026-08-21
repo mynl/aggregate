@@ -15,8 +15,8 @@ from scipy.optimize import newton
 from scipy.special import loggamma, binom
 from scipy.optimize import NoConvergence  # noqa
 from ._help import HelpMixin
-from .constants import (FIG_H, FIG_W, INFO_NA, ReflectedSeverityClampWarning,
-                        info_row, warn_once)
+from .constants import (FIG_H, FIG_W, INFO_NA, IgnoredDecLClauseWarning,
+                        ReflectedSeverityClampWarning, info_row, warn_once)
 from .moments import VALIDATION_NOISE
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
@@ -1187,6 +1187,11 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         # Distinguish "no layer clause" (None) from "explicit 0 attachment".
         # Treatment of mass at zero depends on this.
         self.exp_attachment = exp_attachment
+        # The limit AS DECLARED. ``self.limit`` is the working value and a
+        # histogram ``_build`` tightens it to the atom support, so it can no
+        # longer answer "was there a layer clause?"; ``_drop_layer_clause``
+        # needs that question answered on the signed path.
+        self._exp_limit = exp_limit
         self.detachment = exp_limit + self.attachment
         self.fz = None
         self.pattach = 0
@@ -1275,6 +1280,9 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             # clamp and the layered-loss transform; the layered methods are the
             # raw fz methods (identity). Moments are the raw distribution's;
             # discrete kinds already populated sev1/sev2/sev3 in ``_build``.
+            # A layer clause cannot survive that, so drop it (and say so)
+            # before the identity layering goes on.
+            self._drop_layer_clause()
             self._apply_signed()
         else:
             self._compute_attachment_probs()
@@ -1712,6 +1720,65 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
                  self._reflect_shift, self.sev_lb, self.sev_ub),
             stacklevel=3)
 
+    def _drop_layer_clause(self):
+        """Drop a layer clause a signed severity cannot use, and say so.
+
+        Notes
+        -----
+        A signed severity is the raw law: :meth:`_apply_signed` installs
+        identity layering, with no ``x < 0 -> 0`` clamp and no attachment or
+        limit transform. ``__init__`` has already recorded the clause, though,
+        which leaves the layer **half applied**: the bookkeeping claims a bound
+        the law does not have, so ``bounded``, ``tail_class`` and
+        ``detachment`` all report a policy that was never applied, and the
+        bucket sizer builds a bounded window for an unbounded support (the
+        ``OverflowError`` in ``dev/done/plan-signed-bounded-window-overflow.md``).
+        Reset the three fields to their unlayered values and warn once.
+
+        Warning and dropping is the house answer for a clause a declaration
+        cannot activate: :class:`~aggregate.constants.IgnoredDecLClauseWarning`
+        is what a pure ``agg`` raises for the ceded premium, reinstatement and
+        variable rating clauses it has no premium context for.
+
+        The mathematics says the clause could not be honored as written even in
+        principle. A layer ``y xs a`` is ``min(y, max(X - a, 0))``, so on a
+        signed ``X`` the outer ``max`` annihilates the negative half, which is
+        the whole reason for writing ``ssev``. Layering a signed base properly,
+        with an arbitrary and possibly negative attachment, is a real feature
+        and stays deferred; see ``dev/plan-negative-x-agg.md`` section 6.
+
+        The unlayered ``limit`` is ``inf`` for a continuous law, and the atom
+        support max for a histogram kind, whose ``_build`` sets
+        ``limit = min(exp_limit, xs.max())`` and so reports the support top
+        when there is no clause.
+
+        Silent when there is nothing to drop, which is every ordinary signed
+        severity: ``self._exp_limit`` is the limit **as declared**, because
+        ``self.limit`` may already carry a histogram ``_build``'s support
+        truncation and can no longer answer the question.
+        """
+        if self.exp_attachment is None and not np.isfinite(self._exp_limit):
+            return
+        # Name the clause the user WROTE, which is ``_exp_limit`` again: a
+        # histogram ``_build`` may have tightened ``limit`` to the atoms, and
+        # quoting ``5 xs 0`` back at someone who wrote ``10 xs 0`` reads as a
+        # different complaint.
+        clause = (f'{self._exp_limit:,.0f} xs {self.attachment:,.0f}'
+                  if np.isfinite(self._exp_limit)
+                  else f'unlimited xs {self.attachment:,.0f}')
+        self.limit = (float(self.fz.support()[1]) if self._is_histogram
+                      else np.inf)
+        self.attachment = 0
+        self.exp_attachment = None
+        self.detachment = self.limit + self.attachment
+        warn_once(
+            f"Severity '{self.sev_name}': signed severity ignores the layer "
+            f"clause '{clause}' (a signed law is never clamped). Drop the "
+            f"layer, or use 'sev' if clamping at 0 is what you meant.",
+            IgnoredDecLClauseWarning,
+            key=('signed-layer-dropped', str(self.sev_name), clause),
+            stacklevel=3)
+
     def _apply_signed(self):
         """Post-build for a signed (never-clamp) severity: identity layering.
 
@@ -1728,7 +1795,10 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         -----
         Occurrence reinsurance / layering on a signed severity is out of scope
         (see ``dev/plan-negative-x-agg.md`` §6); a signed severity is the raw
-        unlayered distribution.
+        unlayered distribution. A layer clause written anyway is dropped, with
+        a warning, by :meth:`_drop_layer_clause` immediately before this runs,
+        so the recorded ``limit`` / ``attachment`` / ``detachment`` describe
+        the law that was actually built.
         """
         self.pattach = 1.0
         self.moment_pattach = 1.0

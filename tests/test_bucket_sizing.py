@@ -25,7 +25,10 @@ import numpy as np
 import pytest
 
 from aggregate import build
+from aggregate._bucket_window import _need_log2
 from aggregate.constants import InfiniteVarianceError
+from aggregate.distributions import Aggregate
+from aggregate.tail import _severity_bounded
 
 
 def test_motivating_signed_port_uses_unit_resolution():
@@ -745,3 +748,124 @@ def test_1p_reporting_surfaces():
     assert {'A', 'B'}.issubset(set(td.index))
     # the worst-of total tail is a label, not a raw enum
     assert td.loc['total', 'right_tail'] == 'subexponential'
+
+
+# ---------------------------------------------------------------------------
+# Non-finite windows (dev/done/plan-signed-bounded-window-overflow.md)
+# ---------------------------------------------------------------------------
+# A signed severity carrying a layer clause used to record a finite ``limit``
+# it never applied, so ``_severity_bounded`` said BOUNDED, ``bounded_small``
+# proposed ``(-inf, 4.98e6)`` from the reflected support, and ``_size`` called
+# ``int(inf)``. Three layers of fix, tested one layer at a time.
+
+
+def test_signed_layer_window_no_longer_overflows():
+    """The reported reproduction builds instead of raising ``OverflowError``.
+
+    It builds *defective* (the raw ``180 - lognorm cv 10`` reaches ~14.5M
+    buckets over 50 claims), which is honest and is the subject of
+    ``dev/plan-validation-punchup.md``. What this pins is that the sizer no
+    longer raises.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg NTa 50 claims 25000 xs 0 ssev -lognorm 200 cv 10 + 180 '
+                  'mixed ig .4', bs=5)
+    assert a.bs == 5
+    # the metadata is honest, so the bounded row is never even built.
+    assert 'bounded_small' not in a.bs_window_df.index
+    assert a.sevs[0].limit == np.inf
+
+
+def test_bounded_window_rejects_a_non_finite_edge():
+    """[Bounded-Window-Finite-Edge] a window with an infinite edge is no window.
+
+    The structural ``_severity_bounded`` test reads the spec (here a finite
+    ``limit``); the window reads the *computed* support. When they disagree,
+    the moment window is the honest fallback.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg BWa 5 claims ssev 100 - lognorm 80 cv .2 poisson',
+                  update=False)
+    sev = a.sevs[0]
+    assert not np.isfinite(sev.fz.support()[0])
+    # stand in for any other route to a finite recorded ``limit`` on a law
+    # whose computed support is not finite.
+    sev.limit = 1000.0
+    assert _severity_bounded(sev)
+    assert a._bounded_severity_window(1 - 1e-12) is None
+
+
+def test_bounded_window_still_windows_a_real_bounded_layer():
+    """The positive control: an ordinary bounded layer still gets its window."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg BWb 5 claims 1000 xs 0 sev lognorm 500 cv 1.5 poisson',
+                  update=False)
+    lo, hi = a._bounded_severity_window(1 - 1e-12)
+    assert lo == 0.0
+    assert np.isfinite(hi) and hi > 1000.0
+
+
+@pytest.mark.parametrize('span, bs, expected', [
+    (np.inf, 5.0, np.inf),
+    (100.0, np.inf, np.inf),
+    (np.nan, 5.0, np.inf),
+    (np.inf, np.inf, np.inf),
+    (100.0, 0.0, np.inf),
+    (0.0, 5.0, 0),
+    (-3.0, 5.0, 0),
+    (1023.0, 1.0, 10),
+    (1024.0, 1.0, 11),
+])
+def test_need_log2_never_reaches_int_of_infinity(span, bs, expected):
+    """[Non-Finite-Window-Guard] "more than any cap", never ``OverflowError``.
+
+    The old ``int(np.ceil(np.log2(max(span / bs + 1.0, 1.0)))) if span > 0``
+    raised on an infinite span, and its guard did not catch it because
+    ``inf > 0`` is ``True``.
+    """
+    assert _need_log2(span, bs) == expected
+
+
+def test_pinned_bs_does_not_size_a_window_it_will_not_use():
+    """With ``bs`` pinned the grid is the user's, so ``need`` is never read.
+
+    The reported crash was in arithmetic whose result was discarded three
+    lines later. Pinning ``bs`` on an ordinary book must be unchanged.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg PBa 5 claims sev lognorm 100 cv 2 poisson', bs=1, log2=14)
+    assert a.bs == 1 and a.log2 == 14
+
+
+def test_a_non_finite_method_window_is_recorded_and_rejected(monkeypatch):
+    """Defense in depth: any method proposing an infinite edge is rejected.
+
+    Selection falls through to another method rather than raising out of the
+    sizer's arithmetic, the ``exact_discrete`` unreachable-support precedent.
+    """
+    monkeypatch.setattr(Aggregate, '_bounded_severity_window',
+                        lambda self, p: (-np.inf, 1e6))
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg NFa 5 claims 1000 xs 0 sev lognorm 500 cv 1.5 poisson')
+    row = a.bs_window_df.loc['bounded_small']
+    assert not row['applies']
+    assert 'non-finite window (rejected)' in row['note']
+    assert 'moment' in a.bs_window_df.loc['used', 'note']
+
+
+def test_bounded_layer_still_selects_bounded_small():
+    """No regression: an ordinary bounded layer keeps the ``bounded_small`` grid."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg BSa 3 claims 1000 xs 0 sev lognorm 500 cv 1.5 poisson')
+    df = a.bs_window_df
+    assert df.loc['bounded_small', 'applies']
+    assert df.loc['bounded_small', 'selected']
+    assert 'bounded_small' in df.loc['used', 'note']
+    assert df.loc['bounded_small', 'x_min'] == 0.0
+    assert np.isfinite(df.loc['bounded_small', 'x_max'])

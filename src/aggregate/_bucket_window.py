@@ -444,6 +444,41 @@ def _integer_ratio(a, b, rel_tol=1e-9):
     return r >= 1.0 and math.isclose(r, round(r), rel_tol=rel_tol)
 
 
+def _need_log2(span, bs):
+    """``log2`` of the bucket count a window of width ``span`` needs at step ``bs``.
+
+    Parameters
+    ----------
+    span : float
+        Window width, origin to top.
+    bs : float
+        Bucket size.
+
+    Returns
+    -------
+    int or float
+        ``0`` for an empty window, and ``np.inf`` when ``span``, ``bs``, or
+        their ratio is not finite.
+
+    Notes
+    -----
+    The infinite return reads as "more than any cap" at every call site, so a
+    non-finite window falls through the sizing branches instead of reaching
+    ``int()``. The bare ``int(np.ceil(np.log2(...)))`` this replaces raised
+    ``OverflowError`` on an infinite span, and the guard it carried (``if span
+    > 0``) did not catch it, because ``inf > 0`` is ``True``. See
+    ``dev/done/plan-signed-bounded-window-overflow.md``.
+    """
+    if not (np.isfinite(span) and np.isfinite(bs)) or bs <= 0:
+        return np.inf
+    if span <= 0:
+        return 0
+    ratio = span / bs + 1.0
+    if not np.isfinite(ratio):
+        return np.inf
+    return int(np.ceil(np.log2(max(ratio, 1.0))))
+
+
 def snap_bs_to_reference(agg, b0, pinned):
     """Keep the grid commensurable with a reference severity's own lattice.
 
@@ -664,23 +699,39 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             bs = round_bucket(W / N0) if W > 0 else 1.0
         x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
         span = x_hi - x0
-        need = int(np.ceil(np.log2(max(span / bs + 1.0, 1.0)))) if span > 0 else 0
         if bs_in > 0:
+            # The user pinned bs, so the grid is theirs and the cap ``log2``
+            # is honored verbatim: ``need`` is never read on this path. Skip
+            # computing it rather than discard it, because a non-finite
+            # ``x_lo`` (hence ``x0``, hence ``span``) made it raise
+            # ``OverflowError`` inside arithmetic whose result was thrown away
+            # three lines later. See
+            # ``dev/done/plan-signed-bounded-window-overflow.md``.
             l2 = log2
-        elif need <= log2:
-            # at least 1 (>= 2 buckets) so a degenerate / point-mass window
-            # never collapses to a single bucket.
-            l2 = min(log2, max(need, 1))
-        elif (grow_cap is not None and lattice_bs is not None
-              and need <= grow_cap):
-            # windowed lattice case: keep the exact lattice bs and grow log2
-            # past the cap (the band is narrow, so a small bounded bump) so
-            # an integer-atom severity is not coarsened off its lattice.
-            l2 = need
         else:
-            bs = round_bucket(span / N0)
-            x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
-            l2 = log2
+            need = _need_log2(span, bs)
+            if need <= log2:
+                # at least 1 (>= 2 buckets) so a degenerate / point-mass window
+                # never collapses to a single bucket.
+                l2 = min(log2, max(need, 1))
+            elif (grow_cap is not None and lattice_bs is not None
+                  and need <= grow_cap):
+                # windowed lattice case: keep the exact lattice bs and grow log2
+                # past the cap (the band is narrow, so a small bounded bump) so
+                # an integer-atom severity is not coarsened off its lattice.
+                l2 = need
+            elif np.isfinite(span):
+                bs = round_bucket(span / N0)
+                x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
+                l2 = log2
+            else:
+                # Non-finite window with bs free: ``need`` is inf, and there is
+                # no bucket size that covers an infinite span, so there is
+                # nothing to coarsen toward (``round_bucket`` refuses inf).
+                # Report the cap grid. ``_row`` has already marked such a
+                # window inapplicable, so this answer is recorded for
+                # inspection and never selected.
+                l2 = log2
         return x0, float(bs), int(l2)
 
     def _row(x_lo, x_hi, lattice_bs, coverage, note, force_origin=False,
@@ -688,6 +739,17 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         # ``x_max`` is the method's own computed window top (e.g. the exact
         # support max), NOT the padded grid extent -- the ``used`` row shows
         # the realized grid.
+        if not (np.isfinite(x_lo) and np.isfinite(x_hi)):
+            # A window with an infinite edge is not a window: no grid covers
+            # it, and there is nothing to coarsen toward. Record the row
+            # inapplicable (the ``exact_discrete`` unreachable-support
+            # precedent) so selection falls through to another method, rather
+            # than raising out of the sizer's arithmetic. Every producer above
+            # is now guarded at its own layer, so this is defense in depth.
+            return dict(applies=False, x_min=float(x_lo), x_max=float(x_hi),
+                        W=np.inf, bs=np.nan, log2=int(log2),
+                        coverage=coverage,
+                        note=f'{note}; non-finite window (rejected)')
         x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs, force_origin, grow_cap)
         return dict(applies=True, x_min=float(x0), x_max=float(x_hi),
                     W=float(x_hi - x0), bs=bs_, log2=l2_,
@@ -864,6 +926,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     if 'exact_discrete' in rows and rows['exact_discrete']['applies']:
         selected = 'exact_discrete'
     elif ('bounded_small' in rows
+          and rows['bounded_small']['applies']
           and rows['bounded_small']['W'] <= 1.5 * rows['moment']['W']):
         selected = 'bounded_small'
     else:

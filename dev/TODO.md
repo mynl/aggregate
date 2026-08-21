@@ -620,7 +620,8 @@
   Approved 2026-08-04, panel scope added 2026-08-05.
   Plan: `dev/done/plan-chart-ir.md`, **closed to done 2026-08-12**: the 1.0
   scope landed (eight app emitters by a244, first-class `.plot()` through
-  `plot_chartdoc`); the bivariate tail rides in `dev/plan-3d-plot.md` and the
+  `plot_chartdoc`); the bivariate tail rides in `dev/done/plan-3d-plot.md`,
+  whose two remaining LIB edits are `dev/plan-3d-plot-LIB.md`, and the
   remaining conversions are post-1.0 by the plan's own charter. **Progress:** inventory landed a197
   (`dev/chart-inventory.md`, six judgment calls awaiting author picks);
   schema v1 landed a198 (`charts/ir.py` plus `tests/test_charts_ir.py`,
@@ -790,12 +791,22 @@
   no reinsurance chart. `plots/_aggregate.py` and `plots/_quantile.py`
   are deleted with it; `MAX_RETURN_PERIOD` moved to the renderer.
   **Only job 7 `[Chart-Bivariate]` is left**, and the 3-D punchups the
-  author wanted are now written down: `dev/plan-3d-plot.md` (a symlink to
-  the canonical copy in `aggregate_api/dev/`), a three-party plan over
-  LIB, API and the SPA.
-  **The LIB half of that plan is done**, in two bumps, with review notes
-  and the five points where the code and the plan disagree recorded in
-  `dev/plan-3d-plot-LIB.md`. a257 `[Joint-Density-Clip]`: both 2-D FFT
+  author wanted are now written down: `dev/done/plan-3d-plot.md` (a symlink
+  to the canonical copy in `aggregate_api/dev/done/`, moved there 2026-08-21
+  when the app half finished), a three-party plan over LIB, API and the SPA.
+  **The live LIB half is `dev/plan-3d-plot-LIB.md`**, written 2026-08-21:
+  two edits the app is waiting on, both ruled by the author 2026-08-12 and
+  neither built, `[Joint-Surface-Representative-Point]` (`edge = "mid"`, the
+  canonical plan's 5.1.2) and `[Joint-Surface-Whole-Grid]` (emit the whole
+  reduced grid with `window` as the drawing range, its 5.8), plus one
+  finding of its own: `plots/_chartdoc.py` `_z_grid_panel` reads neither
+  `window` nor `edge`, so the second edit needs a renderer fix beside it or
+  the library's own picture becomes a sliver at the origin. Two bumps, in
+  that order, and the reasoning for both sits in the canonical plan.
+  **The first two bumps are done**, and the review notes and the five points
+  where the code and the plan disagree are in the canonical plan's section
+  5.0, not in a file of their own as this entry used to claim.
+  a257 `[Joint-Density-Clip]`: both 2-D FFT
   de-fuzz sites route through one helper that warns on a large negative
   rather than preserving it, on a floor relative to the mass the grid
   carries. a258 `[Joint-Surface-Contract]`: the display coordinate is the

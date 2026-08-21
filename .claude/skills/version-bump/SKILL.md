@@ -79,10 +79,13 @@ the change implies, and never splits them across commits:
 **Never let a version land in a different commit from its CHANGELOG section.**
 That is precisely what breaks bisect.
 
-Watch for symlinked plans. `dev/plan-3d-plot.md` and
-`dev/plan-pricing-natural-allocation.md` are symlinks whose canonical copies
-live in the API repo. Do not move a symlink into `dev/done/`; the shared plan is
-retired from the side that owns it.
+Watch for symlinked plans. `dev/done/plan-3d-plot.md` and
+`dev/done/plan-pricing-natural-allocation.md` are symlinks whose canonical
+copies live in the API repo, both retired to `done/` on 2026-08-21. Do not move
+a symlink into `dev/done/` on its own; a shared plan is retired from the side
+that owns it and the link follows in the same breath. The live LIB half of the
+joint surface is `dev/plan-3d-plot-LIB.md`, a real file, and it moves to
+`dev/done/` on its own when its two bumps land.
 
 ## 5. Write the CHANGELOG section
 

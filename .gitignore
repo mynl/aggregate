@@ -84,5 +84,6 @@ docs/cookbook/*.quarto_ipynb
 
 # Symlink to the canonical copy in aggregate_api. Ignored because git stores a
 # symlink as a blob holding the literal path, which is meaningless anywhere
-# else, the same trap the aggregate_api .venv junction fell into.
-dev/plan-3d-plot.md
+# else, the same trap the aggregate_api .venv junction fell into. The canonical
+# copy moved to that repo's dev/done/ on 2026-08-21, so the link moved with it.
+dev/done/plan-3d-plot.md

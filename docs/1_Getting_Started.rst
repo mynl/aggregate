@@ -120,6 +120,10 @@ creates an aggregate distribution called ``Eg1``. The frequency distribution is 
     a = build('agg Eg1 dfreq [1:5] dsev [1:3]')
     qd(a)
 
+.. note::
+
+   Working in JupyterLab? The cell above can be written as DecL and nothing else. See :ref:`the %%agg cell magic <agg-magic>` at the foot of this page.
+
 The DecL program::
 
     agg Eg2 5 claims 1000 xs 0 sev lognorm 50 cv 4 poisson
@@ -154,5 +158,59 @@ Creating an object automatically stores its specification as a **recipe**, with 
 
     qd(build.recipes.iloc[:5, :9], line_width=73, max_colwidth=50, justify='left')
     qd(build.recipes.query('name == "Eg1"').iloc[:, :9], line_width=73, max_colwidth=50, justify='left')
+
+.. _agg-magic:
+
+The ``%%agg`` Cell Magic
+=========================
+
+In `JupyterLab <https://jupyter.org>`_ a DecL program does not have to live inside a Python string. Load the magic once per kernel::
+
+    %load_ext aggregate.magics
+
+and then write the program as the cell::
+
+    %%agg
+    agg Eg1 dfreq [1:5] dsev [1:3]
+
+That is exactly ``a = build('agg Eg1 dfreq [1:5] dsev [1:3]')`` followed by ``qd(a)``, with two conveniences. The program is no longer inside quotes, so an editor still sees DecL and highlights it as DecL, and the object is bound to its own declared name as well as to ``a``, giving both ``a`` and ``Eg1``.
+
+The load is explicit on purpose: importing a package should not put names in your notebook that you did not ask for.
+
+A cell can declare as many objects as you like, separated by a blank line or by a semicolon at the end of a line::
+
+    %%agg book
+    agg Line1 100 claims 1000 xs 0 sev lognorm 50 cv 3 poisson
+
+    agg Line2 200 claims 1000 xs 0 sev gamma 40 cv 1.5 poisson
+
+    port Book agg.Line1 agg.Line2
+
+Each declared name is bound on its own, so ``Line1``, ``Line2`` and ``Book`` are all live afterwards, and the name given to the magic, ``book`` here, is bound to a dictionary of all three. A name DecL allows but Python does not, such as ``Mack2003.Lognorm``, is reachable through that dictionary. With one output the same name is bound to the object itself. The default is ``a``, so a bare ``%%agg`` behaves like the single-object example above.
+
+The arguments control the volume and the grid:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 22 78
+
+   * - Argument
+     - Effect
+   * - ``name``
+     - Positional. The variable to bind, default ``a``.
+   * - ``-q``, ``--quiet``
+     - Build and report what was bound, skipping the ``qd`` display. The setting for a cell declaring a dozen objects.
+   * - ``-s``, ``--silent``
+     - Build and print nothing at all.
+   * - ``-p``, ``--plot``
+     - Also call ``.plot()``, for a cell declaring a single object. Independent of the volume, so ``-s -p`` draws the figure and says nothing.
+   * - ``--log2 N``
+     - Number of buckets as a power of two. Default 0, meaning let the object choose.
+   * - ``--bs X``
+     - Bucket size, evaluated in the notebook namespace, so ``1/32`` and a variable both work. Default 0, meaning let the object choose.
+
+A ``hints{}`` clause inside the program does the same job as ``--log2`` and ``--bs`` and travels with the declaration, which is usually the better place for it.
+
+The magic is a wrapper around :meth:`Underwriter.build_many`, and :meth:`Underwriter.build` is that same method plus an unwrap, so there is no second spelling to learn for a cell that happens to declare several objects.
 
 The :doc:`2_Aggregate_Overview` contains more details and examples.

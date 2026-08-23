@@ -125,3 +125,15 @@ documentation, papers, and blogs. It is **not** part of the core API and is
 never imported on the ``import aggregate`` path.
 
 .. automodule:: aggregate.pedagogy
+
+Notebook magic
+--------------
+
+:mod:`aggregate.magics` supplies the ``%%agg`` cell magic, which builds a cell
+of DecL and binds the results into the notebook. It is loaded on request with
+``%load_ext aggregate.magics`` and, like :mod:`aggregate.pedagogy`, is never
+imported on the ``import aggregate`` path: it imports IPython at module scope,
+which the rest of the library takes care to avoid. See
+:ref:`the user-facing description <agg-magic>` in Getting Started.
+
+.. automodule:: aggregate.magics

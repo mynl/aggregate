@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a315
+
+**[Notebook-Magic] the `%%agg` cell magic: a DecL program can be the cell.** New module `aggregate.magics`, loaded on request with `%load_ext aggregate.magics`, supplying one cell magic. `%%agg` followed by a DecL program builds it, binds it, and `qd`s it, which is what `a = build('''...''')` did with the language buried inside a Python string literal. Out of the quotes, an editor sees DecL and highlights it as DecL. A version of this shipped as `agg_magics.py` before 0.21 and was lost in the reorganization; this is that idea rebuilt on the current surface, at the author's request.
+
+**Explicit load, on the house preference for less magic.** `import aggregate` does not register it. A magic that arrives unasked is a name in the notebook nobody declared, and the module imports IPython at module scope, which `aggregate.utilities` goes to some trouble to keep off the `import aggregate` path (it costs about a second). Keeping `magics.py` off that path too is the other half of that care.
+
+**One magic, not two.** `Underwriter.build` is `Underwriter.build_many` plus an unwrap and a count check, so the magic always calls the plural form and unwraps when exactly one output comes back. One statement or twenty is the same cell, with nothing to detect and no second spelling to remember.
+
+**What gets bound.** A single output binds the target name, `a` unless one is given, and also the declared DecL name when it is a legal Python identifier, so `agg Dice ...` leaves both `a` and `Dice`. Several outputs bind the target to a `{decl_name: object}` dict plus each legal identifier on its own. A name DecL allows and Python does not, `EV.Peel`, is reachable through the dict. A recipe that cannot stand alone, a named mixture severity, binds the `Recipe` itself rather than being dropped, so its spec is still in reach.
+
+**Flags.** `-q` builds and reports what it bound without the `qd` display, for a cell declaring a dozen objects; `-s` prints nothing at all; `-p` also calls `.plot()`, for a cell declaring one object, and says it declined rather than putting several unlabeled figures under one cell. `-p` is independent of the volume, so `-s -p` draws and says nothing. `--log2` and `--bs` set the grid, `--bs` evaluated in the notebook namespace so `1/32` and a variable both work; a `hints{}` clause in the program does the same job and travels with the declaration.
+
+**Documented where a new user will meet it**: a section at the foot of Getting Started with a pointer note beside the first `build` example, a section in `README.md`, and the module on the Auxiliary Modules reference page. `tests/test_magics.py` covers binding, the three volumes, the grid arguments, both plot paths and a parse error, and runs against a bare `Underwriter` that has read no `.agg` file, so a broken entry in the shipped library cannot fail it.
+
+---
+
 ## 1.0.0a314
 
 **[Chart-2D-Punchups] three axes stop deciding for the reader.** The library half, in full, of the paired plan `dev/done/plan-2d-punchup-requirements.md` (the app half is `aggregate_api/dev/plan-2d-punchups.md`, which is canonical for the whole change and runs after this). Nothing in the wire format moves: no new field, no `CHART_IR_VERSION` bump, no reader change. Three existing `ChartAxis` fields take different values on four declarations, and every `agg`, `pnl`, `sev` and `reins` document hash changes with them.

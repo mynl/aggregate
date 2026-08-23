@@ -126,6 +126,23 @@ severity, mean 50 and cv 2.
 
 See the documentation for more examples.
 
+## In JupyterLab: the `%%agg` cell magic
+
+In a notebook the DecL does not have to live inside a Python string. Load the magic once per kernel:
+
+    %load_ext aggregate.magics
+
+and write the program as the cell:
+
+    %%agg
+    agg Dice dfreq [3] dsev [1:6]
+
+which is exactly `a = build('agg Dice dfreq [3] dsev [1:6]')` followed by `qd(a)`, with two conveniences: the program is not in quotes, so your editor still highlights it as DecL, and the object is bound to its declared name as well as to `a`, giving both `a` and `Dice`.
+
+A cell can declare as many objects as it likes, separated by a blank line or a semicolon, in which case each name is bound on its own and the magic's own name is bound to a dictionary of them all. Add `-q` to skip the display, `-s` to print nothing, `-p` to also plot a single object, and `--log2` / `--bs` to set the grid.
+
+Full description in [Getting Started](https://aggregate.readthedocs.io/en/latest/1_Getting_Started.html#the-agg-cell-magic).
+
 ## Dependencies
 
 See requirements.txt.

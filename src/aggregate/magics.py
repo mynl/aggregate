@@ -57,6 +57,8 @@ class AggregateMagics(Magics):
               help='bind and print nothing at all')
     @argument('-p', '--plot', action='store_true',
               help='also plot, for a cell declaring a single object')
+    @argument('-v', '--validation', action='store_true',
+              help='qd the validation_df instead of the object summary')
     @argument('--log2', type=int, default=0,
               help='log2 bucket count, 0 (default) means auto')
     @argument('--bs', default='0',
@@ -102,6 +104,12 @@ class AggregateMagics(Magics):
         which, so the flag reports that it declined instead. It is independent
         of the three volumes: ``--silent --plot`` draws the figure and says
         nothing, which is the notebook equivalent of a plot statement.
+
+        **Validation** with ``--validation`` swaps each object's ``qd`` for a
+        ``qd`` of its ``validation_df``, the moment vs estimate audit. An
+        object without the frame (a recipe stub, an ``expr`` value) displays
+        itself as usual. The three volumes apply unchanged: ``--quiet`` and
+        ``--silent`` skip the display, validation frame included.
         """
         args = parse_argstring(self.agg, line)
         bs = eval(args.bs, {}, self.shell.user_ns)
@@ -133,7 +141,10 @@ class AggregateMagics(Magics):
             if len(recipes) > 1:
                 print(f'\n{r.kind} {r.name}')
             try:
-                qd(outputs[r.name])
+                obj = outputs[r.name]
+                if args.validation:
+                    obj = getattr(obj, 'validation_df', obj)
+                qd(obj)
             except Exception as e:                      # noqa: BLE001
                 # qd covers the first-class classes; a Recipe stub or a bare
                 # expression value falls through to the ordinary display.

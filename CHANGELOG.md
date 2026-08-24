@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a317
+
+**[Agg-Magic-Validation] the `%%agg` magic gains `-v`, `--validation`**, which `qd`s each built object's `validation_df`, the moment vs estimate audit, in place of the object summary. An object without the frame (a recipe stub, an `expr` value) displays itself as before, and the volume flags apply unchanged. `magics.py` only.
+
 ## 1.0.0a316
 
 **[Mixture-Thinning-Moments] a severity mixture splits the claim count by thinning the frequency, not by scaling its mean.** New `MomentAggregator.thin_moments(wt, m1, m2, m3)` returns the moments of `Binomial(N, wt)` given the parent's; `Aggregate` resolves each exposure row's frequency once and thins it per component. `MomentAggregator.add_f1s` is deleted, `_record_component` takes a frequency moment triple rather than a count, and `Frequency.carries_own_count` is new (true only for the empirical family). `dfreq` with a severity mixture was wrong in the answer as well as the report: `dfreq[1] sev [2764 24548 275654 1917469 10000000] * expon wts [...]` now gives a severity mean of 13,990, against 12,220,435 theoretic and 2,442,979 from the FFT before. A mixture under a `logarithmic` frequency no longer raises. `reins_stats_df` reports the excess claim count as the thinned count, so `dfreq [1 2] dsev [10 20 30]` with a `10 xs 10` layer shows 1.0 claims reaching the layer, not 1.5.

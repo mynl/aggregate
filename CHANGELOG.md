@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a323
+
+**[Reins-Insurer-Terms-Block] the reins exhibit's contract block serves `loss` in place of `pr_loss`, and `output` as an integer.** Under the insurer perspective `reins_layer_terms` now reads share, limit, attach, pr_attach, pr_detach, **loss**, lol, output. `loss` is the row's expected aggregate loss, read off the store's `('agg', 'mean')`; no frame row is added and `reins_stats_df` keeps `pr_loss`, which the raw perspective still serves. It pairs with `lol`: `loss` is the placed figure, so a half placed layer shows half the dollars, while `lol` divides by share times limit and is share independent. `output` casts to `int64` in the view, so the served TableDoc carries an integer dtype. `tests/data/exhibit_snapshots.json` regenerates, one key of 124.
+
 ## 1.0.0a322
 
 **[Reins-Insurer-Moments-Block] the reins exhibit's layer moments block gains the cover and narrows frequency to its mean.** Under the insurer perspective the `reins_layer_moments` block now reads cover | freq | sev | agg over share limit attach | mean | mean cv skew | mean cv skew. The three cover columns are the `meta` share, limit and attachment restated under a `cover` component group, repeated from the contract block above so this one stands alone; the frequency cv and skew are dropped. Layer frequency is the ground up count thinned by the probability a loss reaches the layer, so freq mean times sev mean is agg mean on every row, now asserted by `test_reins_layer_frequency_is_the_thinned_count`. View level only: `reins_stats_df` does not move and the raw perspective still serves every dropped column. `tests/data/exhibit_snapshots.json` regenerates, one key of 124.

@@ -26540,16 +26540,16 @@
        "text": "0.00000"
       },
       {
-       "raw": 1.0,
-       "text": "1.00000"
+       "raw": 29.999999999999996,
+       "text": "30.00"
       },
       {
        "raw": 0.0,
        "text": "0.00000"
       },
       {
-       "raw": 0.0,
-       "text": "0.00000"
+       "raw": 0,
+       "text": "0"
       }
      ]
     },
@@ -26578,16 +26578,16 @@
        "text": "0.33333"
       },
       {
-       "raw": 0.7777777777777778,
-       "text": "0.77778"
+       "raw": 10.000000000000014,
+       "text": "10.00"
       },
       {
        "raw": 1.0000000000000013,
        "text": "1.00000"
       },
       {
-       "raw": 0.0,
-       "text": "0.00000"
+       "raw": 0,
+       "text": "0"
       }
      ]
     },
@@ -26616,16 +26616,16 @@
        "text": "\u2014"
       },
       {
-       "raw": 0.7777777777777778,
-       "text": "0.77778"
+       "raw": 10.00000000000001,
+       "text": "10.00"
       },
       {
        "raw": 1.000000000000001,
        "text": "1.00000"
       },
       {
-       "raw": 0.0,
-       "text": "0.00000"
+       "raw": 0,
+       "text": "0"
       }
      ]
     },
@@ -26654,21 +26654,21 @@
        "text": "\u2014"
       },
       {
-       "raw": 1.0,
-       "text": "1.00000"
+       "raw": 20.000000000000007,
+       "text": "20.00"
       },
       {
        "raw": null,
        "text": "\u2014"
       },
       {
-       "raw": 1.0,
-       "text": "1.00000"
+       "raw": 1,
+       "text": "1"
       }
      ]
     }
    ],
-   "caption": "The contract, layer by layer: the share of a limit over an attachment, the chance a loss reaches it (pr_attach) and exhausts it (pr_detach), and the loss on line. Gross, ceded and net read down the rows, because that is the comparison and the eye makes it down a column.",
+   "caption": "The contract, layer by layer: the share of a limit over an attachment, the chance a loss reaches it (pr_attach) and exhausts it (pr_detach), the expected loss and the loss on line. Of that pair, loss is the placed figure, so a half placed layer shows half the dollars, while lol divides by share times limit and reads the same whatever the share. Gross, ceded and net read down the rows, because that is the comparison and the eye makes it down a column.",
    "columns": [
     {
      "align": "l",
@@ -26766,13 +26766,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c7",
      "name": [
-      "pr_loss"
+      "loss"
      ],
      "raw": true
     },
@@ -26792,11 +26792,10 @@
     },
     {
      "align": "r",
-     "dtype": "float",
+     "dtype": "int",
      "format": {
-      "digits": 5,
       "group": true,
-      "kind": "dec"
+      "kind": "int"
      },
      "key": "c9",
      "name": [
@@ -26829,7 +26828,7 @@
       "text": "pr_detach"
      },
      {
-      "text": "pr_loss"
+      "text": "loss"
      },
      {
       "text": "lol"

@@ -639,7 +639,9 @@ def test_reins_aggregate_insurer_turns_the_layering_over(objects):
     assert terms.index.names == ['view', 'layer']
     assert list(terms.index) == list(moments.index)
     assert list(terms.columns) == ['share', 'limit', 'attach', 'pr_attach',
-                                   'pr_detach', 'pr_loss', 'lol', 'output']
+                                   'pr_detach', 'loss', 'lol', 'output']
+    # [Reins-Insurer-Terms-Block]: output is a flag, served as an integer
+    assert terms['output'].dtype.kind == 'i'
     assert list(moments.columns.get_level_values(0).unique()) == \
         ['cover', 'freq', 'sev', 'agg']
     assert list(moments.columns) == [
@@ -658,6 +660,28 @@ def test_reins_aggregate_insurer_turns_the_layering_over(objects):
     # still no noncentral moments in the insurer reading
     assert 'ex1' not in moments.columns.get_level_values(1)
     assert all('caption' in kw for _, _, kw in ins)
+
+
+def test_reins_layer_loss_reflects_share_and_lol_does_not():
+    """[Reins-Insurer-Terms-Block]: the pairing is the point.
+
+    ``loss`` is the placed figure, so the ceder halving its share halves the
+    dollars; ``lol`` is mean over share times limit, so it reads the same
+    whatever the share. A reader comparing two layers needs both, and needs to
+    know which is which, which is what the caption now says.
+    """
+    full = build('agg EX.Full dfreq [3] dsev [2 4 6 8 10 12] '
+                 'occurrence net of 6 xs 6')
+    part = build('agg EX.Part dfreq [3] dsev [2 4 6 8 10 12] '
+                 'occurrence net of 0.5 po 6 xs 6')
+    key = ('occ', 'layer.1')
+    f = exhibit_frames(full, 'reins', 'insurer')[0][1].loc[key]
+    p = exhibit_frames(part, 'reins', 'insurer')[0][1].loc[key]
+    # 0.5 part of 6 xs 6 is a 1/12 share, and the loss follows it exactly
+    assert p['share'] == pytest.approx(f['share'] / 12)
+    assert p['loss'] == pytest.approx(f['loss'] / 12)
+    # while the loss on line is share independent
+    assert p['lol'] == pytest.approx(f['lol'])
 
 
 def test_reins_layer_frequency_is_the_thinned_count(objects):
@@ -698,8 +722,11 @@ def test_reins_aggregate_insurer_is_a_reading_of_the_raw_frame(objects):
                       exhibit_frames(obj, 'reins', 'insurer')[:2]]
     for view, layer in terms.index:
         for measure in terms.columns:
+            # ``loss`` is the aggregate mean under the contract's own
+            # vocabulary; everything else is a meta row read straight
+            source = ('agg', 'mean') if measure == 'loss' else ('meta', measure)
             got, want = terms.loc[(view, layer), measure], \
-                raw.loc[('meta', measure), (view, layer)]
+                raw.loc[source, (view, layer)]
             assert (got == want) or (pd.isna(got) and pd.isna(want))
         for component, measure in moments.columns:
             # the cover group is the meta rows restated under a name the

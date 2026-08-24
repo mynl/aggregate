@@ -255,3 +255,19 @@ Divergences.
 4. **`pandas` is now imported in `exhibits/_aggregate.py`.** It was not, the module having previously done all its work through `_core` helpers and frame methods. The relabel needs `pd.MultiIndex.from_tuples`.
 
 5. **The exhibit IR snapshot moved, and the diff was read by key rather than by line.** `tests/data/exhibit_snapshots.json` regenerates through `tests/capture_exhibit_snapshots.py`. Exactly one of its 124 keys changed, `reins/insurer/ReinsAggregate`, with none added and none removed, which is the whole check that the change is confined to the block it targets.
+
+## Item 4 [Reins-Insurer-Terms-Block], landed `1.0.0a323`
+
+Both changes landed as specified, at view level, with `reins_stats_df` keeping `pr_loss` and RAW still serving it. `loss` sits in the old `pr_loss` position between `pr_detach` and `lol`, and `output` serves as `int64`.
+
+Divergences.
+
+1. **Executed out of the plan's numeric order, immediately after item 2.** Items 2 and 4 edit the same function and the same two exhibit tests, and each regenerates the same one key of `exhibit_snapshots.json`. Running them adjacently meant one read of that code rather than two with item 3's corpus sweep in between. Nothing in either depends on the other, so this is ordering only.
+
+2. **The source of a contract row is declared, not branched.** `_LAYER_TERM_SOURCES` maps the one row that is not a `meta` row to where it is read from, and `_term_rows` consumes it. `_LAYER_TERM_INTEGERS` does the same job for the cast. Both are one entry mappings today, which is deliberate: the alternative is a special case for `loss` and another for `output` buried in the block body, where the next reader has to find them.
+
+3. **The integer cast is guarded on completeness, not asserted.** The plan reasons that the cast is safe because `col` defaults `output` to 0.0 and never leaves it `NaN`, which is true of every column the store builds today. The code still checks `notna().all()` before casting, because an all `NaN` column would otherwise turn into a `TypeError` at exhibit build time on some future stage that does not set it, and a float flag is a cosmetic problem where a raised exhibit is not.
+
+4. **A second test came with it.** The plan asks only that the column change. `test_reins_layer_loss_reflects_share_and_lol_does_not` pins the pairing the plan calls the point of the change: a `0.5 po 6 xs 6` layer is a one twelfth share, its `loss` is one twelfth of the fully placed layer's, and its `lol` is identical. That is the assertion that would catch `loss` being read off an unplaced quantity later.
+
+5. **No documentation edit was owed.** `pr_loss` is documented in `_aggregate.py` and `docs/2_aggregate_overview/pipeline-reinsurance.rst`, and both describe `reins_stats_df`, which is unchanged. Checked rather than assumed.

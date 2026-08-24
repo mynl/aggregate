@@ -55,9 +55,23 @@ def _validation_insurer_aggregate(obj, blocks):
 
 
 #: The layer's own contract, in reading order: what was bought, then how
-#: likely it is to be touched, then what it costs per unit of limit.
+#: likely it is to be touched, then what it costs. The ``loss`` and ``lol``
+#: pairing is the point of the tail of this list, and the pair is deliberate:
+#: ``loss`` is the placed figure, so a 50% placed layer shows half the dollars,
+#: while ``lol`` is mean over share times limit and so is share independent.
 _LAYER_TERMS = ('share', 'limit', 'attach', 'pr_attach', 'pr_detach',
-                'pr_loss', 'lol', 'output')
+                'loss', 'lol', 'output')
+
+#: Where a contract row is read from when it is not a ``meta`` row. ``loss`` is
+#: the row's expected aggregate loss, which the store already carries as
+#: ``('agg', 'mean')``; no new frame row is created for it.
+_LAYER_TERM_SOURCES = {'loss': ('agg', 'mean')}
+
+#: Contract rows served as integers rather than floats. ``output`` is a flag,
+#: 0 or 1, and the meta row is always set (``col`` defaults it to 0.0 and never
+#: leaves it ``NaN``), so the cast is total. The served TableDoc carries
+#: dtypes, so the grid renders it as an integer with no app work.
+_LAYER_TERM_INTEGERS = ('output',)
 
 #: The cover repeated onto the moments block, under its own component group.
 #: The same three meta rows the contract block leads with: with them present
@@ -82,6 +96,25 @@ _LAYER_MOMENTS = {
     'sev': ('mean', 'cv', 'skew'),
     'agg': ('mean', 'cv', 'skew'),
 }
+
+
+def _term_rows(frame):
+    """The contract block's rows, in reading order, ``loss`` read off ``agg``.
+
+    Most of the contract is the store's ``meta`` block, but ``loss`` is the
+    aggregate mean under the insurer's own vocabulary. Reading it here rather
+    than adding a ``meta`` row keeps the store as it is: a view may restate
+    what the frame already holds (``[Perspective-May-Restructure]``), and the
+    number is the same number.
+
+    Returns a frame indexed by the contract's own flat measure names, ready
+    for :func:`_layer_rows` to turn over.
+    """
+    keep = [(_LAYER_TERM_SOURCES.get(m, ('meta', m)), m) for m in _LAYER_TERMS]
+    keep = [(src, m) for src, m in keep if src in frame.index]
+    out = frame.reindex(index=[src for src, _m in keep])
+    out.index = pd.Index([m for _src, m in keep], name='measure')
+    return out
 
 
 def _moment_rows(frame):
@@ -141,15 +174,21 @@ def _reins_insurer_aggregate(obj, blocks):
     """
     (_stats_name, stats_frame, stats_kw), \
         (summary_name, summary_frame, summary_kw) = blocks
-    meta = stats_frame.loc['meta'] if 'meta' in \
-        stats_frame.index.get_level_values('component') else stats_frame.iloc[:0]
+    has_meta = 'meta' in stats_frame.index.get_level_values('component')
+    terms = _layer_rows(_term_rows(stats_frame), _LAYER_TERMS) if has_meta \
+        else _layer_rows(stats_frame.iloc[:0], _LAYER_TERMS)
+    for column in _LAYER_TERM_INTEGERS:
+        if column in terms.columns and terms[column].notna().all():
+            terms[column] = terms[column].astype('int64')
     moments = _moment_rows(stats_frame)
     terms_caption = (
         'The contract, layer by layer: the share of a limit over an '
         'attachment, the chance a loss reaches it (pr_attach) and exhausts '
-        'it (pr_detach), and the loss on line. Gross, ceded and net read '
-        'down the rows, because that is the comparison and the eye makes it '
-        'down a column.')
+        'it (pr_detach), the expected loss and the loss on line. Of that '
+        'pair, loss is the placed figure, so a half placed layer shows half '
+        'the dollars, while lol divides by share times limit and reads the '
+        'same whatever the share. Gross, ceded and net read down the rows, '
+        'because that is the comparison and the eye makes it down a column.')
     moments_caption = (
         'What each layer does to the three distributions. The cover columns '
         'repeat the share, limit and attachment, so the block reads on its '
@@ -166,7 +205,7 @@ def _reins_insurer_aggregate(obj, blocks):
         'reads as rebucketing error on the leading gross or subject row and '
         'as the percentage impact of the cession on the ceded and net rows.')
     return [
-        ('reins_layer_terms', _layer_rows(meta, _LAYER_TERMS),
+        ('reins_layer_terms', terms,
          dict(stats_kw, caption=terms_caption)),
         ('reins_layer_moments',
          _layer_rows(moments, list(moments.index)),

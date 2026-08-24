@@ -1277,3 +1277,25 @@ port ASV.Port hints{log2=16; bs=1/32} agg ASV.PortUnit 1.5 claims 100 xs 0 sev g
 agg ASV.FromPort 10 claims sev port.ASV.Port poisson                                                                note{a portfolio total as a severity};
 agg ASV.SignedInner dfreq [1] ssev 100 - lognorm 50 cv .5 hints{log2=12; bs=1/16}                                   note{a signed source};
 agg ASV.UsesSigned dfreq [1] ssev agg.ASV.SignedInner                                                               note{ssev over a signed reference keeps the negative atoms}
+
+# ============================================================
+# MXT. Mixture component thinning (1.0.0a316)
+# ============================================================
+# [Mixture-Thinning-Moments]: a severity mixture splits the claim count, and the
+# component count is Binomial(N, w) whatever N is. The weight cannot ride the
+# count, because only a Poisson thinning is recoverable from its mean. These
+# pin the families where the two readings differ: fixed and dfreq (a degenerate
+# count thins to a binomial, not to a smaller degenerate count), binomial (the
+# trial count is fixed and the success probability thins), the Poisson clusters,
+# and logarithmic, whose mean is bounded below so the old route could not even
+# express a small component. MXT.Dfreq and MXT.Fixed are the same frequency
+# written two ways and must agree throughout stats_df. See
+# tests/test_mixture_thinning.py and dev/done/plan-mixture-thinning-moments.md.
+agg MXT.Dfreq dfreq [3] sev [1 10] * expon wts [0.9 0.1]                                                            note{a one atom dfreq is a fixed count; must match MXT.Fixed exactly};
+agg MXT.Fixed 3 claims sev [1 10] * expon wts [0.9 0.1] fixed                                                       note{the same frequency written with an exposure clause};
+agg MXT.DfreqSpread dfreq [1 2 6] sev [1 10] * expon wts [0.9 0.1]                                                  note{a genuinely spread empirical count, which has no fixed equivalent};
+agg MXT.Binomial 3 claims sev [1 10] * expon wts [0.9 0.1] binomial 0.5                                             note{Bin(r, p) thins to Bin(r, wp): the trials do not thin};
+agg MXT.Logarithmic 3 claims sev [1 10] * expon wts [0.9 0.1] logarithmic                                           note{the 0.1 component has thinned mean 0.3, below the logarithmic minimum};
+agg MXT.NeymanA 3 claims sev [1 10] * expon wts [0.9 0.1] neymana 2                                                 note{a Poisson cluster count, negatively dependent components};
+agg MXT.Pascal 3 claims sev [1 10] * expon wts [0.9 0.1] pascal 0.5 2                                               note{a Poisson stopped sum of negative binomials};
+agg MXT.MixedExponential dfreq [1] sev [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05] hints{log2=18; bs=500}   note{ISO/Verisk style commercial auto mixed exponential, mean 13,990; the case that surfaced the defect};

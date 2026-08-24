@@ -48,13 +48,15 @@ class MomentAggregator:
         self.sev_1 = self.sev_2 = self.sev_3 = 0
         self.tot_sev_1 = self.tot_sev_2 = self.tot_sev_3 = 0
         # running total of the *inputs* to freq_moms, i.e. the un-modified
-        # (base) claim counts. Identical to tot_freq_1 for every frequency
-        # whose freq_moms preserves the mean -- which is all of them except
-        # the zero-modified forms, where freq_moms deliberately shifts it.
+        # (base) claim counts, accumulated once per exposure row. Differs from
+        # tot_freq_1 under a zero modification (freq_moms deliberately shifts
+        # the mean) and under an empirical frequency (whose moments are its
+        # own, whatever count is requested).
         # ``get_fsa_stats(remix=True)`` re-enters freq_moms and must feed the
         # base back in, not the already-shifted total.
         self.tot_freq_base = 0
-        # function to comptue frequency moments, hence can call add_f1s(...)
+        # frequency moment function; callers evaluate it at the exposure row
+        # count and thin per mixture component (see thin_moments)
         self.freq_moms = freq_moms
 
     def add_fs(self, f1, f2, f3, s1, s2, s3):
@@ -108,30 +110,6 @@ class MomentAggregator:
         s2 = vs + s1 * s1
         self.add_fs(f1, f2, 0., s1, s2, 0.)
 
-    def add_f1s(self, f1, s1, s2, s3):
-        """
-        accumulate new moments defined by f1 and s - fills in f2, f3 based on
-        stored frequency distribution
-
-        used by Aggregate
-
-        compute agg for the latest values
-
-
-        :param f1:
-        :param s1:
-        :param s2:
-        :param s3:
-        :return:
-        """
-
-        # fill in the frequency moments and store away. ``f1`` in is the base
-        # (un-modified) count; ``f1`` out is the realized mean, which the zero-
-        # modified wrappers shift.
-        self.tot_freq_base += f1
-        f1, f2, f3 = self.freq_moms(f1)
-        self.add_fs(f1, f2, f3, s1, s2, s3)
-
     def get_fsa_stats(self, total, remix=False):
         """
         Get the current f x s = agg flat moment list.
@@ -173,6 +151,76 @@ class MomentAggregator:
         nc2 = f2 + f1
         nc3 = f3 + 3 * f2 + f1
         return nc2, nc3
+
+    @staticmethod
+    def thin_moments(wt, m1, m2, m3):
+        r"""Non-central moments of the ``wt``-thinning of a count from the parent's.
+
+        A finite severity mixture splits each claim into one of its components
+        by an iid latent label with :math:`P(\text{label} = i) = w_i`. The
+        component count :math:`K_i` is therefore :math:`\mathrm{Binomial}(N,
+        w_i)` conditional on the parent count :math:`N`, whatever the
+        distribution of :math:`N`.
+
+        Parameters
+        ----------
+        wt : float
+            Mixture weight of the component, in ``[0, 1]``.
+        m1, m2, m3 : float
+            First three non-central moments of the parent count ``N``.
+
+        Returns
+        -------
+        tuple of float
+            First three non-central moments of ``K``, the ``wt``-thinning
+            of ``N``.
+
+        Notes
+        -----
+        Take expectations of the :math:`\mathrm{Binomial}(n, w)` raw moments
+        over :math:`N`:
+
+        .. math::
+
+            E[K]   &= w E[N] \\
+            E[K^2] &= w(1-w)E[N] + w^2 E[N^2] \\
+            E[K^3] &= w(1-w)(1-2w)E[N] + 3w^2(1-w)E[N^2] + w^3 E[N^3].
+
+        This is the only route to component moments that asks nothing of the
+        frequency beyond its own moments at its own mean. Evaluating
+        ``freq_moms(w * n)`` instead is correct only when the thinning of
+        ``N`` is the same family with the mean scaled by ``w``. That holds
+        for Poisson and for every mixed Poisson, and fails for fixed,
+        binomial, empirical (``dfreq``), renewal (``years``), Neyman A and
+        Pascal. It is not even defined for logarithmic, whose mean is bounded
+        below.
+
+        The map is the identity at ``wt = 1``, so a limit profile (weights all
+        one) passes through unchanged.
+
+        The component aggregates are dependent unless ``N`` is Poisson. With
+        :math:`\nu = E[N]`, :math:`v = \mathrm{Var}(N)` and component severity
+        means :math:`\mu_i`,
+
+        .. math::
+
+            \mathrm{Cov}(A_i, A_j) = w_i w_j \mu_i \mu_j (v - \nu),
+            \qquad i \ne j,
+
+        so the ``mixed`` and ``independent`` columns of ``stats_df`` reconcile
+        exactly: the total variance is the sum of the component variances plus
+        those cross terms. The sign of :math:`v - \nu` fixes the sign of the
+        dependence, negative for fixed and binomial, zero for Poisson,
+        positive for the mixed Poissons. See
+        ``dev/done/plan-mixture-thinning-moments.md``.
+        """
+        w = float(wt)
+        k1 = w * m1
+        k2 = w * (1 - w) * m1 + w ** 2 * m2
+        k3 = (w * (1 - w) * (1 - 2 * w) * m1
+              + 3 * w ** 2 * (1 - w) * m2
+              + w ** 3 * m3)
+        return k1, k2, k3
 
     @staticmethod
     def agg_from_fs(f1, f2, f3, s1, s2, s3):

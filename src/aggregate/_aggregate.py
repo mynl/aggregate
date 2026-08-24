@@ -2506,6 +2506,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             self.limit = limit
             # these all have the same length because have been broadcast
             n_components = len(exp_el)
+            self._guard_exposure_rows(n_components)
             logger.debug('Aggregate.__init__ | Broadcast/align: exposures + severity = %d exp = '
                          '%d sevs = %d componets', len(exp_el), len(sev_a), n_components)
             self.sevs = np.empty(n_components, dtype=type(Severity))
@@ -2567,8 +2568,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 # _lr *= _swt  ?? seems wrong
                 _en *= _swt
 
+                # weights are all 1 here, so the thinning map is the identity
+                # and each row simply carries its own frequency at its own count
                 self._record_component(self._comp_cols[r], ma, _at, _y, _scv,
-                                       _en, _el, _pr, _lr,
+                                       self.frequency.freq_moms(_en), _en,
+                                       _el, _pr, _lr,
                                        mix_cv, sev1, sev2, sev3)
                 self.en[r] = _en
                 r += 1
@@ -2599,6 +2603,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             # mixture-product arm: outer exposure × inner severity-mixture
             # gives a 2-D component grid; labels carry both indices.
             _n_exp = len(exp_el)
+            self._guard_exposure_rows(_n_exp)
             _n_mix = len(sev_name)
             self._init_stats_df([
                 f'e{e_idx}.m{m_idx}'
@@ -2657,6 +2662,18 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                     # ZeroModifiedExposureWarning raised after the loops)
                     self._zm_monetary_exposure = True
                     self._zm_requested_loss += _el
+                elif _en < 0:
+                    # empirical / renewal sentinel: the frequency states its own
+                    # count, so read it off the pmf rather than the exposure clause
+                    _en = float(np.sum(self.frequency.freq_a * self.frequency.freq_b))
+
+                # Resolve this row's frequency ONCE, before the mixture split.
+                # A zero modification belongs to N, so it is applied here and
+                # not once per component; ``freq_moms`` is already wrapped to
+                # return the realized (shifted) moments for the base count.
+                _en_base = self._zm_base_count(_en)
+                _parent3 = self.frequency.freq_moms(_en_base)
+                _row_mean = _parent3[0]
 
                 # for cases where a mixture component has no losses in the layer
                 # usually because of underflow.
@@ -2685,19 +2702,17 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                     else:
                         self.sevs[r] = s
 
-                    # input claim count, figure total loss for the component
-                    if _en > 0:
-                        _el = _en * sev1
-                    elif _en < 0:
-                        # for empirical freq claim count entered as -1
-                        _en = np.sum(self.frequency.freq_a * self.frequency.freq_b)
-                        _el = _en * sev1
+                    # realized claim count for the row, figure total loss for
+                    # the component. ``_row_mean`` is E[N] after any zero
+                    # modification, resolved once above the loop.
+                    if _row_mean > 0:
+                        _el = _row_mean * sev1
                     else:
                         logger.info('%s xs %s on %s x (%s, %s, %s, %s, %s) + %s '
                                     ' | %s < X le %s has '
                                     '_en = %s. Adjusting el to 0.',
                                     _y, _at, _ssc, _at, _sm, _scv, _sa, _sb, _sloc,
-                                    _slb, _sub, _en)
+                                    _slb, _sub, _row_mean)
                         _el = 0.
 
                     # if premium compute loss ratio, if loss ratio compute premium
@@ -2709,22 +2724,20 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                     # scale for the mix - OK because we have split the exposure and severity components
                     _pr0 = _pr * _swt
                     _el0 = _el * _swt
-                    _en0 = _en * _swt
+                    # ``en`` carries the BASE count (what ``freq_pgf`` consumes,
+                    # via ``frequency.base_mean``), so it splits the row's base
+                    # rather than the realized mean. Identical to the thinned
+                    # first moment for every unmodified frequency.
+                    _en0 = _en_base * _swt
 
-                    # Zero modification / truncation moves the mean. Applied to
-                    # the *weighted* per-component count -- the same value
-                    # ``_record_component`` hands to ``freq_moms`` -- so the
-                    # recorded loss and the accumulated moments agree.
-                    if self._freq_zm and _en0 > 0:
-                        _en0 = self._zm_base_count(_en0)
-                        _el0 = self._zm_realized_count(_en0) * sev1
-                        if _pr0 > 0:
-                            _lr = _el0 / _pr0
-                        elif _lr > 0:
-                            _pr0 = _el0 / _lr
+                    # Thin the row's frequency onto this component: K | N is
+                    # Binomial(N, w) whatever N is. The weight cannot ride the
+                    # claim count instead, because only a Poisson thinning is
+                    # recoverable from its mean alone.
+                    _freq3 = MomentAggregator.thin_moments(_swt, *_parent3)
 
                     self._record_component(f'e{e_idx}.m{m_idx}', ma, _at, _y, _scv,
-                                           _en0, _el0, _pr0, _lr,
+                                           _freq3, _en0, _el0, _pr0, _lr,
                                            mix_cv, sev1, sev2, sev3)
 
                     self.en[r] = _en0
@@ -2908,6 +2921,20 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
           row) and ``m`` is the severity-mixture component (one per weighted
           severity); the limit-profile arm always uses ``m=0``.
         * ``mixed`` / ``independent``: theoretical (subject / gross) totals.
+          ``mixed`` is the model: one frequency over the pooled severity, which
+          is also what the FFT computes. ``independent`` sums the component
+          aggregates as though they were independent. The two agree only for a
+          Poisson frequency, which is the one family whose mixture components
+          really are independent. The gap between them is exactly the sum of
+          the component covariances, which are available in closed form: with
+          ``nu = E[N]``, ``v = Var(N)`` and component severity means ``mu_i``,
+          ``Cov(A_i, A_j) = w_i w_j mu_i mu_j (v - nu)`` for ``i != j``, so
+          ``Var(mixed) = Var(independent) + sum_{i != j} Cov(A_i, A_j)``. The
+          sign of ``v - nu`` fixes the sign of the dependence: negative for
+          fixed, binomial and Neyman A, zero for Poisson, positive for the
+          mixed Poissons. The covariance matrix is not stored, being a matrix
+          rather than a column; see
+          :meth:`~aggregate.moments.MomentAggregator.thin_moments`.
         * ``empirical``: post-FFT empirical moments (the final, possibly
           after-reinsurance object).
         * ``after_occ``: empirical moments after the occurrence-reinsurance
@@ -2985,7 +3012,46 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             return base_en
         return self.frequency.modify_mean(base_en)
 
-    def _record_component(self, col, ma, attach, layer, scv, en, el, prem, lr, mix_cv,
+    def _guard_exposure_rows(self, n_exposure_rows):
+        """Refuse an exposure profile an empirical frequency cannot carry.
+
+        An exposure profile of several rows is modeled as one frequency at the
+        summed claim count against the pooled severity, which is what the FFT
+        computes. A ``dfreq`` (or ``years``) frequency states its own count and
+        cannot be asked for a different mean, so the summed-count parent does
+        not exist and the program is ill posed.
+
+        This is not the severity-mixture case, which is well posed for every
+        frequency: a mixture splits one count rather than summing several, and
+        the split is handled by thinning
+        (:meth:`~aggregate.moments.MomentAggregator.thin_moments`).
+
+        Parameters
+        ----------
+        n_exposure_rows : int
+            Number of rows in the broadcast exposure clause, before the
+            severity-mixture product.
+
+        Raises
+        ------
+        ValueError
+            If there is more than one exposure row and the frequency carries
+            its own count.
+        """
+        if n_exposure_rows > 1 and self.frequency.carries_own_count:
+            raise ValueError(
+                f'{self.name}: a dfreq or years frequency states its own claim '
+                f'count, so it cannot be spread over the {n_exposure_rows} rows '
+                f'of an exposure profile. A profile is one frequency at the '
+                f'summed count over the pooled severity, and a stated count '
+                f'distribution cannot be asked for a different mean. Either '
+                f'state the count with an exposure clause and a frequency that '
+                f'takes a mean (for example "1 claim ... fixed" or '
+                f'"... poisson"), or declare one aggregate per row and combine '
+                f'them in a portfolio. A severity mixture ("wts") is unaffected '
+                f'and needs no change.')
+
+    def _record_component(self, col, ma, attach, layer, scv, freq3, base, el, prem, lr, mix_cv,
                           sev1, sev2, sev3):
         """Accumulate this component into ``ma`` and write its ``stats_df`` column.
 
@@ -3006,15 +3072,27 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             Per-component attachment and layer height.
         scv : float
             Severity CV parameter for this component.
-        en, el, prem, lr : float
-            Per-component frequency, expected loss, premium, loss ratio, already
-            scaled by the mixture weight by the caller.
+        freq3 : tuple of float
+            The component's first three non-central frequency moments, already
+            thinned by the mixture weight by the caller (see
+            :meth:`MomentAggregator.thin_moments`). The caller supplies the
+            moments rather than a count because only a Poisson thinning is
+            recoverable from its mean alone.
+        base : float
+            This component's share of the exposure row's un-modified claim
+            count, which ``ma`` accumulates so ``get_fsa_stats(remix=True)``
+            can re-enter ``freq_moms`` at the count the frequency was built
+            with. Sums to the row count across the row's components.
+        el, prem, lr : float
+            Per-component expected loss, premium, loss ratio, already scaled by
+            the mixture weight by the caller.
         mix_cv : float
             Overall mixing-distribution CV (constant across rows).
         sev1, sev2, sev3 : float
             First three raw severity moments for this component.
         """
-        ma.add_f1s(en, sev1, sev2, sev3)
+        ma.tot_freq_base += base
+        ma.add_fs(*freq3, sev1, sev2, sev3)
         moments = ma.get_fsa_stats(total=False)
         # Write this component's data directly into the canonical ``stats_df``
         # column. Maps MA's flat moment names to the ``(component, measure)``

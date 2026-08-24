@@ -185,8 +185,15 @@ class Frequency(HelpMixin):
     #     zero modification.
     #   _prob_eq_0: class-level default ``None``; ZM subclasses override with
     #     a method that returns P(N = 0 | mean = n).
+    #   carries_own_count: True iff the frequency states its own mean and so
+    #     ignores the ``n`` passed to ``freq_moms`` / ``freq_pgf``. Only the
+    #     empirical family (``dfreq``, and ``years`` through it) does; every
+    #     other family is a family until an exposure clause fixes its mean.
+    #     ``Aggregate`` refuses to spread such a frequency over an exposure
+    #     profile, which would need a mean it cannot be asked for.
     freq_name = ''
     supports_zm = False
+    carries_own_count = False
     _prob_eq_0 = None
 
     def __init_subclass__(cls, **kwargs):
@@ -986,10 +993,15 @@ class FrequencyEmpirical(Frequency):
     Empirical (user-supplied) discrete frequency. ``freq_a`` is the array of
     outcomes, ``freq_b`` the array of probability masses; both are
     validated and possibly summarized via ``validate_discrete_distribution``.
-    Moments are independent of the requested mean ``n`` (which is ignored).
+    Moments are independent of the requested mean ``n`` (which is ignored),
+    which is what :attr:`carries_own_count` records. A mixture component's
+    count is obtained by thinning these moments
+    (:meth:`~aggregate.moments.MomentAggregator.thin_moments`), never by
+    asking for a scaled mean.
     """
 
     freq_name = 'empirical'
+    carries_own_count = True
 
     def _build(self):
         self.freq_a, self.freq_b = validate_discrete_distribution(

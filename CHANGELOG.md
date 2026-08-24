@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a316
+
+**[Mixture-Thinning-Moments] a severity mixture splits the claim count by thinning the frequency, not by scaling its mean.** New `MomentAggregator.thin_moments(wt, m1, m2, m3)` returns the moments of `Binomial(N, wt)` given the parent's; `Aggregate` resolves each exposure row's frequency once and thins it per component. `MomentAggregator.add_f1s` is deleted, `_record_component` takes a frequency moment triple rather than a count, and `Frequency.carries_own_count` is new (true only for the empirical family). `dfreq` with a severity mixture was wrong in the answer as well as the report: `dfreq[1] sev [2764 24548 275654 1917469 10000000] * expon wts [...]` now gives a severity mean of 13,990, against 12,220,435 theoretic and 2,442,979 from the FFT before. A mixture under a `logarithmic` frequency no longer raises. `reins_stats_df` reports the excess claim count as the thinned count, so `dfreq [1 2] dsev [10 20 30]` with a `10 xs 10` layer shows 1.0 claims reaching the layer, not 1.5.
+
+Numbers move and one program now raises. Per-component `stats_df` columns and the `independent` total change for fixed, binomial, empirical (`dfreq`), renewal (`years`), Neyman A, Pascal and any zero-modified frequency; `mixed`, the FFT answer, and every Poisson or mixed Poisson program are unchanged. An exposure profile of more than one row under `dfreq` or `years` now raises `ValueError` instead of returning a `nan` variance and half the correct mean. Downstream: the two `reins` exhibit snapshots are re-captured.
+
 ## 1.0.0a315
 
 **[Notebook-Magic] the `%%agg` cell magic: a DecL program can be the cell.** New module `aggregate.magics`, loaded on request with `%load_ext aggregate.magics`, supplying one cell magic. `%%agg` followed by a DecL program builds it, binds it, and `qd`s it, which is what `a = build('''...''')` did with the language buried inside a Python string literal. Out of the quotes, an editor sees DecL and highlights it as DecL. A version of this shipped as `agg_magics.py` before 0.21 and was lost in the reorganization; this is that idea rebuilt on the current surface, at the author's request.

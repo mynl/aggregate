@@ -1115,7 +1115,12 @@ def reins_stats_df(agg):
                 cond = (u1 / pr, u2 / pr, u3 / pr)
             else:
                 cond = (np.nan, np.nan, np.nan)
-            lf = agg.frequency.freq_moms(n * pr)     # conditional count n'
+            # Excess claim count: each claim reaches the layer independently
+            # with probability ``pr``, so the layer count is the ``pr``-thinning
+            # of the gross count, Binomial(N, pr). Re-solving the frequency at
+            # mean ``n * pr`` is the same thing only for a Poisson, and ignores
+            # the conditioning entirely for a dfreq, whose mean is its own.
+            lf = MomentAggregator.thin_moments(pr, f1, f2, f3)
             agg_k, _ = agg._fft_aggregate(ceded_k, agg.padding)
             agg6 = reins_density6(agg, agg_k)
             data[('occ', f'layer.{k}')] = col(

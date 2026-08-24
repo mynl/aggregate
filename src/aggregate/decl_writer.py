@@ -169,13 +169,23 @@ def _elt_div(num, den):
 # Severity
 # ======================================================================
 
-def _render_dist(spec: dict) -> str:
+def _render_dist(spec: dict, split: bool = False):
     """Render a continuous severity distribution body (the ``sev`` of an agg).
 
     Inverts the ``sev0`` / ``sev1`` / ``sev2`` / ``sev_weighted`` / ``sev_picks``
     / ``sev_unconditional`` transformer chain. Emits, in order:
     ``<scale> * <name> <params> + <loc>`` then ``wts``, ``splice``, ``picks`` and
     a trailing ``!`` for an unconditional severity.
+
+    Parameters
+    ----------
+    spec : dict
+    split : bool, default False
+        When set, return ``(head, picks_fragment)`` instead of the joined
+        string, so the caller can put ``picks`` on its own line in the spread
+        layout (``[Format-Program-Picks-Line]``). The second element is ``''``
+        when the severity carries no picks, and joining the two with a single
+        space reproduces the unsplit string byte for byte.
 
     Notes
     -----
@@ -219,10 +229,16 @@ def _render_dist(spec: dict) -> str:
 
     core += _render_weights(spec)
     core += _render_splice(spec)
-    core += _render_picks(spec)
-    if spec.get('sev_conditional') is False:
-        core += ' !'
-    return core
+
+    # ``picks`` is the one severity clause long enough to earn its own line in
+    # the spread layout, so it comes back separately for _render_sev_clause to
+    # hang off a _Block. The trailing ``!`` rides at the end of whichever
+    # fragment is last, which is what keeps the terse byte order (picks then
+    # bang) exactly as it was.
+    picks = _render_picks(spec).lstrip()
+    bang = ' !' if spec.get('sev_conditional') is False else ''
+    parts = (core, picks + bang) if picks else (core + bang, '')
+    return parts if split else _join(parts)
 
 
 def _render_weights(spec: dict) -> str:
@@ -310,8 +326,16 @@ def _render_dsev(spec: dict) -> str:
     return s
 
 
-def _render_sev_clause(spec: dict) -> str:
-    """Render the severity clause of an aggregate: ``dsev``, ``sev`` or ``ssev``."""
+def _render_sev_clause(spec: dict):
+    """Render the severity clause of an aggregate: ``dsev``, ``sev`` or ``ssev``.
+
+    Returns a plain ``str`` for the ordinary case, and a :class:`_Block` when
+    the severity carries ``picks``: head is the clause without the picks and
+    the picks fragment is its only child, so the spread layout gives
+    ``picks [attachments] [losses]`` its own line one level deeper. Terse
+    space-joins a block back onto one line, so this is byte for byte the old
+    rendering there (``[Format-Program-Picks-Line]``).
+    """
     # Interior ``severity`` label rides in ``label_map`` (dev/plan-labels.md S3),
     # appended after the whole clause.
     label = _render_label(spec.get('label_map', {}).get('severity'))
@@ -338,7 +362,13 @@ def _render_sev_clause(spec: dict) -> str:
     # silently change the declaration. See
     # dev/done/plan-reflected-loss-severity.md ([Reflect-Unparser-Round-Trip]).
     kw = 'ssev' if spec.get('sev_signed') else 'sev'
-    return f'{kw} {_render_dist(spec)}{label}'
+    head, picks = _render_dist(spec, split=True)
+    if picks:
+        # the interior label closes the whole clause, so it rides on the last
+        # fragment: the terse byte order is unchanged and the spread form
+        # re-parses, the preprocessor folding the two lines back into one
+        return _Block(f'{kw} {head}', [f'{picks}{label}'])
+    return f'{kw} {head}{label}'
 
 
 # ======================================================================
@@ -1106,8 +1136,11 @@ def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
         (_, _, sa), (_, _, sb) = spec['units']
         return _Block(f'clash {_fmt_name(name)}', [
             f"{_fmt_num(cl['na'])} {_fmt_num(cl['nb'])} {_fmt_num(cl['nc'])} claims",
-            _join([_render_layers(sa), _render_sev_clause(sa)]),
-            _join([_render_layers(sb), _render_sev_clause(sb)]),
+            # a clash component is one line by construction (limit plus
+            # severity), so a picks-bearing severity is flattened back rather
+            # than opening a nested block inside it
+            _join([_render_layers(sa), _render_terse(_render_sev_clause(sa))]),
+            _join([_render_layers(sb), _render_terse(_render_sev_clause(sb))]),
             _render_freq(spec),
             *_render_trailer(spec, trailer),
         ])

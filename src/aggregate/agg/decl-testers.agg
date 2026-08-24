@@ -539,6 +539,15 @@ agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500
 # and 10000.
 agg DW.PicksOffGrid 1 claim sev lognorm 100 cv 2 picks [100 200 500] [45 20 25] fixed                        note{off grid picks under auto sizing: parse-only, raises on build}
 
+# [Format-Program-Picks-Line]: the severity clause with picks is a _Block, so
+# the spread layout gives picks its own line one level deeper. The terse form
+# is unchanged, which is what these three pin. The trailing ! and an interior
+# label both close the whole clause, so they ride at the end of the picks
+# fragment and the terse byte order does not move.
+agg DW.PicksLine   dfreq [1] sev 100 * uniform picks [50 75 100] [30 12 5]                                    note{picks on its own line in the spread layout, inline in terse};
+agg DW.PicksBang   dfreq [1] sev 100 * uniform picks [50 75 100] [30 12 5] !                                  note{unconditional picks severity: the ! rides at the end of the picks fragment};
+agg DW.PicksLabel  dfreq [1] sev 100 * uniform picks [50 75 100] [30 12 5] as Picked                          note{interior severity label after picks: closes the clause, so it rides last}
+
 
 # H4. Hygiene-4 regressions — value_type, info rows, pnl prem/lr meta
 # ===================================================================

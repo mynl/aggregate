@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a324
+
+**[Format-Program-Picks-Line] `picks` gets its own line in the spread layout.** `_render_sev_clause` returns a `_Block` when the severity carries picks: the distribution heads the clause and `picks [attachments] [losses]` is its child, one level deeper. `_render_dist` gains a `split=` argument returning `(head, picks fragment)`; its other two callers are unchanged. The terse form does not move a byte, so `spec_to_decl`, the `to_agg` export and the round-trip corpus are untouched: the trailing `!` of an unconditional severity and an interior severity label both close the whole clause, so both ride at the end of the picks fragment. The `clash` renderer flattens the clause with `_render_terse`, a clash component being one line by construction.
+
+App ask, recorded here per the grammar ripple agreement: `web/src/decl-keywords.json` has no `picks` entry, so the editor does not color it. LIB already does (`decl_pygments`). One line, on the app's own next bump.
+
 ## 1.0.0a323
 
 **[Reins-Insurer-Terms-Block] the reins exhibit's contract block serves `loss` in place of `pr_loss`, and `output` as an integer.** Under the insurer perspective `reins_layer_terms` now reads share, limit, attach, pr_attach, pr_detach, **loss**, lol, output. `loss` is the row's expected aggregate loss, read off the store's `('agg', 'mean')`; no frame row is added and `reins_stats_df` keeps `pr_loss`, which the raw perspective still serves. It pairs with `lol`: `loss` is the placed figure, so a half placed layer shows half the dollars, while `lol` divides by share times limit and is share independent. `output` casts to `int64` in the view, so the served TableDoc carries an integer dtype. `tests/data/exhibit_snapshots.json` regenerates, one key of 124.

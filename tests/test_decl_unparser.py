@@ -315,6 +315,44 @@ def test_format_reins_cessions_indent():
     assert lines[i + 2] == '    50% po 100 xs 300'
 
 
+def test_format_picks_gets_its_own_line():
+    """[Format-Program-Picks-Line]: picks is a block child, not an inline tail.
+
+    The severity clause with picks was the one clause the spread layout left
+    running off the page. It is now a ``_Block``: the distribution heads the
+    clause and the picks fragment is its child, one level deeper.
+    """
+    prog = 'agg P dfreq [1] sev 100 * uniform picks [50 75 100] [30 12 5]'
+    lines = format_program(prog).split('\n')
+    assert '  sev 100 * uniform' in lines
+    i = lines.index('  sev 100 * uniform')
+    assert lines[i + 1] == '    picks [50 75 100] [30 12 5]'
+    # terse space-joins the block back, byte for byte the historical form
+    assert format_program(prog, layout='terse') == prog
+
+
+def test_format_picks_carries_the_unconditional_bang_and_label():
+    """The trailing ``!`` and the interior label ride on the last fragment.
+
+    Both close the whole severity clause, so terse byte order is picks, then
+    bang, then label; putting them anywhere else would change what re-parses.
+    """
+    bang = 'agg PB dfreq [1] sev 100 * uniform picks [50 75 100] [30 12 5] !'
+    assert format_program(bang, layout='terse') == bang
+    assert format_program(bang).split('\n')[-1] == \
+        '    picks [50 75 100] [30 12 5] !'
+    labeled = ('agg PL dfreq [1] sev 100 * uniform '
+               'picks [50 75 100] [30 12 5] as Picked')
+    assert format_program(labeled).split('\n')[-1] == \
+        '    picks [50 75 100] [30 12 5] as Picked'
+
+
+def test_format_picks_free_severity_keeps_the_bang_on_its_own_line():
+    """No picks means no block: the ``!`` stays where it always was."""
+    prog = 'agg PN 5 claims 1000 xs 0 sev lognorm 100 cv 2 ! poisson'
+    assert '  sev lognorm 100 cv 2 !' in format_program(prog).split('\n')
+
+
 def test_format_html_spread_preserves_newlines():
     out = format_program(_SMOKE, fmt='html')           # default spread
     assert '<span' in out and '\n' in out

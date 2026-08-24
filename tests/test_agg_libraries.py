@@ -80,7 +80,7 @@ def test_every_library_entry_is_tagged(library):
 
 
 #: Tag namespaces. Everything is namespaced except one deliberate bare tag.
-TAG_NAMESPACES = ('topic:', 'role:', 'check:')
+TAG_NAMESPACES = ('topic:', 'role:', )
 #: ``slow`` names a pytest marker (``test_library_recipes`` maps it to
 #: ``@pytest.mark.slow``), not a property of the subject, so namespacing it
 #: would only add a translation step.
@@ -129,7 +129,7 @@ def test_library_is_the_default_recipe_base():
     """``build`` with no arguments reads library.agg."""
     from aggregate import build
     assert len(build.recipes) > 100
-    a = build('LimitProfile')
+    a = build('ExposureLimitProfile')
     assert 'role:hero' in a.tags
 
 
@@ -153,18 +153,17 @@ UNPARSER_EXEMPT = {
     # named object reference
     'BernoulliFrequency', 'FixedFrequency',
     'GeometricFrequency', 'NegativeBinomialFrequency', 'NegativeBinomialMixed',
-    'PoissonSimple', 'BasicMixedSev', 'InverseGaussianMixed',
+    'PoissonSimple', 'InverseGaussianMixed',
     # named ENGINE reference: `xpnl USHurr ... less agg.USXOLTower`. Since
     # a216 [Inline-Port-Engine] an engine writes its body out, so the
     # canonical form inlines the whole referenced aggregate and the source's
     # one-line reference cannot be recovered from the spec. Same cause as the
     # group above; kept separate because the fix is different (the spec would
     # have to record that a reference was written).
-    'USHurr',
     # distortion combinator
     'MinimumDistortion',
     # canonical form would be ambiguous
-    'PremiumMinusLoss', 'SignedPremiumMinusLoss', 'PnLSignedSsev',
+    'SignedPremiumMinusLoss', 'PnLSignedSsev',
 }
 
 

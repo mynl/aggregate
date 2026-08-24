@@ -309,11 +309,30 @@ These are standing rules — follow them without being re-asked:
   `1.0.0a*` version in `pyproject.toml`. (Pure tidying — file moves, comment or
   doc-only edits with no behaviour change — does not.)
 - **Keep `CHANGELOG.md` current.** Each version bump adds a `## <version>`
-  section to `CHANGELOG.md` (the running release-notes draft) describing what
-  landed and any breaking changes — add it at the close of the iteration, don't
-  defer. `README.md` is the stable-audience front page (purpose, install,
-  getting started, links) and points at `CHANGELOG.md`; touch it only when that
-  front-page material itself changes.
+  section to `CHANGELOG.md` (the running release-notes draft) at the close of
+  the iteration, never deferred. `README.md` is the stable-audience front page
+  (purpose, install, getting started, links) and points at `CHANGELOG.md`;
+  touch it only when that front-page material itself changes.
+- **A CHANGELOG entry is ONE PARAGRAPH.** Open with the bold
+  `**[Descriptive-Label] what landed**` lede and stay in that paragraph. Add a
+  second short one only for a genuine breaking change, a moved number, or an
+  action a downstream repo must take, and say it in a sentence. Three
+  paragraphs means the entry is doing a job some other file already does.
+  - **Facts a reader acts on, and nothing else**: new or renamed names,
+    changed defaults, results that moved, required syncs. A reader scanning
+    forty versions wants to know whether this one touches them.
+  - **No rationale, no design narrative, no editorializing.** Why the code is
+    shaped this way belongs in the docstring's `Notes` section, where it sits
+    beside the code and cannot go stale; the argument that got there belongs
+    in the `dev/plan-*.md`. Reasons in the CHANGELOG are the same sentence
+    written a third time, and they are what makes the file unreadable.
+  - **Do not imitate the length of the entries above yours.** Several older
+    ones run to a page. They are not the standard; this rule is, from a315 on.
+    Length is the whole problem: `CHANGELOG.md` is already far longer than
+    anyone will read.
+  - The commit subject is the one-line index, the CHANGELOG entry is the
+    paragraph, the plan doc is the argument, the docstring is the why. One
+    fact lives in exactly one of the four.
 - **Keep `dev/TODO.md` current.** When a tracked item lands, mark it done (and
   note the version / `dev/done/plan-*.md`); when scope shifts, edit the entry.
   Move a completed plan from `dev/` to `dev/done/`.

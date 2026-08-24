@@ -163,6 +163,62 @@
   is recorded inapplicable rather than raised on). Ordinary aggregates are
   byte-for-byte unchanged. Layering a signed base properly stays deferred,
   as the successor to `dev/plan-negative-x-agg.md` section 6.
+- ~~**[Validation-Punchup]**~~ **DONE `1.0.0a311` to `1.0.0a313`**
+  (`dev/done/plan-validation-punchup.md`, which carries execution notes and
+  five recorded divergences): the `ALIASING` test became
+  `convolution_residual` and went from six firings and six false positives to
+  zero, keeping the one genuine wrap in the library; the size biased
+  feasibility reading landed with `bs_max` / `reach` / `log2_required` on
+  `_bs_feasibility` and in `bs_description` / `bs_explanation`; and
+  `Validation.INFEASIBLE` plus `InfeasibleGridWarning` say out loud when no
+  bucket size can reproduce a severity's mean, on four of 255 corpus programs,
+  every one already failing its severity mean. Two author rulings were taken
+  during execution: the wrap gate moved from `deficit_materiality` to
+  `VALIDATION_NOISE` (five programs lose the mean to sub-material truncation
+  and would otherwise read as wrap), and `_severity_high_estimate` stopped
+  capping a signed reach. `docs/2_aggregate_overview/bucket-selection.rst` and
+  `pipeline-aggregate.rst` carry the account. Original entry follows.
+- **[Validation-Punchup, original]**: two validation changes found while diagnosing
+  `[Signed-Bounded-Window]`, both measured against the whole 257-program
+  corpus. One, the `ALIASING` test is a ratio whose denominator can be machine
+  epsilon, and all six of its firings in the corpus are false positives at
+  1e-12 to 3.5e-7 against an `eps` of 1e-4; replace it with a direct measure of
+  the convolution step's mean error. Two, add a feasibility reading that says
+  when a severity cannot be reproduced on the requested grid at any bucket size
+  (`log2 >= 11.23 * sigma - 1` for an unlimited lognormal), with a new
+  `Validation.INFEASIBLE` and an educational warning. Author ruled the four
+  design questions 2026-08-21, including two deliberate rejections recorded in
+  the plan. Plan: `dev/done/plan-validation-punchup.md`. Closes
+  `[Aliasing-Test-Misfires-On-A-Reference-Severity]` and the open half of
+  `[Validation-Calc-Review]` (#49).
+- **[Far-Tail-Raw-Moment-Inflation]** (found 2026-08-21 diagnosing
+  `[Validation-Punchup]`): higher **raw** moments degrade as the grid grows
+  taller at fixed `bs`. On `lognorm 200 cv 2` at `bs=6.427` the relative error
+  on the third raw moment runs 1.5%, 12.8%, 103%, 828% for `log2` 18, 19, 20,
+  21, while the mean error stays flat at 6.4e-6. The far tail carries a
+  constant 2.22e-16 of mass per bucket, which is one ulp of 1.0 and points at a
+  survival function reaching the grid as `1 - cdf` somewhere in the chain, and
+  the `x**3` weighting turns that dust into a large number. Diagnosing it means
+  tracing the `sf` evaluation, not the validation code, so it is its own item.
+- ~~**[Chart-2D-Punchups]**~~ **DONE `1.0.0a314`, LIB half only**
+  (`dev/done/plan-2d-punchup-requirements.md`, which carries the execution log
+  and seven recorded divergences): three axis declarations stop deciding for
+  the reader. `return_period` becomes an ordinary axis, `scales=('linear',
+  'log')` over a suggested ladder of `1 .. RETURN_PERIOD_TOP` with the old
+  nine-decade window kept as `full_range`, in all three emitters that declare
+  it (`_emit_aggregate.outcome_doc` serving `agg` and `pnl`, plus `_emit_reins`
+  and `_emit_severity`; the plan named two). `reins`' `sev_density` keeps log
+  as its drawn scale and declares linear beside it, and its `claim` axis
+  suggests its own extent where `_claim_window` declines, so an unlimited
+  program stops losing the zoom out and the log reading together (closes item
+  12 of `aggregate_api/dev/api-punchlist.md`). The mass axis publishes the
+  extent `outcome_doc` already computed, so a clipped severity companion's head
+  is one press away. Three author rulings taken during the review: the third
+  emitter, L3 landing rather than staying open, and confirmation that
+  `.plot(return_period=True)` drawing linear is the goal rather than a side
+  effect. **The app half is open**, `aggregate_api/dev/plan-2d-punchups.md`
+  parts A1 to A6, and needs `uv sync --extra dev` with the server stopped
+  before any of this is visible to it.
 - ~~**[Dfreq-One-Claim-Shortcut]**~~ **DONE `1.0.0a303`**
   (`dev/done/plan-dfreq-one-claim-shortcut.md`): `dfreq [1]` takes the same
   exact severity-copy path as `1 claim ... fixed`. New read-only
@@ -174,9 +230,10 @@
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against the
   published *Aggregate* paper and make the docs match the actual algo. The
   "all switches → config" sub-goal is done (`eps`/`noise`, `aliasing_ratio`,
-  `exeqa_noise_floor`, `deficit_materiality`); remaining: fix the false-positive
-  *agg-mean-error ≫ sev-error / aliasing* failure (try larger `bs`; revisit the
-  too-tight tolerance, now an `aliasing_ratio` config edit).
+  `exeqa_noise_floor`, `deficit_materiality`). The aliasing false positive that
+  was the other half of this item moved to `[Validation-Punchup]`, where it is
+  measured and designed; what remains here is the audit against the paper and
+  the docs.
 - **[Input-Guards]** (ported from README) — three correctness/guard items: zero
   `lb` not consistent with attachment equals zero; flag **fixed** frequency with
   a non-integer expected value; flag **mixing** with an inconsistent frequency
@@ -261,7 +318,10 @@
      `PHDistortionSimple`, `PnLBook`, `SignedPortfolioMixed`, `TVaRDistortion`,
      `UnitSeverity`, `WindowContinuous`. Regenerate the list with
      `build.recipes.query('not note')`.
-- **[Aliasing-Test-Misfires-On-A-Reference-Severity]** (found writing
+- ~~**[Aliasing-Test-Misfires-On-A-Reference-Severity]**~~ **DONE `1.0.0a311`**
+  (part one of `dev/done/plan-validation-punchup.md`): the ratio is gone, so
+  there is no denominator left to collapse. Original entry, for the record.
+  (found writing
   `SplitLimitPolicy`, a297) — `valid_aggregate`'s aliasing test asks whether the
   aggregate mean relative error exceeds `ALIASING_RATIO` times the **severity**
   mean relative error. A `sev agg.NAME` reference on a matched grid is exact, so
@@ -272,7 +332,11 @@
   The `VALIDATION_NOISE` silencer at `1e-12` is the only thing standing between
   a correct model and a wrong verdict, and `SplitLimitPolicy` only lands under
   it because `bs=1/4` keeps the grid small. Either exempt a reference severity
-  from the ratio test or floor the denominator.
+  from the ratio test or floor the denominator. **Superseded 2026-08-21 by
+  `[Validation-Punchup]`**, which drops the ratio entirely rather than patching
+  its denominator: this case is one instance of a test that has no true
+  positives anywhere in the corpus. Closes when part one of
+  `dev/done/plan-validation-punchup.md` lands, which it did at `1.0.0a311`.
 - **[Session-Build-Clobbers-The-Trailer]** (was `[Recipe-Run-Clobbers-The-Trailer]`,
   found running the a297 recipes; **rewritten for the general case a300**) — a
   session `build(...)` **re-registers** its entry in the shared recipe base, so

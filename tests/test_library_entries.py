@@ -56,7 +56,7 @@ ENTRIES = _entries()
 #: library. ``BivariateNormal`` alone is twelve seconds.
 SLOW_ENTRIES = {
     'BivariateNormal', 'BivariateCatPair', 'BivariateClaytonMixed',
-    'BivariateGumbel', 'BivariateIndependent', 'LayerPicks',
+    'BivariateGumbel', 'BivariateIndependent', 'LayerPicks.Uniform',
 }
 
 #: Entries that deliberately **refuse** to build, and the exception each
@@ -70,12 +70,14 @@ CANNOT_BUILD = {
     'DefectivePareto': 'InfiniteVarianceError',
     # A mixture severity is not a distribution on its own; it has to be folded
     # into an aggregate. Both entries are severity *components*, used by name.
-    'ISOMixedExponential': 'CannotBuild',
+    # ``ISOMixedExponential`` carried the first of these until the library
+    # reorganization renamed it ``CommAutoMixedExponentialSev``.
+    'CommAutoMixedExponentialSev': 'CannotBuild',
     'MixedExponentialSev': 'CannotBuild',
-    # Deferred by design: joint P&L, and book-level P&L. Both raise with the
-    # reason rather than producing something wrong.
-    'BivariatePnLAxis': 'NotImplementedError',
-    'NumericsPayPair': 'NotImplementedError',
+    # Deferred by design: book-level P&L raises with the reason rather than
+    # producing something wrong. ``BivariatePnLAxis`` and ``NumericsPayPair``
+    # were the other two demonstrations and left the library in the same
+    # reorganization, with no successor.
     'PnLBook': 'NotImplementedError',
 }
 
@@ -99,36 +101,52 @@ VALIDATION_BASELINE = {
     'CurveLogLogistic': 'SEV_CV|AGG_CV',
     'CurveLomax': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
     'CurvePareto': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV|INFEASIBLE',
-    'SevOneParameter': 'SEV_MEAN|AGG_MEAN',
+    'SevOneParameterScaled': 'SEV_MEAN|AGG_MEAN',
     # --- Failure demonstrations ----------------------------------------
     # These exist *to* fail. HeavyTailValidation is the worked example of what
     # a failed validation looks like and what the explanation says.
-    'HeavyTailValidation': 'SEV_MEAN|AGG_MEAN|DEFECTIVE|INFEASIBLE',
+    # The reorganization respelled this one from ``100 * pareto 1.3 + -100``
+    # to the equivalent ``100 * lomax 1.3``. Same law, but the sizer reads the
+    # shifted Pareto's body differently, so INFEASIBLE no longer fires and the
+    # entry now reports three flags rather than four.
+    'HeavyTailValidation': 'SEV_MEAN|AGG_MEAN|DEFECTIVE',
     'InverseGaussianMixed': 'AGG_MEAN|AGG_CV|AGG_SKEW|DEFECTIVE',
     # --- Picking leaves the declared moments, by design -----------------
     # See test_layer_picks_reproduces_every_pick: the picks are reproduced
     # exactly, and the analytic severity moments are precisely what picking
     # decided to move away from. Read accuracy off the layer table instead.
-    'LayerPicks': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
+    # ``LayerPicks.Compare`` is a portfolio holding one picked and one
+    # unpicked unit, so it carries the picked unit's departure plus the skew
+    # terms the pairing exposes.
+    'LayerPicks.Uniform': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
+    'LayerPicks.Compare':
+        'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW',
     # --- Signed severity on a wrapped window ----------------------------
     # A signed window aliases at the ends; the numerics section exists to
-    # show that behavior rather than to hide it. ``SignedPortfolioPair`` is
-    # the real thing and the only ALIASING in the shipped library: it loses
-    # 94% of the total mean with a pmf deficit of 1.2e-13, which is mass
-    # conserved and relocated, the definition of wrap. Its three former
-    # companions left this list at 1.0.0a311, when the flag stopped being a
-    # ratio of two mean errors and started measuring the convolution step
+    # show that behavior rather than to hide it. Three entries left this list
+    # at 1.0.0a311, when the flag stopped being a ratio of two mean errors and
+    # started measuring the convolution step
     # (``dev/done/plan-validation-punchup.md``); their residuals are 2.5e-10,
     # 1.1e-12 and 3.5e-7, and they were never aliasing.
-    'SignedPortfolioPair': 'ALIASING',
-    'WindowContinuous': 'SEV_CV',
-    'WindowedGrid': 'AGG_SKEW',
+    #
+    # ``SignedPortfolioPair`` was the fourth and the only true positive left,
+    # two Poisson(50) signed normals offset either way so the total mean was
+    # zero, where wrap shows. The library reorganization rewrote it as two
+    # one-claim fixed units with means 25 and 5, so the total is 30 and the
+    # grid reproduces it: it no longer aliases and no longer belongs here.
+    # THE SHIPPED LIBRARY NOW HAS NO ALIASING ENTRY AT ALL, which is worth a
+    # deliberate decision rather than a silent gap.
+    'WindowedContinuous': 'SEV_CV',
+    'WindowedSimple': 'AGG_SKEW',
+    # A signed reflection: the FFT skew of a reflected lognormal is the
+    # hardest of the six moments to reproduce and the only one that misses.
+    'SignedPremiumMinusLoss': 'AGG_SKEW',
     # --- Deliberately coarse or deliberately thick ----------------------
     # The cat model pins bs=2 on a billions-scale lognormal with cv 14.6, and
     # the thick portfolios are chosen to sit at the edge of what the grid can
     # carry. Both are the subject of their sections.
     'GrossCatXOL': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|INFEASIBLE',
-    'ExactGamma': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV',
+    'RawLognorm': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV',
     'BodoffFour': 'SEV_MEAN|SEV_CV|AGG_MEAN',
     'PIRCatNonCatGross': 'SEV_SKEW',
     'PropertyCasualty': 'SEV_MEAN|AGG_MEAN',
@@ -243,13 +261,14 @@ def test_three_dice_is_exact():
     of the die. That is what separates "is the method right" from "is the
     discretization fine", which every other entry has to hold apart.
     """
-    a = build('ThreeDice')
-    # E[A] = 3 x 3.5 = 10.5, and the estimate is EXACT, not merely close
-    assert abs(a.actual_m - 10.5) < 1e-12
-    assert abs(a.est_m - 10.5) < 1e-9
-    # support runs 3..18; each extreme has probability (1/6)^3
-    assert abs(a.density_df.loc[3, 'p_total'] - (1 / 6) ** 3) < 1e-12
-    assert abs(a.density_df.loc[18, 'p_total'] - (1 / 6) ** 3) < 1e-12
+    a = build('DiceThreeEvenDice')
+    # the die is dsev [2:12:2], the even faces 2..12, so E[X] = 7
+    # E[A] = 3 x 7 = 21, and the estimate is EXACT, not merely close
+    assert abs(a.actual_m - 21.0) < 1e-12
+    assert abs(a.est_m - 21.0) < 1e-9
+    # support runs 6..36; each extreme has probability (1/6)^3
+    assert abs(a.density_df.loc[6, 'p_total'] - (1 / 6) ** 3) < 1e-12
+    assert abs(a.density_df.loc[36, 'p_total'] - (1 / 6) ** 3) < 1e-12
 
 
 def test_ph_distortion_is_a_concave_probability_map():
@@ -277,15 +296,22 @@ def test_ph_distortion_is_a_concave_probability_map():
 def test_layer_picks_reproduces_every_pick():
     """The picks clause hits the selected layer losses to floating point.
 
-    Marked slow: the entry pins ``log2=20`` and the comparison needs the
-    unadjusted curve at the same resolution, so this is two large builds.
-    """
-    tower = np.array([0., 100e3, 250e3, 500e3, 1e6])
-    picks = np.array([6700., 1700., 1600., 1000.])
+    Marked slow with the entry, which is one of the six over a second.
 
-    a = build('LayerPicks')
-    gross = build('agg Gross 1 claim sev.ISOMixedExponential fixed',
-                  bs=125, log2=20)
+    The entry this pinned before the library reorganization was a mixed
+    exponential whose tower stopped well below the end of the severity, so the
+    mean was the picks *plus* an untouched tail and the tail had to be checked
+    separately. ``LayerPicks.Uniform`` is a uniform on [0, 100] whose top pick
+    is 100, so the tower covers the whole severity: the tail term is exactly
+    zero and the mean is the picks and nothing else, which is a sharper
+    statement of the same property.
+    """
+    tower = np.array([0., 50., 75., 100.])
+    picks = np.array([30., 12., 5.])
+
+    a = build('LayerPicks.Uniform')
+    gross = build('agg Gross dfreq[1] sev 100 * uniform',
+                  bs=a.bs, log2=a.log2)
 
     def layer_losses(obj):
         """Expected loss to each tower layer, off the limited expected value."""
@@ -295,13 +321,11 @@ def test_layer_picks_reproduces_every_pick():
 
     # every pick is reproduced, to floating point
     assert np.abs(layer_losses(a) / picks - 1).max() < 1e-8
-    # the adjusted mean is the picks plus the untouched loss above the tower
-    tail = gross.est_sev_m - layer_losses(gross).sum()
-    assert abs(a.est_sev_m / (picks.sum() + tail) - 1) < 1e-6
-    # and above the top of the tower nothing moved
-    xs = np.asarray(a.xs)
-    above = (xs > 1e6) & (xs < 2e7)
-    assert np.abs(a.sf(xs[above]) / gross.sf(xs[above]) - 1).max() < 1e-6
+    # picking moved the mean off the declared 50 and onto the picks
+    assert abs(gross.est_sev_m - 50.) < 1e-9
+    assert abs(a.est_sev_m - picks.sum()) < 1e-9
+    # the tower covers the severity, so there is no loss above it to preserve
+    assert layer_losses(gross).sum() == pytest.approx(gross.est_sev_m, rel=1e-9)
 
 
 def test_limit_profile_derives_the_claim_count():
@@ -311,10 +335,10 @@ def test_limit_profile_derives_the_claim_count():
     the severity limited at that band's limit, then adds the bands. The count
     is an output, which is the whole point of stating exposure this way.
     """
-    a = build('LimitProfile')
+    a = build('ExposureLimitProfile')
     # the aggregate mean IS the premium-weighted expected loss, exactly:
-    # 10000x0.8 + 20000x0.7 + 5000x0.5 = 24500
-    assert abs(a.actual_m - 24500.0) < 1e-9
+    # 10000x0.8 + 20000x0.7 + 5000x0.6 + 5000x0.5 = 27500
+    assert abs(a.actual_m - 27500.0) < 1e-9
     # and the FFT estimate agrees to grid accuracy
     assert abs(a.est_m / a.actual_m - 1) < 1e-6
     # E[A] = E[N] x E[X] still holds across the blended profile

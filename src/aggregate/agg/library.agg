@@ -2,63 +2,38 @@
 # library.agg  --  the shipped DecL library
 # ======================================================================
 #
-# Version: 1
+# Version: 2
 #
 # PURPOSE
 # -------
-# ONE library. It replaces examples.agg (the old curated set),
-# cookbook.agg (the feature walkthrough) and actuarial-severity-curves.agg
-# (the severity reference), which were three files with overlapping
-# purpose, three different naming conventions, and no machine-readable
-# grouping. It is the default `build` recipe base and the source the
-# aggregate_api (aLL) SPA reads for its Examples dropdown.
+# Library of educational, illustrative and testing examples.
 #
 # NAMES are descriptive and GLOBALLY UNIQUE across kinds, so `build('X')`
 # and `build.recipe('X')` always mean the same entry and no `kind=`
-# disambiguator is ever needed. The old single-letter filing prefixes
-# (A., B., K. ...) are gone, grouping is what tags{} is for. Names that
-# lead with a citekey (Mack2003.Lognorm) keep it: that is a citation, not
-# a filing code.
+# disambiguator is ever needed.
 #
 # THE TRAILER carries everything a tool reads. Comments are for humans
 # only, nothing in src/aggregate parses them (the lexer deletes them
 # before the grammar ever sees a line).
 #
-#   note{...}       one-line description. The SPA dropdown blurb.
-#   tags{...}       comma- and/or space-separated slugs; grouping and
+#   note{...}       one-line description. The aLL SPA dropdown blurb.
+#   tags{...}       comma-separated slugs; grouping and
 #                   selection (build.discover(tags=...)).
 #   hints{...}      key=value; build settings, caller-wins.
 #
-# A trailer holds FACTS ABOUT THE ENTRY, and nothing longer. Long-form
-# write-ups are not facts about an entry, they are documents, and they live
-# in the presentations repository (C:/s/AI/notes/aggregate-presentations),
-# which is the staging ground for material that ends up in the monograph.
-# The `doc{{{...}}}` clause that used to carry them here was retired before
-# 1.0: it mixed a book into a declaration language, and the DecL stable-tier
-# promise would have frozen that mistake for the life of the major version.
-# See dev/done/plan-decommission-docs.md.
+# TAG VOCABULARY: namespaced.
 #
-# A note that wants a library program should PRINT it rather than retype it:
+# Tags never restate the object's TYPE. Type is what `kind` is for:
+# build.discover(kind='sev') finds every severity object.
 #
-#     print(build.recipe('LayerPicks').decl)
+# Every tag carries a namespace:
 #
-# which reads the live library and so cannot go stale.
-#
-# TAG VOCABULARY: namespaced, and it never restates the object's TYPE.
-#
-# Type is what `kind` is for: build.discover(kind='sev') finds every severity
-# object. A tag saying `severity` on a `sev` entry would be dead weight, and
-# would invite "why does type appear twice, which do I use?". So every tag
-# carries a namespace and answers a question `kind` cannot:
-#
-#   topic:X   what the recipe is ABOUT, severity frequency aggregate
+#   topic:X   subject of the recipe, severity frequency aggregate
 #             reinsurance pnl portfolio distortion bivariate picks tweedie
 #             numerics, with bounds and ruin reserved. Independent of type: an
 #             `agg` entry demonstrating a severity form is topic:severity, and
 #             that is not a restatement.
-#   role:X    how hard it is and where it stands. Every entry carries EXACTLY
-#             ONE level, so a role-grouped menu covers the library with no
-#             leftovers:
+#   role:X    Every entry carries at least one role, and exactly one of:
 #
 #               intro         the very basic examples, the place to start.
 #               intermediate  the teaching items, one idea each.
@@ -89,36 +64,19 @@
 # a trailer written after the last unit binds to that unit, because the
 # portfolio's trailer slot closes before the units are read.
 #
-# HOW MUCH DOCUMENTATION: every entry carries a note{...}, and that is the
-# whole norm. It is all `discover` and the object dropdown need, and there
-# is no second tier to fill in: `build.recipes` is a DIRECTORY of the
-# library, never a backlog.
-#
 # LAYOUT: the canonical `spread` form, one clause per line at a two-space
-# indent, each statement closed by `;` and separated by a blank line. It is
-# what `build.recipe('X').decl` prints and what every generated cookbook page
-# shows, so the file and the docs read alike. Regenerate it with
-# `python dev/done/reflow_library.py`, which renders each entry through
-# `decl_writer.format_program(..., layout='spread')` and refuses to write
-# unless every statement still parses to the same spec.
+# indent, each statement closed by `;` and separated by a blank line.
+# Not all entries round-trip: math expressions, array explosion, tower
+# explosion, and recipe sev expansion.
+# A `sev agg.NAME` reference is NOT in that set: the spec records the reference
+# instead of inlining the object.
 #
-# Thirteen entries are exempt, and stay hand-written. The unparser cannot
-# invert a named object reference (`sev.UnitSeverity` is resolved and inlined at
-# parse time, and since a216 an engine reference like `less agg.USXOLTower`
-# writes its whole body out), or the `minimum` distortion combinator (the child
-# names are not retained). Three more keep the compact `ssev <c> - <dist>`
-# spelling, whose canonical form `-1 * <dist> + <c>` parses two ways. All are
-# laid out in the same style by hand; tests/test_agg_libraries.py holds the
-# list and checks the rest.
+# ORDER is important: aLL Examples are in the input order in this file.
+# The order goes starter examples, distortions, severity clause forms,
+# the severity curve reference, frequency, aggregates, aggregates with reinsurance,
+# an aggregate as a # severity, bivariate, profit and loss, numerics, portfolios,
+# and reproductions.
 #
-# A `sev agg.NAME` reference is NOT in that set: since a293 the writer renders
-# it, because the spec records the reference instead of inlining the object.
-#
-# SECTION ORDER, and it is load bearing: this is reading order, and the
-# consumer menus present the library in it rather than resorting. Starter
-# examples, distortions, severity clause forms, the severity curve reference,
-# frequency, aggregates, aggregates with reinsurance, an aggregate as a
-# severity, bivariate, profit and loss, numerics, portfolios, reproductions.
 # Adding an entry means choosing where in the reading it belongs, not
 # appending it to the end of a section.
 #
@@ -147,14 +105,14 @@ agg DiceOneDie.Sev
 
 agg DiceTwoDice
   dfreq [2]
-  dsev [1 2 3 4 5 6]
-  note{Sum of the rolls of two dice.}
+  dsev [1:6]
+  note{Sum of the rolls of two dice. The dice using an array.}
   tags{topic:aggregate, role:intro};
 
-agg DiceThreeDice
+agg DiceThreeEvenDice
   dfreq [3]
-  dsev [1 2 3 4 5 6]
-  note{Sum of three dice, exact discrete aggregate; zero validation error.}
+  dsev [2:12:2]
+  note{Sum of three even-only dice using array with a step-size, exact discrete aggregate; zero validation error.}
   tags{topic:aggregate, role:intro};
 
 agg DiceOfDice
@@ -171,7 +129,7 @@ agg BasicRandomWalk
 
 agg BasicBiasedCoins
   dfreq [1000]
-  dsev [0 1] [.51 .49]
+  dsev [0 1] [0.51 0.49]
   note{The number of heads in one thousand tosses of a slightly biased coin.}
   tags{topic:aggregate, role:intro};
 
@@ -305,7 +263,7 @@ agg SevReversed
   1 claim
   ssev -(50 / exp(0.3**2/2)) * lognorm 0.3
   fixed
-  note{Signed severity: a negative scale reflects the lognormal through zero, giving mean -50 and a cv reported as -0.3069, negative because the mean is.}
+  note{Signed severity: a negative scale reflects the lognormal through zero, giving mean -50 and a cv reported as -0.3069, negative because the mean is negative.}
   tags{topic:severity, role:advanced};
 
 agg SevMixture
@@ -578,7 +536,7 @@ agg NegativeBinomialMixed
 agg InverseGaussianMixed
   10 claims
   dsev [1]
-  mixed ig .65
+  mixed ig 0.65
   note{An inverse Gaussian mixing distribution, where the shape parameter is the cv of the mixing distribution.}
   tags{topic:frequency, role:intermediate};
 
@@ -897,7 +855,7 @@ bivariate BivariateIndependent
   25 claims
   agg A
     dfreq [1]
-    ssev lognorm 50 cv .25 - 25
+    ssev lognorm 50 cv 0.25 - 25
   agg B
     dfreq [1]
     ssev gamma 50 cv 0.25 - 25
@@ -949,10 +907,10 @@ bivariate BivariateCatPair
   25 claims
   agg Wind
     dfreq [0 1] [0.3 0.7]
-    sev lognorm 40 cv 0.65 splice [0] [250]
+    sev lognorm 40 cv 0.65 splice [0 250]
   agg Flood
     dfreq [0 1] [0.1 0.9]
-    sev lognorm 60 cv 0.95 splice [0] [300]
+    sev lognorm 60 cv 0.95 splice [0 300]
   copula independent
   mixed gamma 0.2
   note{A common shock bivariate: the Wind and Flood units share one frequency mixing variable.}
@@ -1109,7 +1067,7 @@ agg SignedLump
 
 agg SignedPremiumMinusLoss
   5 claims
-  ssev 100 - lognorm 95 cv .2
+  ssev 100 - lognorm 95 cv 0.2
   poisson
   note{Premium minus loss: the constant minus distribution form reflects the severity, giving a mean of 5.}
   tags{topic:aggregate, role:advanced};

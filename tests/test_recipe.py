@@ -136,9 +136,9 @@ def test_decl_carries_hints_and_nothing_else():
 def test_decl_rebuilds_the_entry(lib):
     """The rendered declaration is real DecL that reproduces the object."""
     from aggregate import build
-    r = lib.recipe('ThreeDice')
+    r = lib.recipe('DiceThreeEvenDice')
     rebuilt = build(r.decl)
-    assert abs(rebuilt.actual_m - build('ThreeDice').actual_m) < 1e-12
+    assert abs(rebuilt.actual_m - build('DiceThreeEvenDice').actual_m) < 1e-12
 
 
 def test_decl_is_empty_when_the_entry_cannot_be_unparsed(lib):

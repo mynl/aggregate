@@ -371,7 +371,7 @@ agg HINT.Dup     1 claim sev gamma 50 cv 0.1 fixed hints{bs=1; bs=2}
 # See tests/test_fcc_surface.py, tests/test_doc_clause.py.
 agg FCC.Note 10 claims sev lognorm 50 cv 1 poisson note{a stored note} hints{log2=16};
 agg FCC.RT   10 claims sev lognorm 50 cv 1 poisson note{hello} hints{log2=16};
-agg FCC.Pin  10 claims sev lognorm 50 cv 1 poisson zm 0.5 ! note{drop me};
+agg FCC.Pin  10 claims sev lognorm 50 cv 1 poisson zm 0.5 note{drop me};
 port FCC.NoteP
 	agg N1 5 claims sev lognorm 10 cv 1 poisson note{unit one}
 	agg N2 3 claims sev gamma 5 cv .5 poisson note{unit two}
@@ -819,17 +819,26 @@ agg AB.Renewal.LayerMix 5 years sev gamma 10 cv .3 wait [1 2] xs [0 0.5] expon w
 # forward, so the realized E[N] is an output -- the textbook parameterization,
 # matching Loss Data Analytics and R's actuar. A trailing "!" pins the mean
 # instead: solve for the base mean whose realized E[N] equals the clause.
-agg AC.ZM.Poisson 4 claims dsev [1] poisson zm 0.5                                            note{Base Poisson(4) reweighted to p0=0.5; realized E[N] = 2.0373, not 4};
-agg AC.ZM.PoissonPin 4 claims dsev [1] poisson zm 0.5 !                                       note{Trailing ! pins E[N] = 4 exactly; the base mean solves to 7.9973};
-agg AC.ZT.Poisson 4 claims dsev [1] poisson zt                                                note{Zero-truncated Poisson(4): E[N] = 4/(1-exp(-4)) = 4.0746};
-agg AC.ZT.PoissonSmall 0.5 claims dsev [1] poisson zt                                         note{Base mean below 1 is fine; the ZT mean is 1.2707 (a ZT count cannot average below 1)};
-agg AC.ZT.PoissonPin 4 claims dsev [1] poisson zt !                                           note{Pinned ZT: E[N] = 4, base mean 3.9207};
-agg AC.ZM.Deflate 4 claims dsev [1] poisson zm 0.005                                          note{Zero DEFLATION: p0 below the natural exp(-4) = 0.0183 raises the mean};
-agg AC.ZM.Negbin 4 claims dsev [1] negbin 3 zm .5                                             note{ZM negative binomial; freq_a is the variance multiplier 1+beta};
-agg AC.ZM.Geometric 4 claims dsev [1] geometric zm .5                                         note{ZM geometric};
-agg AC.ZM.Binomial 4 claims dsev [1] binomial 0.6 zm .5                                       note{ZM binomial, per-trial probability 0.6};
-agg AC.ZM.Logarithmic 4 claims dsev [1] logarithmic zm .5                                     note{Logarithmic already has p0 = 0, so zm only adds mass at zero};
-agg AC.ZM.LossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5 !                              note{Monetary exposure with !: hits E[X] = 1000; without ! it warns and delivers 500};
+agg AC.ZM.Poisson 4 claims dsev [1] poisson zm 0.5 !                                            note{The ! reading: 4 is the base mean, Poisson(4) reweighted to p0=0.5, so the realized E[N] = 2.0373, not 4};
+agg AC.ZM.PoissonPin 4 claims dsev [1] poisson zm 0.5                                       note{The default reading: E[N] = 4 exactly, the base mean solving to 7.9973};
+agg AC.ZT.Poisson 4 claims dsev [1] poisson zt !                                                note{Zero-truncated Poisson(4): E[N] = 4/(1-exp(-4)) = 4.0746};
+agg AC.ZT.PoissonSmall 0.5 claims dsev [1] poisson zt !                                         note{Base mean below 1 is fine; the ZT mean is 1.2707 (a ZT count cannot average below 1)};
+agg AC.ZT.PoissonPin 4 claims dsev [1] poisson zt                                           note{Pinned ZT: E[N] = 4, base mean 3.9207};
+agg AC.ZM.Deflate 4 claims dsev [1] poisson zm 0.005 !                                          note{Zero DEFLATION: p0 below the natural exp(-4) = 0.0183 raises the mean};
+agg AC.ZM.Negbin 4 claims dsev [1] negbin 3 zm .5 !                                             note{ZM negative binomial; freq_a is the variance multiplier 1+beta};
+agg AC.ZM.Geometric 4 claims dsev [1] geometric zm .5 !                                         note{ZM geometric};
+agg AC.ZM.Binomial 4 claims dsev [1] binomial 0.6 zm .5 !                                       note{ZM binomial, per-trial probability 0.6};
+agg AC.ZM.Logarithmic 4 claims dsev [1] logarithmic zm .5 !                                     note{Logarithmic already has p0 = 0, so zm only adds mass at zero};
+agg AC.ZM.LossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5                              note{Monetary exposure, default reading: hits E[X] = 1000; append ! and it warns and delivers 500};
+
+# [ZT-ZM-Recalibrate-Default] (a325): create_frequency renders its child in the
+# explicit base-parameterization form whichever way the parent was written, so
+# the modification is applied once. The pinned parent is the case that broke,
+# reporting 100 / (1 - 0.3) = 142.857 against the parent's own 100.
+agg AC.ZM.Count    100 claims sev lognorm 50 cv 1 poisson zm 0.3                             note{pinned zm parent: create_frequency must reproduce E[N] = 100, not 142.857};
+agg AC.ZM.CountB   100 claims sev lognorm 50 cv 1 poisson zm 0.3 !                           note{the same parent under the ! reading: 100 is the base mean};
+agg AC.ZT.Count    100 claims sev lognorm 50 cv 1 poisson zt                                 note{pinned zt parent, the truncated twin};
+agg AC.ZT.CountB   100 claims sev lognorm 50 cv 1 poisson zt !                               note{zt under the ! reading: 100 is the base mean}
 
 # ============================================================
 # AD. Eventual-ruin solvers ([Ruin-Wiener-Hopf])
@@ -947,7 +956,7 @@ agg AH.Limit   2 claims 5000 xs 0 sev lognorm 1000 cv 2 poisson                 
 agg AH.Negbin  2 claims sev lognorm 1000 cv 2 negbin 2                                         note{Refused: Poisson thinning is what makes 1 - exp(-lam S) hold};
 agg AH.Fixed   2 claims sev lognorm 1000 cv 2 fixed                                            note{Refused: fixed count};
 agg AH.Mixed   2 claims sev lognorm 1000 cv 2 mixed gamma 0.3                                  note{Refused: gamma-mixed Poisson is not Poisson};
-agg AH.ZM      2 claims sev lognorm 1000 cv 2 poisson zm 0.5                                   note{Refused: zero modification breaks P(N=0) = exp(-lam)};
+agg AH.ZM      2 claims sev lognorm 1000 cv 2 poisson zm 0.5 !                                   note{Refused: zero modification breaks P(N=0) = exp(-lam)};
 
 # ============================================================
 # AI. Layer peeling ([Layer-Peeling-Shorthand], 1.0.0a183)
@@ -1301,14 +1310,14 @@ xpnl DRV.Walk derive premium less agg DRV.WalkE 100 premium at 0.65 lr sev logno
 # are different: the frequency one holds the zt/zm mean, the severity one keeps
 # the layer unconditional. See tests/test_agg_as_severity.py and
 # dev/done/plan-agg-port-as-sev.md.
-agg ASV.Inner 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! hints{log2=16; bs=1/32}                            note{the certified inner: per-policy law, at least one claim, 100 per claimant};
+agg ASV.Inner 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt hints{log2=16; bs=1/32}                            note{the certified inner: per-policy law, at least one claim, 100 per claimant};
 agg ASV.Book 5000 claims 300 xs 0 sev agg.ASV.Inner mixed gamma .2                                                  note{the split limit: 5000 policies, 300 policy aggregate as an occurrence limit; the layers clause conditions by default};
 agg ASV.BookUncond 5000 claims 300 xs 0 sev agg.ASV.Inner ! mixed gamma .2                                          note{the same book with the layer kept unconditional by the severity !};
 agg ASV.NoLayer 10 claims sev agg.ASV.Inner poisson                                                                 note{no layers clause, so the reference is convolved whole};
 agg ASV.Dice dfreq [1] dsev [1 2 3] hints{log2=8; bs=1}                                                             note{a discrete inner: the outer is then an exact self convolution};
 agg ASV.TwoDice dfreq [2] sev agg.ASV.Dice                                                                          note{two of the inner, exactly};
 agg ASV.Chain dfreq [2] sev agg.ASV.TwoDice hints{log2=8; bs=1}                                                     note{depth 2: a reference whose own severity is a reference};
-port ASV.Port hints{log2=16; bs=1/32} agg ASV.PortUnit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt !;
+port ASV.Port hints{log2=16; bs=1/32} agg ASV.PortUnit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt;
 agg ASV.FromPort 10 claims sev port.ASV.Port poisson                                                                note{a portfolio total as a severity};
 agg ASV.SignedInner dfreq [1] ssev 100 - lognorm 50 cv .5 hints{log2=12; bs=1/16}                                   note{a signed source};
 agg ASV.UsesSigned dfreq [1] ssev agg.ASV.SignedInner                                                               note{ssev over a signed reference keeps the negative atoms}

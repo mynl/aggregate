@@ -1290,10 +1290,16 @@ class UnderwritingTransformer(Transformer):
 
     # ----- frequency -------------------------------------------------
     # Zero modification / truncation. The bare forms leave ``freq_pin_mean``
-    # unset: the exposure clause supplies the *base* mean and the realized
-    # E[N] is whatever the (a, b, 1) reweighting makes it. The ``!`` variants
-    # pin the mean instead -- Aggregate then solves for the base mean whose
-    # realized E[N] equals the exposure clause.
+    # unset, which is now the *pinned* reading: ``Aggregate`` defaults it True
+    # and solves for the base mean whose realized E[N] equals the exposure
+    # clause, so ``10 claims ... zt`` delivers ten claims. The ``!`` variants
+    # opt out and set it False, giving the textbook (a, b, 1) base
+    # parameterization where the clause sets the base mean and the reweighting
+    # shifts the realized E[N] off it ([ZT-ZM-Recalibrate-Default]).
+    #
+    # The rule names still read from the grammar, where the ``!`` alternatives
+    # are the ``_pin`` ones. Renaming them would be a grammar edit for no gain:
+    # the marker is what moved, not the shape of the language.
     def freq_zm(self, c):
         freq, _zm, expr = c
         freq["freq_zm"] = True
@@ -1304,7 +1310,7 @@ class UnderwritingTransformer(Transformer):
         freq, _zm, expr = c
         freq["freq_zm"] = True
         freq["freq_p0"] = expr
-        freq["freq_pin_mean"] = True
+        freq["freq_pin_mean"] = False
         return freq
 
     def freq_zt(self, c):
@@ -1317,7 +1323,7 @@ class UnderwritingTransformer(Transformer):
         freq, _zt = c
         freq["freq_zm"] = True
         freq["freq_p0"] = 0.0
-        freq["freq_pin_mean"] = True
+        freq["freq_pin_mean"] = False
         return freq
 
     def freq_mixed_two(self, c):

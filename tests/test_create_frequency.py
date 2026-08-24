@@ -28,7 +28,15 @@ def _count_moments(freq_agg):
     'agg P 100 claims sev lognorm 50 cv 1 poisson',
     'agg G 100 claims sev lognorm 50 cv 2 mixed gamma 0.5',
     'agg N 100 claims sev lognorm 50 cv 1 negbin 2',
+    # both readings of a zero-modified clause, and both truncated forms.
+    # [ZT-ZM-Recalibrate-Default]: the child is rendered in the explicit
+    # base-parameterization form whichever way the parent was written, so the
+    # modification is applied once. The pinned parent is the case that broke:
+    # it reported 100 / (1 - 0.3) = 142.857 against the parent's 100.
     'agg ZM 100 claims sev lognorm 50 cv 1 poisson zm 0.3',
+    'agg ZMB 100 claims sev lognorm 50 cv 1 poisson zm 0.3 !',
+    'agg ZT 100 claims sev lognorm 50 cv 1 poisson zt',
+    'agg ZTB 100 claims sev lognorm 50 cv 1 poisson zt !',
 ])
 def test_count_matches_parent_frequency(program):
     """The count distribution reproduces the parent frequency moments."""

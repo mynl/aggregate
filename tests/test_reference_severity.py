@@ -28,7 +28,7 @@ logging.disable(logging.CRITICAL)
 
 def _inner(name='RS.Inner'):
     """The plan's headline inner: a per-policy split-limit aggregate."""
-    return build(f'agg {name} 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt !')
+    return build(f'agg {name} 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt')
 
 
 def _exact_moment(xs, ps, n):
@@ -43,7 +43,7 @@ def test_portfolio_as_severity_no_longer_raises():
     # scipy, before any severity logic ran: an object-valued ``sev_name`` was
     # handed ``name=''`` and scipy indexes ``name[0]``.
     p = build('port RS.pSL agg RS.SL 1.5 claims 100 xs 0 '
-              'sev gamma 50 cv 2 poisson zt !')
+              'sev gamma 50 cv 2 poisson zt')
     s = p.as_severity()
     assert s.sev_kind == 'meta'
     assert s.support_atoms is not None and len(s.support_atoms) > 1

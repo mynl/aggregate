@@ -1,9 +1,11 @@
 """Zero-truncated / zero-modified frequency: the (a, b, 1) class.
 
 Covers ``[ZT-ZM-Frequency-Fix]`` (1.0.0a152), which reparameterized ``zm`` /
-``zt`` to the textbook form: the exposure clause states the **un-modified
-(base)** mean and the reweighting shifts it forward in closed form, with the
-DecL ``!`` marker opting back in to a pinned mean.
+``zt`` to the textbook form, and ``[ZT-ZM-Recalibrate-Default]`` (1.0.0a325),
+which swapped which reading the DecL marker selects. The exposure clause now
+states the **realized** ``E[N]`` by default, so ``n claims`` means n claims,
+and the ``!`` marker opts out into the textbook (a, b, 1) form where the
+clause is the **un-modified (base)** mean and the reweighting shifts it.
 
 The reference values are computed here from the published formulas rather than
 captured from the implementation, so these are genuine cross-checks:
@@ -142,12 +144,12 @@ def test_prob_eq_0_is_the_modified_value():
 
 
 # ---------------------------------------------------------------------------
-# DecL: default shifts the mean, ``!`` pins it
+# DecL: the default pins the mean, ``!`` shifts it
 # ---------------------------------------------------------------------------
 
-def test_decl_default_shifts_the_mean():
-    """``4 claims ... poisson zm 0.5`` -> base 4, realized E[N] = c * 4."""
-    a = build('agg ZMDefault 4 claims dsev [1] poisson zm 0.5', log2=12)
+def test_decl_bang_shifts_the_mean():
+    """``4 claims ... poisson zm 0.5 !`` -> base 4, realized E[N] = c * 4."""
+    a = build('agg ZMDefault 4 claims dsev [1] poisson zm 0.5 !', log2=12)
     c = 0.5 / (1 - np.exp(-4.0))
     assert a.base_mean == pytest.approx(4.0)
     assert a.n == pytest.approx(c * 4.0)
@@ -155,9 +157,9 @@ def test_decl_default_shifts_the_mean():
     assert a.density_df.p_total.iloc[0] == pytest.approx(0.5, abs=1e-10)
 
 
-def test_decl_bang_pins_the_mean():
-    """``poisson zm 0.5 !`` -> realized E[N] is exactly the exposure clause."""
-    a = build('agg ZMPinned 4 claims dsev [1] poisson zm 0.5 !', log2=12)
+def test_decl_default_pins_the_mean():
+    """``poisson zm 0.5`` -> realized E[N] is exactly the exposure clause."""
+    a = build('agg ZMPinned 4 claims dsev [1] poisson zm 0.5', log2=12)
     assert a.n == pytest.approx(4.0, rel=1e-10)
     assert a.base_mean > 4.0
     assert a.frequency.modify_mean(a.base_mean) == pytest.approx(4.0, rel=1e-9)
@@ -168,13 +170,13 @@ def test_decl_zero_truncated_builds_at_every_mean():
     """``zt`` used to raise a NaN solver error for every input."""
     for n, expected in [(0.5, 0.5 / (1 - np.exp(-0.5))),
                         (4.0, 4.0 / (1 - np.exp(-4.0)))]:
-        a = build(f'agg ZT{n} {n} claims dsev [1] poisson zt', log2=12)
+        a = build(f'agg ZT{n} {n} claims dsev [1] poisson zt !', log2=12)
         assert a.n == pytest.approx(expected)
         assert a.density_df.p_total.iloc[0] == pytest.approx(0.0, abs=1e-12)
 
 
 def test_decl_round_trips_the_bang():
-    """The writer emits ``!`` so a pinned program survives a re-render."""
+    """The writer emits ``!`` so an un-pinned program survives a re-render."""
     a = build('agg ZMRT 4 claims dsev [1] poisson zm 0.5 !', log2=10)
     assert 'zm 0.5 !' in ' '.join(a.pprogram.split())
     plain = build('agg ZMRT2 4 claims dsev [1] poisson zm 0.5', log2=10)
@@ -186,9 +188,13 @@ def test_decl_round_trips_the_bang():
 # ---------------------------------------------------------------------------
 
 def test_monetary_exposure_warns_and_names_the_fix():
-    """A ``loss`` target is missed when the mean shifts; say so."""
-    with pytest.warns(ZeroModifiedExposureWarning, match=r'Append ! '):
-        a = build('agg ZMLoss 1000 loss sev lognorm 10 cv 1 poisson zm 0.5',
+    """A ``loss`` target is missed when the mean shifts; say so.
+
+    Only reachable through ``!`` since a325: the default pins the target, so
+    a reader who did not ask for the base parameterization never sees this.
+    """
+    with pytest.warns(ZeroModifiedExposureWarning, match=r'Drop the ! '):
+        a = build('agg ZMLoss 1000 loss sev lognorm 10 cv 1 poisson zm 0.5 !',
                   log2=16)
     # base count 100 = 1000 / 10, realized halves it
     assert a.base_mean == pytest.approx(100.0)
@@ -198,16 +204,18 @@ def test_monetary_exposure_warns_and_names_the_fix():
 def test_monetary_exposure_with_bang_hits_the_target_silently():
     with warnings.catch_warnings():
         warnings.simplefilter('error', ZeroModifiedExposureWarning)
-        a = build('agg ZMLossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5 !',
+        a = build('agg ZMLossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5',
                   log2=16)
     assert a.actual_m == pytest.approx(1000.0, rel=1e-6)
 
 
 def test_claims_exposure_does_not_warn():
-    """Count in / shifted count out is the documented default: stay quiet."""
+    """A count clause is never a money target, so stay quiet either way."""
     with warnings.catch_warnings():
         warnings.simplefilter('error', ZeroModifiedExposureWarning)
         build('agg ZMClaims 4 claims sev lognorm 10 cv 1 poisson zm 0.5', log2=14)
+        build('agg ZMClaimsB 4 claims sev lognorm 10 cv 1 poisson zm 0.5 !',
+              log2=14)
 
 
 # ---------------------------------------------------------------------------

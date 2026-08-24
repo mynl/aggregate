@@ -1,6 +1,8 @@
 # Plan: punchups, August 24
 
-Status: drafted 2026-08-24. A running punch list: each numbered item is
+Status: DONE, all five items landed 2026-08-24 as 1.0.0a321 to a325, one bump each. Item 3 carried an open question that the author ruled during execution (flip the constructor default too); everything else was executable as drafted. The execution log at the foot records the review, the gate evidence and the divergences per item.
+
+Originally: drafted 2026-08-24. A running punch list: each numbered item is
 self-contained, executes independently, and bumps the version on its own.
 More items will be added; keep each section tight.
 
@@ -285,3 +287,25 @@ Divergences.
 3. **The interior severity label rides on the picks line.** The plan says only that the bang does. The label closes the whole clause in the terse form, so it has to follow the picks for the bytes to be unchanged, which puts it at the end of the picks child in spread: `picks [50 75 100] [30 12 5] as Picked`. It re-parses, the preprocessor folding the lines back into one statement, but it reads as though the label belongs to the picks rather than to the severity. Worth a look if the author dislikes it; the alternative costs the byte identity.
 
 4. **Three tests and three corpus lines, against the plan's one case.** The plan asks for a spread-layout case for a picks program. Landed with that plus one pinning the bang and the label on the last fragment, and one pinning that a picks-free severity keeps its bang on the severity line (the case that proves the block is conditional). The three matching programs are in `decl-testers.agg` under DW, and round-trip.
+
+## Item 3 [ZT-ZM-Recalibrate-Default], landed `1.0.0a325`
+
+Executed on the author's ruling of 2026-08-24, taken during this session: **flip the constructor default too**, so `Aggregate` takes `freq_pin_mean=True` and DecL and the constructor read the same way. The plan recommended the parser-only alternative and the author chose the other one; the cost accepted is a stable-tier behavior change for direct constructor callers, recorded in the CHANGELOG entry as a breaking change.
+
+Behavior preservation was measured, not argued. Every one of the nineteen `zt` / `zm` corpus entries was built at `a324` and again after the swap, and all nineteen agree exactly on realized `n`, base mean, `est_m` and aggregate mean. The `expected_specs.json` regen touches exactly the eight `_test_suite.agg` lines that carry the clause and nothing else.
+
+Divergences, and the two findings the plan did not anticipate.
+
+1. **A real defect, not a stale expectation: `create_frequency` applied the modification twice.** `_frequency_program` feeds `self.base_mean` into the child program, which was right while a bare clause meant "this number is the base mean". After the swap a bare clause reads its number as the realized mean, so the child solved for a base mean whose realized mean was the parent's base mean. A `zm 0.3` parent of 100 claims reported a count of 142.857, which is 100 / (1 - 0.3). The child is now rendered in the explicit base-parameterization form (`freq_pin_mean=False`, which the writer spells `!`) whichever way the parent was written, and `test_count_matches_parent_frequency` grew from one zero-modified case to four, covering `zm`, `zm !`, `zt` and `zt !`. Four matching corpus lines joined `decl-testers.agg` under AC.
+
+2. **Three ripple sites the plan does not list.** `constants.py` `ZeroModifiedExposureWarning`'s docstring said "Append `!` ... to pin the target"; `_frequency.py` `solve_base_mean`'s infeasible message said "Drop the ! to let the mean shift"; and that method's own docstring said it was "reached from DecL only through the `!` marker". All three are now backwards, and all three are reworded. The warning's **emit condition** needed no change at all: `_aggregate.py` already gates on `not self._freq_pin_mean`, so the warning simply stops firing on the default path and fires only for a reader who asked for the base parameterization, which is the right behavior and a quiet improvement.
+
+3. **The corpus toggle was scripted, and the first script corrupted two notes.** A regex over the whole line matched `zt` inside `note{pr(N=0)=1, there is no zt version}` on two `_test_suite.agg` entries. Caught by reading the diff rather than by a test, since a note is prose and nothing parses it. The corpus was reverted and the script rerun with the `note{}` / `tags{}` / `hints{}` trailer split off first. That split then missed two `port` statements whose `hints{}` precedes the unit, so `ASV.Port` and `Z.Ref.Book` were toggled by hand. Twenty five clauses in all.
+
+4. **Four notes were rewritten, because their prose named the marker.** `AC.ZM.PoissonPin`, `AC.ZM.Poisson`, `AC.ZM.LossPin` and `library.agg`'s `ZMPoissonFrequency` all described the behavior in terms of `!` and read backwards after the toggle. The entry **names** were checked and are all still correct: a `Pin` entry still pins, it just spells it differently now.
+
+5. **The transformer rule names still say `_pin` for the `!` alternatives.** `freq_zm_pin` / `freq_zt_pin` now set `freq_pin_mean=False`, which reads oddly. Renaming them means editing `decl.lark`'s rule aliases for no behavioral gain, so a comment above them explains the mismatch instead. Worth revisiting if the grammar is touched for another reason.
+
+6. **`docs/2_aggregate_overview/features.rst` and the generated `ref_include.rst` moved in lockstep**, per the plan. Three code samples lost a now-wrong `!` and two passages were rewritten; `ref_include.rst` regenerates from `grammar(add_to_doc=True)` and carries only the two grammar comments. The docs build is the author's, as usual.
+
+7. **Two more suites hard-code the marker and had to be inverted.** `test_agg_as_severity.py` and `test_reference_severity.py` build split limit inners as `poisson zt !`, and the first of them deliberately contrasts `AAS.SL` (pinned) against `AAS.SLzt` (un-pinned) as two different models. The swap inverts both, so each named entry keeps its meaning: every `zt !` in the two files became bare, and `AAS.SLzt` gained the marker it now needs. The contrast, and the comment explaining it, survive intact. These did not surface until the full tier 2 run, the targeted suites having all passed.

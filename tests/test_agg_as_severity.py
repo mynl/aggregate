@@ -34,9 +34,9 @@ HINTS = 'hints{log2=16; bs=1/32}'
 #: The three inners of the plan's section 5 discussion, identical except for
 #: the frequency clause, plus the aggregate-reinsurance benchmark.
 INNERS = f"""
-agg AAS.SL    1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! {HINTS}
+agg AAS.SL    1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt {HINTS}
 
-agg AAS.SLzt  1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt {HINTS}
+agg AAS.SLzt  1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! {HINTS}
 
 agg AAS.SL2   1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson {HINTS}
 
@@ -76,7 +76,7 @@ def test_two_claims_of_a_reference_is_the_self_convolution():
 
 def test_reference_severity_moments_are_the_inners_exact_atom_sums():
     src = build(f'agg AAS.MRef 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
-                f'poisson zt ! {HINTS}')
+                f'poisson zt {HINTS}')
     outer = build('agg AAS.OneOf dfreq [1] sev agg.AAS.MRef')
     sev = outer.sevs[0]
     xs, ps = src.xs, src.agg_density / src.agg_density.sum()
@@ -88,7 +88,7 @@ def test_port_reference_matches_the_portfolio_total():
     # a portfolio's own trailer sits before its units (``port_out: PORT name
     # as_label trailer agg_list``), which is where the hygiene rule reads it
     p = build(f'port AAS.PBook {HINTS} agg AAS.U1 1.5 claims 100 xs 0 '
-              f'sev gamma 50 cv 2 poisson zt !')
+              f'sev gamma 50 cv 2 poisson zt')
     ref = build('agg AAS.FromPort dfreq [1] sev port.AAS.PBook')
     xs = p.density_df.loss.values
     ps = p.density_df.p_total.values
@@ -130,7 +130,7 @@ def test_the_zt_identity():
 
 
 def test_the_freq_bang_variant_is_a_different_model():
-    # ``poisson zt !`` holds the truncated mean at 1.5; ``poisson zt`` makes
+    # ``poisson zt`` holds the truncated mean at 1.5; ``poisson zt !`` makes
     # 1.5 the underlying parameter and the truncated mean about 1.93
     a = build('agg AAS.ZtA2 5000 claims 300 xs 0 sev agg.AAS.SL2 poisson')
     c = build('agg AAS.ZtC 5000 claims 300 xs 0 sev agg.AAS.SL poisson')
@@ -327,7 +327,7 @@ def test_iterated_builds_re_resolve_the_inner():
 def test_one_program_can_define_and_use_an_inner():
     uw = Underwriter()
     rv = uw.build_many(f"""
-agg SP.SL 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! {HINTS}
+agg SP.SL 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt {HINTS}
 
 agg SP.Auto 5000 claims 300 xs 0 sev agg.SP.SL mixed gamma .2
 """)
@@ -617,7 +617,7 @@ def test_a_portfolio_unit_resolves_a_reference_severity():
     assert unit.sevs[0].sev_kind == 'dhistogram'
     assert unit.sevs[0].sev1 == pytest.approx(
         build('agg AAS.SL 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
-              f'poisson zt ! {HINTS}').est_m, rel=1e-9)
+              f'poisson zt {HINTS}').est_m, rel=1e-9)
     assert p.est_m > 0
 
 

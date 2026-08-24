@@ -2190,7 +2190,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                  sev_pick_attachments=None, sev_pick_losses=None,
                  occ_reins=None, occ_kind='', occ_reins_label=None,
                  freq_name='', freq_a=0.0, freq_b=0.0, freq_zm=False, freq_p0=np.nan,
-                 freq_pin_mean=False,
+                 freq_pin_mean=True,
                  exp_years=0.0, exp_rate=0.0,
                  wait_name='', wait_a=np.nan, wait_b=0.0, wait_mean=0.0, wait_cv=0.0,
                  wait_loc=0.0, wait_scale=0.0, wait_xs=None, wait_ps=None,
@@ -2250,12 +2250,15 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         :param freq_b:          claims per occurrence (delaporte or sig), scale of beta or lambda (Sichel)
         :param freq_zm:         True/False zero modified flag
         :param freq_p0:         if freq_zm, provides the modified value of p0; default is nan
-        :param freq_pin_mean:   DecL ``!`` after ``zm`` / ``zt``. False (default): the
-                                exposure clause sets the **un-modified (base)** mean and
-                                the (a, b, 1) reweighting shifts it, so the realized E[N]
-                                is an output -- the textbook parameterization. True: solve
-                                for the base mean whose realized E[N] matches the exposure
-                                clause instead. Ignored unless ``freq_zm``.
+        :param freq_pin_mean:   True (default): solve for the base mean whose realized
+                                E[N] matches the exposure clause, so ``n claims`` means
+                                n claims. False, the DecL ``!`` after ``zm`` / ``zt``:
+                                the clause sets the **un-modified (base)** mean and the
+                                (a, b, 1) reweighting shifts it, so the realized E[N] is
+                                an output, the textbook parameterization. Ignored unless
+                                ``freq_zm``. The default changed at 1.0.0a325
+                                ([ZT-ZM-Recalibrate-Default]); before that it was False
+                                and the DecL marker meant the opposite.
         :param exp_years:       renewal horizon T (the DecL ``T years`` exposure);
                                 requires ``freq_name='renewal'`` and a ``wait_*``
                                 law (strict pairing). The claim count is the
@@ -2983,7 +2986,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 f'{self.name}: the exposure clause states a monetary target of '
                 f'{self._zm_requested_loss:,.6g}, but zm/zt shifts the mean off '
                 f'it: E[N] {_base_n:,.6g} -> {self.n:,.6g} delivers '
-                f'{tot_loss:,.6g}. Append ! to the zm/zt clause to pin the '
+                f'{tot_loss:,.6g}. Drop the ! from the zm/zt clause to pin the '
                 f'target instead.',
                 ZeroModifiedExposureWarning, stacklevel=2)
         # Pull the headline moments off the canonical stats_df mixed column.
@@ -3156,11 +3159,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
     def _zm_base_count(self, en):
         """Map an exposure-clause claim count to the base mean the frequency consumes.
 
-        Under ``zm`` / ``zt`` the DecL exposure clause states the **un-modified
-        (base)** mean by default, so this is the identity. The ``!`` marker
-        (:attr:`_freq_pin_mean`) flips the reading: the clause then states the
-        *realized* ``E[N]``, and the base mean is solved for by
-        :meth:`~aggregate.distributions.Frequency.solve_base_mean`.
+        Under ``zm`` / ``zt`` the DecL exposure clause states the *realized*
+        ``E[N]`` by default, so the base mean is solved for by
+        :meth:`~aggregate.distributions.Frequency.solve_base_mean`. The ``!``
+        marker (:attr:`_freq_pin_mean` False) flips the reading: the clause
+        then states the **un-modified (base)** mean and this is the identity,
+        the realized mean being whatever the reweighting makes it.
 
         Returns ``en`` unchanged for an unmodified frequency, so callers can
         apply it without branching.
@@ -5295,7 +5299,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         the count. ``n`` is the correct total expected count even for profiles
         and mixed frequency. Under ``zm`` / ``zt`` the caller passes the *base*
         mean instead, because the preserved zero-modification clause re-applies
-        the shift when the rendered program is rebuilt. An empirical
+        the shift when the rendered program is rebuilt, and pairs it with an
+        explicit ``freq_pin_mean=False`` so the clause reads that number as the
+        base mean rather than as the realized one. An empirical
         (``dfreq``) frequency already *is* the
         count distribution, so its outcome/probability vectors are kept as the
         ``dfreq`` head and no ``claims`` exposure is synthesized.
@@ -5371,6 +5377,17 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # clause, so its exposure number must be the *base* mean -- feeding the
         # realized ``n`` back in would apply the modification a second time.
         # The two coincide for every unmodified frequency.
+        #
+        # Since a325 the bare clause reads its exposure number as the REALIZED
+        # mean, so the child is written in the explicit base-parameterization
+        # form (``freq_pin_mean=False``, which the writer renders as the ``!``
+        # marker). Without this the child solves for a base mean whose realized
+        # mean is the parent's base mean, and the count comes out modified
+        # twice: a ``zm 0.3`` parent of 100 claims reported 142.857
+        # ([ZT-ZM-Recalibrate-Default]). Harmless for an unmodified frequency,
+        # where the writer emits no marker at all.
+        if spec.get('freq_zm'):
+            spec = dict(spec, freq_pin_mean=False)
         return self._count_program(spec, self.base_mean, name)
 
     def with_hints(self, **extra):

@@ -882,7 +882,7 @@
       "freq_b": 4.0
     }
   },
-  "agg Cc.Freq20.Poisson     4 claims dsev  [1]  poisson zt": {
+  "agg Cc.Freq20.Poisson     4 claims dsev  [1]  poisson zt !": {
     "kind": "agg",
     "name": "Cc.Freq20.Poisson",
     "spec": {
@@ -898,11 +898,12 @@
       "freq_name": "poisson",
       "freq_zm": true,
       "freq_p0": 0.0,
+      "freq_pin_mean": false,
       "note": "",
       "hints": ""
     }
   },
-  "agg Cc.Freq21.Poisson     4 claims dsev  [1]  poisson zm .5": {
+  "agg Cc.Freq21.Poisson     4 claims dsev  [1]  poisson zm .5 !": {
     "kind": "agg",
     "name": "Cc.Freq21.Poisson",
     "spec": {
@@ -918,11 +919,12 @@
       "freq_name": "poisson",
       "freq_zm": true,
       "freq_p0": 0.5,
+      "freq_pin_mean": false,
       "note": "",
       "hints": ""
     }
   },
-  "agg Cc.Freq22.Geometric   4 claims dsev  [1]  geometric zm .5        note{pr(N=0)=1, there is no zt version}": {
+  "agg Cc.Freq22.Geometric   4 claims dsev  [1]  geometric zm .5 !        note{pr(N=0)=1, there is no zt version}": {
     "kind": "agg",
     "name": "Cc.Freq22.Geometric",
     "spec": {
@@ -938,11 +940,12 @@
       "freq_name": "geometric",
       "freq_zm": true,
       "freq_p0": 0.5,
+      "freq_pin_mean": false,
       "note": "pr(N=0)=1, there is no zt version",
       "hints": ""
     }
   },
-  "agg Cc.Freq23.Logarithmic 4 claims dsev  [1]  logarithmic zm .5      note{pr(N=0)=1, there is no zt version}": {
+  "agg Cc.Freq23.Logarithmic 4 claims dsev  [1]  logarithmic zm .5 !      note{pr(N=0)=1, there is no zt version}": {
     "kind": "agg",
     "name": "Cc.Freq23.Logarithmic",
     "spec": {
@@ -958,11 +961,12 @@
       "freq_name": "logarithmic",
       "freq_zm": true,
       "freq_p0": 0.5,
+      "freq_pin_mean": false,
       "note": "pr(N=0)=1, there is no zt version",
       "hints": ""
     }
   },
-  "agg Cc.Freq24.Binomial    4 claims dsev  [1]  binomial 0.6 zm .5     note{Cannot make p0 smaller than the natural p}": {
+  "agg Cc.Freq24.Binomial    4 claims dsev  [1]  binomial 0.6 zm .5 !     note{Cannot make p0 smaller than the natural p}": {
     "kind": "agg",
     "name": "Cc.Freq24.Binomial",
     "spec": {
@@ -979,11 +983,12 @@
       "freq_a": 0.6,
       "freq_zm": true,
       "freq_p0": 0.5,
+      "freq_pin_mean": false,
       "note": "Cannot make p0 smaller than the natural p",
       "hints": ""
     }
   },
-  "agg Cc.Freq25.Negbin      4 claims dsev  [1]  negbin 3 zm .5         note{Limits on p0}": {
+  "agg Cc.Freq25.Negbin      4 claims dsev  [1]  negbin 3 zm .5 !         note{Limits on p0}": {
     "kind": "agg",
     "name": "Cc.Freq25.Negbin",
     "spec": {
@@ -1000,6 +1005,7 @@
       "freq_a": 3.0,
       "freq_zm": true,
       "freq_p0": 0.5,
+      "freq_pin_mean": false,
       "note": "Limits on p0",
       "hints": ""
     }
@@ -5833,7 +5839,7 @@
       "hints": ""
     }
   },
-  "agg Z.SplitLimit.Policy 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt ! hints{log2=16; bs=1/32} note{US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.}": {
+  "agg Z.SplitLimit.Policy 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt hints{log2=16; bs=1/32} note{US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.}": {
     "kind": "agg",
     "name": "Z.SplitLimit.Policy",
     "spec": {
@@ -5851,7 +5857,6 @@
       "freq_name": "poisson",
       "freq_zm": true,
       "freq_p0": 0.0,
-      "freq_pin_mean": true,
       "note": "US personal auto split limit, the per-policy law: 100 per claimant, at least one claim per policy.",
       "hints": "log2=16; bs=1/32"
     }
@@ -5871,7 +5876,7 @@
       "hints": ""
     }
   },
-  "port Z.Ref.Book hints{log2=16; bs=1/32} agg Z.Ref.Unit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt !": {
+  "port Z.Ref.Book hints{log2=16; bs=1/32} agg Z.Ref.Unit 1.5 claims 100 xs 0 sev gamma 50 cv 2 poisson zt": {
     "kind": "port",
     "name": "Z.Ref.Book",
     "spec": {
@@ -5894,7 +5899,6 @@
             "freq_name": "poisson",
             "freq_zm": true,
             "freq_p0": 0.0,
-            "freq_pin_mean": true,
             "note": "",
             "hints": ""
           }

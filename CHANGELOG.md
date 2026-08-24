@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a325
+
+**[ZT-ZM-Recalibrate-Default] `zt` and `zm` now deliver the claim count you asked for, and `!` opts out.** `4 claims ... poisson zt` used to give 4.0746 claims and `4 claims ... poisson zm 0.5` gave 2.0373, the exposure clause setting the un-modified (base) mean of the (a, b, 1) construction and the reweighting shifting the realized `E[N]` off it. The bare clause now states the realized mean and solves for the base mean behind it; the trailing `!` selects the old textbook reading. `Aggregate.freq_pin_mean` changes default from `False` to `True` to match, so the constructor and DecL read the same way. `Frequency.solve_base_mean` is now on the common path, so its refusal is reachable from ordinary programs: a zero-truncated count cannot average below one, and `0.5 claims ... zt` that used to build now raises naming `!` as the escape. `ZeroModifiedExposureWarning` fires only on the `!` path, a monetary target being pinned by default. `create_frequency` was applying the modification twice under the new reading and is fixed; it reported 142.857 against a `zm 0.3` parent's own 100.
+
+**Breaking, both tiers.** Direct `Aggregate(freq_zm=True, ...)` callers who relied on the old default get a solved base mean where they used to get the textbook parameterization; pass `freq_pin_mean=False` to keep it. Every `zt` / `zm` line in `library.agg`, `decl-testers.agg` and `_test_suite.agg` had its marker toggled so all nineteen affected entries build to identical numbers, verified entry by entry against `a324`. `expected_specs.json` regenerates, eight lines.
+
 ## 1.0.0a324
 
 **[Format-Program-Picks-Line] `picks` gets its own line in the spread layout.** `_render_sev_clause` returns a `_Block` when the severity carries picks: the distribution heads the clause and `picks [attachments] [losses]` is its child, one level deeper. `_render_dist` gains a `split=` argument returning `(head, picks fragment)`; its other two callers are unchanged. The terse form does not move a byte, so `spec_to_decl`, the `to_agg` export and the round-trip corpus are untouched: the trailing `!` of an unconditional severity and an interior severity label both close the whole clause, so both ride at the end of the picks fragment. The `clash` renderer flattens the clause with `_render_terse`, a clash component being one line by construction.

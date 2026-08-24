@@ -288,9 +288,12 @@ class Frequency(HelpMixin):
         """
         Inverse map: the base mean whose realized ``E[N]`` is ``target_mean``.
 
-        The opt-in counterpart of :meth:`modify_mean`, reached from DecL only
-        through the ``!`` marker (``poisson zm 0.5 !``). This is the one place a
-        numerical solve survives in the zero-modification path.
+        The counterpart of :meth:`modify_mean`, and the DecL default: a bare
+        ``poisson zm 0.5`` states the realized mean and comes here. The ``!``
+        marker (``poisson zm 0.5 !``) opts out and takes :meth:`modify_mean`
+        instead. This is the one place a numerical solve survives in the
+        zero-modification path, and since ``a325`` it is on the common path,
+        so its infeasible branch is reachable from ordinary programs.
 
         Notes
         -----
@@ -315,8 +318,9 @@ class Frequency(HelpMixin):
             raise ValueError(
                 f'solve_base_mean: {self.freq_name!r} with p0 = '
                 f'{self.freq_p0:.6g} cannot reach a mean of {target_mean:.6g}; '
-                f'zero modification admits only E[N] > {floor_mean:.6g}. Drop '
-                f'the ! to let the mean shift, or raise the claim count.')
+                f'zero modification admits only E[N] > {floor_mean:.6g}. '
+                f'Append ! to read the count as the un-modified base mean and '
+                f'let the modification shift it, or raise the claim count.')
         hi = max(target_mean, 1.0)
         for _ in range(200):
             if self.modify_mean(hi) >= target_mean:
@@ -597,8 +601,8 @@ class Frequency(HelpMixin):
                 out.append(
                     f'The exposure clause sets the un-modified base mean '
                     f'{float(base):,.6g}; the modification shifts it to the '
-                    f'realized E[N] below (append ! in DecL to pin the mean '
-                    f'instead).')
+                    f'realized E[N] below (this is the DecL ! reading; drop '
+                    f'the ! to state the realized mean instead).')
         if base is not None:
             # freq_moms consumes the base mean and returns the realized moments
             ex1, ex2, _ = self.freq_moms(float(base))

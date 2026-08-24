@@ -653,14 +653,15 @@ compounds policies.
 .. ipython:: python
 
     sl_policy = build('agg SplitPolicy 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
-                      'poisson zt ! hints{log2=16; bs=1/32}')
+                      'poisson zt hints{log2=16; bs=1/32}')
     qd(sl_policy)
 
 ``SplitPolicy`` is one policy's loss: the 100 per-claimant limit is its layers
 clause, and the zero-truncated Poisson puts at least one claim on every policy
-(the frequency-side ``!`` holds the requested mean at 1.5 rather than treating
-1.5 as the untruncated parameter). The book is 5,000 of them, with the 300
-policy aggregate applied as an ordinary occurrence limit on the reference:
+(the requested mean of 1.5 is the realized one, which is what a bare ``zt``
+means; appending ``!`` would read 1.5 as the untruncated parameter instead).
+The book is 5,000 of them, with the 300 policy aggregate applied as an ordinary
+occurrence limit on the reference:
 
 .. ipython:: python
 
@@ -697,14 +698,15 @@ it with its resolution pinned.
 .. ipython:: python
 
     candidate = build('agg LoosePolicy 1.5 claims 100 xs 0 sev gamma 50 cv 2 '
-                      'poisson zt !')
+                      'poisson zt')
     print(candidate.with_hints())
 
 **The two** ``!``\ **s are different and both legal in one program.** On the
-frequency clause, ``!`` modifies ``zt`` / ``zm`` so the requested mean is the
-realized one. On a severity clause, ``!`` makes the layer unconditional, which
-keeps mass at or below the attachment instead of conditioning it away. The
-split-limit program above carries both.
+frequency clause, ``!`` modifies ``zt`` / ``zm`` so the requested mean is read
+as the un-modified base parameter rather than as the realized mean, which is
+the default. On a severity clause, ``!`` makes the layer unconditional, which
+keeps mass at or below the attachment instead of conditioning it away. They
+are unrelated, and one program may legitimately carry both.
 
 The severity-side one is worth understanding on a reference, because the mass it
 governs is invisible from the declaration. A layers clause conditions on

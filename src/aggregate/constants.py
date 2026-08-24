@@ -324,16 +324,19 @@ class ZeroModifiedExposureWarning(UserWarning):
     Zero truncation and zero modification are the (a, b, 1) construction of
     Klugman, Panjer and Willmot (2012) §6.6: the base distribution is held
     fixed and reweighted, so the mean *moves* -- that is what the modification
-    is for. DecL follows the textbook (and R's ``actuar``) in reading the
-    exposure clause as the **un-modified base mean**, which is exactly right
-    when the clause states a claim count.
+    is for. The ``!`` marker asks DecL for exactly that textbook reading (and
+    R's ``actuar``'s), taking the exposure clause as the **un-modified base
+    mean**.
 
     A *monetary* clause (``1000 loss``, ``1000 premium at 0.65 lr``,
     ``100 exposure at 0.05 rate``) is different: it states a money target that
     the shifted mean will miss. This warning names the requested amount, what
-    was delivered, and the base -> realized count move. Append ``!`` to the
-    ``zm`` / ``zt`` clause to pin the target instead (``poisson zm 0.5 !``),
-    which solves for the base mean that hits it.
+    was delivered, and the base -> realized count move. Drop the ``!`` to pin
+    the target instead, which solves for the base mean that hits it.
+
+    Since ``1.0.0a325`` pinning is the default, so this fires only on the
+    ``!`` path: a reader who did not ask for the base parameterization never
+    sees it ([ZT-ZM-Recalibrate-Default]).
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

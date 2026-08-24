@@ -543,21 +543,21 @@ agg InverseGaussianMixed
 agg ZTPoissonFrequency
   4 claims
   dsev [1]
-  poisson zt
+  poisson zt !
   note{Zero-truncated Poisson, so there is always at least one claim and E[N] = 4 / (1 - exp(-4)) = 4.0746.}
   tags{topic:frequency, role:advanced};
 
 agg ZMPoissonFrequency
   4 claims
   dsev [1]
-  poisson zm 0.5
-  note{Zero-modified Poisson, inflating the no-claim probability to 0.5. The 4 is the unmodified base mean, so reweighting leaves E[N] = 2.0373. Append ! to pin E[N] = 4 instead.}
+  poisson zm 0.5 !
+  note{Zero-modified Poisson, inflating the no-claim probability to 0.5. The trailing ! reads the 4 as the unmodified base mean, so reweighting leaves E[N] = 2.0373. Drop the ! to pin E[N] = 4 instead.}
   tags{topic:frequency, role:advanced};
 
 agg ZMPoissonFrequency.Mean
   4 claims
   dsev [1]
-  poisson zm 0.5 !
+  poisson zm 0.5
   note{Zero-modified Poisson, inflating the no-claim probability to 0.5 while retaining a mean of 4.}
   tags{topic:frequency, role:advanced};
 
@@ -832,7 +832,7 @@ agg SplitLimitClaimant
   1.25 claims
   100 xs 0
   sev lognorm 50 cv 2
-  poisson zt !
+  poisson zt
   note{Claimants in one US auto 100/300 split limit accident: at least one claimant, 1.25 on average, each capped at the 100 per claimant limit. The count is a zero-truncated Poisson, reparameterized to achieve the desired mean.}
   tags{topic:frequency, topic:severity, role:advanced}
   hints{bs=1/4; log2=13};

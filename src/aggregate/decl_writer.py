@@ -404,8 +404,11 @@ def _render_freq(spec: dict) -> str:
     if spec.get('freq_zm'):
         p0 = spec.get('freq_p0', 0.0)
         s += ' zt' if float(p0) == 0.0 else f' zm {_fmt_num(p0)}'
-        # trailing ! = pin the realized mean to the exposure clause
-        if spec.get('freq_pin_mean'):
+        # trailing ! = do NOT recalibrate, i.e. take the exposure clause as the
+        # un-modified base mean. Pinning is the default, so the marker is
+        # emitted for an explicit False and the default (key absent, or True)
+        # renders bare ([ZT-ZM-Recalibrate-Default]).
+        if spec.get('freq_pin_mean', True) is False:
             s += ' !'
     return s
 

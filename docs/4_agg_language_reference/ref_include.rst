@@ -310,13 +310,14 @@
     // Frequency
     // ======================================================================
     
-    // Zero modification / truncation. The exposure clause sets the *un-modified*
-    // (base) mean and the (a, b, 1) reweighting shifts it forward, matching the
-    // textbook parameterization (Klugman-Panjer-Willmot 2012 §6.6, and R's actuar):
-    // base parameters in, mean out. Trailing ``!`` pins the mean instead -- solve
-    // for the base mean whose realized E[N] equals the exposure clause. ``!`` is
-    // the same *unconditional* marker used by ``sev`` / ``dsev`` / ``dwait``, and
-    // the realized count mean is precisely the unconditional one.
+    // Zero modification / truncation. The exposure clause states the *realized*
+    // E[N]: solve for the base mean whose modified mean equals the clause, so
+    // ``10 claims ... zt`` delivers ten claims. Trailing ``!`` opts out and gives
+    // the textbook parameterization instead (Klugman-Panjer-Willmot 2012 §6.6, and
+    // R's actuar): the clause is the *un-modified* (base) mean, base parameters
+    // in, mean out. The marker swapped meaning at 1.0.0a325; it used to mark the
+    // pinned reading and now marks the un-pinned one
+    // ([ZT-ZM-Recalibrate-Default]).
     freq: freq ZM expr "!"         -> freq_zm_pin
         | freq ZM expr             -> freq_zm
         | freq ZT "!"              -> freq_zt_pin
@@ -489,8 +490,9 @@
     //
     // The trailing ``!`` is the SEVERITY-side one: an unconditional layer, as on
     // ``sev`` and ``dsev``. It is unrelated to the FREQUENCY-side ``!`` that
-    // modifies ``zt`` / ``zm`` to hold the requested mean, and one program may
-    // legitimately carry both, in different clauses of different statements.
+    // modifies ``zt`` / ``zm`` to read the exposure clause as the base mean, and
+    // one program may legitimately carry both, in different clauses of different
+    // statements.
     sev_ref_leaf: BUILTIN_AGG      -> sev_ref_agg
                 | BUILTIN_PORT     -> sev_ref_port
                 | sev_ref_leaf "!" -> sev_ref_uncond

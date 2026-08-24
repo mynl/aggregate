@@ -7,6 +7,8 @@ passthroughs. The passthrough declarations (``summary``, ``stats``,
 is edited.
 """
 
+import pandas as pd
+
 from .._aggregate import Aggregate
 from ._core import (
     reins, stats, summary, tail, validation,
@@ -57,10 +59,51 @@ def _validation_insurer_aggregate(obj, blocks):
 _LAYER_TERMS = ('share', 'limit', 'attach', 'pr_attach', 'pr_detach',
                 'pr_loss', 'lol', 'output')
 
+#: The cover repeated onto the moments block, under its own component group.
+#: The same three meta rows the contract block leads with: with them present
+#: the block stands alone instead of depending on the reader holding the block
+#: above in their head.
+_LAYER_COVER = ('share', 'limit', 'attach')
+
 #: What the layer does to the three distributions. Component major, so the
 #: three readings of one distribution sit together.
-_LAYER_COMPONENTS = ('freq', 'sev', 'agg')
-_LAYER_MOMENTS = ('mean', 'cv', 'skew')
+_LAYER_COMPONENTS = ('cover', 'freq', 'sev', 'agg')
+
+#: The measures served per component. Frequency is one number here. The layer
+#: count is the gross count thinned by the probability a loss reaches the layer
+#: (``MomentAggregator.thin_moments``), so its mean is the reading that
+#: matters, and it is the reading that makes the block foot: freq mean times
+#: sev mean equals agg mean on every row. Its cv and skew describe the shape of
+#: that thinning rather than anything about the cover, so they leave this view;
+#: the frame keeps all three and the raw perspective still serves them.
+_LAYER_MOMENTS = {
+    'cover': _LAYER_COVER,
+    'freq': ('mean',),
+    'sev': ('mean', 'cv', 'skew'),
+    'agg': ('mean', 'cv', 'skew'),
+}
+
+
+def _moment_rows(frame):
+    """The consequence block's rows, in component order, cover group included.
+
+    The cover rows live under ``meta`` in the store and are relabeled into a
+    ``cover`` component here, which is a view level restatement of rows the
+    frame already carries and not a new frame row
+    (``[Perspective-May-Restructure]``). Everything else is read straight off
+    its own component.
+    """
+    sources, labels = [], []
+    for component in _LAYER_COMPONENTS:
+        for measure in _LAYER_MOMENTS[component]:
+            sources.append(('meta' if component == 'cover' else component,
+                            measure))
+            labels.append((component, measure))
+    keep = [(s, lab) for s, lab in zip(sources, labels) if s in frame.index]
+    out = frame.reindex(index=[s for s, _lab in keep])
+    out.index = pd.MultiIndex.from_tuples(
+        [lab for _s, lab in keep], names=frame.index.names)
+    return out
 
 
 def _layer_rows(frame, index):
@@ -100,8 +143,7 @@ def _reins_insurer_aggregate(obj, blocks):
         (summary_name, summary_frame, summary_kw) = blocks
     meta = stats_frame.loc['meta'] if 'meta' in \
         stats_frame.index.get_level_values('component') else stats_frame.iloc[:0]
-    moments = stats_frame.reindex(index=[
-        (c, m) for c in _LAYER_COMPONENTS for m in _LAYER_MOMENTS])
+    moments = _moment_rows(stats_frame)
     terms_caption = (
         'The contract, layer by layer: the share of a limit over an '
         'attachment, the chance a loss reaches it (pr_attach) and exhausts '
@@ -109,11 +151,15 @@ def _reins_insurer_aggregate(obj, blocks):
         'down the rows, because that is the comparison and the eye makes it '
         'down a column.')
     moments_caption = (
-        'What each layer does to the three distributions, on the same rows '
-        'as the contract above. Per layer figures are conditional on a loss '
-        'reaching the layer; the Ceded and Net rows are unconditional. Raw '
-        'noncentral moments (ex1, ex2, ex3) are dropped from this view; the '
-        'raw perspective keeps the full store. An aggregate stage leaves '
+        'What each layer does to the three distributions. The cover columns '
+        'repeat the share, limit and attachment, so the block reads on its '
+        'own. Layer frequency is the ground up count thinned by the chance a '
+        'loss reaches the layer, which is what makes freq mean times sev mean '
+        'come to agg mean on every row. Per layer figures are conditional on '
+        'a loss reaching the layer; the Ceded and Net rows are '
+        'unconditional. Raw noncentral moments (ex1, ex2, ex3) and the '
+        'frequency cv and skew are dropped from this view; the raw '
+        'perspective keeps the full store. An aggregate stage leaves '
         'frequency and severity blank, having changed neither.')
     summary_caption = (
         'Per stage cession impact on the eight validation columns: Change '

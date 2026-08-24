@@ -239,3 +239,19 @@ Divergences.
 **What was run clean instead, and its result.** Tier 2, the fast suite, `-m 'not slow'`: **4803 passed, only the three pre-existing library failures**, no memory failures at all. Then `-m slow -n 2` for the quarantined modules: 171 passed with one flake, and `tests/test_reins_bivariate.py` alone at `-n 2` passes whole (40 passed). Together those two commands cover everything the tier 3 gate covers.
 
 **The one flake was then shown to be impossible to attribute to this change.** `test_netceded_refuses_a_pin_it_cannot_honor` builds `OCC`, which carries no economics clause at all, so `_strip_ignored_economics` returns its argument unchanged; and it is an `agg`, so it never reaches the `bvagg` branch this item edits. It then calls `occ_bivariate` directly on the built object, which does not go through the factory. The edit is a provable no-op on that test.
+
+## Item 2 [Reins-Insurer-Moments-Block], landed `1.0.0a322`
+
+All three changes landed at view level, exactly as scoped: `reins_stats_df` does not move and RAW keeps the full store. The header now reads cover | freq | sev | agg over share limit attach | mean | mean cv skew | mean cv skew, the target column list.
+
+Divergences.
+
+1. **`_LAYER_MOMENTS` became a mapping, and `cover` joined `_LAYER_COMPONENTS`.** The plan described three separate edits (pin the frequency, drop freq cv and skew, add a cover group). They collapse into one data structure: `_LAYER_COMPONENTS` gains `'cover'` at the front and `_LAYER_MOMENTS` turns from a flat tuple of three measures into a component keyed mapping. That is what lets the block's column order be read off one declaration rather than assembled in the body, and it is why the freq narrowing costs no code at all. A new `_moment_rows` does the slice and the relabel; `_layer_rows` is untouched.
+
+2. **The cover rows are relabeled, not recomputed.** `('meta', 'share')` in the store becomes `('cover', 'share')` in the view. That keeps the block a pure reading of `reins_stats_df` and keeps `test_reins_aggregate_insurer_is_a_reading_of_the_raw_frame` meaningful; that test gained a two line mapping from the `cover` group back to `meta` rather than an exemption.
+
+3. **The plan's "no code change, add a test" for the thinning identity became two assertions, not one.** `test_reins_layer_frequency_is_the_thinned_count` asserts both halves: that freq mean times sev mean is agg mean on every row where frequency and severity are present, and that each layer's frequency really is the gross frequency times `pr_attach`. The second is the one that would catch a regression in `thin_moments` itself; the first is the one that would catch a view that reordered or mislabeled a column.
+
+4. **`pandas` is now imported in `exhibits/_aggregate.py`.** It was not, the module having previously done all its work through `_core` helpers and frame methods. The relabel needs `pd.MultiIndex.from_tuples`.
+
+5. **The exhibit IR snapshot moved, and the diff was read by key rather than by line.** `tests/data/exhibit_snapshots.json` regenerates through `tests/capture_exhibit_snapshots.py`. Exactly one of its 124 keys changed, `reins/insurer/ReinsAggregate`, with none added and none removed, which is the whole check that the change is confined to the block it targets.

@@ -26853,16 +26853,20 @@
       },
       "Gross",
       {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 1.5,
        "text": "1.500"
-      },
-      {
-       "raw": 0.3333333333333333,
-       "text": "0.33333"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00000"
       },
       {
        "raw": 19.999999999999996,
@@ -26902,12 +26906,16 @@
        "text": "1.000"
       },
       {
-       "raw": 0.6666666666666669,
-       "text": "0.66667"
+       "raw": 10.0,
+       "text": "10.00"
       },
       {
-       "raw": 0.0,
-       "text": "0.00000"
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000"
       },
       {
        "raw": 9.999999999999998,
@@ -26940,16 +26948,20 @@
      "cells": [
       "Ceded",
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
+       "raw": 10.0,
+       "text": "10.00"
+      },
+      {
        "raw": 1.5,
        "text": "1.500"
-      },
-      {
-       "raw": 0.3333333333333333,
-       "text": "0.33333"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00000"
       },
       {
        "raw": 6.666666666666666,
@@ -26985,16 +26997,20 @@
      "cells": [
       "Net",
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 1.5,
        "text": "1.500"
-      },
-      {
-       "raw": 0.3333333333333333,
-       "text": "0.33333"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00000"
       },
       {
        "raw": 13.333333333333332,
@@ -27023,7 +27039,7 @@
      ]
     }
    ],
-   "caption": "What each layer does to the three distributions, on the same rows as the contract above. Per layer figures are conditional on a loss reaching the layer; the Ceded and Net rows are unconditional. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store. An aggregate stage leaves frequency and severity blank, having changed neither.",
+   "caption": "What each layer does to the three distributions. The cover columns repeat the share, limit and attachment, so the block reads on its own. Layer frequency is the ground up count thinned by the chance a loss reaches the layer, which is what makes freq mean times sev mean come to agg mean on every row. Per layer figures are conditional on a loss reaching the layer; the Ceded and Net rows are unconditional. Raw noncentral moments (ex1, ex2, ex3) and the frequency cv and skew are dropped from this view; the raw perspective keeps the full store. An aggregate stage leaves frequency and severity blank, having changed neither.",
    "columns": [
     {
      "align": "l",
@@ -27057,8 +27073,8 @@
      },
      "key": "c2",
      "name": [
-      "freq",
-      "mean"
+      "cover",
+      "share"
      ],
      "raw": true
     },
@@ -27066,14 +27082,14 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c3",
      "name": [
-      "freq",
-      "cv"
+      "cover",
+      "limit"
      ],
      "raw": true
     },
@@ -27081,14 +27097,30 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
+      "cover",
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
       "freq",
-      "skew"
+      "mean"
      ],
      "raw": true
     },
@@ -27098,27 +27130,27 @@
      "dtype": "float",
      "format": {
       "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "sev",
-      "mean"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
       "group": true,
       "kind": "dec"
      },
      "key": "c6",
      "name": [
       "sev",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "sev",
       "cv"
      ],
      "raw": true
@@ -27130,7 +27162,7 @@
       "digits": 3,
       "kind": "si"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "sev",
       "skew"
@@ -27146,7 +27178,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c8",
+     "key": "c9",
      "name": [
       "agg",
       "mean"
@@ -27161,7 +27193,7 @@
       "group": true,
       "kind": "dec"
      },
-     "key": "c9",
+     "key": "c10",
      "name": [
       "agg",
       "cv"
@@ -27175,7 +27207,7 @@
       "digits": 3,
       "kind": "si"
      },
-     "key": "c10",
+     "key": "c11",
      "name": [
       "agg",
       "skew"
@@ -27191,6 +27223,9 @@
      },
      {
       "colspan": 3,
+      "text": "cover"
+     },
+     {
       "text": "freq"
      },
      {
@@ -27210,13 +27245,16 @@
       "text": "layer"
      },
      {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
       "text": "mean"
-     },
-     {
-      "text": "cv"
-     },
-     {
-      "text": "skew"
      },
      {
       "text": "mean"

@@ -641,15 +641,53 @@ def test_reins_aggregate_insurer_turns_the_layering_over(objects):
     assert list(terms.columns) == ['share', 'limit', 'attach', 'pr_attach',
                                    'pr_detach', 'pr_loss', 'lol', 'output']
     assert list(moments.columns.get_level_values(0).unique()) == \
-        ['freq', 'sev', 'agg']
-    assert list(moments.columns.get_level_values(1).unique()) == \
-        ['mean', 'cv', 'skew']
-    # the contract and the consequence share no column
-    assert set(terms.columns).isdisjoint(
-        c for c in moments.columns.get_level_values(1))
+        ['cover', 'freq', 'sev', 'agg']
+    assert list(moments.columns) == [
+        ('cover', 'share'), ('cover', 'limit'), ('cover', 'attach'),
+        ('freq', 'mean'),
+        ('sev', 'mean'), ('sev', 'cv'), ('sev', 'skew'),
+        ('agg', 'mean'), ('agg', 'cv'), ('agg', 'skew')]
+    # [Reins-Insurer-Moments-Block]: the cover is deliberately repeated so the
+    # block stands alone, and it is the only thing the two blocks share.
+    shared = set(terms.columns) & set(moments.columns.get_level_values(1))
+    assert shared == {'share', 'limit', 'attach'}
+    # frequency keeps its mean only: cv and skew describe the thinning, not
+    # the cover, so they stay in the frame and out of this view
+    assert ('freq', 'cv') not in moments.columns
+    assert ('freq', 'skew') not in moments.columns
     # still no noncentral moments in the insurer reading
     assert 'ex1' not in moments.columns.get_level_values(1)
     assert all('caption' in kw for _, _, kw in ins)
+
+
+def test_reins_layer_frequency_is_the_thinned_count(objects):
+    """[Reins-Insurer-Moments-Block]: the block foots, row by row.
+
+    The layer columns thin the gross count by the probability the subject
+    reaches the layer, so layer frequency is ground up frequency times
+    P(attach) and freq mean times sev mean is agg mean on every row. That
+    identity is what makes the three components readable side by side, and it
+    is asserted here so it cannot regress silently: it holds at the frame
+    level today and nothing in the view is allowed to break it.
+    """
+    obj = objects['ReinsAggregate']
+    moments = exhibit_frames(obj, 'reins', 'insurer')[1][1]
+    for row in moments.index:
+        f = moments.loc[row, ('freq', 'mean')]
+        s = moments.loc[row, ('sev', 'mean')]
+        a = moments.loc[row, ('agg', 'mean')]
+        if pd.isna(f) or pd.isna(s):
+            continue
+        assert f * s == pytest.approx(a, rel=1e-9), row
+    # and the layer count really is the thinned gross count
+    gross = moments.loc[('occ', 'Gross'), ('freq', 'mean')]
+    terms = exhibit_frames(obj, 'reins', 'insurer')[0][1]
+    for view, layer in moments.index:
+        if not str(layer).startswith('layer'):
+            continue
+        pr = terms.loc[(view, layer), 'pr_attach']
+        assert moments.loc[(view, layer), ('freq', 'mean')] == \
+            pytest.approx(gross * pr, rel=1e-9)
 
 
 def test_reins_aggregate_insurer_is_a_reading_of_the_raw_frame(objects):
@@ -664,8 +702,11 @@ def test_reins_aggregate_insurer_is_a_reading_of_the_raw_frame(objects):
                 raw.loc[('meta', measure), (view, layer)]
             assert (got == want) or (pd.isna(got) and pd.isna(want))
         for component, measure in moments.columns:
+            # the cover group is the meta rows restated under a name the
+            # reader needs, which is what a view is allowed to do
+            source = 'meta' if component == 'cover' else component
             got = moments.loc[(view, layer), (component, measure)]
-            want = raw.loc[(component, measure), (view, layer)]
+            want = raw.loc[(source, measure), (view, layer)]
             assert (got == want) or (pd.isna(got) and pd.isna(want))
 
 

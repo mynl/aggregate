@@ -200,6 +200,147 @@ def max_log2(x):
     return d
 
 
+#: Relative tolerance for deciding that an attachment lands on a grid point.
+#: The index is at most order 1e6 on a realistic grid, so this leaves a wide
+#: margin over float representation error while still catching a genuine miss:
+#: the smallest real miss is half a bucket, an index error of 0.5.
+_PICKS_GRID_RTOL = 1e-8
+
+#: How far the compatible-bucket search halves the realized bucket. Past
+#: ``bs / 2**20`` the suggestion needs more buckets to cover the same window
+#: than any grid the sizer would build, so reporting no suggestion is more
+#: useful than one that cannot be run.
+_PICKS_BUCKET_HALVINGS = 20
+
+
+def _is_integral(value, rtol=_PICKS_GRID_RTOL):
+    """True when ``value`` is a whole number to within a relative tolerance."""
+    return abs(value - round(value)) <= rtol * max(1.0, abs(value))
+
+
+def _picks_compatible_bucket(attachments, bs):
+    """The largest ``bs / 2**j`` dividing every attachment, or ``None``.
+
+    Parameters
+    ----------
+    attachments : array
+        Layer attachment points, all finite.
+    bs : float
+        The realized bucket size.
+
+    Returns
+    -------
+    float or None
+        The coarsest compatible bucket found within
+        ``_PICKS_BUCKET_HALVINGS`` halvings, else ``None``.
+
+    Notes
+    -----
+    Only halvings of the realized bucket are offered. The grid is a power of
+    two lattice, so halving keeps every existing grid point and adds the
+    midpoints, which is the change a user can make by pinning ``bs`` without
+    disturbing anything else about the sizing. An arbitrary common divisor of
+    the attachments (their gcd, say) would often be a bucket the sizer would
+    never choose and would not divide the window cleanly.
+    """
+    b = float(bs)
+    for _ in range(_PICKS_BUCKET_HALVINGS + 1):
+        if all(_is_integral(a / b) for a in attachments):
+            return b
+        b /= 2.0
+    return None
+
+
+def _picks_grid_indices(attachments, xs, bs):
+    """Positional index of each attachment, refusing any that misses the grid.
+
+    Parameters
+    ----------
+    attachments : array
+        Layer attachment points, ascending.
+    xs : array
+        The realized grid.
+    bs : float
+        The realized bucket size, ``xs[1] - xs[0]``.
+
+    Returns
+    -------
+    numpy array of int
+        The index into ``xs`` of each attachment.
+
+    Raises
+    ------
+    ValueError
+        If any attachment falls strictly inside a bucket, or above the top of
+        the window. The message names every offender, the realized grid, and a
+        bucket that would work.
+
+    Notes
+    -----
+    Picks defines the layers the reweighting is solved on, so unlike a
+    reinsurance tower it cannot rebucket. ``apply_reins_work`` evaluates
+    piecewise linear ceder and netter functions at every grid point and lands
+    the off grid results back on the lattice, which is faithful because the
+    contract is a function of the loss. A pick is a *constraint on an integral
+    between two boundaries*, so a boundary strictly inside a bucket has no
+    faithful reading: the bucket's mass sits at one point and cannot be split
+    between the layer below and the layer above without inventing a
+    within-bucket distribution. Snapping the boundary to the nearest grid point
+    was rejected (author ruling 2026-08-24) because it silently restates the
+    tower the user asked for.
+
+    The check is here rather than in :meth:`Aggregate.picks` so that every
+    caller is gated, including direct use of this function.
+    """
+    xs = np.asarray(xs)
+    attachments = np.asarray(attachments, dtype=float)
+    top = xs[-1]
+
+    positions = (attachments - xs[0]) / bs
+    off_grid = [a for a, i in zip(attachments, positions)
+                if np.isfinite(a) and a <= top and not _is_integral(i)]
+    too_high = [a for a in attachments if not np.isfinite(a) or a > top]
+
+    if off_grid or too_high:
+        from ._bucket_window import _fmt_bs                # noqa: PLC0415 local
+        parts = []
+        if off_grid:
+            named = ', '.join(f'{a:,.6g}' for a in off_grid)
+            parts.append(
+                f'picks: attachment{"s" if len(off_grid) > 1 else ""} {named} '
+                f'{"do" if len(off_grid) > 1 else "does"} not lie on the grid, '
+                f'which runs from {xs[0]:,.6g} in steps of bs={_fmt_bs(bs)}. '
+                f'A layer boundary inside a bucket has no faithful reading, so '
+                f'this is refused rather than snapped to the nearest bucket.')
+            finite = [a for a in attachments if np.isfinite(a) and a <= top]
+            suggestion = _picks_compatible_bucket(finite, bs)
+            if suggestion is not None:
+                parts.append(
+                    f'Rebuild on bs={_fmt_bs(suggestion)}, which divides every '
+                    f'attachment: pass bs={_fmt_bs(suggestion)} to build, or '
+                    f'write hints{{bs={_fmt_bs(suggestion)}}} on a library '
+                    f'entry (the MED entries are the model).')
+            else:
+                parts.append(
+                    'No halving of the bucket down to '
+                    f'bs={_fmt_bs(bs / 2 ** _PICKS_BUCKET_HALVINGS)} divides '
+                    'every attachment, so pin bs to a common divisor of the '
+                    'attachments instead, with hints{bs=...} on a library '
+                    'entry.')
+        if too_high:
+            named = ', '.join('inf' if not np.isfinite(a) else f'{a:,.6g}'
+                              for a in too_high)
+            parts.append(
+                f'picks: attachment{"s" if len(too_high) > 1 else ""} {named} '
+                f'{"lie" if len(too_high) > 1 else "lies"} above the top of '
+                f'the window, {top:,.6g}. Every attachment must be inside the '
+                f'grid; raise log2 or bs to reach it, and note that the top '
+                f'layer is capped by the window rather than unlimited.')
+        raise ValueError(' '.join(parts))
+
+    return np.rint(positions).astype(int)
+
+
 def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, debug=False):
     """
     Adjust the layer unconditional expected losses to target. You need int xf(x)dx, but
@@ -212,6 +353,21 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
         np.allclose(p.layers.v - p.layers.f, p.layers.l - p.layers.e)
 
     is true.
+
+    **Every attachment must lie on the realized grid**, and inside the window.
+    :func:`_picks_grid_indices` checks that first and raises a ``ValueError``
+    naming the offenders and a compatible bucket size. A boundary strictly
+    inside a bucket has no faithful reading, because that bucket's mass sits at
+    one point and cannot be split between the layer below and the layer above;
+    snapping it to the nearest grid point would silently restate the tower
+    (author ruling 2026-08-24). A reinsurance tower over the same attachments
+    is exempt because it rebuckets: a contract is a function of the loss and
+    can be evaluated at every grid point, whereas a pick constrains an integral
+    between two boundaries that therefore have to exist. Before 1.0.0a319 an
+    off grid attachment surfaced as a raw pandas ``KeyError`` from the survival
+    lookup. The integrals below are positional for the same reason: after the
+    check the index is the honest coordinate, and an exact float label lookup
+    is one representation drift from a spurious failure on a non dyadic grid.
 
     Infeasible picks (a target below the full-limit losses implied by the
     layers above it) produce a negative adjustment weight and hence negative
@@ -248,18 +404,33 @@ def _picks_work(attachments, layer_loss_picks, xs, sev_density, n=1, sf=None, de
     # figure bucket size
     bs = xs[1] - xs[0]
 
+    # every attachment must be a grid point, else the layers below are solved
+    # on boundaries the grid cannot express; raises naming a compatible bucket
+    attachment_index = _picks_grid_indices(attachments, xs, bs)
+
     # dataframe of adjusted probabilties, starts here
     density = pd.DataFrame({'x': xs, 'p': sev_density}).set_index('x', drop=False)
     fill_value = max(0, 1. - density.p.sum())
     density['S'] = density.p.shift(-1, fill_value=fill_value)[::-1].cumsum()
 
+    # the integrals below run from zero, which is the first row on the usual
+    # severity grid; computed rather than assumed so a grid that starts
+    # elsewhere keeps the label-slice semantics this replaced
+    zero_index = max(0, int(np.rint((0.0 - xs[0]) / bs)))
+
     # numerical integrals - these match
     layers = pd.DataFrame(columns=['a', 'lev', 'int_fdx', 'aS', 'S'], index=range(1, 1+len(attachments)),
                           dtype=float)
-    for i, x in enumerate(attachments):
-        ix = density.loc[0:x-bs, 'S'].sum() * bs
-        ix2 = density.loc[0:x-bs, ['x', 'p']].prod(axis=1).sum()
-        layers.loc[i+1, :] = [x, ix, ix2, x * density.loc[x, 'S'] if x < np.inf else 0.0, density.loc[x, 'S']]
+    for i, (x, xi) in enumerate(zip(attachments, attachment_index)):
+        # positional, not label: an exact float label lookup is one
+        # representation drift from a spurious KeyError, and after the grid
+        # check the index is the honest coordinate. iloc[zero_index:xi] is the
+        # old loc[0:x-bs], since label slicing includes both endpoints.
+        prefix = density.iloc[zero_index:xi]
+        ix = prefix['S'].sum() * bs
+        ix2 = prefix[['x', 'p']].prod(axis=1).sum()
+        s_at_x = density['S'].iloc[xi]
+        layers.loc[i+1, :] = [x, ix, ix2, x * s_at_x, s_at_x]
 
     # prob of loss in layer
     layers['p'] = layers.S.shift(1, fill_value=1) - layers.S
@@ -4343,6 +4514,35 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Adjust the computed severity to hit picks targets in layers defined by a.
         Delegates work to :func:`_picks_work`. See that function for details.
 
+        Raises
+        ------
+        ValueError
+            If any attachment misses the realized grid or lies above the top of
+            the window. The message names the offenders and a bucket size that
+            would work.
+
+        Notes
+        -----
+        **Every attachment must be a grid point.** Picks defines the layers the
+        reweighting is solved on, so a boundary strictly inside a bucket has no
+        faithful reading: that bucket's mass sits at a single point and cannot
+        be divided between the layer below and the layer above without
+        inventing a within-bucket distribution. The update therefore raises a
+        ``ValueError`` naming a compatible bucket rather than snapping the
+        boundary, which would silently restate the tower the caller asked for
+        (author ruling 2026-08-24).
+
+        A reinsurance tower over the same attachments is exempt, and the
+        contrast is the point. ``apply_reins_work`` evaluates piecewise linear
+        ceder and netter functions at every grid point and lands the off grid
+        results back on the lattice, which is faithful because a contract is a
+        function of the loss and can be evaluated anywhere. A pick is a
+        constraint on an integral between two boundaries, so the boundaries
+        have to exist on the grid.
+
+        The bucket sizer is deliberately blind to picks: an off grid result
+        under auto sizing is an error naming a compatible bucket, not an input
+        to ``_bs_window``.
         """
         # always want to work off gross severity
         if self.sev_density_gross is not None:

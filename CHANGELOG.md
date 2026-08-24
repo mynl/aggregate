@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a319
+
+**[Picks-Off-Grid-Error] a picks attachment that misses the grid raises a ValueError naming a bucket that would work.** `_picks_work` validates every attachment against the realized grid before any frame work: off grid, above the top of the window, or infinite are all refused, where an off grid attachment previously died with a raw pandas `KeyError` from the survival lookup and an infinite one took the same route. The message names each offender, the realized `bs` and window top, and the largest halving of the bucket that divides every attachment, with `hints{bs=...}` given as the DecL spelling. Attachments are not snapped: a layer boundary inside a bucket cannot divide that bucket's mass between the layer below and the layer above. The three survival lookups behind the layer integrals are now positional rather than exact float labels, which is bit for bit identical on every grid that built before.
+
+Nothing that built before changes. `build('agg X 1 claim sev lognorm 100 cv 2 picks [100 200 500] [45 20 25] fixed')` now raises instead of crashing, and builds on the suggested `bs=4`.
+
 ## 1.0.0a318
 
 **[Reference-Trailer-Preservation] a builtin reference keeps the referenced entry's stored trailer.** `agg_out_builtin` merges only the trailer keys that carry a value, so an absent outer clause no longer overwrites the stored `note` and `hints` with the empty strings `trailer()` seeds; an outer clause still wins wherever it is written, and `tags` is unchanged, having never had a seeded default. `agg.MED.WithPicks` builds again, where it died with a raw `KeyError` from the off grid picks adjustment. A reference build also stops writing the blanked trailer back into the recipe base, which had left the entry on the wrong grid for the rest of the session.

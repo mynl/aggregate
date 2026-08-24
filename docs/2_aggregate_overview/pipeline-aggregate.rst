@@ -148,6 +148,8 @@ Severity assembly
 
 ``update_work`` assembles the claim-count-weighted severity. Per-component frequency weights ``wts = freq_ex1 / sum(freq_ex1)`` are read straight from ``stats_df``, and ``sev_density = sum(bed_i * w_i)``. Optional ``picks`` reweighting follows. Passing ``force_severity='yes'`` is the plot-only early exit, with no FFT.
 
+Every ``picks`` attachment must land on the grid and inside the window. Picks defines the layers the reweighting is solved on, so a boundary strictly inside a bucket has no faithful reading: that bucket's mass sits at a single point and cannot be divided between the layer below and the layer above. An attachment that misses raises a ``ValueError`` naming the offenders and a bucket size that divides them all, rather than snapping the boundary and quietly restating the tower. Pin the suggested bucket with ``bs=`` on :func:`~aggregate.underwriter.build`, or with ``hints{bs=...}`` on a library entry. A reinsurance tower over the same attachments is exempt because it rebuckets: a contract is a function of the loss and can be evaluated at any grid point.
+
 Severity is the only thing that is optionally normalized. The aggregate never is.
 
 .. _agg pipeline fft:

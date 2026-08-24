@@ -5,6 +5,14 @@ Feasible picks are hit exactly on the grid; the debug audit path tolerates
 checks relative error, 1.0.0a272); infeasible picks warn instead of failing
 silently. Layer conventions: the attachment list holds the layer tops and
 the bottom layer runs from zero to the first entry.
+
+Attachments must land on the realized grid and inside the window
+(``[Picks-Off-Grid-Error]``, 1.0.0a319). Off grid is refused rather than
+snapped, because a layer boundary inside a bucket cannot divide that bucket's
+mass between the layer below and the layer above. Before a319 the miss
+surfaced as a raw pandas ``KeyError`` from the survival lookup. Every case
+below that exercises the guard **pins the bucket**, so a change in the auto
+sizer can never silently stop testing what it is here to test.
 """
 
 import logging
@@ -68,3 +76,64 @@ def test_picks_infeasible_warns(caplog):
     assert 'negative probabilities' in messages
     # the density is still returned, negative mass and all
     assert np.asarray(a.sev_density).min() < 0
+
+
+# ---------------------------------------------------------------------------
+# The grid check [Picks-Off-Grid-Error]
+# ---------------------------------------------------------------------------
+#: The motivating program from dev/done/plan-picks-grid-and-reference-trailers.md.
+#: At bs=8 the attachments 100 and 500 fall mid bucket (100/8 = 12.5); 200 does
+#: not. bs=4 divides all three.
+OFF_GRID_TOPS = [100, 200, 500]
+OFF_GRID_PICKS = [45, 20, 25]
+OFF_GRID_PROGRAM = ('agg PicksOffGrid 1 claim sev lognorm 100 cv 2 '
+                    f'picks {OFF_GRID_TOPS} {OFF_GRID_PICKS} fixed')
+
+
+def test_off_grid_attachment_raises_naming_the_bucket():
+    """The offenders, the realized grid and a bucket that would work."""
+    with pytest.raises(ValueError) as exc:
+        build(OFF_GRID_PROGRAM, bs=8, log2=16)
+    message = str(exc.value)
+    assert '100' in message
+    assert '500' in message
+    assert 'bs=8' in message
+    assert 'bs=4' in message
+
+
+def test_the_attachment_on_the_grid_is_not_named():
+    """200 is a multiple of 8, so only the two genuine misses are reported."""
+    with pytest.raises(ValueError) as exc:
+        build(OFF_GRID_PROGRAM, bs=8, log2=16)
+    offenders = str(exc.value).split('do not lie on the grid')[0]
+    assert '200' not in offenders
+
+
+def test_the_suggested_bucket_builds_and_hits_the_bottom_pick():
+    """bs=4 is what the message offers, so it has to work."""
+    a = build(OFF_GRID_PROGRAM, bs=4, log2=18)
+    achieved = layer_losses(a, OFF_GRID_TOPS)
+    assert np.allclose(achieved, OFF_GRID_PICKS, atol=1e-6)
+
+
+def test_a_non_dyadic_pinned_grid_still_builds():
+    """bs=0.1 divides the attachments without being a power of two.
+
+    The old code read the survival function by exact float label, which works
+    on 0.1 only by rounding luck. The positional index does not depend on luck.
+    """
+    a = build(OFF_GRID_PROGRAM, bs=0.1, log2=16)
+    achieved = layer_losses(a, OFF_GRID_TOPS)
+    assert np.allclose(achieved, OFF_GRID_PICKS, atol=1e-6)
+
+
+def test_an_attachment_above_the_window_raises(gross):
+    """Beyond the top of the grid is refused, and the top is named."""
+    with pytest.raises(ValueError, match='above the top of the window'):
+        gross.picks([125, 250, 1e9], [100, 74, 96])
+
+
+def test_an_infinite_attachment_raises(gross):
+    """``inf`` took the same raw KeyError route before a319."""
+    with pytest.raises(ValueError, match='above the top of the window'):
+        gross.picks([125, 250, np.inf], [100, 74, 96])

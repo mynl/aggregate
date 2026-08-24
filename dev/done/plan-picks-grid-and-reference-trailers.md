@@ -238,3 +238,21 @@ Findings the plan did not anticipate:
 7. **The rename form still drops the stored trailer, and is left alone.** Section 4 phase A states that every other `**trailer` splat site builds its spec fresh from program text. That does not hold for `agg_out_named` when its body came from `agg_body_rename`, which is a copy of a stored spec: `agg X agg.SRC` yields the auto sized grid and an empty note. Arguably correct for `note`, which describes the source rather than the copy, and hard to defend for `hints`. Out of the plan's scope and left for the author, recorded in the `a318` CHANGELOG entry so it is not silently absorbed.
 
 Verification. Tier 3, `pytest -m 'slow or not slow'`, gave 24 failed and 4937 passed. Twenty are the pre-existing library reorganization failures recorded before execution began; the other four were checked individually with the change reverted, and three reproduce without it while `test_mv_explain_flags_clipped_book` passes serially and failed only under xdist memory pressure, the documented bivariate grouping hazard. No failure is attributable to this change. The suite could not be brought to green because the author's `library.agg` rename was in flight in the working tree.
+
+### Phase B, `[Picks-Off-Grid-Error]`, `1.0.0a319`
+
+The guard is the plan's, moved into two named helpers above `_picks_work` rather than written inline: `_picks_compatible_bucket` computes the suggestion and `_picks_grid_indices` validates and returns the indices the integrals then use. The plan's tolerance, `abs(i - round(i)) > 1e-8 * max(1.0, abs(i))`, and its search floor of `bs / 2**20` are both as specified, named `_PICKS_GRID_RTOL` and `_PICKS_BUCKET_HALVINGS`. On the motivating program the message names 100 and 500, omits 200 (which is a multiple of 8), and suggests `bs=4`, which is what section 4 predicted.
+
+Divergences:
+
+8. **The prefix slices are anchored on the position of label zero, not on position zero.** The plan converts `density.loc[0:x-bs, ...]` to `iloc[:i]`. Those agree only when `xs[0] == 0`, because label slicing starts at the *label* 0 wherever that sits. Severity grids do start at zero, so the plan's form would have been correct in practice, but the code computes `zero_index` from `xs[0]` so the replacement is faithful on any grid rather than faithful by assumption. Verified bit for bit: across the seven layer tower of `tests/test_picks.py` all three integrals agree with the label form to `0.0` absolute difference.
+
+9. **`x * density.loc[x, 'S'] if x < np.inf else 0.0` loses its conditional.** The guard now rejects an infinite attachment, so the branch is unreachable. It had never worked anyway: the same line's second lookup, `density.loc[x, 'S']`, raised on `inf` before the conditional could help.
+
+10. **Two failure kinds get two sentences, not one list.** The plan folds the window check into the same message. Off grid and above the window want different advice, a finer bucket against a longer grid, so the message names them separately and only computes a bucket suggestion for the off grid case.
+
+11. **The documentation sentence went to `docs/2_aggregate_overview/pipeline-aggregate.rst`**, at the pipeline step that performs the reweighting. The plan expected to locate it by grep across `2_aggregate_overview` and `4_agg_language_reference`; the language reference page is generated from the grammar and is not hand edited, and no prose section documents the picks clause itself.
+
+12. **`DW.PicksOffGrid` is mirrored into `decl-testers.agg` as a parse-only fixture.** It is the first corpus entry that deliberately raises on build under auto sizing. That is consistent with the file, which already does not load clean, and the corpus tests parse and round-trip rather than build; the comment beside it says so, so a future build-everything test knows it is deliberate.
+
+Verification. `tests/test_picks.py` grows six cases, all pinning `bs` so auto sizer drift cannot silently stop exercising the guard, and the three existing cases pass unchanged. Snapshot regenerated to a zero diff.

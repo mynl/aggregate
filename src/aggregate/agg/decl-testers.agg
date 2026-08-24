@@ -531,6 +531,14 @@ agg so 3 claims dsev [1 2 3] poisson                                            
 agg DW.ExpRate 1000 exposure at 0.05 rate sev lognorm 100 cv 2 poisson                                       note{exposure/rate head; renders as premium/lr};
 agg DW.Picks   100 claims sev lognorm 100 cv 2 picks [1000 5000 10000] [600 1500 900] poisson                note{picks severity layering}
 
+# DW.PicksOffGrid is a PARSE-ONLY fixture for tests/test_picks.py: under auto
+# sizing it draws bs=8, where 100 and 500 fall mid bucket, so building it
+# raises the [Picks-Off-Grid-Error] ValueError by design (a319). It parses and
+# round-trips like any other statement; pin bs=4 (or 0.1) to build it. DW.Picks
+# above is the contrast, passing only because its auto bs=2 divides 1000, 5000
+# and 10000.
+agg DW.PicksOffGrid 1 claim sev lognorm 100 cv 2 picks [100 200 500] [45 20 25] fixed                        note{off grid picks under auto sizing: parse-only, raises on build}
+
 
 # H4. Hygiene-4 regressions — value_type, info rows, pnl prem/lr meta
 # ===================================================================

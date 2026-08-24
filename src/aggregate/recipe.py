@@ -67,6 +67,24 @@ class Recipe:
         ``'session'`` for an entry created by an in-session ``build(...)``
         call. Backs the ``source`` filter on
         :meth:`aggregate.Underwriter.to_agg`.
+    seq : int
+        Zero-based order in which the entry was read, counted across the whole
+        recipe base rather than restarted per file, so entries from a second
+        ``.agg`` file continue the count. A session build takes the next number
+        at registration, which sorts a user's own programs after the library;
+        rebuilding an existing name keeps that name's place. ``-1`` for a
+        recipe that was never registered (the ``expr`` answers handed back by
+        :meth:`aggregate.Underwriter.build_many`). The ``recipes`` frame stays
+        sorted alphabetically; ``recipes.sort_values('seq')`` is reading order.
+    as_read : str
+        The entry's DecL as it appears in its source file: multi-line, indented
+        as written, comments and the terminating ``;`` removed, trailer kept.
+        ``''`` for a session-built entry, which never had a file. Contrast
+        :attr:`program`, which is the flattened one-line form the parser
+        received, and :attr:`decl`, which is a canonical re-render. Only
+        ``as_read`` still says ``ph 2/3``, ``ceded to tower [0 25 50]`` and
+        ``dsev [1:6]``, because the parser evaluated or expanded each of those
+        and kept only the result on the spec.
 
     Notes
     -----
@@ -83,6 +101,8 @@ class Recipe:
     program: str = ''
     object: Any = None
     source: Any = 'session'
+    seq: int = -1
+    as_read: str = ''
 
     # Derived cache. init=False keeps it off __init__ and out of
     # dataclasses.replace(), which is what makes replace() re-derive.

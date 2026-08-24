@@ -244,9 +244,23 @@ def _render_weights(spec: dict) -> str:
 def _render_splice(spec: dict) -> str:
     """Render a `` splice [lb] [ub]`` clause, or ``''`` for the default support.
 
-    The default ``(sev_lb=0, sev_ub=inf)`` renders nothing. A real splice always
-    uses the two-bracket-list form, which re-parses identically to either the
-    one-list (``splice [a b]``) or two-list source sugar.
+    The default ``(sev_lb=0, sev_ub=inf)`` renders nothing.
+
+    Notes
+    -----
+    The compact one-list form is preferred where it is recoverable, because it
+    is what the library writes. ``splice_one`` builds contiguous bands from
+    breakpoints ``[b0 b1 ... bn]``, giving ``sev_lb = [b0 ... b(n-1)]`` and
+    ``sev_ub = [b1 ... bn]``, so the breakpoints come back by inspection
+    whenever ``lb[1:] == ub[:-1]`` and the compact spelling round-trips. This
+    needs no provenance on the spec, which is why it is done here while the
+    general problem of inverting an evaluated clause is not (see
+    ``[Unparser-Reference-Gaps]``).
+
+    In practice the guard is always satisfied for anything that parses today:
+    a multi-band splice raises in ``Severity``, so every splice that reaches
+    here is a single band. The test is kept rather than assumed, since the
+    refusal is a current limitation and not a statement about the grammar.
     """
     lb = spec.get('sev_lb', 0.0)
     ub = spec.get('sev_ub', np.inf)
@@ -254,6 +268,10 @@ def _render_splice(spec: dict) -> str:
                   and np.isscalar(ub) and np.isinf(ub))
     if is_default:
         return ''
+    lbs = np.atleast_1d(np.asarray(lb, dtype=float))
+    ubs = np.atleast_1d(np.asarray(ub, dtype=float))
+    if len(lbs) == len(ubs) and np.array_equal(lbs[1:], ubs[:-1]):
+        return f' splice {_fmt_seq(np.append(lbs[0], ubs))}'
     return f' splice {_fmt_seq(lb)} {_fmt_seq(ub)}'
 
 

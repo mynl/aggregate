@@ -85,6 +85,13 @@ GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
 # had before, rather than acquiring a new one here.
 _TRAILER_BODY_RE = re.compile(r"\b(note|tags|hints)\{([^}\n]*)\}")
 
+#: A whole-line comment, optional indent then ``#`` or ``//``. The line form of
+#: preprocess step 1, for the line-at-a-time scan in ``raw_statements``.
+_FULL_LINE_COMMENT_RE = re.compile(r"^[ \t]*(?://|#)")
+
+#: A trailing comment, to end of line. Preprocess step 2, same pattern.
+_INLINE_COMMENT_RE = re.compile(r"(//|#)[^\n]*")
+
 class _InheritPremium:
     """Sentinel for ``inherit premium``: copy the engine's technical premium.
 
@@ -295,6 +302,87 @@ class UnderwritingLexer:
         placeholder = re.compile(r"__DECL_TRAILER_(\d+)__")
         return [placeholder.sub(lambda m: bodies[int(m.group(1))], s)
                 for s in statements if s]
+
+    @staticmethod
+    def raw_statements(program: str) -> list[str]:
+        """Split a program into statements, keeping each one's source layout.
+
+        The companion to :meth:`preprocess`. Same statements, same order, but
+        each is returned with its own newlines and indentation intact instead of
+        flattened to one line. Backs :attr:`aggregate.recipe.Recipe.as_read`.
+
+        Parameters
+        ----------
+        program : str
+            Raw multi-line DecL source.
+
+        Returns
+        -------
+        list[str]
+            One entry per statement, in file order, comments removed and the
+            statement-terminating ``;`` dropped, but otherwise as written.
+
+        Notes
+        -----
+        This mirrors the *separation* rules of :meth:`preprocess` rather than
+        reusing it, because ``preprocess`` rewrites the text before it splits:
+        by the time it reaches its paragraph split, comment lines are gone,
+        newlines inside brackets are spaces and a line-final ``;`` has become a
+        blank line, so the source span of a statement no longer exists to be
+        kept. Only the trailer lift is shared, and it is shared deliberately.
+        ``note{...}`` bodies are free text, so a ``#``, a ``//`` or a ``;`` in
+        one is prose; lifting them behind placeholders first is what stops
+        ``note{layer is 5# of limit}`` losing its tail to the comment stripper
+        and merging two statements into one.
+
+        The result is **not** guaranteed equal to the matching
+        :meth:`preprocess` output with its whitespace collapsed, and the
+        difference is the point. ``preprocess`` reformats around brackets on its
+        non-nested path, turning a source ``dfreq[1]`` into ``dfreq [1]``, and
+        that path is chosen by whether the *whole file* contains a nested
+        ``[[...]]``, so the same statement flattens differently depending on its
+        neighbours. The contract that does hold, and the one the tests pin, is
+        that each returned statement **parses to the same spec** as its
+        ``preprocess`` counterpart: it is DecL, not a comment.
+        """
+        bodies = []
+
+        def _lift_trailer(m):
+            bodies.append(m.group(2))
+            return f'{m.group(1)}{{__DECL_TRAILER_{len(bodies) - 1}__}}'
+
+        program = _TRAILER_BODY_RE.sub(_lift_trailer, program)
+
+        blocks, current, depth = [], [], 0
+        for line in program.splitlines():
+            if _FULL_LINE_COMMENT_RE.match(line):
+                # transparent: never separates statements, never appears in the
+                # kept text (preprocess step 1 deletes it outright)
+                continue
+            body = _INLINE_COMMENT_RE.sub('', line)
+            if depth == 0 and not body.strip():
+                if current:
+                    blocks.append(current)
+                    current = []
+                continue
+            current.append(body.rstrip())
+            depth = max(0, depth + body.count('[') - body.count(']'))
+            if depth == 0 and body.rstrip().endswith(';'):
+                # a line-final ; terminates the statement and is not part of it
+                current[-1] = current[-1].rstrip()[:-1].rstrip()
+                blocks.append(current)
+                current = []
+        if current:
+            blocks.append(current)
+
+        placeholder = re.compile(r'__DECL_TRAILER_(\d+)__')
+        out = []
+        for block in blocks:
+            text = '\n'.join(block).strip('\n')
+            if text.strip():
+                out.append(placeholder.sub(
+                    lambda m: bodies[int(m.group(1))], text))
+        return out
 
     def tokenize(self, text: str) -> _TokenizedText:
         """Tokenize a single DecL line.

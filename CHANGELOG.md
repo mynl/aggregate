@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a320
+
+**[Recipe-Seq-As-Read] a recipe records where it was read and how it was written.** `Recipe` gains `seq`, the zero-based position the entry was read in (counted across the whole recipe base, so a second `.agg` file continues the count), and `as_read`, the entry's DecL laid out as it appears in its source file, with comments and the terminating `;` removed and the trailer kept. Both are new columns on the `recipes` frame, which still sorts alphabetically: `recipes.sort_values('seq')` is reading order. `as_read` is `''` for a session build, and a rebuild of an existing name keeps that name's place. New `UnderwritingLexer.raw_statements` splits a program into statements without flattening them. `as_read` is what still says `dsev [1:6]`, `ph 2/3` and `ceded to tower [...]`, since the parser expands or evaluates each of those and keeps only the result.
+
+**A single-band `splice` renders in the compact one-list form.** `_render_splice` emits `splice [8 12]` rather than `splice [8] [12]` whenever the bands are contiguous, which is what the library writes, so `SevSpliced` and `BivariateCatPair` now match their source byte for byte.
+
 ## 1.0.0a319
 
 **[Picks-Off-Grid-Error] a picks attachment that misses the grid raises a ValueError naming a bucket that would work.** `_picks_work` validates every attachment against the realized grid before any frame work: off grid, above the top of the window, or infinite are all refused, where an off grid attachment previously died with a raw pandas `KeyError` from the survival lookup and an infinite one took the same route. The message names each offender, the realized `bs` and window top, and the largest halving of the bucket that divides every attachment, with `hints{bs=...}` given as the DecL spelling. Attachments are not snapped: a layer boundary inside a bucket cannot divide that bucket's mass between the layer below and the layer above. The three survival lookups behind the layer integrals are now positional rather than exact float labels, which is bit for bit identical on every grid that built before.

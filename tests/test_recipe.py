@@ -182,7 +182,8 @@ def test_recipes_frame_carries_the_entry_as_well_as_the_directory(uw):
     terminal does not get used.
     """
     df = uw.recipes
-    assert list(df.columns) == ['note', 'tags', 'source', 'program', 'spec']
+    assert list(df.columns) == ['seq', 'note', 'tags', 'source', 'program',
+                                'spec', 'as_read']
     row = df.loc[('agg', 'AF.Tags.Spaces')]
     assert row['program'].startswith('agg AF.Tags.Spaces')
     assert isinstance(row['spec'], dict) and row['spec']['note']
@@ -200,3 +201,90 @@ def test_empty_recipe_base_still_gives_a_well_formed_frame():
     assert df.empty
     assert df.index.names == ['kind', 'name']
     assert 'note' in df.columns and 'spec' in df.columns
+
+
+# ----------------------------------------------------------------------
+# Reading order and source text [Recipe-Seq-As-Read]
+# ----------------------------------------------------------------------
+# `library.agg` is written as a reading order and its sections build on one
+# another, but the recipes frame sorts alphabetically and `program` is the
+# flattened one-liner. `seq` carries the order, `as_read` carries the layout.
+def test_seq_is_a_permutation_of_the_positions(lib):
+    """Every entry has a distinct place, and the places are contiguous."""
+    seqs = sorted(r.seq for r in lib._recipes.values())
+    assert seqs == list(range(len(seqs)))
+
+
+def test_sorting_by_seq_reproduces_the_file_order(lib):
+    """The point of the field: `seq` order is `library.agg` order.
+
+    Compared on names against a fresh split of the file, so this fails if the
+    counter drifts from the read loop rather than merely being self-consistent.
+    """
+    from aggregate.parser import UnderwritingLexer
+    path = next(p for p in lib.databases if p.name == 'library.agg')
+    statements = UnderwritingLexer.preprocess(path.read_text(encoding='utf-8'))
+    from_file = [lib.parser.parse(lib.lexer.tokenize(s))[1] for s in statements]
+    by_seq = [r.name for r in sorted(lib._recipes.values(), key=lambda r: r.seq)]
+    assert by_seq == from_file
+
+
+def test_as_read_reparses_to_the_same_spec(lib):
+    """The real contract: `as_read` is DecL, not a comment.
+
+    It is deliberately NOT compared to `program` as text. `preprocess`
+    reformats around brackets on its non-nested path, so a source `dfreq[1]`
+    flattens to `dfreq [1]`, and which path it takes depends on whether the
+    whole file holds a nested `[[...]]`. Spec equality is the invariant that
+    survives that.
+    """
+    checked = 0
+    for r in lib._recipes.values():
+        assert r.as_read, f'{r.name}: a library entry must carry its source'
+        kind, name, spec = lib.parser.parse(lib.lexer.tokenize(
+            lib.lexer.preprocess(r.as_read)[0]))
+        assert (kind, name) == (r.kind, r.name)
+        assert repr(spec) == repr(r.spec), f'{r.name}: as_read changed the spec'
+        checked += 1
+    assert checked > 100
+
+
+def test_as_read_keeps_the_layout_and_the_unexpanded_sugar(lib):
+    """Multi-line, indented, and still showing what the author typed."""
+    r = lib._recipes[('agg', 'DiceThreeEvenDice')]
+    assert '\n' in r.as_read
+    assert r.as_read.startswith('agg DiceThreeEvenDice')
+    # the parser expands this to [2 4 6 8 10 12]; only as_read still has it
+    assert 'dsev [2:12:2]' in r.as_read
+    assert 'dsev [2:12:2]' not in r.program
+    # comments and the terminating semicolon are not part of the statement
+    assert '#' not in r.as_read
+    assert not r.as_read.rstrip().endswith(';')
+
+
+def test_a_session_build_has_no_source_text_and_sorts_last(lib):
+    """No file to come from, and a place after everything already read."""
+    u = lib.fork()
+    top = max(r.seq for r in u._recipes.values())
+    u('agg SeqSession.Mine 10 claims sev lognorm 100 cv 2 poisson')
+    r = u._recipes[('agg', 'SeqSession.Mine')]
+    assert r.as_read == ''
+    assert r.seq > top
+
+
+def test_rebuilding_an_existing_name_keeps_its_place(lib):
+    """Reading order is stable: an overwrite is not a reordering."""
+    u = lib.fork()
+    before = u._recipes[('agg', 'DiceThreeEvenDice')].seq
+    u('agg DiceThreeEvenDice dfreq [3] dsev [2 4 6 8 10 12]')
+    assert u._recipes[('agg', 'DiceThreeEvenDice')].seq == before
+
+
+def test_the_frame_carries_both_and_sorts_alphabetically_still(lib):
+    """Additive: the default presentation is unchanged, `seq` is the opt-in."""
+    df = lib.recipes
+    assert list(df.index) == sorted(df.index)
+    assert df['seq'].nunique() == len(df)
+    by_seq = df.sort_values('seq')
+    assert by_seq.index[0] != df.index[0] or len(df) == 1
+    assert (by_seq['as_read'].str.len() > 0).all()

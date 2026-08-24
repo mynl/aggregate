@@ -653,6 +653,10 @@ class Underwriter(HelpMixin):
         # Recipe base: a flat dict {(kind, name): Recipe}. The DataFrame view
         # is built on demand by the `recipes` property.
         self._recipes: dict[tuple, Recipe] = {}
+        # Reading-order counter behind Recipe.seq, handed out by _take_seq.
+        # Monotonic and never reused, so a fork continuing to build past its
+        # parent's last entry cannot collide with it.
+        self._seq_next = 0
         # Severity-reference resolution stack, ``[(kind, name), ...]``: the
         # cycle guard for ``sev agg.NAME``. Resolution recurses through
         # ``_factory``, so depth N falls out with no extra code and this is
@@ -944,6 +948,7 @@ class Underwriter(HelpMixin):
             The files re-read.
         """
         self._recipes = {}
+        self._seq_next = 0
         self.databases = []
         self._loaded = False
         return self.load()
@@ -1934,7 +1939,8 @@ class Underwriter(HelpMixin):
             'resolution you want and re-register it with its grid pinned, '
             f'`build(x.with_hints())`, or add the clause by hand: {suggestion}')
 
-    def add_recipe(self, kind, name, spec, program, source='session'):
+    def add_recipe(self, kind, name, spec, program, source='session',
+                   as_read=''):
         """
         Add (or overwrite) one parsed declaration in the recipe base.
 
@@ -1960,20 +1966,54 @@ class Underwriter(HelpMixin):
         source : pathlib.Path or str, default 'session'
             Provenance: the file the entry came from, or ``'session'`` for an
             in-session build.
+        as_read : str, default ''
+            The statement's source text, laid out as written. ``''`` for a
+            session build, which has no file to have come from.
+
+        Notes
+        -----
+        ``seq`` is assigned here rather than passed in: it is the position of
+        the entry in the recipe base, which only this method knows. Overwriting
+        an existing name keeps that name's ``seq``, so re-running a program in a
+        session leaves reading order alone; a genuinely new name takes the next
+        number and lands after everything already read.
         """
+        existing = self._recipes.get((kind, name))
+        seq = existing.seq if existing is not None and existing.seq >= 0 \
+            else self._take_seq()
         self._recipes[(kind, name)] = Recipe(
-            kind=kind, name=name, spec=spec, program=program, source=source)
+            kind=kind, name=name, spec=spec, program=program, source=source,
+            seq=seq, as_read=as_read)
+
+    def _take_seq(self):
+        """The next reading-order number, monotonic for this recipe base.
+
+        A plain counter rather than ``len(self._recipes)``: entries can be
+        overwritten and a fork shares the parsed entries, so the dict's size is
+        not a position and reusing it would collide.
+        """
+        seq = self._seq_next
+        self._seq_next += 1
+        return seq
 
     #: :attr:`recipes` columns, in display order: identity and audit flags
-    #: first, the wide ``program`` / ``spec`` payload last so the frame stays
-    #: readable at a terminal.
-    _RECIPE_COLUMNS = ('note', 'tags', 'source', 'program', 'spec')
+    #: first, the wide ``program`` / ``spec`` / ``as_read`` payload last so the
+    #: frame stays readable at a terminal. ``seq`` leads because it is one
+    #: integer and it is what a caller sorts on.
+    _RECIPE_COLUMNS = ('seq', 'note', 'tags', 'source', 'program', 'spec',
+                       'as_read')
 
     def _recipes_frame(self):
         """Build the ``(kind, name)``-indexed DataFrame view of the dict store.
 
         Columns are :data:`_RECIPE_COLUMNS`, sorted by index. Built on demand so
         the store itself stays a plain dict.
+
+        The alphabetical sort stays, deliberately. It is what a person reading
+        the frame at a prompt wants, and it is what every existing caller
+        already gets; file order is a column now, so a consumer that wants the
+        library in the order it was written asks for
+        ``recipes.sort_values('seq')``.
         """
         if not self._recipes:
             empty = pd.MultiIndex.from_arrays([[], []], names=['kind', 'name'])
@@ -1986,11 +2026,13 @@ class Underwriter(HelpMixin):
         for (kind, name), r in list(self._recipes.items()):
             rows.append({
                 'kind': kind, 'name': name,
+                'seq': r.seq,
                 'note': bool(r.note),
                 'tags': r.tags,
                 'source': self._format_source(r.source),
                 'program': r.program,
                 'spec': r.spec,
+                'as_read': r.as_read,
             })
         df = pd.DataFrame(rows).set_index(['kind', 'name'])
         return df[list(self._RECIPE_COLUMNS)].sort_index()
@@ -2245,10 +2287,30 @@ class Underwriter(HelpMixin):
         :return: list of :class:`~aggregate.recipe.Recipe` (``object`` is
             ``None`` for each). The returned recipes are copies; mutating their
             ``object`` field does not touch the stored ones.
+
+        ``as_read`` is filled only when reading a file. The source layout of a
+        statement typed at a prompt is not worth keeping (there is no file to
+        show it beside), and ``Recipe.as_read`` documents ``''`` as the session
+        value. The raw split is paired with the flattened one positionally, so
+        it is used only when both produce the same number of statements; the
+        two walk the same separation rules, and a disagreement means one of
+        them is wrong, in which case dropping the source text is much better
+        than attaching it to the wrong entry.
         """
+        raw = []
+        if source != 'session':
+            candidate = self.lexer.raw_statements(portfolio_program)
+            if len(candidate) == len(self.lexer.preprocess(portfolio_program)):
+                raw = candidate
+            else:
+                logger.warning(
+                    'as_read: %s split into %d source statements against %d '
+                    'parsed; source text not recorded for this file.',
+                    getattr(source, 'name', source), len(candidate),
+                    len(self.lexer.preprocess(portfolio_program)))
         portfolio_program = self.lexer.preprocess(portfolio_program)
         rv = []
-        for program_line in portfolio_program:
+        for i, program_line in enumerate(portfolio_program):
             logger.debug(program_line)
             try:
                 kind, name, spec = self.parser.parse(self.lexer.tokenize(program_line))
@@ -2272,7 +2334,8 @@ class Underwriter(HelpMixin):
                     continue
                 logger.info('answer out: %s object %s parsed successfully...adding a recipe',
                             kind, name)
-                self.add_recipe(kind, name, spec, program_line, source=source)
+                self.add_recipe(kind, name, spec, program_line, source=source,
+                                as_read=raw[i] if raw else '')
                 # Hand back a fresh copy: _build_work / build_many set .object
                 # on these, which must not leak into the stored recipe.
                 rv.append(replace(self._recipes[(kind, name)]))

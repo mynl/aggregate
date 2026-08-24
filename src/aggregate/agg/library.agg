@@ -77,31 +77,6 @@
 #                             set small and keep diagnostics out of it.
 #               published     it reproduces a published result. The citekey in
 #                             the name says whose; this says that it is one.
-#   check:X   which invariant the entry is worth checking against. Six
-#             archetypes, and the slug is the label without the [Check-]:
-#
-#               reconciliation      things add up: net + ceded = gross;
-#                                   walks foot down the sheet; allocations
-#                                   sum to the total.
-#               scaling-sweep       vary one knob, watch the output move as
-#                                   predicted (sweep a share 25/50/75/100%
-#                                   and see ceded premium trace a line).
-#               independent-oracle  est_* (FFT) against theoretic moments, a
-#                                   closed form, or a hand convolution.
-#               limiting-case       sanity bounds: TVaR >= VaR; premium >=
-#                                   expected loss; a distortion has g(0)=0,
-#                                   g(1)=1 and is concave; zero placement
-#                                   gives back gross.
-#               round-trip          format_program(build(x)) round-trips;
-#                                   two equivalent spellings agree.
-#               cross-object        an aggregate priced alone equals its
-#                                   allocation in a one-unit portfolio;
-#                                   bivariate marginals recover the
-#                                   univariates.
-#
-#             tests/test_library_entries.py is where the checks live.
-#   slow      the ONE bare tag, deliberately: it names a pytest marker, not a
-#             property of the subject.
 #
 # Enforced by tests/test_agg_libraries.py, a bare, un-namespaced tag fails.
 #
@@ -180,7 +155,7 @@ agg DiceThreeDice
   dfreq [3]
   dsev [1 2 3 4 5 6]
   note{Sum of three dice, exact discrete aggregate; zero validation error.}
-  tags{topic:aggregate, role:intro, check:independent-oracle};
+  tags{topic:aggregate, role:intro};
 
 agg DiceOfDice
   dfreq [1 2 3 4 5 6]
@@ -241,7 +216,7 @@ distortion CCoCDistortion ccoc 0.25
 
 distortion PHDistortion ph 2/3
   note{Proportional hazard distortion with exponent 2/3, so g(s) = s**(2/3).}
-  tags{topic:distortion, role:intro, check:limiting-case};
+  tags{topic:distortion, role:intro};
 
 distortion WangDistortion wang 0.3582869092425833
   note{Wang transform, g(s) = Phi(Phi inverse of s, plus lambda), with lambda = 0.3583.}
@@ -669,7 +644,7 @@ agg ExposureLimitProfile
   sev lognorm 150 cv 1.5
   poisson
   note{A premium by limit by loss ratio profile, with the implied claim count computed for each band.}
-  tags{topic:aggregate, role:hero, role:advanced, check:reconciliation};
+  tags{topic:aggregate, role:hero, role:advanced};
 
 agg TweedieDirect
   tweedie 1.1 100 1.5
@@ -750,7 +725,7 @@ agg OccurrenceXOLProgram
     90% po 5000 xs 5000
   mixed gamma 0.25
   note{A two layer occurrence excess of loss program, seen net.}
-  tags{topic:reinsurance, role:advanced, check:reconciliation};
+  tags{topic:reinsurance, role:advanced};
 
 agg ReinsuranceOccurrenceTower
   dfreq[1]
@@ -892,7 +867,7 @@ agg NeymanInnerOuter
   sev agg.NeymanCluster
   poisson
   note{Neyman Type A assembled by hand: a Poisson(2.5) number of NeymanCluster draws, overall mean 10. The same distribution as NeymanAFrequency.}
-  tags{topic:frequency, role:advanced, check:cross-object}
+  tags{topic:frequency, role:advanced}
   hints{bs=1; log2=10};
 
 agg SplitLimitClaimant
@@ -910,7 +885,7 @@ agg SplitLimitPolicy
   sev agg.SplitLimitClaimant
   poisson
   note{100 US auto policies written 100/300: the per accident loss of SplitLimitClaimant is the severity, capped at the 300 per accident limit.}
-  tags{topic:aggregate, topic:severity, role:advanced, check:reconciliation}
+  tags{topic:aggregate, topic:severity, role:advanced}
   hints{bs=1/4; log2=17};
 
 # ----------------------------------------------------------------------
@@ -1442,4 +1417,3 @@ agg DefectivePareto
   note{A defective aggregate: the Lomax severity has no finite second moment, so no bucket size can be estimated and the build refuses.}
   tags{topic:numerics, role:advanced}
   hints{normalize=False};
-

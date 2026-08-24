@@ -752,6 +752,14 @@ agg IG.Rate 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 30
 agg IG.Reinst 100 claims sev lognorm 50 cv 1.5 occurrence net of 500 xs 500 deposit 150 reinstatements 1 at 100% poisson  note{reinstatement schedule on a plain agg: ignored with warning};
 agg IG.Swing 100 claims sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000 swing basic 500 lcm 0.5          note{variable-rating feature on a plain agg: ignored with warning};
 
+# [Reins-Economics-On-Bvagg-Ignore-Warn]: the same clauses reach a bivariate on
+# its component specs, and both unit-construction routes splat the unit spec
+# into Aggregate. The factory filters per unit, naming the unit, with the
+# joint's own remedy: a joint carries loss against loss, so there is nothing to
+# fold it into. The cession layers stay, since the netceded joint needs them.
+grossceded agg IG.BvDeposit dfreq [3] dsev [2 4 6 8 10 12] occurrence net of 6 xs 6 deposit 5                        note{ceded premium under a view-pair prefix: the GCN control shape, ignored with warning};
+bivariate IG.BvCopula 5 claims agg IG.BvA dfreq [0 1] [.5 .5] dsev [2 4 6 8 10 12] occurrence net of 6 xs 6 deposit 5 agg IG.BvB dfreq [0 1] [.5 .5] dsev [1 2 3 4] copula normal 0.5   note{ceded premium on a copula component: ignored with warning naming the unit};
+
 # ============================================================
 # AA. The pnl/xpnl composition matrix ([One-Classifier-Fix])
 #                                   (tests/test_composition_matrix.py)

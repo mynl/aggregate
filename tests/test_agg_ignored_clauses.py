@@ -9,6 +9,12 @@ naming the ignored clauses. The recipe base keeps the **full** spec, so an
 ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects the economics
 (the spec-injection route). See
 ``dev/plan-pnl-consolidated-xpnl-walk.md`` Phase 1.
+
+[Reins-Economics-On-Bvagg-Ignore-Warn]: the same clauses reach a ``bvagg``
+on its component specs, where both unit-construction routes splat the spec
+into ``Aggregate``. Before the fix that raised ``TypeError``; now the factory
+filters per unit with the joint's own remedy sentence. See
+``dev/plan-punchups-aug-24-LIB.md`` item 1.
 """
 
 import numpy as np
@@ -112,3 +118,74 @@ def test_rebuild_by_name_still_warns(uw):
     with pytest.warns(IgnoredDecLClauseWarning):
         a = uw('agg.W10')
     assert type(a).__name__ == 'Aggregate'
+
+
+# ----------------------------------------------------------------------
+# [Reins-Economics-On-Bvagg-Ignore-Warn]: the joint's components too
+# ----------------------------------------------------------------------
+#: A dice joint: exact, tiny, and it exercises the cession layers the netceded
+#: mode needs kept. The GCN control on a priced occurrence program is the
+#: everyday shape of the bug this covers.
+_VIEW_PAIR = ('grossceded agg W11 dfreq [3] dsev [2 4 6 8 10 12] '
+              'occurrence net of 6 xs 6 deposit 5')
+
+_COPULA_UNIT = ('bivariate W12 5 claims '
+                'agg W12a dfreq [0 1] [.5 .5] dsev [2 4 6 8 10 12] '
+                'occurrence net of 6 xs 6 deposit 5 '
+                'agg W12b dfreq [0 1] [.5 .5] dsev [1 2 3 4] '
+                'copula normal 0.5')
+
+
+@pytest.fixture
+def uwb():
+    """A clean underwriter with lazy update, for the joints.
+
+    The bug is a construction-time splat of the unit spec into ``Aggregate``,
+    so ``__init__`` is the whole story here and the 2-D FFT is pure cost: a
+    joint update runs tens of seconds against a fraction of a second for the
+    build. Everything asserted below is set in ``__init__``.
+    """
+    return Underwriter(databases=None, update=False)
+
+
+def test_view_pair_unit_builds_and_warns(uwb):
+    # the GCN shape: before the fix this raised
+    # TypeError: unexpected keyword argument 'occ_reins_premium'
+    with pytest.warns(IgnoredDecLClauseWarning) as rec:
+        b = uwb(_VIEW_PAIR)
+    assert type(b).__name__ == 'BivariateAggregate'
+    ours = [w for w in rec
+            if issubclass(w.category, IgnoredDecLClauseWarning)]
+    assert len(ours) == 1
+    msg = str(ours[0].message)
+    assert msg.startswith('W11:')          # the unit is named, not the joint
+    assert 'ceded premium' in msg
+    assert 'loss against loss' in msg      # the joint's remedy, not the agg's
+    assert 'pnl' not in msg
+    # the loss structure survives: the netceded joint needs the cession layers
+    assert b._nc_agg.occ_reins is not None
+
+
+def test_copula_unit_builds_and_warns(uwb):
+    with pytest.warns(IgnoredDecLClauseWarning, match='W12a'):
+        b = uwb(_COPULA_UNIT)
+    assert type(b).__name__ == 'BivariateAggregate'
+    assert b.units[0].occ_reins is not None
+
+
+def test_bvagg_recipe_retains_the_economics(uwb):
+    # the filter works on a COPY: the stored unit spec keeps the economics, so
+    # the full declaration survives for anything that reads the recipe back.
+    with pytest.warns(IgnoredDecLClauseWarning):
+        uwb(_VIEW_PAIR)
+    stored = uwb[('bvagg', 'W11')].spec
+    assert stored['units'][0][2]['occ_reins_premium'] == [('deposit', 5)]
+    with pytest.warns(IgnoredDecLClauseWarning):
+        uwb('W11')                          # rebuilt from the stored spec
+
+
+def test_undecorated_bvagg_does_not_warn(uwb, recwarn):
+    uwb('grossceded agg W13 dfreq [3] dsev [2 4 6 8 10 12] '
+        'occurrence net of 6 xs 6')
+    assert not [w for w in recwarn
+                if issubclass(w.category, IgnoredDecLClauseWarning)]

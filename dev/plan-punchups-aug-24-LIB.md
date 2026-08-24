@@ -197,3 +197,45 @@ behind CodeMirror highlighting and offline completion, has no `picks`
 entry. One-line app edit adding `picks` to the appropriate group, recorded
 here as the paired ask per the grammar-ripple agreement (the a249 model
 case) so it is not lost; it rides with the app's next bump, not this repo's.
+
+---
+
+# Execution log
+
+Written as each item lands, per the house convention: what the plan specified, what the code does instead, and why. A recorded divergence is a good outcome; an unrecorded one is the failure.
+
+## Review, 2026-08-24, against `1.0.0a320`
+
+Every landmark the plan names was verified against the tree before any edit. All of them still read as written: `underwriter.py:61` `_AGG_IGNORED_ECONOMICS_KEYS`, the warn and filter dance at 1402 to 1406, `BivariateAggregate(**spec)` at 1665, `bivariate.py:1342` and `1400`; `exhibits/_aggregate.py` `_reins_insurer_aggregate` with its two blocks, `_reinsurance.py:937` `reins_stats_df` and `1123` `thin_moments`; `parser.py:1297` to 1321, `decl_writer.py:222` and `278` and `378`, `decl.lark:311` to 317 and 483 to 491, `_frequency.py:600`, `_aggregate.py:2193`, `2253` and `3161`; `decl_pygments.py:221`. Three claims were re-measured rather than taken on trust, and all three hold: the item 1 symptom reproduces exactly as quoted; the item 2 thinning identity holds on the dice example (layer freq mean 1.5 = 3 x 0.5, and freq mean times sev mean equals agg mean on all four columns); and the item 4 share reading holds (`0.5 po 6 xs 6` shows loss 0.5 against 6 for the full placement while lol stays 1.0 in both).
+
+Names vetted: `_strip_ignored_economics` is free across `src/aggregate`, and `_IGNORED_CLAUSE_REMEDIES` is new. Nothing else on the list introduces a public name.
+
+App ripple, stated even where nothing is owed. Item 1: none, the GCN control already gates on cession presence. Items 2 and 4: none, the pipeline serves blocks whole. Item 5: one line, `picks` into `web/src/decl-keywords.json`, confirmed absent there on 2026-08-24 and confirmed not already carried by the API's own `plan-punchups-aug-24-API.md` (which states it shares nothing with this list). Item 3: none, `zt` / `zm` are already in the mirror and `!` is not a keyword.
+
+**One blocker, item 3.** Its "Decision for the author" is undispositioned, so item 3 is not executed. The other four items are executed, on the plan's own statement that each is self contained.
+
+## Item 1 [Reins-Economics-On-Bvagg-Ignore-Warn], landed `1.0.0a321`
+
+Executed as specified: one shared helper, both call sites, no duplication.
+
+Divergences.
+
+1. **The remedy wording lives in a module dict, not a branch.** The plan said the `context` parameter picks the remedy. It is implemented as `_IGNORED_CLAUSE_REMEDIES`, a two entry mapping beside `_IGNORED_CLAUSE_NAMES`, so the key list, the clause names and the remedy sentences all sit together as the plan intended for the first two. `ignored_clauses_message` gained the `context` parameter (defaulted to `'agg'`, so the signature is compatible) and `_strip_ignored_economics` passes it through.
+
+2. **The bvagg branch guards on `units` being present and on the unit kind.** The plan said call it once per `('agg', unit_name, unit_spec)` in `spec['units']`. The discrete `dbvsev` mode carries no `units` at all, so the loop is guarded; a non `agg` unit kind passes through untouched, since `pnl` components are refused a few lines later inside `BivariateAggregate` and filtering them first would only change which error the reader sees.
+
+3. **`stacklevel` moved from 2 to 3.** The warn is one function deeper than it was, so the reported location is unchanged.
+
+4. **Four tests, not two.** The plan asked for the view pair case and the copula case. Landed with two more, matching the shape of the `agg` block above them in the same file: the stored recipe keeps the economics (the copy discipline the plan is explicit about, asserted directly rather than inferred), and an undecorated joint emits nothing. A `uwb` fixture with `update=False` serves all four: every assertion is `__init__` state, and a joint update costs about 23 seconds against a fraction of a second for the build.
+
+5. **`bvagg.NAME` is not a reference form.** The copy discipline test was first written to rebuild by dotted reference, mirroring `test_rebuild_by_name_still_warns` on the agg side. There is no `bvagg.NAME` builtin prefix in the grammar, so it rebuilds by bare name instead, which exercises the same stored spec.
+
+### The gate at `a321`, and why it is not green
+
+**Three failures are pre-existing at `HEAD` (`92a05a4`), not caused by anything here.** Proven rather than assumed: a detached worktree at `HEAD` with `PYTHONPATH` pointed at its own `src` fails exactly these three and no others. They are `test_agg_libraries.py::test_library_retired_the_letter_prefixes`, `test_agg_libraries.py::test_library_is_written_in_the_canonical_layout` (27 entries not canonical; the test names its own remedy, `python dev/done/reflow_library.py`) and `test_library_entries.py::test_split_limit_policy_prices_the_per_accident_limit` (relative gap 1.7e-05 against a 1e-9 tolerance, which reads as fallout from `a318` no longer rebuilding hinted entries on the auto sized grid). All three are the author's, in the `library.agg` reorganization that is still in flight, and all three are untouched by this list. Note for item 5: that canonical layout test will have to be re-pinned by a `reflow_library.py` run once the picks fragment moves to its own line, and `LayerPicks.Uniform` and `LayerPicks.Lognorm.Experience` are already among its 27 offenders.
+
+**Everything else that failed was a memory allocation failure, and they move between runs.** Four full runs of `-m 'slow or not slow'` produced three different extra failures: `test_bivariate.py::test_mv_explain_flags_clipped_book` and `test_reins_bivariate.py::test_netceded_refuses_a_pin_it_cannot_honor` in the first, `test_composition_matrix.py::test_gc_feat_walk_has_occ_step_and_true_gross` in the second (`numpy._core._exceptions._ArrayMemoryError: Unable to allocate 8.00 MiB`), none in the second for the first two, and a worker dying outright in the third (`[gw0] node down: Not properly terminated`). `dev/TODO.md` `[Bivariate-Gate-Flake]` names the first two of those tests by node id and describes exactly this profile: load dependent, unreproducible in isolation, two different tests in two different bivariate modules pointing at a shared cause rather than at either test.
+
+**What was run clean instead, and its result.** Tier 2, the fast suite, `-m 'not slow'`: **4803 passed, only the three pre-existing library failures**, no memory failures at all. Then `-m slow -n 2` for the quarantined modules: 171 passed with one flake, and `tests/test_reins_bivariate.py` alone at `-n 2` passes whole (40 passed). Together those two commands cover everything the tier 3 gate covers.
+
+**The one flake was then shown to be impossible to attribute to this change.** `test_netceded_refuses_a_pin_it_cannot_honor` builds `OCC`, which carries no economics clause at all, so `_strip_ignored_economics` returns its argument unchanged; and it is an `agg`, so it never reaches the `bvagg` branch this item edits. It then calls `occ_bivariate` directly on the built object, which does not go through the factory. The edit is a provable no-op on that test.

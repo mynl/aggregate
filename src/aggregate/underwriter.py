@@ -84,27 +84,97 @@ _IGNORED_CLAUSE_NAMES = (
 )
 
 
-def ignored_clauses_message(name, spec):
-    """The ignored-economics message for a plain ``agg``, or ``''`` if none.
+#: Remedy sentences for :func:`ignored_clauses_message`, one per construction
+#: context. The clause list is common to both; only the way out differs. An
+#: ``agg`` can activate the economics by being folded into a P&L, so its remedy
+#: is a recipe. A ``bvagg`` cannot: a joint carries loss against loss by design
+#: (the 2-D FFT convolves loss grids, and ``pnl`` components are refused
+#: outright), so its remedy is the statement that there is nothing to do.
+_IGNORED_CLAUSE_REMEDIES = {
+    'agg': ("a plain 'agg' has no premium context, so only the loss structure "
+            "builds. The stored program keeps the full declaration: fold it "
+            "into a 'pnl' / 'xpnl' by reference (e.g. \"pnl {name}_pnl "
+            "<premium> premium less agg.{name}\") to activate the economics."),
+    'bvagg': ("a joint carries loss against loss, so only the loss structure "
+              "of the component builds. The cession layers are kept, since the "
+              "joint needs them; the stored program keeps the full "
+              "declaration."),
+}
+
+
+def ignored_clauses_message(name, spec, context='agg'):
+    """The ignored-economics message for a loss-only build, or ``''`` if none.
 
     Names each present-but-unusable clause (ceded premium, cede,
-    reinstatements, a variable-rating feature, retro) and the remedy: fold the
-    agg into a ``pnl`` / ``xpnl`` by reference to activate the economics. One
-    source of truth for the wording -- emitted as an
-    :class:`~aggregate.constants.IgnoredDecLClauseWarning` by the factory and
-    replayed by ``PnL.construction_explanation``
+    reinstatements, a variable-rating feature, retro) and closes with the
+    remedy for the construction context. One source of truth for the wording:
+    emitted as an :class:`~aggregate.constants.IgnoredDecLClauseWarning` by the
+    factory and replayed by ``PnL.construction_explanation``
     ([Reins-Economics-On-Agg-Ignore-Warn]).
+
+    Parameters
+    ----------
+    name : str
+        The object being built, or the unit inside it, named in the message.
+    spec : dict
+        The parsed spec to inspect.
+    context : {'agg', 'bvagg'}, default 'agg'
+        Which remedy sentence to close with. ``agg`` offers the P&L recipe;
+        ``bvagg`` says the joint is loss only, so there is nothing to do
+        ([Reins-Economics-On-Bvagg-Ignore-Warn]).
+
+    Returns
+    -------
+    str
+        The message, or ``''`` when the spec carries no ignored clause.
     """
     clauses = [label for keys, label in _IGNORED_CLAUSE_NAMES
                if any(k in spec for k in keys)]
     if not clauses:
         return ''
     plural = 's' if len(clauses) > 1 else ''
-    return (f"{name}: ignoring the {', '.join(clauses)} clause{plural} -- a "
-            "plain 'agg' has no premium context, so only the loss structure "
-            f"builds. The stored program keeps the full declaration: fold it "
-            f"into a 'pnl' / 'xpnl' by reference (e.g. \"pnl {name}_pnl "
-            f"<premium> premium less agg.{name}\") to activate the economics.")
+    remedy = _IGNORED_CLAUSE_REMEDIES[context].format(name=name)
+    return (f"{name}: ignoring the {', '.join(clauses)} clause{plural} -- "
+            f"{remedy}")
+
+
+def _strip_ignored_economics(name, spec, context='agg'):
+    """Warn about, then filter out, the economics clauses a loss build cannot use.
+
+    The reinsurance-economics and feature clauses parse anywhere the shared agg
+    body parses, so they reach every construction route, but they are not
+    :class:`~aggregate.distributions.Aggregate` constructor kwargs: splatting
+    an unfiltered spec raises ``TypeError``. This is the one place that detects
+    them, says so, and hands back a spec the constructor accepts.
+
+    The loss-structure keys (``occ_reins`` / ``occ_kind`` and the aggregate
+    twins) deliberately stay: a netceded joint needs the cession layers to have
+    anything to draw. Only :data:`_AGG_IGNORED_ECONOMICS_KEYS` go.
+
+    Parameters
+    ----------
+    name : str
+        Named in the warning: the object, or the unit inside a joint.
+    spec : dict
+        The parsed spec. Never mutated.
+    context : {'agg', 'bvagg'}, default 'agg'
+        Passed to :func:`ignored_clauses_message` to pick the remedy.
+
+    Returns
+    -------
+    dict
+        A filtered **copy** when a clause was present, otherwise ``spec``
+        itself. The copy matters: ``parsed.spec`` *is* the stored recipe's spec
+        and the stored program must keep the full declaration, which is what an
+        ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects
+        ([Reins-Economics-On-Agg-Ignore-Warn]).
+    """
+    msg = ignored_clauses_message(name, spec, context)
+    if not msg:
+        return spec
+    warnings.warn(msg, IgnoredDecLClauseWarning, stacklevel=3)
+    return {k: v for k, v in spec.items()
+            if k not in _AGG_IGNORED_ECONOMICS_KEYS}
 
 
 # Write order for to_agg: .agg files load sequentially and named references
@@ -1395,15 +1465,8 @@ class Underwriter(HelpMixin):
             # A pure aggregate ignores what it cannot use and says so: the
             # reinsurance-economics / feature clauses parse everywhere (the
             # shared agg body), but activating them needs a P&L premium
-            # context. Filter a COPY -- ``parsed.spec`` *is* the stored
-            # recipe's spec, and the retained keys are exactly what an
-            # ``agg.NAME`` reference inside a ``pnl`` / ``xpnl`` re-injects
-            # ([Reins-Economics-On-Agg-Ignore-Warn]).
-            msg = ignored_clauses_message(name, spec)
-            if msg:
-                warnings.warn(msg, IgnoredDecLClauseWarning, stacklevel=2)
-                spec = {k: v for k, v in spec.items()
-                        if k not in _AGG_IGNORED_ECONOMICS_KEYS}
+            # context ([Reins-Economics-On-Agg-Ignore-Warn]).
+            spec = _strip_ignored_economics(name, spec)
             obj = Aggregate(**spec)
             obj.program = program
             # With ``program`` now populated, fold the method-of-moments
@@ -1662,6 +1725,22 @@ class Underwriter(HelpMixin):
             obj = inner
         elif kind == 'bvagg':
             from .bivariate import BivariateAggregate
+            # Same story as the ``agg`` branch, one level down: both
+            # unit-construction routes inside BivariateAggregate splat the unit
+            # spec into ``Aggregate``, so an economics clause on a component
+            # (the GCN control on a priced program is the everyday case) raises
+            # TypeError. Filter per unit, naming the unit in the warning, and
+            # rebuild the outer spec and the units list around the copies so
+            # ``parsed.spec`` is never mutated
+            # ([Reins-Economics-On-Bvagg-Ignore-Warn]).
+            units = spec.get('units')
+            if units:
+                rebuilt = [(k, n, _strip_ignored_economics(n, s, 'bvagg'))
+                           if k == 'agg' else (k, n, s)
+                           for k, n, s in units]
+                if any(new is not old for (*_, new), (*_, old)
+                       in zip(rebuilt, units)):
+                    spec = dict(spec, units=rebuilt)
             obj = BivariateAggregate(**spec)
             obj.program = program
         elif kind == 'port':

@@ -850,6 +850,16 @@ netceded agg AE.Trailer.NetCeded 8 claims sev 300 * beta 2 3 occurrence net of 0
 clash AE.Trailer.Clash 8 5 2 claims sev lognorm 50 cv 1.2 sev lognorm 60 cv 1.5 mixed gamma 0.2 note{binds to the clash};
 port AE.Trailer.Port note{on the portfolio} agg AE.Trailer.PortUnit 5 claims sev lognorm 10 cv 1 poisson note{on the last unit}
 
+# AE.Trailer.RefSource is the entry a builtin reference points at, for
+# tests/test_reference_trailer.py: a reference stands for the stored entry, so
+# an absent outer clause must leave the stored note, tags and hints in place
+# (a318, [Reference-Trailer-Preservation]). bs=125 is non dyadic on purpose, so
+# a reference that loses the hints lands on a visibly different grid instead of
+# agreeing with the auto sized one by luck. The reference statements themselves
+# are NOT mirrored here: the unparser resolves `agg.NAME` back to the full spec,
+# so they are not round-trip fixed points ([Unparser-Reference-Gaps]).
+agg AE.Trailer.RefSource 1 claim sev lognorm 100 cv 2 fixed note{the stored trailer a reference must preserve} tags{topic:reference} hints{bs=125; log2=18}
+
 # ============================================================
 # AF. tags{...} ([Recipe-Library])
 #     (tests/test_trailer_clauses.py)

@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a318
+
+**[Reference-Trailer-Preservation] a builtin reference keeps the referenced entry's stored trailer.** `agg_out_builtin` merges only the trailer keys that carry a value, so an absent outer clause no longer overwrites the stored `note` and `hints` with the empty strings `trailer()` seeds; an outer clause still wins wherever it is written, and `tags` is unchanged, having never had a seeded default. `agg.MED.WithPicks` builds again, where it died with a raw `KeyError` from the off grid picks adjustment. A reference build also stops writing the blanked trailer back into the recipe base, which had left the entry on the wrong grid for the rest of the session.
+
+Numbers move: a program referencing a hinted library entry by `agg.NAME` now builds on the entry's pinned grid rather than the auto sized one, and sixteen `library.agg` entries carry `hints{}`. The rename form, `agg NEW agg.OLD`, still drops the stored trailer and is left alone here.
+
 ## 1.0.0a317
 
 **[Agg-Magic-Validation] the `%%agg` magic gains `-v`, `--validation`**, which `qd`s each built object's `validation_df`, the moment vs estimate audit, in place of the object summary. An object without the frame (a recipe stub, an `expr` value) displays itself as before, and the volume flags apply unchanged. `magics.py` only.

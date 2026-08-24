@@ -626,8 +626,29 @@ class UnderwritingTransformer(Transformer):
         return ("agg", name, {"name": name, **as_label, **body, **trailer})
 
     def agg_out_builtin(self, c):
+        """A builtin reference, ``agg.NAME``, with its own reinsurance and trailer.
+
+        Notes
+        -----
+        Only the trailer keys that carry a value are merged. ``trailer`` seeds
+        ``note`` and ``hints`` with empty strings so that a freshly declared
+        object gets those defaults, but ``bagg`` here is the *stored* spec of
+        the referenced entry, so splatting the whole trailer overwrites the
+        entry's own note and hints with nothing. That silently rebuilt every
+        hinted library entry on the auto sized grid instead of the grid its
+        author pinned, and made ``agg.MED.WithPicks`` fail outright, since its
+        picks attachments only lie on the grid at the pinned ``bs=125``. Tags
+        were already safe by accident, having no seeded default; filtering on
+        truth extends the same rule to all three keys.
+
+        An outer trailer still wins wherever it is written, because a written
+        clause carries a value. The accepted limitation is that an empty
+        clause on a reference, ``note{}`` were the grammar to admit it, no
+        longer blanks the stored note.
+        """
         bagg, agg_reins, trailer = c
-        return ("agg", bagg["name"], {**bagg, **agg_reins, **trailer})
+        stated = {k: v for k, v in trailer.items() if v}
+        return ("agg", bagg["name"], {**bagg, **agg_reins, **stated})
 
     # ----- profit-and-loss aggregate (premium minus loss) -----------
     def answer_pnl(self, c):

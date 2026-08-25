@@ -24,9 +24,9 @@ Object                         Shape      Role
 ``reins_summary_df``           DataFrame  per-stage economic view, the daily driver
 ``_reins_view_stats``          DataFrame  private; per stage, view and basis, EX against Est
                                           moments; feeds ``reins_summary_df``
-``reinsurance_kinds()``        str        "None / Occurrence only / Aggregate only / both"
-``reinsurance_description()``  str        human sentence, "Net of 88% share of 4,000 xs 1,000..."
-``reinsurance_occ_plot()``     figure     occurrence log-density and aggregate quantile plot
+``reins_kinds``                str        "None / Occurrence only / Aggregate only / both"
+``reins_description``          str        human sentence, "Net of 88% share of 4,000 xs 1,000..."
+``reins_occ_plot()``           figure     occurrence log-density and aggregate quantile plot
 =============================  =========  =========================================================
 
 The vocabulary used throughout:
@@ -117,7 +117,7 @@ The reinsurance analogue of ``density_df``: one row per grid bucket, with consis
     p_agg_ceded       = agg_density_ceded
     p_agg_net         = agg_density_net
 
-Two names enforce the gross-against-subject convention. ``p_agg_gross`` is the FFT of the gross severity, which is the true gross aggregate, and ``p_agg_subject`` is the aggregate-cover input, which is the aggregate of the occurrence output. All aggregate columns come from :meth:`_fft_aggregate`, so the fixed-1 and zero-risk shortcuts are honored identically to the main path. ``reins_density_df`` is the densities-of-record frame the other objects are computed from, and :meth:`reinsurance_occ_plot` reads from here.
+Two names enforce the gross-against-subject convention. ``p_agg_gross`` is the FFT of the gross severity, which is the true gross aggregate, and ``p_agg_subject`` is the aggregate-cover input, which is the aggregate of the occurrence output. All aggregate columns come from :meth:`_fft_aggregate`, so the fixed-1 and zero-risk shortcuts are honored identically to the main path. ``reins_density_df`` is the densities-of-record frame the other objects are computed from, and :meth:`reins_occ_plot` reads from here.
 
 ``_reins_view_stats``, the EX against Est frame
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -234,11 +234,11 @@ The subject, after-occurrence, after-aggregate progression is computed here, and
 Text and plot helpers
 ---------------------
 
-:meth:`reinsurance_kinds`
+:attr:`reins_kinds`
     Counts which stages are present and returns one of four strings.
-:meth:`reinsurance_description`
+:attr:`reins_description`
     Walks ``occ_reins`` and ``agg_reins`` building a human sentence, "Net of 88% share of 4,000 xs 1,000 per occurrence then net of 100% share of 2,000 xs 3,000 in the aggregate." The ``net of`` and ``ceded to`` wording is the requested view, and ``reins_stats_df`` and ``reins_summary_df`` label the aggregate subject consistently with it, and with the ``output`` flag.
-:meth:`reinsurance_occ_plot`
+:meth:`reins_occ_plot`
     An occurrence log-density panel plus an aggregate quantile plot, reading the ``p_*`` columns of ``reins_density_df`` and cumulating inline for the CDF panel.
 
 .. _reins notes:

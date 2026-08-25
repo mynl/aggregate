@@ -26,7 +26,7 @@ The maintenance contract: every major point in ``CHANGELOG.md`` is accounted for
 by a row. "Under the hood" plus an em-dash means an internal change named in the
 appendix but not exampled.
 
-.. csv-table:: Coverage ledger, a1 to a195
+.. csv-table:: Coverage ledger, a1 to a325
    :header-rows: 1
    :widths: 46 8 26 20
 
@@ -210,6 +210,137 @@ appendix but not exampled.
    "``validation_score``; each probe row line-searches the bucket axis", "a193", "Grids & windows", "``simple``"
    "sharpen takes the best affordable grid; ``min_gain`` retired; ``log2_cap`` 20", "a194", "Grids & windows", "``dice``"
    "a grid that loses mass is disqualified; ``deficit`` / ``defective`` / ``warns``", "a195", "Grids & windows", "``simple``"
+   "API reference chapter audited against the live surface", "a196", "Under the hood", "—"
+   "``dev/chart-inventory.md``: every figure the library draws, one row each", "a197", "Under the hood", "—"
+   "chart IR schema v1: ``ChartDoc`` over panels, axes, series and marks", "a198", "Served documents", "``doc``"
+   "chart surface pilot: ``build_chart_doc`` and the first emitter", "a199", "Served documents", "``simple``"
+   "``aggregate.exhibits``: registry, ``Perspective``, ``Exhibit``, ``build_exhibit``", "a200", "Served documents", "``simple``"
+   "the ``reins`` exhibit and its INSURER reading", "a201", "Served documents", "``reins``"
+   "chart conversion: the distortion ``g(s)`` document", "a202", "Served documents", "—"
+   "the P&L accounting exhibits, raw stage", "a203", "Served documents", "``pnl``"
+   "**breaking:** ``stats_df`` becomes ``economic_df``; ``ratio_df`` becomes ``economic_ratios_df``", "a204", "P&L", "``pnl``"
+   "``exhibits.py`` becomes a package mirroring ``plots/``", "a205", "Served documents", "—"
+   "the Economics ledger gets its business reading", "a206", "Served documents", "``pnl``"
+   "``economic_waterfall``, the flagship business exhibit", "a207", "Served documents", "``tower``"
+   "chart IR sign-off gate, part one", "a208", "Under the hood", "—"
+   "chart IR sign-off gate, part two", "a209", "Under the hood", "—"
+   "chart conversion: the reinsurance triple", "a210", "Served documents", "``reins``"
+   "an axis's suggested range is the range of its data", "a211", "Served documents", "—"
+   "chart conversion: severity", "a212", "Served documents", "—"
+   "derived programs: the text that reproduces the object you arrived at", "a213", "Programs as text", "``simple``"
+   "``ChartSeries.support``: the discretization is the distribution", "a214", "Served documents", "``dice``"
+   "``sharpen()`` writes its outcome onto the object's own program", "a215", "Grids, buckets & windows", "``simple``"
+   "a P&L writes its portfolio engine out inline", "a216", "P&L", "``book``"
+   "``add_exa`` attaches its columns in one concat", "a217", "Under the hood", "—"
+   "the reproductions book opens with a five-paper short version", "a218", "Under the hood", "—"
+   "warning policy: a defective law is announced once, where it can change a price", "a219", "Reporting quartet", "``defective``"
+   "``RuntimeWarning`` census: 75 failures under ``-W error`` to zero", "a220", "Under the hood", "—"
+   "single-parameter Pareto gets closed-form partial moments", "a221", "Under the hood", "—"
+   "an undefined moment reports ``inf`` or ``0``, never a cancelled ``nan``", "a222", "Reporting quartet", "—"
+   "``reins_view=`` names which of a cession's distributions to price on", "a223", "Pricing & the pentagon", "``quoted``"
+   "``reins_price_df``: what a stated risk measure says a cession is worth", "a224", "Pricing & the pentagon", "``quoted``"
+   "the reinsurance chart draws a book, not just an aggregate", "a225", "Served documents", "``book_w_re``"
+   "every exhibit block says what it is, and a window prints as a window", "a226", "Served documents", "``simple``"
+   "``tail_df`` / ``tail_periods_df`` on :class:`PnL` and :class:`BivariateAggregate`", "a227", "Reporting quartet", "``tower``"
+   "``ChartSeries.support`` survives serialization", "a228", "Served documents", "``dice``"
+   "``greater_tables`` becomes a plain dependency; Python floor rises to 3.12", "a229", "Under the hood", "—"
+   "a reflected severity is legal under plain ``sev`` and clamps at zero", "a230", "New DecL elements", "``refl``"
+   "spliced signed severity reported unspliced analytic moments", "a230", "Under the hood", "—"
+   "the ``tweedie`` keyword survives the parse and renders back", "a231", "New DecL elements", "``tw``"
+   "``Aggregate.as_tweedie()`` reports the reproductive parameters", "a232", "New DecL elements", "``tw``"
+   "declared readings: an axis states the scales it admits, a panel the forms", "a233", "Served documents", "``doc``"
+   "``ChartDoc.tex`` is total: every string carries both forms", "a234", "Served documents", "``doc``"
+   "``Aggregate.plot`` draws through the IR; the compositor is deleted", "a235", "Served documents", "``simple``"
+   "``Distortion.plot`` draws through the IR", "a236", "Served documents", "—"
+   "``PnL.plot`` delegates to the aggregate emitter over its signed result", "a237", "Served documents", "``pnl``"
+   "payload weight: lattice coordinates and empty runs; ``CHART_IR_VERSION`` 2", "a238", "Served documents", "``doc``"
+   "``Severity.plot``: four panels become two", "a239", "Served documents", "—"
+   "``Panel.invertible``: a Lee diagram read the other way round is the cdf", "a240", "Served documents", "``doc``"
+   "``Bounds.plot_envelope``: the cloud and all five distortions on one band", "a241", "Served documents", "—"
+   "``Portfolio.plot`` emits total, units and the kappa reading", "a242", "Served documents", "``book``"
+   "equal aspect is a reading, not a box shape", "a243", "Served documents", "—"
+   "``chart_reins`` is the occurrence plot; the last compositor goes", "a244", "Served documents", "``reins``"
+   "the view-pair keyword gets its own line in the spread layout", "a245", "Programs as text", "``netceded``"
+   "a served block carries its raw values, not only formatted strings", "a246", "Served documents", "``simple``"
+   "``max_rows``: how many rows a block carries is the caller's question", "a247", "Served documents", "``simple``"
+   "``PnL.value_type``: a P&L says which sign convention it is read on", "a248", "P&L", "``pnl``"
+   "**breaking:** ``po`` is the one partial-placement keyword; ``so`` / ``of`` retired", "a249", "New DecL elements", "``reins``"
+   "``reins_density_df`` removes its FFT fuzz, so reins calibration works", "a250", "Under the hood", "—"
+   "a sized P&L premium is rounded to a number someone would write down", "a251", "Under the hood", "—"
+   "``load_chart_doc``: a served chart document has a way home", "a252", "Served documents", "``doc``"
+   "a RAW block is exactly one public frame; ``walk_df`` / ``evaluation_df``", "a253", "P&L / Served documents", "``tower``"
+   "``bs_window_df`` publishes ``W`` and ``coverage``", "a254", "Grids, buckets & windows", "``simple``"
+   "``sharpen``, the twelfth exhibit: the grid probe says what it scored", "a255", "Served documents", "``simple``"
+   "the INSURER layering analysis turns over, layers down the rows", "a256", "Served documents", "``reins``"
+   "joint density clip: small is noise, large and negative is not", "a257", "Under the hood", "—"
+   "the joint surface says what grid it is and what it left out", "a258", "Served documents", "``netceded``"
+   "``CalibrationResult``: a calibration is a receipt that knows its subject", "a259", "Pricing & the pentagon", "``cal``"
+   "``p = 1`` is refused on an unbounded risk, which has no maximum", "a260", "Pricing & the pentagon", "``unbounded``"
+   "``evaluate`` takes the calibration anchor, so the round trip closes", "a261", "Pricing & the pentagon", "``cal``"
+   "the layered quote speaks the same pentagon octet as every other price", "a262", "Pricing & the pentagon", "``quoted``"
+   "``pricing.calibrate`` / ``.stand_alone`` / ``.allocate`` exhibits", "a263", "Served documents", "``cal``"
+   "the maximum envelope carries its jump at the origin", "a264", "Pricing & allocation bounds", "—"
+   "the pentagon surface honors ``allocation_method``; ``ccoc`` on an unbounded book", "a265", "Pricing & the pentagon", "``unbounded``"
+   "FYI premium on the ``claims`` and ``loss`` sizing heads", "a266", "New DecL elements", "``simple``"
+   "the grid-sizing exhibit prints its window like an amount", "a267", "Grids, buckets & windows", "``simple``"
+   "``+``, ``-`` and ``*`` join the DecL expression sub-language inside parentheses", "a268", "New DecL elements", "—"
+   "a probability axis declares its reflection; a Lee panel reads the survival", "a269", "Reporting quartet", "``simple``"
+   "``derive premium``, the fourth premium head", "a270", "P&L", "``pnl``"
+   "marks are the mean and break-even only; the percentile lines come off", "a271", "Served documents", "``doc``"
+   "infeasible picks warn instead of failing silently", "a272", "Grids, buckets & windows", "—"
+   "``exeqa_df``: the kappa curve comes off the joint", "a273", "Bivariate", "``netceded``"
+   "``natural_allocation``: a gross premium splits across an occurrence program", "a274", "Bivariate", "``gross_ceded``"
+   "the grid sizing frames carry their own dtypes", "a275", "Grids, buckets & windows", "``simple``"
+   "the return-period table is indexed by probability and carries both tails", "a276", "Reporting quartet", "``simple``"
+   "the netceded joint sizes itself honestly, and says what it chose", "a277", "Bivariate", "—"
+   "``JointBandsMixin``: one band iterator either side of the disk boundary", "a278", "Bivariate", "``netceded``"
+   "``exeqa_df(levels=, cdf_range=)``: the kappa curve gains a band", "a279", "Bivariate", "``netceded``"
+   "the ``kappa`` chart: the conditional cession as a curve with a band", "a280", "Served documents", "``netceded``"
+   "stand-alone prices the parts; allocate splits the whole", "a281", "Pricing & the pentagon", "``cal``"
+   "``CalibrationResult.stand_alone_df``: every unit priced alone", "a282", "Pricing & the pentagon", "``cal``"
+   "``CalibrationResult.natural_allocation_df``", "a283", "Pricing & the pentagon", "``rc``"
+   "the occurrence branch of ``pricing.allocate``", "a284", "Served documents", "``rc``"
+   "one ``kappa`` chart name, three sources", "a285", "Bivariate", "``book``"
+   "the column formats become two YAML sheets shipped as package data", "a286", "Served documents", "—"
+   "the sheets are wired and seven hard-coded format dicts are deleted", "a287", "Served documents", "—"
+   "the column vocabulary is swept: an undeclared float column fails a test", "a288", "Served documents", "—"
+   "the pricing calibration learns about the output window", "a289", "Under the hood", "—"
+   "``SeverityMeta`` rebuilt on the discrete-severity foundation", "a290", "Under the hood", "—"
+   "``sev agg.NAME`` and ``sev port.NAME``: an aggregate can be a severity", "a291", "New DecL elements", "``split_policy``"
+   "the outer grid learns about the reference's lattice", "a292", "Grids, buckets & windows", "—"
+   "a portfolio unit can take its severity from a reference", "a293", "New DecL elements", "—"
+   "a reference to an unbounded aggregate reports unbounded, everywhere", "a294", "New DecL elements", "—"
+   "a format sheet can say how a family of columns reads", "a295", "Served documents", "—"
+   "the moment store states a default reading for its unnameable columns", "a296", "Served documents", "—"
+   "``library.agg`` loses 28 duplicate programs and gains a reading order", "a297", "The recipe library", "—"
+   "the Quarto cookbook leaves the repository", "a298", "The recipe library", "—"
+   "every shipped entry builds, and its invariants are ordinary pytest", "a299", "The recipe library", "—"
+   "the seven long-form write-ups leave ``library.agg``", "a300", "The recipe library", "—"
+   "**breaking:** the DecL ``doc{{{...}}}`` trailer clause is removed", "a301", "The recipe library / New DecL elements", "—"
+   "``Underwriter.fork()``, ``Underwriter.preview()``, ``RecipeNotFound``", "a302", "The recipe library", "``scratch``"
+   "``dfreq [1]`` takes the same exact path as ``1 claim ... fixed``", "a303", "New DecL elements", "``one``"
+   "**breaking:** ceding commission folds into ``E``; the ``C`` column goes", "a304", "P&L", "``tower``"
+   "the Economics ledger's INSURER view narrows to four columns", "a305", "Served documents", "``pnl``"
+   "``net_combined_ratio``: ``pnl_program`` prices the reinsurance", "a306", "P&L", "``priced``"
+   "a display cell is filed under the point its mass actually sits at", "a307", "Served documents", "—"
+   "the whole reduced lattice travels; ``window`` is the drawing range in it", "a308", "Served documents", "—"
+   "a layer clause on a signed severity, and the ``int(inf)`` it produced", "a309", "Under the hood", "—"
+   "``_bucket_window.py`` normalized to US spelling", "a310", "Under the hood", "—"
+   "the ``ALIASING`` flag measures aliasing at the convolution step", "a311", "Grids, buckets & windows", "``unlimited``"
+   "the library says when the grid cannot reproduce the severity's mean", "a312", "Grids, buckets & windows", "``unlimited``"
+   "``Validation.INFEASIBLE`` and ``InfeasibleGridWarning``", "a313", "Grids, buckets & windows", "``unlimited``"
+   "three chart axes stop deciding for the reader", "a314", "Served documents", "—"
+   "the ``%%agg`` cell magic: a DecL program can be the cell", "a315", "New DecL elements", "—"
+   "a severity mixture splits the claim count by thinning the frequency", "a316", "Under the hood", "—"
+   "``%%agg -v`` displays each object's ``validation_df``", "a317", "New DecL elements", "—"
+   "a builtin reference keeps the referenced entry's stored trailer", "a318", "The recipe library", "—"
+   "an off-grid picks attachment raises, naming a bucket that would work", "a319", "Grids, buckets & windows", "—"
+   "``Recipe.seq`` and ``Recipe.as_read``", "a320", "The recipe library", "``r``"
+   "a reinsurance economics clause on a bivariate component warns", "a321", "New DecL elements", "—"
+   "the INSURER layer moments block gains the cover columns", "a322", "Served documents", "``reins``"
+   "the INSURER contract block serves ``loss`` in place of ``pr_loss``", "a323", "Served documents", "``reins``"
+   "``picks`` gets its own line in the spread layout", "a324", "Programs as text", "—"
+   "**breaking:** ``zt`` and ``zm`` deliver the count you asked for; ``!`` opts out", "a325", "New DecL elements", "``zt``"
 
 The cast of examples
 --------------------
@@ -779,6 +910,118 @@ splicing (what those would mean on a compound output is undecided), and the
 ``sev`` / ``ssev`` keyword is required. Depth is unlimited, with a cycle guard
 that names the chain. ``Aggregate.as_severity`` and ``Portfolio.as_severity``
 are the programmatic equivalents.
+
+One keyword for a partial placement: ``po`` (a249)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Breaking.** DecL offered three spellings of the same layer, ``50% so 100 xs
+0``, ``50% po 100 xs 0`` and ``50% of 100 xs 0``. ``so`` and ``of`` are retired
+and ``po`` (*part of*) is the survivor, unchanged in meaning: the leading
+quantity picks the reading, a percentage being the share directly and a bare
+number an absolute amount whose share is ``amount / limit``.
+
+.. ipython:: python
+
+    print(build('agg Po 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+                'occurrence net of 50% po 300 xs 200 poisson', update=False).pprogram)
+
+``so`` was an ordinary English word and so a poor reserved word, and ``of``
+forked the Earley parse against the ``net of`` that precedes it. ``of`` survives
+in ``net of`` and ``ceded to``; only the placement sense is gone. A bare
+placement amount still normalizes to an explicit share when the program is
+rendered back.
+
+A reflected severity under plain ``sev`` (a230)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``sev 10 - lognorm 1.5 splice [0 10]`` used to be rejected with a message
+pointing at ``ssev``. That was inconsistent: ``sev 10 * norm + 5`` and
+``sev lognorm 5 cv 1 - 10`` both reach below zero, and both build as ordinary
+non-signed losses, clamped at zero by the layered-loss transform. Reflection was
+the one shape singled out, so it now takes the same route:
+
+.. ipython:: python
+
+    refl = build('agg Reflected 5 claims sev 10 - lognorm 1.5 splice [0 10] poisson')
+    qd(refl)
+
+Write ``ssev`` when the negative part is a real payoff to be kept; write ``sev``
+when it is a loss and belongs clamped at zero.
+
+``tweedie`` round trips, and an aggregate reports its own (a231, a232)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``tweedie`` keyword used to be a one-way rewrite: the clause was expanded at
+parse time into its compound Poisson-gamma equivalent and nothing downstream
+learned a Tweedie had been declared, so the canonical program came back as a
+claim count and a scaled gamma. The declaration is now recorded on the spec and
+renders back as written.
+
+.. ipython:: python
+
+    tw = build('agg Tw tweedie 1.5 10 2')
+    print(tw.pprogram)
+    tw.as_tweedie()
+
+:meth:`as_tweedie` runs the other way, reporting the reproductive parameters
+``(p, mean, dispersion)`` satisfying :math:`\mathrm{variance} = \phi\mu^p` for
+any aggregate that has them, and ``None`` for one that does not. The clause reads
+``tweedie <p> <mean> <dispersion>``, shape parameter first; it read
+``<mean> <p> <dispersion>`` before a231, and a program written against the old
+order needs its first two numbers swapped.
+
+``dfreq [1]``: one claim is the severity (a303)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+With exactly one claim the aggregate **is** the severity, after any occurrence
+reinsurance, so the FFT round trip is an identity executed numerically. The
+convolution has always known that, but it recognized only one spelling of the
+fact. Both spellings now take the exact path:
+
+.. ipython:: python
+
+    import numpy as np
+    one   = build('agg One dfreq [1] dsev [1:6]')
+    fixed = build('agg Fixed 1 claim dsev [1:6] fixed')
+    np.array_equal(one.density_df.p_total.values, fixed.density_df.p_total.values)
+
+``zt`` and ``zm`` deliver the count you asked for, and ``!`` opts out (a325)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Breaking, both tiers.** ``4 claims ... poisson zt`` used to build 4.0746
+claims, because the exposure clause set the *un-modified* mean of the
+:math:`(a, b, 1)` construction and the reweighting then moved the realized
+:math:`\mathsf E[N]` off it. The bare clause now states the realized mean and
+solves for the base mean behind it. The trailing ``!`` selects the old textbook
+reading:
+
+.. ipython:: python
+
+    zt  = build('agg ZT  4 claims dsev [1] poisson zt')
+    ztb = build('agg ZTB 4 claims dsev [1] poisson zt !')
+    zt.est_m, ztb.est_m
+
+The effect is larger under ``zm``: ``4 claims ... poisson zm 0.5`` used to
+deliver 2.0373 and now delivers 4. ``Aggregate.freq_pin_mean`` changes default
+from ``False`` to ``True`` to match, so the constructor and DecL read the same
+way; a direct ``Aggregate(freq_zm=True, ...)`` caller who wants the textbook
+parameterization passes ``freq_pin_mean=False``. Because the solve is now on the
+common path its refusal is reachable from an ordinary program: a zero-truncated
+count cannot average below one, so ``0.5 claims ... zt`` raises and names ``!``
+as the escape.
+
+Economics clauses on a bivariate component (a321)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``deposit`` / ``rol`` / ``rate``, ``cede``, ``reinstatements``, the variable
+rating features and ``retro`` parse anywhere the shared aggregate body parses, so
+they reach a ``bivariate``'s unit specs, where they used to raise a bare
+``TypeError`` from ``Aggregate.__init__``. A bivariate has no ledger to book a
+ceded premium into, so the clause is now dropped with an
+``IgnoredDecLClauseWarning`` naming what was ignored, the same treatment a plain
+``agg`` gives an economics clause it cannot honor. Every view-pair prefix
+(``netceded``, ``grossceded``, ``grossnet``) was affected and all three are
+fixed.
 
 Better parse errors (a16)
 -------------------------
@@ -1466,6 +1709,72 @@ blocked the good name. No deprecation shim.
 
 .. _feat tail class:
 
+The grid sizing frame carries the two columns it exists for (a254, a267, a275)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``bs_window_df`` published the candidate windows and withheld the two numbers a
+reader compares them on: ``W``, the window's width, and ``coverage``, the
+fraction of the distribution it holds. Both are now public columns, and each
+column carries its own dtype rather than the ``object`` the old transpose gave
+every one of them:
+
+.. ipython:: python
+
+    qd(simple.bs_window_df)
+    dict(simple.bs_window_df.dtypes.astype(str))
+
+The window edges read as amounts and ``coverage`` as a probability, rather than
+as a float's repr, which was the state a254's widening left them in.
+
+When no bucket size can reproduce the mean (a311, a312, a313)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Three changes from one diagnosis. The ``ALIASING`` flag now measures aliasing
+directly, at the convolution step, rather than through a ratio whose denominator
+was machine epsilon; it had six firings in the 257 program corpus and six false
+positives, and the cause was structural rather than a badly chosen threshold.
+Then the library learned to say when the grid cannot reproduce the severity's
+mean **at any bucket size**, and ``Validation.INFEASIBLE`` puts that reading
+where a user meets it, in ``valid`` and in a build-time
+``InfeasibleGridWarning``:
+
+.. ipython:: python
+
+    unlimited = build('agg Unlimited 5 claims sev lognorm 100 cv 8 poisson', log2=16)
+    unlimited.valid
+    print(unlimited.validation_explanation)
+
+The mean of a thick unlimited law is furnished far above its median, so the
+resolution its body needs and the reach its tail needs pull apart faster than a
+fixed bucket count can span, and a **finer** ``bs`` makes it worse by shortening
+the reach. This is why an unlimited severity is the wrong model for a real
+policy: put an occurrence limit on it, which truncates the size-biased tail and
+brings the two demands back together, or accept the reported moment errors
+deliberately.
+
+Picks refuse what they cannot honor (a272, a319)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A layer boundary inside a bucket has no faithful reading, so an attachment that
+misses the grid is refused rather than snapped, and the message names a bucket
+size that would work:
+
+.. ipython:: python
+
+    try:
+        build('agg Picks 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+              'picks [150 333.7 1000] [60 30 10] poisson', bs=1)
+    except ValueError as e:
+        print(e)
+
+An attachment above the top of the window, or an infinite one, is refused the
+same way; each used to die with a raw pandas ``KeyError`` from the survival
+lookup. Separately, a layer loss pick below the full-limit losses implied by the
+layers above it forces a negative adjustment weight, which makes the adjusted
+survival function increase across the layer and returns a severity carrying
+negative probabilities. That used to happen with no signal at all and now warns,
+naming the offending layers at the moment they are read.
+
 Tail-thickness classification (a29)
 -----------------------------------
 
@@ -1645,6 +1954,81 @@ Distortion calibration works on a single distribution, with :class:`Aggregate`
 and :class:`Portfolio` reaching it identically (a93), and since a99 it handles
 **signed** and **payoff** supports. That is what lets a P&L, which lives on both
 sides of zero, be priced with the same machinery as a loss.
+
+A calibration is a receipt: ``CalibrationResult`` (a259, a260, a261)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:meth:`calibrate_distortions` returns an object rather than writing state onto
+the book and handing back a frame. The receipt knows what it was written about,
+so every frame it serves is reproducible from it alone:
+
+.. ipython:: python
+
+    cal = book.calibrate_distortions(coc=0.10, p=0.995)
+    type(cal).__name__
+    qd(cal.calibration_df)
+
+The anchor is named exactly once, as ``p`` or as ``a``, and the receipt records
+which. ``p = 1`` is a statement about a maximum, so on an **unbounded** risk it
+is refused rather than resolved to the top of the FFT grid, which moves with
+``log2`` rather than with the risk:
+
+.. ipython:: python
+
+    unbounded = build('agg Unbounded 10 claims sev lognorm 100 cv 2 poisson')
+    try:
+        unbounded.calibrate_distortions(coc=0.10, p=1)
+    except ValueError as e:
+        print(e)
+
+:meth:`evaluate` returns the matching ``EvaluationResult`` and takes the same
+anchor, which closes the round trip: calibrate at an anchor, price, then evaluate
+the resulting premium at that anchor and the calibration comes back.
+
+.. ipython:: python
+
+    ev = book.evaluate(21899, a=cal.a)
+    qd(ev.evaluation_df)
+
+Stand-alone prices the parts, allocate splits the whole (a281 to a284)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Two different questions had been sharing one name. **Allocate** splits one
+premium across the parts, so its rows foot to the total; that is ``pricing_df``.
+**Stand-alone** prices each part as its own distribution under the same fitted
+family, so its rows do **not** foot, and the gap between ``sum of parts`` and
+``total`` is what pooling is worth under that family:
+
+.. ipython:: python
+
+    qd(cal.stand_alone_df.loc['ph'])
+
+The same pair of questions applies to an occurrence program, where the parts are
+the ceded and net components rather than the units of a book.
+``natural_allocation_df`` splits a calibrated gross premium across them, ceded
+plus net footing to gross exactly.
+
+Pricing a cession: ``reins_view`` and ``reins_price_df`` (a223, a224, a262)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A reinsured object holds one distribution, and which one depends on how the
+program was written: a ``net of`` program holds its net, a ``ceded to`` program
+holds its ceded. The whole pricing surface used to read that one distribution
+with no way to say otherwise, so an entry point calling it "the net" was right
+half the time, silently. ``reins_view`` names the view:
+
+.. ipython:: python
+
+    quoted = build('agg Quoted 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+                   'occurrence net of 500 xs 500 poisson')
+    quoted.reins_views
+    rc = quoted.calibrate_distortions(coc=0.10, p=0.995, reins_view='gross')
+    qd(rc.reins_price_df.loc[['ph', 'wang']])
+
+``reins_price_df`` answers what a stated risk measure says a cession is worth,
+which is a different question from what the treaty's ``deposit`` says it costs.
+It speaks the same pentagon octet as every other price in the library, one block
+per calibrated family, gross then ceded then net.
 
 Pricing and allocation bounds
 -----------------------------
@@ -2168,14 +2552,16 @@ The ledger's index: ``Side`` and ``Label`` (a189, a191)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking.** The :class:`PnL` sheets renamed their index levels. ``View`` became
-**``Side``** and ``Line`` became **``Label``**, on ``stats_df``, on
-``summary_df``, and as ``legs_df`` columns:
+**``Side``** and ``Line`` became **``Label``**, on the ledger sheet, on
+``summary_df``, and as ``legs_df`` columns. The ledger sheet itself was called
+``stats_df`` until a204 and is ``economic_df`` from there on (see
+:ref:`feat pnl economic frames`):
 
 .. ipython:: python
 
     print('single group:', pnl.economic_df.index.names)
-    print('walk        :', tower.stats_df.index.names)
-    print('labels      :', tower.stats_df.index.get_level_values('Label').unique().tolist())
+    print('walk        :', tower.economic_df.index.names)
+    print('labels      :', tower.economic_df.index.get_level_values('Label').unique().tolist())
 
 ``Line`` assumed a line of business, which the ledger does not otherwise assume,
 and the level holds presentation labels. ``Side`` was already the internal word
@@ -2210,8 +2596,8 @@ code that filtered legs out with ``Label not in ('Total', 'Net', 'Impact')``
 needs the direct label in that set. A step's own result is still the first
 ``Margin`` row of its block in plan order, whatever the label reads.
 
-Ratios in their own frame: ``ratio_df`` and ``legs_df`` (a185, a186)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Ratios in their own frame: ``economic_ratios_df`` and ``legs_df`` (a185, a186)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 **Breaking.** The ``Scaled`` column is gone, and with it ``scaled_stats_df``, the
 ``scale`` property and the ``scale=`` constructor argument. ``Scaled`` divided
@@ -2223,14 +2609,15 @@ now live in their own table:
 
 .. ipython:: python
 
-    qd(tower.ratio_df)
+    qd(tower.economic_ratios_df)
 
 The amounts are signed **in the gross direction**: consideration as booked,
 obligations negated. A cession's ceded premium and recovery are therefore both
 negative, which buys three things at once. The amounts **add across blocks**, so
-layers sum into their tier and tiers into ``All``. ``M == P - L - E - C`` holds
+layers sum into their tier and tiers into ``All``. ``M == P - L - E`` holds
 identically, being the signed row sum, with ``1 - CR == M / P`` as its other
-reading. And every ratio comes out with its **conventional sign**, because
+reading (the frame carried a fourth ``C`` column for ceding commission until
+a304, which folded it into ``E`` as a contra expense). And every ratio comes out with its **conventional sign**, because
 numerator and denominator flip together: the cover above reads ``LR = 0.51``, not
 ``-0.51``, and a cover that paid back three times its premium would read
 ``3.10``. Ratios are re-derived from each row's own amounts, never averaged from
@@ -2244,7 +2631,7 @@ random and correlated with loss they diverge:
 
     retro = build('pnl R retro basic 3000 lcm 1.1 min 3500 max 8000 premium less '
                   'agg R_e 1000 loss sev lognorm 100 cv 2 poisson')
-    qd(retro.ratio_df[['P', 'L', 'M', 'LR', 'E_LR']])
+    qd(retro.economic_ratios_df[['P', 'L', 'M', 'LR', 'E_LR']])
 
 ``LR = 0.2426`` against ``E_LR = 0.2256``, a 7% relative gap in the direction the
 retro implies, since premium rises with loss and damps the per-atom ratio. With a
@@ -2270,6 +2657,106 @@ Both frames are **raw materials**: unformatted, and deliberately absent from
 presentation-ready layer.
 
 .. _feat bivariate:
+
+.. _feat pnl economic frames:
+
+The accounting frames get their own names (a204, a216)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Breaking.** ``stats_df`` means one thing across every first-class class, the
+``(component, measure)`` by view moment store of a book, and on a :class:`PnL`
+it used to mean something else: the ledger sheet. The two are now told apart by
+name. The ledger sheet is ``economic_df``, the ratio table is
+``economic_ratios_df`` (from ``ratio_df``), and ``PnL.stats_df`` delegates to
+``self.engine.stats_df``, so the name reads the same way on every class:
+
+.. ipython:: python
+
+    print('ledger  :', pnl.economic_df.index.names)
+    print('moments :', list(pnl.stats_df.index.names))
+
+A P&L is an accounting view of a book, so the natural reading of "the moments" is
+the book's own. A hand-built kernel P&L carries no engine and gets an **empty**
+frame rather than ``None`` or a raise, because the first-class contract says the
+member exists and callers reach it defensively. a216 lets a P&L write its
+portfolio engine out inline, so ``pnl_program`` on a book produces text that
+builds anywhere rather than text that needs the recipe base.
+
+``value_type`` on a P&L (a248)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:attr:`PnL.value_type` joins :attr:`Aggregate.value_type` and
+:attr:`Portfolio.value_type`, so a consumer asks rather than inferring the sign
+convention from the class name:
+
+.. ipython:: python
+
+    pnl.value_type
+
+It is a constant, the payoff label, read through the same ``value_type_label``
+helper the other two use, so relabeling in the ``[labels]`` section of the config
+moves all three together. ``PnL.info`` gains the matching row in the same
+position.
+
+The margin waterfall: ``walk_df`` and ``evaluation_df`` (a253)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Two frames read the same walk, one in currency and one as ratios. ``walk_df``
+carries one row per step that books a result of its own, in ledger order, so the
+last row is the net position:
+
+.. ipython:: python
+
+    qd(tower.walk_df)
+
+The two 1-in-100 columns are the point of the frame. ``standalone`` reads each
+step in **its own** adverse state, so it does not foot down the walk, tail
+measures not being additive; ``diversified`` reads each step conditional on the
+**whole book** landing at its 1-in-100, off the ledger's kappa column, so that
+one foots exactly. The gap between them is the diversification benefit.
+
+.. ipython:: python
+
+    qd(tower.evaluation_df)
+
+``evaluation_df`` is the same rows as ratios: premium and margin spent against
+the gross block, the combined ratio, margin over its own standard deviation, and
+margin over the capital each of the two adverse readings would call for. Nothing
+here is newly estimated; every number is arithmetic over quantities the P&L has
+already computed. A single-group P&L books one result, so the walk is one row and
+there is nothing to walk.
+
+Ceding commission is a contra expense (a304)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Breaking, stable tier.** Ceding commission received is netted against
+acquisition expense, exactly the way a cession recovery is netted against loss,
+and the separate ``C`` column of ``economic_ratios_df`` is gone. ``CR`` and
+``E_CR`` are numerically unchanged, since commission was always inside the
+combined ratio. ``ER`` changes meaning where a commission exists: a cession block
+now reads the cede rate and the ``All`` block reads the expense ratio net of
+commission. ``legs_df`` keeps the itemization, so the commission is still
+visible as its own leg.
+
+Pricing the reinsurance: ``net_combined_ratio`` (a306)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Wrap a reinsured engine in a P&L and an unpriced cession books at zero ceded
+premium with a ``ZeroPremiumCessionWarning`` saying "price the cover to silence
+this". :meth:`Aggregate.pnl_program` can now do exactly that. Passing
+``net_combined_ratio`` builds the premium from the bottom up, net technical
+premium plus the cost of each cover, grossed up once for expenses:
+
+.. ipython:: python
+
+    priced = build('agg Priced 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+                   'occurrence net of 500 xs 500 poisson')
+    print(priced.pnl_program(net_combined_ratio=0.95))
+
+The cover comes back carrying a ``deposit``, so the program is self-consistent
+and builds without the warning. ``occ_combined_ratio`` and
+``agg_combined_ratio`` set each tier separately, and either accepts a sequence
+giving one value per layer in declaration order.
 
 Bivariate aggregates
 --------------------
@@ -2369,6 +2856,62 @@ because each unit is an ordinary ``agg``; an **object-level** label has no DecL
 spelling yet, so it is set with ``label=``, a grammar gap logged as
 ``[Bivariate-DecL-Label]``.
 
+The kappa curve, off the joint: ``exeqa_df`` (a273, a278, a279)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:meth:`exeqa_df` is the conditional mean of one axis given the other, over the
+whole conditioning grid. It is one matrix-vector product per direction and adds
+no state:
+
+.. ipython:: python
+
+    kap = netceded.exeqa_df(axis=0)
+    list(kap.columns)
+
+The index is the conditioning axis; ``exeqa_<conditioning>`` is the identity and
+``exeqa_<other>`` is the curve. Two optional keywords widen it without changing
+the default: ``levels`` adds per-row quantiles of the conditioned axis, turning
+the curve into a curve with a band, and ``cdf_range`` restricts the rows.
+
+.. ipython:: python
+
+    band = netceded.exeqa_df(axis=0, levels=[0.05, 0.95])
+    list(band.columns)
+
+The band work rides ``JointBandsMixin``, one row-wise fold implemented once for
+both the in-memory and the disk-backed joint, so a massive bivariate no longer
+refuses the question. The picture the band columns were built for is the
+``kappa`` chart, which since a285 also draws for a :class:`Portfolio` and for an
+:class:`Aggregate` carrying an occurrence program: the question, what each part
+contributes given the whole, is the same in all three cases, so it is one name.
+
+Splitting a gross premium across an occurrence program (a274)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:meth:`natural_allocation` allocates a distorted gross premium to the ceded and
+net components of a joint that carries a gross axis, with ceded plus net footing
+to gross exactly:
+
+.. ipython:: python
+
+    from aggregate import Distortion
+    gross_ceded = build('grossceded agg Split 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
+                        'occurrence net of 500 xs 500 poisson')
+    qd(gross_ceded.natural_allocation(Distortion('ph', 0.7)))
+
+A ``(net, ceded)`` joint has no gross axis to condition on, so it is refused with
+a message naming the two view pairs that work.
+
+Honest sizing on a netceded joint (a277)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Three defects reported and fixed together, because they are one story: a caller
+could not reach the grid they asked for, and the grid they got instead answered
+anyway. A ``bs=`` passed to :meth:`occ_bivariate` now reaches the joint, the
+joint sizes itself against the risk rather than against a default, and it says
+what it chose. The measured case returned a 512 by 2,048 joint carrying a mass
+deficit of 0.535 and a correlation of -0.2225, all three of them silent.
+
 Reinsurance economics: stochastic ceded premium
 -----------------------------------------------
 
@@ -2451,6 +2994,165 @@ The classical Pollaczek-Khinchine solver is still there and now carries a strict
 Poisson guard, so it refuses rather than silently returning the wrong answer for
 a renewal process. Defective waiting laws are refused outright.
 
+Served documents: exhibits and charts
+-------------------------------------
+
+Two modules, ``aggregate.exhibits`` and ``aggregate.charts``, turn an object into
+a **document**: a table or a picture described completely enough that a consumer
+can render it without knowing an :class:`Aggregate` ever existed. They exist
+because the library owns the meaning of its own output. A downstream consumer
+that decides for itself which columns matter, how they read and what the chart
+asserts is guessing at business it cannot see, and its guesses go stale silently.
+
+Both are **provisional** in the PEP 411 sense (see
+:doc:`../3_reference/3_x_API_Stability`): they may change in a minor release with
+no deprecation, which is the price of getting the vocabulary right before 1.0
+freezes it. Everything else in this document is on the stable tier.
+
+Tables: ``aggregate.exhibits`` (a200 to a207, a246, a247, a253)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Ask an object what it can show, then ask for one:
+
+.. ipython:: python
+
+    from aggregate import exhibits
+    [name for name, _ in exhibits.available_exhibits(simple)]
+
+.. ipython:: python
+
+    ex = exhibits.build_exhibit(simple, 'summary', 'insurer')
+    sorted(ex.to_payload())
+
+The twelve registered exhibits are ``summary``, ``tail``, ``stats``,
+``validation``, ``reins``, ``economic``, ``economic_ratios``,
+``economic_waterfall``, ``dependency``, ``bs_window``, ``tail_behavior`` and
+``sharpen``, each declared once and dispatched on type, so a class that gains a
+frame gains the exhibit by registering rather than by editing a switch.
+
+A **perspective** is who is reading. ``RAW`` is the library's own reading and
+``INSURER`` the business one, and the invariant that keeps them honest is a253's:
+a ``RAW`` block is exactly one public frame, named on the object, served in the
+frame's own orientation with no split and no dropped rows. ``INSURER`` is the
+only perspective that may restructure, which is how the reinsurance layering
+analysis turns over to read layers down the rows, and how the Economics ledger
+narrows to level, spread, spread relative to level, and one tail.
+
+A served block carries its numbers as well as its formatted strings (a246), so a
+body cell arrives as ``{'text': '17.50', 'raw': 17.5000001}`` and a consumer can
+sort and filter on the value rather than on the rendering. How many rows a block
+carries is the caller's question, not the library's: ``max_rows`` defaults to 200
+and accepts ``None`` for the whole frame (a247).
+
+The column vocabulary is a file (a286 to a288, a295, a296)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+How every named column reads is declared in two YAML **format sheets** shipped as
+package data in ``aggregate/formats/``, the sibling of ``aggregate/agg/`` and for
+the same reason. ``formats-raw.yaml`` holds the default reading of every named
+column; ``formats-insurer.yaml`` is an **overlay** holding only the entries where
+the business reading differs, so absent means same and two sheets cannot drift
+apart the way two full sheets would. Seven hard-coded format dicts were deleted
+when the sheets were wired.
+
+A ``patterns:`` section keys on a regular expression matched whole against the
+displayed label, for the families no list can enumerate: the moment store's
+mixture components are ``e0.m0``, ``e0.m1``, ``e0.m2``, one per component, so how
+many exist is a property of the program rather than of the vocabulary. A sweep
+over every served block under both perspectives reports any float data column
+with no declared reading, so a new word entering the vocabulary is a test failure
+rather than a raw float in someone's browser.
+
+Pictures: ``aggregate.charts`` (a197 to a244, a252)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The chart IR is the same contract for pictures, and the discovery and build
+surface mirrors exhibits exactly:
+
+.. ipython:: python
+
+    from aggregate import charts
+    charts.available_charts(simple)
+    doc = charts.build_chart_doc(simple, 'agg')
+    doc.name, [pan.id for pan in doc.panels], [a.id for a in doc.axes]
+
+A ``ChartDoc`` is panels over axes over series, plus marks, metadata and a ``tex``
+map, stamped with a content hash. ``CHART_IR_VERSION`` is 2. The governing
+principle, settled at a233, is that **which readings a quantity admits is a fact
+about the quantity, not about the drawing**: an axis declares the scales and
+ranges it may honestly be read on, and a panel the forms it may take. A log
+reading of a heavy tail is meaningful and a log reading of a distortion's unit
+square is not, so the document says so, and the renderer's switch acts wherever
+the declaration exists and nowhere else.
+
+.. ipython:: python
+
+    outcome = {a.id: a for a in doc.axes}['outcome']
+    outcome.scale, outcome.scales
+
+That principle is why a mark is rare. A mark is a line the document asserts
+permanently, and after a271 exactly two readings earn one: the mean, on the mass
+panel of ``agg``, ``port`` and ``pnl``, and break-even at zero, in both panels of
+``pnl``. Everything marked at a return period came off, because a return period
+is a reading a viewer chooses rather than a fact the document asserts.
+
+.. ipython:: python
+
+    [m.label for m in doc.marks]
+
+Two more declarations round it out. ``Panel.invertible`` says the panel's axes
+exchange, which on a Lee diagram performs an inversion rather than a transpose, a
+quantile function and a distribution function being inverses; and an axis may
+declare itself the complement or the reciprocal of another, which is what lets
+one probability axis serve the non-exceedance, the survival and the
+return-period readings from one set of pairs.
+
+Every human-facing string carries both a plain and a typeset form, and the map is
+**total** (a234): a plain word maps to itself, and a missing entry is an emitter
+bug rather than a document saying "this string has no typeset form". The analogy
+is alt text in HTML, written because two consumers need different things,
+matplotlib reading one and a browser the other.
+
+A document travels, and comes home (a238, a252)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A document states what it can state rather than writing it out. A series carries
+an arithmetic coordinate as a ``(start, step, count)`` lattice, and an empty run
+of a lattice severity collapses to its endpoints. Neither rounds, thins nor
+samples: every value a document carried before, it carries still. The aggregate
+document for a ``log2 = 16`` book fell from 7.4 MB to 5.4 MB, and for a lattice
+book from 1.6 MB to 0.05 MB.
+
+``load_chart_doc`` reads a served document back, closing the loop the table side
+already had through ``TableDoc.model_validate``:
+
+.. ipython:: python
+
+    from aggregate.charts.ir import canonical_dict, doc_hash, load_chart_doc
+    doc_hash(load_chart_doc(canonical_dict(doc))) == doc.hash
+
+One set of decisions, two renderers (a235 to a244)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The IR is not a second path beside the drawing code. ``plots.plot_chartdoc`` is
+one generic matplotlib renderer over any document, and ``.plot()`` on
+:class:`Aggregate`, :class:`Portfolio`, :class:`PnL`, :class:`Severity`,
+:class:`Distortion` and :class:`Bounds` draws through it. Every per-class
+compositor was deleted as its emitter landed, so there is one set of semantic
+decisions and no third path to drift.
+
+.. ipython:: python
+
+    @savefig features_chartdoc.png scale=20
+    simple.plot()
+
+Several of the conversions were redesigns rather than rewires, and the redesign
+is the interesting part: a severity's four panels became two with nothing lost, a
+portfolio's density and log density became one panel read two ways, which freed
+the second panel for the **kappa** reading, and the envelope's five calibrated
+distortions moved onto one band instead of being split three and two by the order
+they were added.
+
 The recipe library
 ------------------
 
@@ -2532,8 +3234,96 @@ entry's own program, so a recipe never retypes the code it documents.
    editors and to tracebacks, which reported ``<recipe LimitProfile:check>``
    and no line in any real file. What replaced it is ordinary pytest, and the
    one thing worth keeping from ``<<decl>>`` is available directly as
-   ``print(build.recipe('LayerPicks').decl)``, which reads the live entry and
+   ``print(build.recipe('LayerPicks.Uniform').decl)``, which reads the live entry and
    so cannot go stale. This section stands as history.
+
+One library, tidied and tested (a297, a299)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``library.agg`` went from 196 statements to 168, losing 28 duplicate programs and
+gaining a reading order, with three new recipes added. Before a299 the shipped
+library had exactly one assertion against it, that the file loaded, and nothing
+in it was ever built. ``tests/test_library_entries.py`` now builds every shipped
+entry and checks the invariants each one states, 177 cases.
+
+A recipe records where it was read and how it was written (a320)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`Recipe` gains ``seq``, the zero-based position the entry was read in, and
+``as_read``, its DecL laid out as it appears in its source file, with comments
+and the terminating ``;`` removed and the trailer kept:
+
+.. ipython:: python
+
+    r = build.recipe('DiceTwoDice')
+    r.seq, getattr(r.source, 'name', r.source)
+    print(r.as_read)
+
+Both are columns on the ``recipes`` frame, which still sorts alphabetically, so
+``build.recipes.sort_values('seq')`` is reading order. ``seq`` counts across the
+whole recipe base, so a second ``.agg`` file continues the count, and a rebuild
+of an existing name keeps that name's place. ``as_read`` is the only one of the
+three renderings that still says ``dsev [1:6]``, since the parser expands the
+range and keeps the result; it is ``''`` for a session build, which was read
+from no file.
+
+One base, many sessions: ``fork``, ``preview``, ``RecipeNotFound`` (a302)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:meth:`Underwriter.fork` returns an isolated copy sharing the parsed recipes: a
+scratch base for a notebook, at about 7 microseconds against roughly 3.2 seconds
+for a fresh load. Declarations built in a fork land in the fork and are invisible
+to the parent and to every sibling, in both directions:
+
+.. ipython:: python
+
+    scratch = build.fork()
+    scratch('agg Scratch dfreq [1] dsev [1]', update=False)
+    ('agg', 'Scratch') in scratch.recipes.index, ('agg', 'Scratch') in build.recipes.index
+
+A fork is a snapshot rather than a subscription: entries the parent gains
+afterwards do not appear in it.
+
+:meth:`Underwriter.preview` reports what a program resolves to without building
+anything. It registers nothing and writes no instance attribute, so two threads
+may preview at once:
+
+.. ipython:: python
+
+    pv = build.preview('agg Uses 5 claims sev sev.UnitSeverity poisson')
+    pv.route
+    pv.resolved
+
+Every reference form funnels through one lookup callback, so recording what that
+callback saw catches every form the language has, including any added later,
+with no text scanning and no spec walking. The one deferred form,
+``sev agg.NAME``, is followed to exhaustion, because a program two steps from a
+redefined entry would otherwise report as leaning on nothing but the library.
+
+``RecipeNotFound`` names the lookup miss and subclasses ``KeyError``, so every
+existing ``except KeyError`` behaves as before while a host can now tell "that
+name is gone" from every other lookup failure:
+
+.. ipython:: python
+
+    from aggregate import RecipeNotFound
+    try:
+        build.recipe('NoSuchEntry')
+    except RecipeNotFound as e:
+        print(e, '|', isinstance(e, KeyError))
+
+An **ambiguous** name, the same name under two kinds, stays a plain ``KeyError``:
+the entry is there, the question was not answerable.
+
+A reference keeps the referenced entry's trailer (a318)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``agg NAME agg.OTHER`` merges only the trailer keys that carry a value, so an
+absent outer clause no longer overwrites the stored ``note`` and ``hints`` with
+the empty strings the trailer seeds. An outer clause still wins wherever it is
+written. The visible casualty had been ``agg.MED.WithPicks``, which needs its
+stored ``hints{bs=...}`` to place its picks on the grid and died with a raw
+``KeyError`` without it.
 
 Under the hood
 --------------
@@ -2653,3 +3443,68 @@ refer to ``CHANGELOG.md`` sections.
   silently booked as the impact row; and ``PnL.__add__`` reconstructed from a
   fixed argument list, so any new constructor argument silently dropped on
   composition.
+- **a196** the API reference chapter audited against the live surface, so every
+  autosummary entry resolves and no removed name is still listed.
+- **a197 / a208 / a209** the chart IR's inventory pass and its two sign-off
+  gates. ``dev/chart-inventory.md`` catalogued every figure the library drew,
+  one row each, and the gates measured the IR path against the compositor it
+  was to replace before either was deleted.
+- **a217** ``add_exa`` attaches its columns in one ``concat`` rather than one
+  assignment per column, which is both faster and free of the fragmentation
+  warning pandas raises on a wide frame built a column at a time.
+- **a218** the reproductions book gained a five-paper opening chapter, one page
+  each, DecL beside the exhibit it reproduces.
+- **a220** the ``RuntimeWarning`` census closed. ``pytest -W error::RuntimeWarning``
+  over the full suite went from 75 failures to 0, and the census itself, the
+  count of distinct source lines emitting one, went from 14 to none. Benign
+  numpy boundary noise is guarded with ``np.errstate``; four sites that were
+  quietly returning ``nan`` into a result are fixed. The suite is not run this
+  way by default, because a third-party release could break the everyday loop,
+  so it is a gate at a numerics-touching bump.
+- **a221** the single-parameter (Type I) Pareto gained closed-form partial
+  moments, so ``sev {xm} * pareto {alpha}``, which is what DecL writes, stops
+  integrating a heavy tail to infinity by quadrature on every build. The shifted
+  Lomax form already had an analytic branch.
+- **a229** ``greater_tables`` became a plain dependency once 6.0.0 published to
+  PyPI, retiring the sibling-checkout install instruction. Python floor rises to
+  3.12 and the numpy and pandas floors to GT's.
+- **a230** a spliced signed severity reported unspliced analytic moments.
+  ``_apply_lb_ub`` swaps ``cdf``, ``sf``, ``pdf``, ``ppf``, ``isf`` and
+  ``support`` on the frozen RV but not ``moment``, which both ``_apply_reflect``
+  and ``_apply_signed`` read. The FFT answer was right throughout; the analytic
+  moments were not, so a correct build failed validation.
+- **a250** ``reins_density_df`` removes its FFT fuzz like every other density
+  frame. One line, and past it ``calibrate_distortions(reins_view=...)`` stopped
+  raising a bare ``AssertionError`` and ``reins_price_df`` stopped returning
+  ``NaN``: measured over six program shapes, four of five failed to calibrate on
+  at least one view.
+- **a251** a P&L premium sized from a target loss ratio is rounded where it is
+  produced, so a derivation writes ``1430 premium`` rather than sixteen digits
+  derived from an input of "about 70 percent" into a program a reader is meant
+  to keep and edit.
+- **a257** the two 2-D FFT paths finished by zeroing round-off dust with a
+  two-sided predicate borrowed from ``remove_fuzz``, which is written for the
+  signed columns of a frame and does not transfer: a joint density is
+  non-negative even where its **support** is signed, so a large negative value
+  is a defect to surface rather than dust to erase.
+- **a289** ``_pricing.py`` was written against a zero-based grid and never told
+  about the output window, so on any build whose grid windows,
+  ``calibrate_distortions`` returned distortion shapes wrong by exactly the
+  window offset. **This moves numbers on every windowed book.**
+- **a290** ``SeverityMeta``, behind ``Severity(some_aggregate)`` and
+  ``Portfolio.as_severity()``, was rebuilt on the discrete-severity foundation
+  instead of the pre-1.0 ``rv_histogram`` hybrid: the source's output pmf becomes
+  the atoms of a ``dsev``, exactly as though it had been transcribed by hand.
+- **a309** a layer clause on a signed severity was half applied, and the bucket
+  sizer then called ``int(inf)`` on the window that lie produced, raising
+  ``OverflowError`` out of grid sizing. Three fixes at three layers, in
+  root-cause order.
+- **a310** ``_bucket_window.py`` normalized to US spelling, which moves one
+  served string and two private state keys. House rule is to normalize a whole
+  file when it is touched, taken here as its own change so the a309 bug fix
+  stayed readable.
+- **a316** a severity mixture now splits the claim count by **thinning** the
+  frequency rather than by scaling its mean. New
+  ``MomentAggregator.thin_moments(wt, m1, m2, m3)`` returns the moments of
+  ``Binomial(N, wt)`` given the parent's, and each exposure row's frequency is
+  resolved once and thinned per component.

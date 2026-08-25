@@ -101,9 +101,9 @@ The only object you need to import to get started is ``build``. The quick displa
 .. ipython:: python
     :okwarning:
 
-   from aggregate import build, qd
+    from aggregate import build, qd
 
-   build
+    build
 
 ``build`` is a :class:`Underwriter` object. It  allows you to create all other
 objects and  includes a library of examples, called the recipe base.
@@ -204,6 +204,8 @@ The arguments control the volume and the grid:
      - Build and print nothing at all.
    * - ``-p``, ``--plot``
      - Also call ``.plot()``, for a cell declaring a single object. Independent of the volume, so ``-s -p`` draws the figure and says nothing.
+   * - ``-v``, ``--validation``
+     - Display each built object's ``validation_df``, the moment against estimate audit, in place of the object summary. An object with no such frame, a recipe stub or an ``expr`` value, displays itself as before. The volume flags apply unchanged.
    * - ``--log2 N``
      - Number of buckets as a power of two. Default 0, meaning let the object choose.
    * - ``--bs X``

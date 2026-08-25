@@ -7,7 +7,7 @@ This section documents the ``info`` property, the plain-text summary every first
 
 Every first-class class, meaning :class:`Aggregate`, :class:`Portfolio`, :class:`BivariateAggregate`, :class:`PnL`, :class:`Severity`, :class:`Frequency`, :class:`Bounds`, :class:`AllocationBounds` and :class:`PricingBounds`, plus :class:`Distortion`, exposes a plain-text ``info`` property with a **fixed layout**: every row appears every time, in the same order, for every instance of the class. There are no conditional rows. A value that is not yet available, because the object has not been updated or because the row does not apply to this object, renders as the fixed placeholder ``n/a``. Two objects of one class therefore always emit the same set of lines in the same order.
 
-All classes share one formatting convention, implemented by :func:`aggregate.constants.info_row`: a label left-padded to 25 columns (``INFO_LABEL_WIDTH``), no colon, then the value. The tail lines from :func:`aggregate.tail.describe_lines` use the same width. The executable half of the layout is ``tests/test_fcc_surface.py``.
+All classes share one formatting convention, implemented by :func:`aggregate.constants.info_row`: a label left-padded to 25 columns (``INFO_LABEL_WIDTH``), no colon, then the value. The tail lines from :func:`aggregate.tail.describe_rows` use the same width. The executable half of the layout is ``tests/test_fcc_surface.py``.
 
 In each table that follows, *Source* is the attribute or computation behind the value, and *n/a when* states the only condition under which the placeholder appears. A blank means the row is always populated.
 
@@ -42,12 +42,12 @@ P(X=0)                       ``prob_eq_0``, the break-even or no-loss atom
                              off the realized grid                                     not updated
 validation_eps               moment-validation tolerance
 reinsurance                  ``reins_kinds``
-occurrence reinsurance       ``reins_description('occ')``
-aggregate reinsurance        ``reins_description('agg')``
+occurrence reinsurance       ``_reins_description('occ')``
+aggregate reinsurance        ``_reins_description('agg')``
 validation                   ``validation_explanation()`` (single line)
-frequency tail               ``tail.describe_lines`` row 1
-severity tail                ``tail.describe_lines`` row 2
-aggregate tail               ``tail.describe_lines`` row 3
+frequency tail               ``tail.describe_rows`` row 1
+severity tail                ``tail.describe_rows`` row 2
+aggregate tail               ``tail.describe_rows`` row 3
 bounded                      ``self.bounded``
 id                           display-only 8-hex md5 of the canonical spec
 ===========================  =======================================================  =========================

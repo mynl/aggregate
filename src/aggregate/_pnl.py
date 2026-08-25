@@ -1818,11 +1818,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         """The full ledger x metrics sheet, in currency units -- the
         alignment/footing exhibit.
 
-        Renamed from ``economic_df`` at 1.0.0a204 ([PnL-Economic-Frames]): this
+        Renamed from ``stats_df`` at 1.0.0a204 ([PnL-Economic-Frames]): this
         is an **accounting** view of the ledger, never a statistics frame, and
         the old name both misdescribed it and collided with the moment store
         every other first-class citizen serves under that name. See
-        :attr:`economic_df`, which now delegates to the engine.
+        :attr:`stats_df`, which now delegates to the engine.
 
         Rows = the whole ledger (legs, totals, results, running nets, grand
         rows), in ledger order, indexed by :meth:`_side_index`: two-level
@@ -1971,7 +1971,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     def economic_ratios_df(self):
         """Amounts and ratios per ledger block -- **raw materials**, not a card.
 
-        Renamed from ``economic_ratios_df`` at 1.0.0a204 ([PnL-Economic-Frames]), which
+        Renamed from ``ratio_df`` at 1.0.0a204 ([PnL-Economic-Frames]), which
         joins :attr:`economic_df` in naming the accounting family. It is
         **not** a view of that frame: telling an expense leg from a loss leg
         needs :attr:`Leg.kind`, and the ``E_`` columns need the per-atom
@@ -2210,7 +2210,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 The step's premium and margin against the **gross** block's,
                 which is the first block in every builder.
             ``CR``
-                The step's combined ratio, ``(L + E + C) / P``.
+                The step's combined ratio, ``(L + E) / P``.
             ``M / SD``
                 Margin over its own standard deviation.
             ``M / capital standalone``, ``M / capital diversified``

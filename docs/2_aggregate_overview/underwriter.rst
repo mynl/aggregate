@@ -99,8 +99,8 @@ Call                 Returns                What it does
 .. ipython:: python
     :okwarning:
 
-    obj = build('ThreeDice')            # constructs
-    rec = build.recipe('ThreeDice')     # looks up
+    obj = build('DiceTwoDice')            # constructs
+    rec = build.recipe('DiceTwoDice')     # looks up
     type(obj).__name__, type(rec).__name__, rec.object is None
 
 The difference is construct against look up, and it is deliberate. The recipe base stores DecL specs, which are small and picklable, not live objects. Objects are made on demand for two reasons: a :class:`Portfolio` needs an :class:`Underwriter` reference that may differ between sessions, and each ``build('X')`` hands back a fresh instance so one caller's ``update()`` cannot bleed into another's.
@@ -108,15 +108,15 @@ The difference is construct against look up, and it is deliberate. The recipe ba
 .. ipython:: python
     :okwarning:
 
-    build('ThreeDice') is build('ThreeDice')     # a fresh object every time
+    build('DiceTwoDice') is build('DiceTwoDice')     # a fresh object every time
 
 ``build.recipe(x)`` takes a name and an optional ``kind=``, needed only when a name is not unique across kinds. The subscript takes the same two forms, ``build[name]`` and ``build[kind, name]``, and delegates to ``recipe``, so it raises the identical :class:`KeyError` on a name that matches zero or more than one entry.
 
 .. ipython:: python
     :okwarning:
 
-    build.recipe('ThreeDice', kind='agg').name
-    build['agg', 'ThreeDice'].kind
+    build.recipe('DiceTwoDice', kind='agg').name
+    build['agg', 'DiceTwoDice'].kind
 
 For a program with more than one top-level output, ``build`` raises and points you at :meth:`build_many`, which always returns the full ``list[Recipe]`` with ``.object`` populated on each.
 
@@ -209,7 +209,7 @@ Each states a fact about the entry, and a ``note`` is the norm: it is all :meth:
 .. ipython:: python
     :okwarning:
 
-    r = build.recipe('LimitProfile')
+    r = build.recipe('ExposureLimitProfile')
     r
     r.note, r.tags, r.hints
     print(r.decl)
@@ -249,14 +249,14 @@ Every DecL-created object carries both a ``program`` and a ``pprogram`` attribut
     print(d.pprogram)          # what it understood
 
 :attr:`program` is the statement as the parser received it, not what you
-typed. It has been folded onto one line whatever its source layout, had its comments stripped, kept a few double spaces from the bracket step, and had any ``doc`` body replaced by URL-safe base64. That last one surprises people:
+typed. It has been folded onto one line whatever its source layout, had its comments stripped, and kept a few double spaces from the bracket step. A library entry carries the other reading alongside it: :attr:`~aggregate.recipe.Recipe.as_read` (1.0.0a320) is the DecL laid out as it appears in its source file, with the comments and the terminating ``;`` removed and the trailer kept.
 
 .. ipython:: python
     :okwarning:
 
-    build.recipe('ThreeDice').program[-34:]      # the tail of a documented entry
+    print(build.recipe('DiceTwoDice').as_read)
 
-The encoding is deliberate rather than corruption. It happens first, which is what lets a doc body carry ``#`` headings, blank lines and fenced code through the later preprocessing steps. Read it back decoded with ``.doc``.
+``as_read`` is the only one of the three that still says ``dsev [1:6]``, since the parser expands the range and keeps the result. It is ``''`` for a statement built in the session, which was read from no file.
 
 :attr:`pprogram` is that statement re-parsed and rendered back from the spec, so it is canonical. Equivalent declarations collapse to one form, and what you see is the parse. Four things you will notice:
 
@@ -295,7 +295,7 @@ The encoding is deliberate rather than corruption. It happens first, which is wh
 .. ipython:: python
     :okwarning:
 
-    # `po` (part of) normalizes to the equivalent `so` (share of)
+    # a bare placement amount normalizes to an explicit share
     print(build('''
         agg G:d
             10 claims
@@ -312,7 +312,7 @@ Comparing the two is a quick way to see what the parser actually understood, whi
 .. ipython:: python
     :okwarning:
 
-    print(d.format_program(trailer=True))          # all four clauses
+    print(d.format_program(trailer=True))          # the whole trailer
     print(d.format_program(layout='terse'))        # one line
     print(d.format_program(trailer=('hints',)))    # only what changes the build
 
@@ -356,7 +356,7 @@ Behind the scenes
 
 Skip this the first time through.
 
-Every declaration has a **kind** and a **name**, and exists in up to four forms. A :class:`Recipe` carries all of them:
+Every declaration has a **kind** and a **name**, and a :class:`Recipe` carries every form of it the base holds:
 
 ``kind``
     ``sev`` :class:`Severity`, ``agg`` :class:`Aggregate`, ``port`` :class:`Portfolio`, ``distortion`` :class:`Distortion`, plus ``pnl``, ``xpnl`` and ``bvagg``.
@@ -365,14 +365,20 @@ Every declaration has a **kind** and a **name**, and exists in up to four forms.
 ``spec``
     The parsed dictionary of constructor kwargs.
 ``program``
-    The DecL statement as parsed.
+    The DecL statement as parsed, folded onto one line.
+``as_read``
+    The DecL laid out as it appears in its source file. ``''`` for a session build.
+``source``
+    The file the entry was read from, or ``session`` for one declared this session.
+``seq``
+    The zero-based position the entry was read in, counted across the whole recipe base, so a second ``.agg`` file continues the count. ``build.recipes`` sorts alphabetically; ``build.recipes.sort_values('seq')`` is reading order.
 ``object``
     The live instance, once the factory has run. ``None`` from a lookup.
 
 .. ipython:: python
     :okwarning:
 
-    r = build.recipe('LimitProfile')
+    r = build.recipe('ExposureLimitProfile')
     r.kind, r.name, sorted(r.spec)[:6], r.object is None
 
 Names in the shipped ``library.agg`` are globally unique across kinds, enforced at load, so ``build('X')`` and ``build.recipe('X')`` always mean the same entry and no ``kind=`` is ever needed. The store itself allows ``sev Pareto`` and ``agg Pareto`` to coexist; the shipped library gives that up on purpose.
@@ -401,9 +407,8 @@ Call                                   Gives you
 ``build('X')``                         Look up by name, construct. A fresh object each call.
 ``build.recipe('X')``                  The :class:`Recipe`. No construction.
 ``build.build_many(prog)``             ``list[Recipe]``, ``.object`` populated on each.
-``build.recipes``                      The whole library as a DataFrame, plus its doc audit.
+``build.recipes``                      The whole library as a DataFrame, one row per entry.
 ``build.discover(rx, kind=, tags=)``   Filter by name, type, subject. Optionally build and plot.
-``build.recipe('X').run()``            Execute the entry's Solution and Check.
 ``a.program`` / ``a.pprogram``         As parsed / canonically re-rendered.
 ``a.format_program(trailer=True)``     Full control of markup, layout and trailer.
 ``build.load(...)``                    Read more.

@@ -359,6 +359,53 @@ This task is **part of release hygiene**, not a separately versioned change:
   §4 gate was rewritten around the new `dev/check_features_rst.py`. Docs are
   **pending a rebuild**.
 
+- **Catch-up run, 2026-08-24, at a325.** Gap was 130 releases (a196 to a325),
+  the largest since the a57 to a168 run. The ledger went from 180 rows to
+  **310**, cites a1 to a325 and leaves nothing uncited. One new top-level
+  section was added, **Served documents: exhibits and charts**, for the two
+  provisional modules the page had no home for at all: five subsections
+  covering the exhibit registry and the perspective contract, the YAML format
+  sheets, the chart IR and its declared readings, payload weight and
+  `load_chart_doc`, and the compositor deletions. Twenty-five further
+  subsections were added across the existing sections: seven under New DecL
+  elements (`po`, reflected `sev`, `tweedie` round trip and `as_tweedie`,
+  `dfreq [1]`, `zt` / `zm` recalibration, economics clauses on a bivariate
+  component), six under P&L (the a204 frame renames with a `feat pnl economic
+  frames` anchor, `value_type`, `walk_df` / `evaluation_df`, cede as contra
+  expense, `net_combined_ratio`), three under Pricing (`CalibrationResult` and
+  the anchor guard, stand-alone against allocate, `reins_view` and
+  `reins_price_df`), three under Grids (`bs_window_df` columns and dtypes, the
+  feasibility reading and `Validation.INFEASIBLE`, picks refusals), three under
+  Bivariate (`exeqa_df` and the bands, `natural_allocation`, honest netceded
+  sizing), and four under The recipe library (library tidy and build check,
+  `seq` / `as_read`, `fork` / `preview` / `RecipeNotFound`, reference trailer
+  preservation). Eighteen internal items were named in the Under the hood
+  appendix.
+
+  **Three repairs, all drift.** The a204 rename had left two blocks reading
+  `tower.stats_df` for the ledger sheet, which is now the engine's moment store,
+  so block 94 failed with `KeyError: Level Label not found`; both now read
+  `economic_df`. `PnL.ratio_df` had become `economic_ratios_df`, and the
+  section's `M == P - L - E - C` identity lost its `C` column at a304. The a301
+  history note pointed at `build.recipe('LayerPicks')`, an entry the a297
+  library tidy renamed.
+
+  Gate passed: **140 code cells, 0 errors**. Docs are pending a rebuild.
+
+  Repairs outside `features.rst`, found in the same pass and made:
+  `1_Getting_Started.rst` had a `.. ipython::` block whose option line was
+  indented four spaces and whose body three, so the `from aggregate import
+  build, qd` cell never executed and every later cell in the page raised
+  `NameError`; it also had no row for the a317 `%%agg -v` flag.
+  `underwriter.rst` referenced the retired `ThreeDice` and `LimitProfile`
+  entries in six places, described `program` as carrying a base64 `doc` body
+  (retired a301), claimed `pprogram` normalizes `po` to `so` (retired a249),
+  offered `build.recipe('X').run()` and a "doc audit" on `build.recipes`, and
+  listed five `Recipe` fields where there are now eight.
+  `pipeline-reinsurance.rst` still called the a41 `reins_*` trio
+  `reinsurance_*`, and marked two properties `:meth:`. `info-strings.rst`
+  named `tail.describe_lines`, which is `describe_rows`.
+
 ## 6. First-run note (completed 2026-06-11, at a57)
 
 The first execution covered the entire `a1`–`a57` series; `features.rst` now

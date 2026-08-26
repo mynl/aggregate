@@ -15,9 +15,11 @@ from aggregate.parser import UnderwritingParser
 from aggregate.parser_errors import (
     ErrorReport,
     _caret,
+    _contextual_hint,
     _did_you_mean,
     _extract_word,
     _label,
+    _preceding_text,
     _source_line,
     format_error,
 )
@@ -252,6 +254,81 @@ def test_render_truncates_long_expected_lists():
 
 
 # ----------------------------------------------------------------------
+# Contextual hints
+# ----------------------------------------------------------------------
+
+# ``as`` closes an expense group, so a following ``and`` cannot attach.
+# The token-level report ("Unexpected 'and'") is correct but says nothing
+# about the two-level expense list, which is what the hint supplies.
+_ENGINE = (
+    'xpnl E.X 10000 premium as "GWP" less agg B.A 6500 loss 1000 xs 0 '
+    'sev lognorm 100 cv 2 mixed ig 0.25 less '
+)
+_AND_AFTER_EXPENSE_LABEL = (
+    _ENGINE + "500 fixed expense as FE and 15% premium expense as Comm"
+)
+
+
+def test_hint_fires_on_and_after_expense_label(parser):
+    exc = _try_parse(parser, _AND_AFTER_EXPENSE_LABEL)
+    report = format_error(_AND_AFTER_EXPENSE_LABEL, exc)
+    assert report.hint is not None
+    assert "expense group" in report.hint
+
+
+def test_hint_fires_on_quoted_expense_label(parser):
+    text = _ENGINE + '500 fixed expense as "Fixed Expense" and 15% premium expense'
+    report = format_error(text, _try_parse(parser, text))
+    assert report.hint is not None
+
+
+def test_hint_quiet_on_and_outside_the_expense_clause(parser):
+    # ``and`` is equally unexpected here, but no expense label precedes it,
+    # so the expense hint must not fire.
+    text = "xpnl E.X 10000 premium less agg.A and 5"
+    report = format_error(text, _try_parse(parser, text))
+    assert report.hint is None
+
+
+def test_hint_quiet_on_plain_keyword_typo(parser):
+    report = format_error(_TYPO_INPUT, _try_parse(parser, _TYPO_INPUT))
+    assert report.hint is None
+
+
+def test_render_includes_hint_when_present(parser):
+    exc = _try_parse(parser, _AND_AFTER_EXPENSE_LABEL)
+    rendered = format_error(_AND_AFTER_EXPENSE_LABEL, exc).render()
+    assert "Hint:" in rendered
+
+
+def test_summary_includes_hint_when_present(parser):
+    exc = _try_parse(parser, _AND_AFTER_EXPENSE_LABEL)
+    report = format_error(_AND_AFTER_EXPENSE_LABEL, exc)
+    assert report.hint in report.summary
+
+
+def test_render_omits_hint_when_absent(parser):
+    rendered = format_error(_TYPO_INPUT, _try_parse(parser, _TYPO_INPUT)).render()
+    assert "Hint:" not in rendered
+
+
+def test_contextual_hint_needs_a_got_literal():
+    assert _contextual_hint("500 fixed expense as FE and", 1, 28, None) is None
+
+
+def test_preceding_text_single_line():
+    assert _preceding_text("abcdef", 1, 4) == "abc"
+
+
+def test_preceding_text_spans_earlier_lines():
+    assert _preceding_text("one\ntwo\nthree", 3, 3) == "one\ntwo\nth"
+
+
+def test_preceding_text_out_of_range_is_empty():
+    assert _preceding_text("one", 9, 1) == ""
+
+
+# ----------------------------------------------------------------------
 # to_dict / JSON-safety
 # ----------------------------------------------------------------------
 
@@ -261,7 +338,7 @@ def test_to_dict_keys_match_dataclass_fields(parser):
     assert set(d) == {
         "line", "column", "source", "source_line", "caret",
         "got", "got_type", "expected", "expected_terminals",
-        "suggestions", "message",
+        "suggestions", "message", "hint",
     }
 
 

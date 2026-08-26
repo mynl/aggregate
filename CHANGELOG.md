@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a326
+
+**[Parse-Error-Hints] `ErrorReport` gains a `hint`, and the first rule explains `and` after an expense label.** `500 fixed expense as FE and 15% premium expense as Comm` reported a bare `Unexpected 'and'`, accurate and silent on the cause; the report now adds a sentence saying `as` closes an expense group, so either the `and` goes (separate groups, one leg each) or the label moves after the last `and`-joined term (one combined leg). `ErrorReport.hint` is `str | None`, defaults to `None`, adds a key to `to_dict()`, renders as a trailing `Hint:` line, and appends to `summary`, so `str(e)` carries it. Rules live in `parser_errors._HINT_RULES`, each matching the source text immediately before the error position. Consumers that build their own display from `to_dict()` rather than `render()` or `summary` need to read the new key to show it.
+
 ## 1.0.0a325
 
 **[ZT-ZM-Recalibrate-Default] `zt` and `zm` now deliver the claim count you asked for, and `!` opts out.** `4 claims ... poisson zt` used to give 4.0746 claims and `4 claims ... poisson zm 0.5` gave 2.0373, the exposure clause setting the un-modified (base) mean of the (a, b, 1) construction and the reweighting shifting the realized `E[N]` off it. The bare clause now states the realized mean and solves for the base mean behind it; the trailing `!` selects the old textbook reading. `Aggregate.freq_pin_mean` changes default from `False` to `True` to match, so the constructor and DecL read the same way. `Frequency.solve_base_mean` is now on the common path, so its refusal is reachable from ordinary programs: a zero-truncated count cannot average below one, and `0.5 claims ... zt` that used to build now raises naming `!` as the escape. `ZeroModifiedExposureWarning` fires only on the `!` path, a monetary target being pinned by default. `create_frequency` was applying the modification twice under the new reading and is fixed; it reported 142.857 against a `zm 0.3` parent's own 100.

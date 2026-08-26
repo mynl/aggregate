@@ -8,7 +8,9 @@ Lark's :class:`~lark.exceptions.UnexpectedToken`,
 information (line, column, expected terminal set) but render as terse
 one-liners. This module converts them into :class:`ErrorReport` objects
 suitable for IDE-style display: caret-annotated source line, friendly
-terminal labels, and "did you mean" suggestions.
+terminal labels, "did you mean" suggestions, and a contextual ``hint``
+naming the grammar rule behind an error whose token-level report is
+accurate but unilluminating.
 
 The intended consumer is the default :class:`UnderwritingParser.parse`
 error path (every ``build(...)`` call hitting a DecL typo), plus any
@@ -204,6 +206,11 @@ class ErrorReport:
         keyword literals in ``expected_terminals``.
     message : str
         One-line human-readable summary.
+    hint : str | None
+        A contextual explanation of the grammar rule that was violated,
+        when one of the rules in :data:`_HINT_RULES` recognizes the
+        shape of the input before the error. ``None`` otherwise. See
+        :func:`_contextual_hint`.
     """
 
     line: int
@@ -217,6 +224,7 @@ class ErrorReport:
     expected_terminals: list[str]
     suggestions: list[str]
     message: str
+    hint: str | None = None
 
     def to_dict(self) -> dict:
         """JSON-serializable dict form (for tooling, logging, or transport)."""
@@ -228,7 +236,9 @@ class ErrorReport:
 
         Used as ``args[0]`` of the wrapping :class:`ValueError`, so
         ``str(e)`` and the default Python traceback footer carry the
-        useful single-line form.
+        useful single-line form. The ``hint`` rides along when present:
+        it is the actionable half of the report, and a caller that only
+        ever sees ``str(e)`` would otherwise miss it.
         """
         head = (
             f"DecL parse error at line {self.line}, "
@@ -236,6 +246,8 @@ class ErrorReport:
         )
         if self.suggestions:
             head += " Did you mean: " + ", ".join(self.suggestions) + "?"
+        if self.hint:
+            head += " " + self.hint
         return head
 
     def render(self) -> str:
@@ -245,7 +257,8 @@ class ErrorReport:
         line (no blank break between them), and the "Expected" list sits
         on the same line (no blank break before it). Long source lines are
         windowed around the caret so the marker stays visible on one
-        terminal row.
+        terminal row. A ``hint`` takes its own trailing line, since it is
+        a sentence rather than a list and reads badly wrapped into one.
         """
         message = self.message
         if self.suggestions:
@@ -263,6 +276,8 @@ class ErrorReport:
             "",
             message,
         ]
+        if self.hint:
+            lines.append(f"Hint: {self.hint}")
         return "\n".join(lines)
 
 
@@ -340,6 +355,7 @@ def _from_token(source: str, exc: UnexpectedToken) -> ErrorReport:
         expected_terminals=expected_raw,
         suggestions=suggestions,
         message=f"Unexpected {_label(got_type)} {got!r}.",
+        hint=_contextual_hint(source, line, col, got),
     )
 
 
@@ -375,6 +391,7 @@ def _from_chars(source: str, exc: UnexpectedCharacters) -> ErrorReport:
         expected_terminals=expected_raw,
         suggestions=suggestions,
         message=message,
+        hint=_contextual_hint(source, line, col, got),
     )
 
 
@@ -547,6 +564,113 @@ def _label(terminal: str | None) -> str:
     if terminal.startswith("__"):
         return "token"
     return f"'{terminal.lower()}'"
+
+
+# ----------------------------------------------------------------------
+# Contextual hints
+# ----------------------------------------------------------------------
+# A hint fires on the shape of the text *before* the error position, and
+# explains the grammar rule the author tripped over. It is for the case
+# where the token-level report is correct but unilluminating: "Unexpected
+# 'and'" is true and tells you nothing about why the 'and' is unwelcome
+# here. Each rule is a (name, got-literal, pattern, text) row; the pattern
+# is anchored at the end of the preceding text with ``\s*$``, so it reads
+# as "the input immediately before the caret looks like this".
+#
+# Keep rules narrow. A hint that fires on the wrong error is worse than no
+# hint, because it sends the author looking in the wrong place.
+
+# The DecL ID character class (decl.lark ``ID``), for matching a bareword
+# ``as`` label. The keyword exclusions do not matter here: this pattern is
+# only ever applied to text the parser already accepted.
+_ID_PATTERN = r"[A-Za-z][A-Za-z0-9._:~\-]*"
+_AS_LABEL_PATTERN = rf'(?:"[^"]*"|\'[^\']*\'|{_ID_PATTERN})'
+
+_HINT_RULES: tuple[tuple[str, str, re.Pattern, str], ...] = (
+    (
+        "expense-group-closed-by-label",
+        "and",
+        re.compile(rf"\bexpenses?\s+as\s+{_AS_LABEL_PATTERN}\s*$"),
+        "'as' closes an expense group, so 'and' cannot follow the label. "
+        "Drop the 'and' to leave the groups separate (one expense leg "
+        "each), or move the 'as' label after the last 'and'-joined term "
+        "to combine them into one leg.",
+    ),
+)
+
+
+def _preceding_text(source: str, line: int, column: int) -> str:
+    """The text of ``source`` up to (not including) the error position.
+
+    Parameters
+    ----------
+    source : str
+        The DecL text that was parsed.
+    line, column : int
+        1-indexed error position, as carried on the Lark exception.
+
+    Returns
+    -------
+    str
+        Everything before the caret. ``""`` when the position falls
+        outside ``source``, which makes every hint rule miss rather
+        than raise.
+
+    Notes
+    -----
+    Reconstructed from ``line`` / ``column`` rather than an absolute
+    stream offset because the three Lark exception classes disagree on
+    which offset attribute they carry, while all of them carry the
+    line and column that the rest of this module already trusts.
+    """
+    lines = source.splitlines()
+    if not (1 <= line <= len(lines)):
+        return ""
+    return "\n".join(lines[: line - 1] + [lines[line - 1][: max(0, column - 1)]])
+
+
+def _contextual_hint(source: str, line: int, column: int,
+                     got: str | None) -> str | None:
+    """Match the input before the error against :data:`_HINT_RULES`.
+
+    Parameters
+    ----------
+    source : str
+        The DecL text that was parsed.
+    line, column : int
+        1-indexed error position.
+    got : str | None
+        The offending literal, lowercased before comparison so a
+        miscased keyword still earns its hint.
+
+    Returns
+    -------
+    str | None
+        The first matching rule's text, or ``None``.
+
+    Notes
+    -----
+    The one rule today covers the expense clause's two-level list, where
+    ``and`` binds *tighter* than the ``as`` label: terms joined by ``and``
+    combine into one group, and the label attaches to the finished group
+    (``expense_group: expense_terms as_label`` in ``decl.lark``). That is
+    the opposite of the reinsurance precedent an author reasons from,
+    where ``reins_list: reins_list AND reins_clause`` joins clauses that
+    have *already* taken their own labels, so a label there may legally be
+    followed by ``and``. The asymmetry is deliberate (an expense group is
+    one obligation leg, a reinsurance clause is one layer) and it is
+    exactly what makes the bare "Unexpected 'and'" report unhelpful.
+    """
+    if not got:
+        return None
+    literal = got.strip().lower()
+    before = _preceding_text(source, line, column)
+    if not before:
+        return None
+    for _name, want, pattern, text in _HINT_RULES:
+        if literal == want and pattern.search(before):
+            return text
+    return None
 
 
 def _did_you_mean(got: str, expected_terminals: Iterable[str]) -> list[str]:

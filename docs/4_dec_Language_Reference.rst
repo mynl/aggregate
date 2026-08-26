@@ -143,6 +143,17 @@ the source line (windowed to the caret on long inputs), a caret
 marker, friendly "expected" labels, and ``difflib``-derived "did you
 mean" suggestions.
 
+Some mistakes produce a report that is accurate and still unhelpful,
+because the offending token is fine in itself and the problem is the
+grammar rule around it. For those, ``report.hint`` carries a sentence
+naming the rule. Writing ``500 fixed expense as FE and 15% premium
+expense as Comm`` reports ``Unexpected 'and'``, and the hint explains
+that ``as`` closes an expense group, so the ``and`` has nothing to join:
+drop it to leave two groups (one expense leg each), or move the ``as``
+label after the last ``and``-joined term to combine them into one leg.
+The hint is ``None`` when no rule matches, and it appears in both
+``str(e)`` and ``render()``.
+
 ``str(e)`` is the one-line summary — ``DecL parse error at line L,
 column C: Unexpected '...'. Did you mean: ...?`` — so the default
 Python / Jupyter traceback footer is already useful without any

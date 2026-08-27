@@ -181,11 +181,9 @@ Finding things with :meth:`discover`
 Tags narrow rather than widen: an entry matches when it carries every tag given. The shipped vocabulary is namespaced.
 
 ``topic:``
-    What the entry is about: ``severity`` ``frequency`` ``aggregate`` ``reinsurance`` ``pnl`` ``portfolio`` ``distortion`` ``bivariate`` ``numerics``.
+    What the entry is about: ``severity`` ``frequency`` ``aggregate`` ``reinsurance`` ``economics`` ``portfolio`` ``spectral`` ``bivariate`` ``picks`` ``tweedie`` ``numerics``. A topic is never a kind keyword, so the ``pnl`` kind is ``topic:economics`` and the ``distortion`` kind is ``topic:spectral``.
 ``role:``
-    Where it stands: ``hero`` (landing page), ``intro`` (teaching order), ``reference``, ``paper`` (reproduces a published result).
-``check:``
-    Which invariant its Check asserts: ``reconciliation`` ``scaling-sweep`` ``independent-oracle`` ``limiting-case`` ``round-trip`` ``cross-object``.
+    Where it stands: ``intro``, ``intermediate``, ``advanced`` and ``reference`` are the reading levels; ``hero`` (it appears in the landing gallery) and ``published`` (it reproduces a published result) are markers written on top of a level.
 
 Pass ``describe=True`` or ``plot=True`` to build every match and show it, and ``return_objects=True`` to get the objects back alongside the frame. Be careful: that builds everything the filter matched.
 

@@ -887,8 +887,8 @@ pricing_calibrate = _make_exhibit_function(
 
 pricing_stand_alone = _make_exhibit_function(
     'pricing.stand_alone', 'Stand-alone pricing',
-    """The calibrated families applied to each part **as a price in its own
-    right**. Also on :class:`~aggregate.results.CalibrationResult`.
+    """The calibrated families applied to each part on a stand-alone basis.
+    Also on :class:`~aggregate.results.CalibrationResult`.
 
     Stand-alone prices the parts alone; ``pricing.allocate`` splits the whole
     across them. That is the distinction the two leaves exist to keep apart

@@ -175,7 +175,7 @@ appendix but not exampled.
    "the recipe runtime: ``Recipe``, ``build.recipe()``, ``build.recipes``", "a158", "Recipe library", "—"
    "three shipped libraries merge into ``library.agg`` (186 entries)", "a159", "Recipe library", "—"
    "the library tests itself (``tests/test_library_recipes.py``)", "a160", "Recipe library", "—"
-   "library tags namespaced (``topic:`` / ``role:`` / ``check:``)", "a161", "Recipe library", "—"
+   "library tags namespaced (``topic:`` / ``role:``)", "a161", "Recipe library", "—"
    "test-impact analysis for the edit loop", "a162", "Under the hood", "—"
    "``<<decl>>``: a recipe never retypes its own program", "a163", "Recipe library", "—"
    "one ``Recipe`` class, one registry; ``knowledge`` → ``recipes`` (**breaking**)", "a164", "Recipe library", "—"
@@ -3164,7 +3164,7 @@ demonstrates and tests itself.
 
 The DecL trailer grew from two clauses to four. ``note{}`` is the one-line
 description and ``hints{}`` the build settings, as before. New: **``tags{}``**, a
-namespaced classification (``topic:``, ``role:``, ``check:``), and
+namespaced classification (``topic:``, ``role:``), and
 **``doc{{{ }}}``**, a fenced markdown body carrying a full Problem / Solution /
 Discussion / Check recipe. The fence survives markdown headings, blank lines and
 Python code because it is extracted and base64-encoded *before* the comment

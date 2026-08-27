@@ -1274,6 +1274,60 @@
   author flagged this explicitly (2026-07-07). Scope it standalone before
   touching anything.
 
+- **[Multi-Window-Splice-Conditional]** (logged 2026-08-26, post-v1.0, carried
+  as a known issue). A splice over more than one window does not produce the
+  conditional distribution it reads as. For `A` the disjoint union of the
+  windows, `splice [l1 l2] [u1 u2]` should give `(X | X ∈ A)`, density
+  `f(x) 1_A(x) / P(X ∈ A)`, which is exactly what the single-window form
+  already does. It departs from that in two independent ways.
+  **First, the claim count is multiplied by the number of windows.**
+  `1 claim ... splice [2 24] [10 40]` builds `n = 2` with `en = [1, 1]`, and
+  `splice [2 4 6 8 10 12] [3 5 7 9 11 13]` builds `n = 6`. The contiguous
+  one-list form is affected too, `splice [2 10 40]` being two segments and
+  building `n = 2`. Only the single-window `splice [a b]` is clean, which is
+  why the two shipped library entries (`splice [5 25]`, `splice [0 250]`)
+  never showed it.
+  **Second, the segment weights are equal rather than proportional.** Even with
+  the count pinned by an explicit `wts`, each window carries weight `1/k`
+  instead of its own probability `(F(u_i) - F(l_i)) / P(X ∈ A)`.
+  Cause: `Severity` declares the feature unimplemented and raises on a
+  multi-element bound (`_scalar_bound`, "Multi-segment splice is not
+  implemented"), so a standalone `sev NAME ... splice [2 24] [10 40]` is
+  refused outright. `Aggregate` reaches the same grammar by broadcasting
+  `sev_lb` / `sev_ub` into k separate `Severity` components before that guard
+  runs, each holding a scalar window, so the guard never fires and the result
+  is k unweighted lines summed, one claim each.
+  Measured on `lognorm 10 cv 1` over `A = [2, 10] ∪ [24, 40]`, where
+  `P(X ∈ A) = 0.649122` and `E[X | X ∈ A] = 7.486509` at cv `0.946070`: as
+  written the aggregate mean is `35.446506` (4.73x); with `wts=2` the severity
+  mean is `17.723253` (2.37x); with the proportional weights
+  `[0.919311 0.080689]` it is `7.486509` at cv `0.946070`, exact to every
+  digit. The far window holds 5.2% of the parent mass and equal weighting
+  hands it half.
+  The property that settles the default: under proportional weights an interior
+  cut is a no-op, `splice [2 10 40]` and `splice [2 40]` both giving
+  `9.651841`, where equal weights move it to `11.441118`. Cutting a window
+  should not re-weight the distribution.
+  Fix shape: implement it in `Severity` rather than patch the weights in
+  `Aggregate`. A splice is one random variable with a piecewise conditional
+  law, not a mixture of lines. Lift `_scalar_bound` to accept a sorted disjoint
+  window list and generalize the `make_conditional_*` decorators to sum over
+  windows against the single denominator `P(X ∈ A)`. That gets the standalone
+  `sev` building, `sev.NAME` references working, analytic moments, and `n`
+  untouched because there is one component again. Defaulting the broadcast
+  weights in `Aggregate` instead would fix the numbers and leave the standalone
+  `sev` refusing to build. One policy call rides along: whether an explicit
+  `wts` may override the proportional default, which would give the Klugman
+  spliced distribution with free weights as a separate, deliberate object.
+  Window validation is absent and belongs in the same edit. Overlapping windows
+  build and double count (`splice [2 5] [10 40]` is `[2, 10]` and `[5, 40]`,
+  severity mean `8.8909`), out-of-order windows build, and the two cases that
+  do raise report from a layer below, `lb > ub` as zero probability mass and a
+  length mismatch as a raw numpy broadcast error.
+  No library entry exercises a multi-window splice and none was added while
+  this stands (author, 2026-08-26): an example written today would have to
+  carry the `wts` workaround and would bake it in.
+
 > *Rejected, so it is not re-proposed cold:* DecL colorization (aesthetic-only,
 > structurally weak) and the `dev`/`user` **display mode** `ReprMixin` (not worth
 > the effort — both views are already one attribute away). Reasoning:

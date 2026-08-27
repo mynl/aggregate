@@ -104,17 +104,52 @@ def test_tags_are_namespaced(library):
         if bad:
             offenders[f'{kind}:{name}'] = bad
     assert not offenders, (
-        f'un-namespaced tags (use topic:/role:/check:, or add to BARE_TAGS '
+        f'un-namespaced tags (use topic:/role:, or add to BARE_TAGS '
         f'with a reason): {offenders}')
 
 
-def test_no_tag_restates_its_own_kind(library):
-    """Belt and braces: a tag must never just name the entry's own type.
+#: The DecL kind keywords. A ``topic:`` slug spelled as one of these restates
+#: what ``discover(kind=...)`` already says, so the vocabulary routes around
+#: them: ``topic:economics`` carries the ``pnl`` kind and ``topic:spectral``
+#: carries the ``distortion`` kind, each named for the subject rather than the
+#: type (``aggregate.spectral`` is where a distortion lives, and economics is
+#: what a premium clause activates).
+KIND_TOKENS = frozenset({'agg', 'sev', 'port', 'pnl', 'xpnl', 'bvagg',
+                         'distortion'})
 
-    ``test_tags_are_namespaced`` already makes this impossible, but state the
-    actual invariant separately -- the namespace rule is the *mechanism*, this
-    is the *reason*, and a future bare tag added to ``BARE_TAGS`` must still
-    satisfy it.
+
+def test_no_topic_restates_a_kind(library):
+    """No ``topic:`` slug is a kind keyword, on any entry.
+
+    This is the invariant ``test_tags_are_namespaced`` is the *mechanism*
+    for, stated where it can be read. It has to inspect the slug rather than
+    the whole tag: the earlier form of this test looked for the bare word
+    ``pnl`` in ``spec['tags']``, which namespacing had already made
+    unreachable, so it passed while ``topic:pnl`` and ``topic:distortion``
+    sat in the file naming their own entries' kinds.
+
+    Near synonyms are deliberately allowed. ``topic:aggregate`` on an ``agg``
+    is fine because the topic names a subject that crosses kinds (a ``port``
+    entry can be ``topic:severity``), and a reader never mistakes the English
+    word for the ``agg`` keyword. A slug that *is* the keyword offers no such
+    daylight.
+    """
+    offenders = {}
+    for (kind, name), pp in library._recipes.items():
+        bad = [t for t in pp.spec.get('tags', ())
+               if t.startswith('topic:') and t[len('topic:'):] in KIND_TOKENS]
+        if bad:
+            offenders[f'{kind}:{name}'] = bad
+    assert not offenders, (
+        f'topics spelled as a kind keyword: {offenders}; name the subject '
+        f'instead (topic:economics for pnl, topic:spectral for distortion)')
+
+
+def test_no_bare_tag_restates_its_own_kind(library):
+    """Belt and braces for anything added to ``BARE_TAGS``.
+
+    An un-namespaced tag escapes the slug check above, so hold the rule on
+    that route too: ``slow`` passes, a future bare ``pnl`` would not.
     """
     kind_words = {'agg': 'aggregate', 'sev': 'severity', 'port': 'portfolio',
                   'pnl': 'pnl', 'xpnl': 'pnl', 'bvagg': 'bivariate',
@@ -137,16 +172,22 @@ def test_library_is_the_default_recipe_base():
 # Layout and trailer placement (1.0.0a178)
 # ----------------------------------------------------------------------
 #: Entries `decl_writer` cannot render back to what was written, so they are
-#: hand-written and exempt from the canonical-layout check. Three causes, all
-#: recorded as `[Unparser-Reference-Gaps]` in `dev/TODO.md`: a named object
-#: reference (`sev.UnitSeverity`) is resolved and inlined at parse time with
-#: nothing on the spec recording that a reference was written; the `minimum`
-#: combinator drops its child distortion names; and the compact `ssev <c> -
-#: <dist>` spelling renders in the general affine form `-1 * <dist> + <c>`,
-#: whose leading `-1 *` parses two ways (see `tests/test_grammar_ambiguity.py`).
+#: hand-written and exempt from the canonical-layout check. The causes, all
+#: variations on "the parser evaluates or expands the clause and keeps only
+#: the result": a named object reference (`sev.UnitSeverity`) is resolved and
+#: inlined at parse time with nothing on the spec recording that a reference
+#: was written; the `minimum` / `mixture` combinators drop their child
+#: distortion names; the compact `ssev <c> - <dist>` spelling renders in the
+#: general affine form `-1 * <dist> + <c>`, whose leading `-1 *` parses two
+#: ways (see `tests/test_grammar_ambiguity.py`); arithmetic is evaluated at
+#: parse (`(250 / exp(1/2))` becomes the number); a limit-position `tower` is
+#: exploded into its layers; the treaty reinstatement language (`1 free and 2
+#: at 100%`, number words included) collapses to the multiplier list; the
+#: `exposure at rate` spelling shares a spec with `premium at lr`; and a
+#: sparse `dbvsev` expands to the dense matrix.
 #: Shrinking this set is progress; growing it needs a reason.
 #:
-#: The `tweedie` clause was a fourth cause until 1.0.0a231, when it gained the
+#: The `tweedie` clause was another cause until 1.0.0a231, when it gained the
 #: `_tweedie` provenance key: three entries left this set, which is what fixing
 #: one of these gaps looks like.
 UNPARSER_EXEMPT = {
@@ -154,16 +195,57 @@ UNPARSER_EXEMPT = {
     'BernoulliFrequency', 'FixedFrequency',
     'GeometricFrequency', 'NegativeBinomialFrequency', 'NegativeBinomialMixed',
     'PoissonSimple', 'InverseGaussianMixed',
-    # named ENGINE reference: `xpnl USHurr ... less agg.USXOLTower`. Since
-    # a216 [Inline-Port-Engine] an engine writes its body out, so the
-    # canonical form inlines the whole referenced aggregate and the source's
-    # one-line reference cannot be recovered from the spec. Same cause as the
-    # group above; kept separate because the fix is different (the spec would
-    # have to record that a reference was written).
+    # named object reference: the capstone chain and the joint-view group
+    # state each set of terms once and pull everything else in by `sev.X` /
+    # `agg.X` reference. The DRY reading is the point of the entries, so the
+    # source spelling is deliberately unrecoverable.
+    'Capstone.Gross', 'Capstone.ExposureRating', 'Capstone.SelectedLosses',
+    'Capstone.LossPicksTest', 'Capstone.XOL', 'Capstone.FullProgram',
+    'Capstone.GrossNet',
+    'SwingRatedAggCover', 'RetroRatedAccount', 'SlidingScaleCommission',
+    'BivariateGrossNet', 'BivariateGrossCeded', 'BivariateNetCeded',
+    # named ENGINE reference: `xpnl Capstone.PnL ... less
+    # agg.Capstone.FullProgram`. Since a216 [Inline-Port-Engine] an engine
+    # writes its body out, so the canonical form inlines the whole referenced
+    # aggregate and the source's one-line reference cannot be recovered from
+    # the spec. Same cause as the group above; kept separate because the fix
+    # is different (the spec would have to record that a reference was
+    # written).
+    'Capstone.XOL.PnL', 'Capstone.PnL', 'Capstone.PC',
     # distortion combinator
-    'MinimumDistortion',
+    'MinimumDistortion', 'MixtureDistortion',
     # canonical form would be ambiguous
     'SignedPremiumMinusLoss', 'PnLSignedSsev',
+    # arithmetic evaluated at parse: the mean-250 construction is the point
+    'Capstone.Sev',
+    # limit-position tower exploded into its layers
+    'TowerLimitProfile',
+    # treaty reinstatement language collapsed to the multiplier list
+    'ReinstatementTreaty', 'ReinstatementNumberWords',
+    # `exposure at rate` records the same spec as `premium at lr`
+    'ExposureRatedPolicy',
+    # sparse dbvsev expanded to the dense matrix
+    'BivariateDiscreteSparse',
+    # ------------------------------------------------------------------
+    # Pre-existing entries confirmed non-canonical when the a327 merge
+    # normalized the comparison; every cause is one of the above.
+    # arithmetic and number spelling evaluated at parse: `ph 2/3`, the
+    # `(50 / exp(0.3**2/2))` scale constructions, the Tweedie moment
+    # formulas, `1.0` rendering back as `1`
+    'PHDistortion', 'SevReversed', 'TweedieFromMoments', 'TweedieFreqSev',
+    'TweedieMultiModal', 'LayerPicks.Lognorm.Exposure',
+    'LayerPicks.Lognorm.Experience', 'LayerPicks.Compare',
+    # array shorthand expanded: `[1:6]` becomes the explicit list
+    'DiceTwoDice', 'DiceThreeEvenDice',
+    # digit separators dropped: `10_000` becomes `10000`
+    'ExposureLimitProfile', 'OccurrenceXOL', 'AggregateStopLoss',
+    'OccurrenceXOLProgram', 'WindowedSimple',
+    # reinsurance-position tower exploded into its layers
+    'ReinsuranceOccurrenceTower', 'ReinsuranceOccurrenceTower.Agg',
+    'CommAuto.Exposure', 'CommAuto.WithPicks',
+    # the ssev affine spelling renders as `-1 * <dist> + <c>` (the same
+    # cause that exempts SignedPremiumMinusLoss above)
+    'BivariateIndependent', 'SignedPremiumMinusLossNormal',
 }
 
 
@@ -188,9 +270,16 @@ def test_library_is_written_in_the_canonical_layout():
             continue
         canonical = format_program((kind, name, spec), fmt='text',
                                    layout='spread', trailer=True)
-        # Compare flattened: the file carries the layout, the check carries the
-        # content, and preprocess is what turns one into the other.
-        if UnderwritingLexer.preprocess(canonical)[0] != statement:
+        # Compare flattened and whitespace-normalized: the file carries the
+        # layout, the check carries the content. Normalization matters because
+        # preprocess flattens bracketed lists two ways -- the whole-program
+        # fast path of its step 3 pads every bracket with a space, while the
+        # depth-aware path (taken whenever the program holds a nested
+        # ``dbvsev [[...]]``, as the library does since 1.0.0a327) does not --
+        # so the same statement flattens with different spacing as part of the
+        # file than as a single canonical rendering.
+        canon_flat = ' '.join(UnderwritingLexer.preprocess(canonical)[0].split())
+        if canon_flat != ' '.join(statement.split()):
             offenders.append(name)
     assert not offenders, (
         f'{offenders} are not in canonical form -- run '

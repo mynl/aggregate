@@ -6,7 +6,7 @@ parser splatted the whole trailer dict over the stored spec, and ``trailer``
 seeds ``note`` and ``hints`` with empty strings, so an absent outer clause
 blanked the stored values. The visible cost was the grid: every hinted library
 entry silently rebuilt on the auto sized grid instead of the one its author
-pinned, and ``agg.MED.WithPicks`` failed outright, since its picks attachments
+pinned, and ``agg.CommAuto.WithPicks`` failed outright, since its picks attachments
 lie on the grid only at the pinned ``bs=125``.
 
 The rule these tests pin: **outer wins where written, stored survives where
@@ -94,12 +94,12 @@ def test_building_a_reference_leaves_the_stored_entry_alone(uw):
 
 
 def test_hinted_library_entry_with_picks_builds_through_a_reference():
-    """The reported crash: ``agg.MED.WithPicks`` off its pinned grid.
+    """The reported crash: ``agg.CommAuto.WithPicks`` off its pinned grid.
 
     Pinned on the shipped entry deliberately. The picks attachments are exact
     multiples of the entry's ``bs=125`` and of nothing the auto sizer picks, so
     this is the end to end case that the trailer really did reach the update.
     """
-    a = build.fork()('agg.MED.WithPicks')
+    a = build.fork()('agg.CommAuto.WithPicks')
     assert a.bs == 125.0
     assert a.log2 == 18

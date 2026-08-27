@@ -29,10 +29,12 @@
 # Every tag carries a namespace:
 #
 #   topic:X   subject of the recipe, severity frequency aggregate
-#             reinsurance pnl portfolio distortion bivariate picks tweedie
-#             numerics, with bounds and ruin reserved. Independent of type: an
-#             `agg` entry demonstrating a severity form is topic:severity, and
-#             that is not a restatement.
+#             reinsurance economics portfolio spectral bivariate picks
+#             tweedie numerics capstone, with bounds and ruin reserved. Independent of
+#             type: an `agg` entry demonstrating a severity form is
+#             topic:severity, and that is not a restatement. A topic is never
+#             a kind token: topic:economics covers the `pnl` kind and
+#             topic:spectral covers the `distortion` kind.
 #   role:X    Every entry carries at least one role, and exactly one of:
 #
 #               intro         the very basic examples, the place to start.
@@ -72,10 +74,10 @@
 # instead of inlining the object.
 #
 # ORDER is important: aLL Examples are in the input order in this file.
-# The order goes starter examples, distortions, severity clause forms,
-# the severity curve reference, frequency, aggregates, aggregates with reinsurance,
-# an aggregate as a # severity, bivariate, profit and loss, numerics, portfolios,
-# and reproductions.
+# The order goes starter examples, the capstone worked example, distortions,
+# severity clause forms, the severity curve reference, frequency, aggregates,
+# aggregates with reinsurance, an aggregate as a severity, bivariate,
+# profit and loss, numerics, portfolios, and reproductions.
 #
 # Adding an entry means choosing where in the reading it belongs, not
 # appending it to the end of a section.
@@ -160,6 +162,102 @@ agg BasicBook
   tags{topic:aggregate, role:hero, role:intro};
 
 # ----------------------------------------------------------------------
+# The capstone example
+# A complete reinsurance pricing workflow, suitable for demoing to
+# reinsurance actuaries: a gross book entered from a limit and attachment
+# profile, exposure rating, layer loss picks, an XOL program, quota share
+# variants with a sliding scale commission, and the P&L views. Entries
+# build on one another by reference, so the terms are stated once.
+# ----------------------------------------------------------------------
+
+sev Capstone.Sev (250 / exp(1/2)) * lognorm 1
+  note{Severity curve for the capstone example, lognormal with mean 250 and sigma=1.}
+  tags{topic:capstone, role:advanced};
+
+agg Capstone.Gross
+  [2000 5000 10000 3000 1000] premium as GWP at [0.95 0.95 0.9 0.85 0.75] lr
+  [500 1000 5000 10000 5000] xs [0 0 0 0 1000]
+  sev.Capstone.Sev
+  mixed gamma 0.125
+  note{Capstone gross portfolio entered from a limit and attachment profile by premium and loss ratio. DRY: refer to the severity by name.}
+  tags{topic:capstone, role:advanced};
+
+agg Capstone.ExposureRating
+  agg.Capstone.Gross
+  occurrence ceded to
+    tower [0 250 500 1000 2000 5000 10000]
+  note{Exposure rating layering of the capstone example into 250 xs 0, 250 xs 250, 500 xs 500, 1000 xs 1000, 3000 xs 2000 and 5000 xs 5000 using the tower keyword. An intermediate step to view the layer exposure rating.}
+  tags{topic:capstone, role:advanced};
+
+agg Capstone.SelectedLosses
+  [2000 5000 10000 3000 1000] premium as GWP at [0.95 0.95 0.9 0.85 0.75] lr
+  [500 1000 5000 10000 5000] xs [0 0 0 0 1000]
+  sev sev.Capstone.Sev
+    picks [500 1000 2000 5000 10000] [13500 2250 1250 500 50]
+  mixed gamma 0.125
+  note{Aggregate built using an adjusted capstone severity curve to achieve the desired blended experience and exposure rating loss picks by layer.}
+  tags{topic:capstone, role:advanced};
+
+agg Capstone.LossPicksTest
+  agg.Capstone.SelectedLosses
+  occurrence ceded to
+    tower [0 500 1000 2000 5000 10000]
+  note{Throw-away test view to confirm the adjusted severity curve achieves the desired loss picks by layer.}
+  tags{topic:capstone, role:advanced};
+
+agg Capstone.XOL
+  agg.Capstone.SelectedLosses
+  occurrence net of
+    50% po 500 xs 500 deposit 3000 as "500x500" and
+    90% po 1000 xs 1000 deposit 1750 as "1x1" and
+    95% po 3000 xs 2000 rol 25% as "3x2" and
+    5000 xs 5000 rol 3% as "5x5"
+  note{Apply the XOL program terms to the capstone book using the adjusted severity curve.}
+  tags{topic:capstone, role:advanced};
+
+xpnl Capstone.XOL.PnL
+  derive premium
+  less
+    agg.Capstone.XOL
+  less
+    25% premium expenses as "G&A"
+  note{PnL (profit and loss) view of the capstone book with the XOL program only.}
+  tags{topic:capstone, role:advanced};
+
+agg Capstone.FullProgram
+  agg.Capstone.XOL
+  aggregate net of
+    75% po inf xs 0 rate 100% cede 32.5% as QS
+  note{Apply a quota share on the net book to the capstone account model, in addition to the XOL program.}
+  tags{topic:capstone, role:advanced};
+
+xpnl Capstone.PnL
+  derive premium
+  less
+    agg.Capstone.FullProgram
+  less
+    25% premium expenses as "G&A"
+  peel bottom-up
+  note{PnL (profit and loss) view of the capstone book by program and layer.}
+  tags{topic:capstone, role:advanced};
+
+xpnl Capstone.PC
+  derive premium
+  less
+    agg Capstone.Slide agg.Capstone.XOL
+      aggregate net of
+        75% po inf xs 0 rate 100% slide 0.48 at 0.42 and 0.38 at 0.62 and 0.18 at 0.82 as "QS w Slide"
+  less
+    25% premium expenses as "G&A"
+  note{The final capstone model, adding a sliding scale commission to the quota share. The XOL program is pulled in by reference, ensuring all terms stay consistent. Look at Capstone.XOL.PnL to calibrate the slide: loss ratios net of XOL are broadly between 42% and 83%. Peel is not available in this case, but it would add nothing new.}
+  tags{topic:capstone, role:advanced};
+
+grossnet
+  agg Capstone.GrossNet agg.Capstone.XOL
+    note{Bivariate distribution of gross and net of XOL program losses for the capstone book. Also see grossceded and netceded.}
+    tags{topic:capstone, topic:bivariate, role:advanced};
+
+# ----------------------------------------------------------------------
 # Distortions (risk measures)
 # PHDistortion and DualDistortion come first: MinimumDistortion refers to
 # them by name, and builtin references resolve by sequential load.
@@ -170,27 +268,31 @@ agg BasicBook
 
 distortion CCoCDistortion ccoc 0.25
   note{Constant cost of capital distortion, pricing to a 25% return on capital, which is a discount rate of 0.25 / 1.25 = 20%.}
-  tags{topic:distortion, role:intro};
+  tags{topic:spectral, role:intro};
 
 distortion PHDistortion ph 2/3
   note{Proportional hazard distortion with exponent 2/3, so g(s) = s**(2/3).}
-  tags{topic:distortion, role:intro};
+  tags{topic:spectral, role:intro};
 
 distortion WangDistortion wang 0.3582869092425833
   note{Wang transform, g(s) = Phi(Phi inverse of s, plus lambda), with lambda = 0.3583.}
-  tags{topic:distortion, role:intermediate};
+  tags{topic:spectral, role:intermediate};
 
 distortion DualDistortion dual 1.5
   note{Dual power distortion with exponent 1.5, and the second leaf of MinimumDistortion below.}
-  tags{topic:distortion, role:intermediate};
+  tags{topic:spectral, role:intermediate};
 
 distortion TVaRDistortion tvar 0.2
   note{TVaR distortion at p = 0.2, which prices as the average of the worst 80% of outcomes.}
-  tags{topic:distortion, role:intro};
+  tags{topic:spectral, role:intro};
 
 distortion MinimumDistortion minimum dist.PHDistortion dist.DualDistortion
   note{The minimum of two distortions is itself a distortion; here the minimum of PHDistortion and DualDistortion.}
-  tags{topic:distortion, role:advanced};
+  tags{topic:spectral, role:advanced};
+
+distortion MixtureDistortion mixture dist.PHDistortion dist.DualDistortion wts [0.6 0.4]
+  note{A weighted mixture of two distortions, itself a distortion. Weights are only meaningful for mixture: the other combinators, minimum among them, take the child list alone.}
+  tags{topic:spectral, role:advanced};
 
 # ----------------------------------------------------------------------
 # Severity: the clause forms
@@ -273,12 +375,27 @@ agg SevMixture
   note{A mixture of severities, showing that every aspect of the severity clause can be mixed.}
   tags{topic:severity, role:intermediate};
 
+agg EqualWeightMixture
+  10 claims
+  500 xs 0
+  sev lognorm [20 40 100] cv [0.5 0.6 0.7] wts=3
+  mixed gamma 0.2
+  note{The equal-weight shorthand: wts=3 gives three components of weight one third each, a shorthand for the explicit list. The severity mean is their equally weighted average, before the 500 limit.}
+  tags{topic:severity, role:intermediate};
+
 agg SevSpliced
   1 claim
   sev lognorm 10 cv 1.5 splice [5 25]
   fixed
   note{A lognormal conditioned on 5 <= X <= 25.}
   tags{topic:severity, role:intermediate};
+
+agg SplicedDisjointSegments
+  1 claim
+  sev lognorm [10 10] cv [1 1] wts [0.7 0.3] splice [2 10] [5 20]
+  fixed
+  note{A spliced severity on the disjoint segments [2, 5] and [10, 20]: the two-list splice form pairs each mixture component with its own bounds, conditioning the first onto [2, 5] with weight 0.7 and the second onto [10, 20] with weight 0.3, so no mass falls between the segments.}
+  tags{topic:severity, role:advanced};
 
 agg SevLayer
   1 claim
@@ -295,6 +412,14 @@ agg SevLayer.Unconditional
   fixed
   note{Unconditional severity: the trailing ! keeps losses below the attachment of 5 in the count as zeros, so the layer mean is lower than in the conditional reading.}
   tags{topic:severity, role:intermediate};
+
+agg UnconditionalDiscreteSeverity
+  5 claims
+  4 xs 2
+  dsev [1 2 3 4 5 6] !
+  poisson
+  note{The trailing ! makes the severity unconditional, so the five claims are ground-up claims and the two die faces below the attachment contribute nothing. Conditional is the default, where the count is of claims reaching the layer; the severity mean falls from 2.5 to 1.667 here.}
+  tags{topic:severity, role:advanced};
 
 agg MixedSeverityAndProfile
   [1000 2000 500] premium at [0.8 0.7 0.5] lr
@@ -540,6 +665,13 @@ agg InverseGaussianMixed
   note{An inverse Gaussian mixing distribution, where the shape parameter is the cv of the mixing distribution.}
   tags{topic:frequency, role:intermediate};
 
+agg DelaporteMixedFrequency
+  10 claims
+  dsev [1]
+  mixed delaporte 0.65 0.25
+  note{A two-parameter mixing law: the Delaporte is a shifted gamma mixed Poisson, taking the mixing cv and the shift. sig and sichel take two parameters in the same position.}
+  tags{topic:frequency, role:advanced};
+
 agg ZTPoissonFrequency
   4 claims
   dsev [1]
@@ -566,6 +698,52 @@ agg NeymanAFrequency
   dsev [1]
   neymana 4
   note{Neyman Type A claim count: a Poisson number of clusters, each contributing a Poisson number of claims. The parameter is the mean cluster size, so 10 claims in clusters of 4 means 2.5 clusters on average.}
+  tags{topic:frequency, role:advanced};
+
+agg PascalFrequency
+  10 claims
+  dsev [1]
+  pascal 0.8 3
+  note{A two-parameter frequency: the Pascal, a Poisson stopped sum of negative binomials, taking a contagion and a claims-per-occurrence parameter.}
+  tags{topic:frequency, role:advanced};
+
+# Renewal (Sparre Andersen) frequency: a `years` exposure paired with a
+# waiting-time law. The wait clause takes the whole severity mini-language,
+# written on the time axis; dwait mirrors dsev.
+
+agg RenewalExponentialWait
+  10 years
+  dsev [1]
+  wait expon
+  note{Renewal frequency: claims arrive over a ten year exposure with exponential waiting times of mean one, which reproduces 10 claims dsev [1] poisson exactly. The wait clause takes the whole severity mini-language, so a waiting time is written like any other distribution, on the time axis.}
+  tags{topic:frequency, role:advanced};
+
+agg RenewalGammaWait
+  5 years
+  dsev [1]
+  wait gamma 2
+  note{Erlang waiting times, shape two and mean two, over a five year exposure, giving an expected count of 2.25. Non-exponential waits are what separate a renewal count from a Poisson one.}
+  tags{topic:frequency, role:advanced};
+
+agg RenewalDeterministicWait
+  3 years
+  dsev [1]
+  dwait [1]
+  note{Deterministic unit waits over three years, so the count is exactly three: the arrival falling on the horizon counts. dwait mirrors dsev, taking outcomes and probabilities.}
+  tags{topic:frequency, role:advanced};
+
+agg RenewalDefectiveWait
+  2 years
+  dsev [1]
+  dwait [1 2] [0.4 0.5] !
+  note{A defective, terminating renewal process: the wait probabilities sum to 0.9, so with probability 0.1 no further claim ever arrives and the expected count falls to 1.06. The trailing ! is what permits the defect.}
+  tags{topic:frequency, role:advanced};
+
+agg RenewalLayeredWait
+  5 years
+  dsev [1]
+  wait 2 xs 1 expon
+  note{The layered wait form applies the severity layer transform to the waiting time, here conditional on the wait exceeding one and capped two above it, lifting the expected count to 5.58. Add ! for the unconditional reading, where waits below the attachment collapse to a zero-wait cluster.}
   tags{topic:frequency, role:advanced};
 
 # ----------------------------------------------------------------------
@@ -596,6 +774,14 @@ agg ExposureByPremium
   note{Exposure stated as premium and a loss ratio, from which the claim count is derived.}
   tags{topic:aggregate, role:intro};
 
+agg ExposureRatedPolicy
+  10000 exposure at 0.125 rate
+  250 xs 0
+  sev lognorm 40 cv 1.5
+  poisson
+  note{The exposure-rated exposure clause: expected loss is exposure times rate, 10_000 at 0.125 for a loss pick of 1_250, and the claim count is derived from the severity. The spec records it exactly as premium at lr does, so the spelling does not survive a reformat.}
+  tags{topic:aggregate, role:intermediate};
+
 agg ExposureLimitProfile
   [10_000 20_000 5_000 5_000] premium at [0.8 0.7 0.6 0.5] lr
   [1_000 2_000 5_000 5_000] xs [0 0 0 250]
@@ -603,6 +789,14 @@ agg ExposureLimitProfile
   poisson
   note{A premium by limit by loss ratio profile, with the implied claim count computed for each band.}
   tags{topic:aggregate, role:hero, role:advanced};
+
+agg TowerLimitProfile
+  1 claim
+  tower [0 100 250 500]
+  sev lognorm 100 cv 3
+  fixed
+  note{A tower written in the policy limit position rather than the reinsurance one, expanding to the three consecutive layers 100 xs 0, 150 xs 100 and 250 xs 250.}
+  tags{topic:aggregate, role:intermediate};
 
 agg TweedieDirect
   tweedie 1.1 100 1.5
@@ -686,7 +880,7 @@ agg OccurrenceXOLProgram
   tags{topic:reinsurance, role:advanced};
 
 agg ReinsuranceOccurrenceTower
-  dfreq[1]
+  dfreq [1]
   sev 125 * uniform
   occurrence ceded to tower [0 25 50 75 100 125]
   note{An occurrence reinsurance tower on a single claim. Look at Reinsurance, then Stats in aLL to see the layer losses.}
@@ -733,9 +927,9 @@ agg ReinsuranceExposureRating
     500 xs 500 and
     1000 xs 1000
   mixed gamma 0.2
-  hints{log2=16; bs=2}
   note{Exposure rating on a small portfolio with a limits profile, amounts in 000s.}
-  tags{topic:reinsurance, role:hero, role:advanced};
+  tags{topic:reinsurance, role:hero, role:advanced}
+  hints{log2=16; bs=2};
 
 agg ReinsuranceExposureRating.Check
   5000 premium at 0.8 lr
@@ -745,18 +939,18 @@ agg ReinsuranceExposureRating.Check
     500 xs 500 and
     1000 xs 1000
   mixed gamma 0.2
-  hints{log2=16; bs=2}
   note{A check on the top layer of ReinsuranceExposureRating, which only the 2000 limit band exposes.}
-  tags{topic:reinsurance, role:advanced};
+  tags{topic:reinsurance, role:advanced}
+  hints{log2=16; bs=2};
 
 agg LayerPicks.Uniform
-  dfreq[1]
+  dfreq [1]
   sev 100 * uniform picks [50 75 100] [30 12 5]
   note{Layer loss picks: the severity curve is adjusted to match the selected picks by layer, which moves the mean with it.}
   tags{topic:reinsurance, topic:picks, role:advanced}
 
 agg LayerPicks.Lognorm.Exposure
-  dfreq[1]
+  dfreq [1]
   1000 xs 0
   sev (100 / exp(1.5**2/2)) * lognorm 1.5
   occurrence ceded to tower [0 125 250 500 1000]
@@ -764,7 +958,7 @@ agg LayerPicks.Lognorm.Exposure
   tags{topic:reinsurance, topic:picks, role:advanced}
 
 agg LayerPicks.Lognorm.Experience
-  dfreq[1]
+  dfreq [1]
   1000 xs 0
   sev (100 / exp(1.5**2/2)) * lognorm 1.5
       picks [125 250 500 1000] [30 20 20 18]
@@ -776,16 +970,16 @@ port LayerPicks.Compare
   note{Compares picked and unpicked severity as two units of one portfolio.}
   tags{topic:reinsurance, topic:picks, role:advanced}
   agg LayerPicks.Lognorm.Exposure
-    dfreq[1]
+    dfreq [1]
     1000 xs 0
     sev (100 / exp(1.5**2/2)) * lognorm 1.5
   agg LayerPicks.Lognorm.Experience
-    dfreq[1]
+    dfreq [1]
     1000 xs 0
     sev (100 / exp(1.5**2/2)) * lognorm 1.5
       picks [125 250 500 1000] [30 20 20 18]
 
-agg MED.Exposure
+agg CommAuto.Exposure
   1 claim
   sev [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05]
   occurrence ceded to tower [0 100000 250000 500000 1000000 5000000]
@@ -794,7 +988,7 @@ agg MED.Exposure
   tags{topic:reinsurance, topic:picks, role:advanced}
   hints{bs=125; log2=18};
 
-agg MED.WithPicks
+agg CommAuto.WithPicks
   1 claim
   sev [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05]
   picks [100000 250000 500000 1000000 5000000] [7000 1500 1500 1500 2250]
@@ -803,6 +997,128 @@ agg MED.WithPicks
   note{Layer loss picks: the CommAutoMixedExponentialSev curve reweighted to hit the chosen picks.}
   tags{topic:reinsurance, topic:picks, role:advanced}
   hints{bs=125; log2=18};
+
+# Reinsurance economics: premium forms (rate, deposit, rol), ceding
+# commissions, reinstatements and the variable features (swing, retro,
+# slide, profit commission, corridor), shown through the P&L lens.
+# VariableFeature.Base is the shared book the variable features wrap.
+
+xpnl CedingCommission
+  inherit premium
+  less
+    agg CedingCommission.Book
+      10000 premium at 0.7 lr
+      2000 xs 0
+      sev lognorm 150 cv 2.5
+      occurrence net of
+        1750 xs 250 rate 0.325 cede 0.1 as "Occ Re"
+      mixed gamma 0.25
+  less
+    2000 fixed expenses as Expenses
+  note{Ceded premium as a rate on the gross premium, with a 10% ceding commission returned on it. rate is the third premium form beside deposit and rol, and cede is only valid alongside a premium; the layer is entered gross of commission.}
+  tags{topic:reinsurance, role:advanced};
+
+xpnl ReinstatementTreaty
+  10000 premium
+  less
+    agg ReinstatementTreaty.Book
+      10000 premium at 0.9 lr
+      20000 xs 0
+      sev 1500 * lomax 1.5
+      occurrence net of
+        18000 xs 2000 rol 0.275 reinstatements 1 free and 2 at 100% as Cat
+      mixed gamma 0.25
+  note{The treaty-language reinstatement schedule: one free reinstatement then two at the full base rate on line, so the cover runs to four annual limits. It builds the same schedule as the explicit multiplier list [0 1 1].}
+  tags{topic:reinsurance, role:advanced};
+
+xpnl NoReinstatementTreaty
+  10000 premium
+  less
+    agg NoReinstatementTreaty.Book
+      10000 premium at 0.9 lr
+      20000 xs 0
+      sev 1500 * lomax 1.5
+      occurrence net of
+        18000 xs 2000 rol 0.275 no reinstatements as Cat
+      mixed gamma 0.25
+  note{Zero reinstatements: a single annual limit, recovery capped there and no reinstatement premium, so the ceded premium stays deterministic. This is distinct from omitting the clause, which leaves the cover free and unlimited.}
+  tags{topic:reinsurance, role:advanced};
+
+xpnl ReinstatementNumberWords
+  10000 premium
+  less
+    agg ReinstatementNumberWords.Book
+      10000 premium at 0.9 lr
+      20000 xs 0
+      sev 1500 * lomax 1.5
+      occurrence net of
+        18000 xs 2000 rol 0.275 reinstatements one free and three at 100% as Cat
+      mixed gamma 0.25
+  note{Reinstatement counts written as number words rather than digits. The words one to five are read as counts only in this position, so they stay ordinary identifiers everywhere else.}
+  tags{topic:reinsurance, role:advanced};
+
+agg VariableFeature.Base
+  10000 premium at 0.9 lr
+  2000 xs 0
+  sev lognorm 150 cv 2.5
+  mixed gamma 0.25
+  note{The shared base book for the variable-feature entries: swing, retro and sliding scale each wrap this same aggregate by reference.}
+  tags{topic:reinsurance, role:reference};
+
+xpnl SwingRatedAggCover
+  10000 premium
+  less
+    agg SwingRated agg.VariableFeature.Base
+      aggregate net of
+        5000 xs 8000 swing basic 300 lcm 1.1 min 1000 max 3000 as "Agg XOL"
+  note{Swing rating: the ceded premium is a collared affine function of ceded loss, clip(basic + lcm * ceded, min, max). Swing replaces the deposit, rol or rate clause rather than decorating it.}
+  tags{topic:reinsurance, role:advanced};
+
+pnl RetroRatedAccount
+  retro basic 500 lcm 1.05 min 6000 max 13000 premium
+  less
+    agg RetroRated agg.VariableFeature.Base
+  note{Retrospective rating: the account-level clause that varies the gross premium with the account loss, replacing the fixed premium head. Retro currently requires a book with no inuring reinsurance, the one-dimensional case where net account loss equals gross loss. xpnl is not available for retro rating.}
+  tags{topic:reinsurance, role:advanced};
+
+xpnl SlidingScaleCommission
+  12000 premium
+  less
+    agg SlidingScale agg.VariableFeature.Base
+      aggregate net of
+        80% po inf xs 0 rate 100% slide 0.32 at 0.6 and 0.22 at 0.7 and 0.17 at 0.8 as "QS+slide"
+  less
+    22.5% premium expenses as Expenses
+  note{Sliding scale commission: the ceding commission slides down the anchors as the ceded loss ratio rises, interpolating between them and flat outside. Slide replaces the cede clause and needs a base premium to form the ratio.}
+  tags{topic:reinsurance, role:advanced};
+
+xpnl ProfitCommission
+  inherit premium
+  less
+    agg ProfitCommission.Book
+      10000 premium at 0.9 lr
+      2000 xs 0
+      sev lognorm 150 cv 2.5
+      mixed gamma 0.25
+      aggregate net of
+        80% po inf xs 0 rate 1 pc 0.35 after 0.1 as "QS + P/C"
+  note{Profit commission: the reinsurer returns 35% of the profit remaining after a 10% expense allowance, so the credit is share * (1 - ceded loss ratio - allowance) of ceded premium, floored at zero. Net of expense calculation.}
+  tags{topic:reinsurance, role:advanced};
+
+xpnl LossCorridor
+  inherit premium
+  less
+    agg LossCorridor.Book
+      10000 premium at 0.7 lr
+      2000 xs 0
+      sev lognorm 150 cv 2.5
+      mixed gamma 0.25
+      aggregate net of
+        80% po inf xs 0 rate 0.8 corridor 0.5 po 0.4 xs 0.5 as "QS+Corridor"
+  less
+    0.2 premium expenses as Expenses
+  note{Loss corridor: the cedant takes back half of the ceded loss in a ratio band running 40 points excess of 50%, so the recovery flattens across the corridor and resumes above it. The band is written with the layer words po and xs. Net quota share with no cede.}
+  tags{topic:reinsurance, role:advanced};
 
 
 # ----------------------------------------------------------------------
@@ -848,7 +1164,9 @@ agg SplitLimitPolicy
 
 # ----------------------------------------------------------------------
 # Bivariate and dependent risks
-# By copula first, then the common-shock and net / ceded joint views.
+# By copula first, then the common-shock pair, the joint gross / ceded /
+# net views of a reinsurance program, the clash model and the discrete
+# bivariate severities.
 # ----------------------------------------------------------------------
 
 bivariate BivariateIndependent
@@ -916,14 +1234,28 @@ bivariate BivariateCatPair
   note{A common shock bivariate: the Wind and Flood units share one frequency mixing variable.}
   tags{topic:bivariate, role:advanced};
 
+agg BivariateOccReBase
+  8 claims
+  sev 300 * beta 2 3
+  occurrence net of
+    50% po 250 xs 50
+  poisson
+  note{The base excess of loss program for the three joint views that follow, each of which wraps it by reference.}
+  tags{topic:bivariate, topic:reinsurance, role:reference};
+
+grossnet
+  agg BivariateGrossNet agg.BivariateOccReBase
+    note{The joint distribution of gross and net for an excess of loss program. The three view prefixes name the axes in order: netceded, grossceded and grossnet.}
+    tags{topic:bivariate, topic:reinsurance, role:advanced};
+
+grossceded
+  agg BivariateGrossCeded agg.BivariateOccReBase
+    note{The joint distribution of gross and ceded for the same program, the view that shows how much of a bad gross year the treaty actually pays.}
+    tags{topic:bivariate, topic:reinsurance, role:advanced};
+
 netceded
-  agg BivariateNetCeded
-    8 claims
-    sev 300 * beta 2 3
-    occurrence net of
-      50% po 250 xs 50
-    poisson
-    note{The joint distribution of net and ceded for an excess of loss reinsurance program.}
+  agg BivariateNetCeded agg.BivariateOccReBase
+    note{The joint distribution of net and ceded for the same excess of loss program.}
     tags{topic:bivariate, topic:reinsurance, role:advanced};
 
 netceded
@@ -938,9 +1270,31 @@ netceded
     note{The joint gross, ceded and net view of a reinsured book.}
     tags{topic:bivariate, topic:reinsurance, role:advanced};
 
+clash BivariateClash
+  8 5 2 claims
+  sev lognorm 50 cv 0.6
+  sev lognorm 60 cv 0.8
+  mixed gamma 0.2
+  note{A shared-event clash model: 8 claims are A only, 5 are B only, and 2 are both, and the solver derives the shared frequency and the per-event triggers, so the two components become Bernoulli factories on one common count.}
+  tags{topic:bivariate, role:advanced};
+
+bivariate BivariateDiscreteJoint
+  dfreq [1 5 20] [0.5 0.25 0.25]
+  dbvsev [1 2 3] [1 2 3] [[0.1875 0.125 0] [0.125 0.125 0.125] [0 0.125 0.1875]]
+  note{Discrete bivariate severity, the two-dimensional analogue of dsev: the joint per-claim probability matrix is given directly on an explicit lattice, row index the X outcome and column index the Y outcome. The marginals reproduce the standalone dsev compounds exactly.}
+  tags{topic:bivariate, role:advanced};
+
+bivariate BivariateDiscreteSparse
+  5 claims
+  dbvsev [[10 1 0.4] [10 2 0.1] [20 1 0.2] [20 2 0.15] [1 50 0.15]]
+  fixed
+  note{The sparse specification of dbvsev: outcome, outcome and probability triples, which reads better than a dense matrix when most of the joint lattice is empty. It expands to the dense form on Reformat, which is why it does not round-trip. Enjoy on log scale!}
+  tags{topic:bivariate, role:advanced};
+
 # ----------------------------------------------------------------------
 # Profit and loss (signed support)
-# USHurr refers to agg.USXOLTower, declared in the reinsurance section.
+# The premium forms first, then the expense forms, then the payoff
+# orientation and the signed-support entries.
 # ----------------------------------------------------------------------
 
 pnl PnLSimple
@@ -952,7 +1306,7 @@ pnl PnLSimple
       sev lognorm 120 cv 1
       mixed gamma 0.25
   note{A single profit and loss line, with the premium inherited from the unit.}
-  tags{topic:pnl, role:intro};
+  tags{topic:economics, role:intro};
 
 pnl PnLClaims
   100 premium
@@ -962,7 +1316,7 @@ pnl PnLClaims
       sev lognorm 8 cv 1.5
       poisson
   note{The claims form, where the premium is stated independently of the loss model.}
-  tags{topic:pnl, role:intro};
+  tags{topic:economics, role:intro};
 
 pnl PnLLoss
   100 premium
@@ -972,7 +1326,7 @@ pnl PnLLoss
       sev lognorm 8 cv 1.5
       poisson
   note{The expected loss form, with E[loss] = 85 and a margin of 15.}
-  tags{topic:pnl, role:intro};
+  tags{topic:economics, role:intro};
 
 pnl PnLLossRatio
   1000 premium
@@ -982,7 +1336,7 @@ pnl PnLLossRatio
       sev lognorm 100 cv 2
       poisson
   note{The loss ratio form, with E[loss] = 700 and a margin of 300.}
-  tags{topic:pnl, role:intro};
+  tags{topic:economics, role:intro};
 
 pnl PnLVector
   [100 200 100] premium
@@ -993,7 +1347,48 @@ pnl PnLVector
       sev lognorm 500 cv 2
       poisson
   note{Vector premium, giving a shift of 400 and a mean of 80, the sum of premium_i (1 - lr_i).}
-  tags{topic:pnl, role:intermediate};
+  tags{topic:economics, role:intermediate};
+
+xpnl PnLExpenses
+  10000 premium as GWP
+  less
+    agg Book.Agg.1
+      6500 loss
+      1000 xs 0
+      sev lognorm 100 cv 2
+      mixed ig 0.25
+  less
+    500 fixed expenses as Fees 0.15 premium expenses as Commission 0.1 loss expenses as LAE
+  note{Explicitly specify premium in the pnl clause. A list of expenses appears as separate line items.}
+  tags{topic:economics, role:advanced};
+
+xpnl PnLInherit
+  inherit premium as GWP
+  less
+    agg Book.Agg.2
+      10000 premium at 0.65 lr
+      1000 xs 0
+      sev lognorm 100 cv 2
+      mixed ig 0.25
+  less
+    500 fixed expenses and 0.25 premium expenses as "Total Expenses"
+  note{Inherit premium from the aggregate, which must carry one. Expenses combined with and, label at the end, do not appear split out in the PnL statement.}
+  tags{topic:economics, role:advanced};
+
+xpnl PnLDerive
+  derive premium as GWP
+  less
+    agg Book.Agg.3
+      10000 premium as "Technical Premium" at 0.65 lr
+      1000 xs 0
+      sev lognorm 100 cv 2
+      occurrence net of
+        750 xs 250 deposit 4000 cede 0.325 as "Occ Re"
+      mixed ig 0.25
+  less
+    2000 fixed expenses as Overhead 0.25 premium expenses as Commission
+  note{Derive the premium from the aggregate technical premium by grossing up for expenses.}
+  tags{topic:economics, role:advanced};
 
 pnl PnLSignedDsev
   5 premium
@@ -1002,7 +1397,7 @@ pnl PnLSignedDsev
       dfreq [3]
       dsev [-1 1]
   note{Signed loss, with PnL in (2, 4, 6, 8), mean 5 and standard deviation sqrt(3).}
-  tags{topic:pnl, role:intermediate};
+  tags{topic:economics, role:intermediate};
 
 pnl PnLSignedAsymmetric
   10 premium
@@ -1011,7 +1406,7 @@ pnl PnLSignedAsymmetric
       dfreq [2]
       dsev [-2 1 3] [0.5 0.3 0.2]
   note{A non-symmetric signed dsev, with mean 10 - 2 E[X] = 10.2.}
-  tags{topic:pnl, role:intermediate};
+  tags{topic:economics, role:intermediate};
 
 pnl PnLSignedSsev 100 premium less
   agg PnL.H
@@ -1019,11 +1414,18 @@ pnl PnLSignedSsev 100 premium less
     ssev 20 - lognorm 10 cv 0.5
     poisson
   note{Continuous signed severity, with E[loss] = 50 and a margin of 50.}
-  tags{topic:pnl, role:intermediate};
+  tags{topic:economics, role:intermediate};
+
+agg PayoffPrimitive
+  dfreq [3]
+  dsev [-13 -8 -3 5 8]
+  payoff
+  note{The payoff orientation suffix marks the variable as an asset-return primitive rather than a loss, so it prices through the dual distortion. loss is the twin suffix, stating the ordinary convention explicitly.}
+  tags{topic:economics, role:advanced};
 
 port PnLBook
   note{A two line profit and loss book, cat against property, each line carrying its own premium.}
-  tags{topic:portfolio, topic:pnl, role:advanced}
+  tags{topic:portfolio, topic:economics, role:advanced}
   pnl Cat
     2000 premium
     less
@@ -1081,7 +1483,7 @@ agg SignedPremiumMinusLossNormal
 
 port SignedGotcha
   note{The sev side of the sev and ssev contrast: a plain sev clamps the normal to a non-negative window, so both units are bounded below where those of SignedPortfolioPair are not.}
-  tags{topic:portfolio, topic:pnl, role:advanced}
+  tags{topic:portfolio, topic:economics, role:advanced}
   agg A
     1 claim
     sev 10 * norm + 25
@@ -1093,7 +1495,7 @@ port SignedGotcha
 
 port SignedPortfolioPair
   note{The ssev side of the sev and ssev contrast: two signed normal units, offset either way, on one signed window.}
-  tags{topic:portfolio, topic:pnl, role:advanced}
+  tags{topic:portfolio, topic:economics, role:advanced}
       agg A
         1 claim
         ssev 10 * norm + 25
@@ -1105,7 +1507,7 @@ port SignedPortfolioPair
 
 port SignedPortfolioMixed
   note{One ordinary loss unit and one signed profit and loss unit in the same portfolio, so the total lives on a signed window.}
-  tags{topic:portfolio, topic:pnl, role:advanced}
+  tags{topic:portfolio, topic:economics, role:advanced}
   agg Loss
     30 claims
     sev lognorm 20 cv 0.8
@@ -1254,7 +1656,7 @@ port ThickThickPortfolio
 
 port DiscretePortfolio
   note{Three discrete units with signed severities, so the portfolio total is signed.}
-  tags{topic:portfolio, topic:pnl, topic:numerics, role:advanced}
+  tags{topic:portfolio, topic:economics, topic:numerics, role:advanced}
   agg A
     dfreq [1 2]
     dsev [-3 -1 2] [0.5 0.3 0.2]
@@ -1272,30 +1674,30 @@ port BodoffOne
   note{Bodoff thought experiment number 1, the wind and quake pair whose allocation the paper works through.}
   tags{topic:portfolio, role:intermediate, role:published}
   agg Wind.1
-    dfreq[1]
+    dfreq [1]
     dsev [0 99] [0.8 0.2]
   agg Quake.1
-    dfreq[1]
+    dfreq [1]
     dsev [0 100] [0.95 0.05]
 
 port BodoffTwo
   note{Bodoff thought experiment number 2, the same pair with the wind loss cut to 50.}
   tags{topic:portfolio, role:intermediate, role:published}
   agg Wind.2
-    dfreq[1]
+    dfreq [1]
     dsev [0 50] [0.8 0.2]
   agg Quake.2
-    dfreq[1]
+    dfreq [1]
     dsev [0 100] [0.95 0.05]
 
 port BodoffThree
   note{Bodoff thought experiment number 3, the same pair with the wind loss cut again, to 5.}
   tags{topic:portfolio, role:intermediate, role:published}
   agg Wind.3
-    dfreq[1]
+    dfreq [1]
     dsev [0 5] [0.8 0.2]
   agg Quake.3
-    dfreq[1]
+    dfreq [1]
     dsev [0 100] [0.95 0.05]
 
 port BodoffFour

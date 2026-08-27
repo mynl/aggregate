@@ -907,7 +907,7 @@ agg AE.Trailer.RefSource 1 claim sev lognorm 100 cv 2 fixed note{the stored trai
 # the constraint it once was: see section AG.
 agg AF.Tags.Spaces 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity frequency aggregate}                note{space-separated tag list};
 agg AF.Tags.Commas 5 claims sev lognorm 10 cv 1 poisson                                       tags{severity, frequency, aggregate}              note{comma-separated tag list};
-agg AF.Tags.Mixed  5 claims sev lognorm 10 cv 1 poisson                                       tags{severity,frequency  aggregate, check:round-trip}  note{mixed separators and a namespaced tag};
+agg AF.Tags.Mixed  5 claims sev lognorm 10 cv 1 poisson                                       tags{severity,frequency  aggregate, role:reference}  note{mixed separators and a namespaced tag};
 dist AF.Tags.Dist ph 0.7                                                                      tags{distortion, hero}                            note{distortions carry a trailer since 1.0.0a157};
 
 

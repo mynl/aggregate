@@ -51,12 +51,25 @@ def _entries():
 ENTRIES = _entries()
 
 #: Entries whose build is expensive enough to quarantine behind ``slow``.
-#: Measured at 1.0.0a299: these six are the only ones over a second, and
-#: together they are more than half the wall clock of building the whole
-#: library. ``BivariateNormal`` alone is twelve seconds.
+#: Measured at 1.0.0a299 (the first six) and re-measured at 1.0.0a327 when
+#: the new-examples merge landed: everything over a second sits here.
+#: ``BivariateNormal`` alone is twelve seconds; the capstone chain re-derives
+#: its five-band picked book at every link, so the whole chain is quarantined.
 SLOW_ENTRIES = {
     'BivariateNormal', 'BivariateCatPair', 'BivariateClaytonMixed',
     'BivariateGumbel', 'BivariateIndependent', 'LayerPicks.Uniform',
+    # the capstone chain, 1.2s to 4.4s each
+    'Capstone.Gross', 'Capstone.ExposureRating', 'Capstone.SelectedLosses',
+    'Capstone.LossPicksTest', 'Capstone.XOL', 'Capstone.XOL.PnL',
+    'Capstone.FullProgram', 'Capstone.PnL', 'Capstone.PC',
+    'Capstone.GrossNet',
+    # renewal counts convolve one wait law per arrival
+    'RenewalExponentialWait', 'RenewalLayeredWait',
+    # the clash solver builds both marginals plus the joint
+    'BivariateClash',
+    # heavy lomax books under a 20000 limit, and a cv 3 tower
+    'ReinstatementTreaty', 'NoReinstatementTreaty', 'ReinstatementNumberWords',
+    'CedingCommission', 'TowerLimitProfile', 'PnLDerive',
 }
 
 #: Entries that deliberately **refuse** to build, and the exception each
@@ -111,6 +124,11 @@ VALIDATION_BASELINE = {
     # entry now reports three flags rather than four.
     'HeavyTailValidation': 'SEV_MEAN|AGG_MEAN|DEFECTIVE',
     'InverseGaussianMixed': 'AGG_MEAN|AGG_CV|AGG_SKEW|DEFECTIVE',
+    # The Delaporte's shifted-gamma mixing thickens the count tail enough for
+    # 1.1e-4 of mass to run off the discrete grid, and the discrete update
+    # path sizes its own grid (a caller or hints log2 is ignored), so the
+    # deficit cannot be hinted away. The flag is the honest reading.
+    'DelaporteMixedFrequency': 'DEFECTIVE',
     # --- Picking leaves the declared moments, by design -----------------
     # See test_layer_picks_reproduces_every_pick: the picks are reproduced
     # exactly, and the analytic severity moments are precisely what picking
@@ -120,6 +138,8 @@ VALIDATION_BASELINE = {
     # terms the pairing exposes.
     'LayerPicks.Uniform': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
     'LayerPicks.Compare':
+        'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW',
+    'Capstone.SelectedLosses':
         'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW',
     # --- Signed severity on a wrapped window ----------------------------
     # A signed window aliases at the ends; the numerics section exists to

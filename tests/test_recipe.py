@@ -254,9 +254,16 @@ def test_as_read_keeps_the_layout_and_the_unexpanded_sugar(lib):
     r = lib._recipes[('agg', 'DiceThreeEvenDice')]
     assert '\n' in r.as_read
     assert r.as_read.startswith('agg DiceThreeEvenDice')
-    # the parser expands this to [2 4 6 8 10 12]; only as_read still has it
+    # as_read and the flattened program keep the sugar as written; only the
+    # canonical rendering expands it. (The old form of this check asserted
+    # 'dsev [2:12:2]' not in r.program, which held only because the
+    # whole-file bracket-padding of preprocess step 3 respaced it to
+    # 'dsev  [2:12:2]'; the library's nested dbvsev entries now route the
+    # file down the depth-aware path, which keeps the spacing as typed.)
     assert 'dsev [2:12:2]' in r.as_read
-    assert 'dsev [2:12:2]' not in r.program
+    assert '[2:12:2]' in r.program
+    assert '[2:12:2]' not in r.decl
+    assert '[2 4 6 8 10 12]' in r.decl
     # comments and the terminating semicolon are not part of the statement
     assert '#' not in r.as_read
     assert not r.as_read.rstrip().endswith(';')

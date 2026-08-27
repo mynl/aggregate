@@ -3296,7 +3296,7 @@ class Underwriter(HelpMixin):
             build.discover(tags='topic:severity role:reference')   # BOTH tags
             build.discover(kind='agg', tags='topic:severity')      # both axes
             build.discover('Dice', plot=True)          # build + plot
-            build.discover(tags='topic:distortion', describe=True)
+            build.discover(tags='topic:spectral', describe=True)
 
         :param regex: filter on the recipe index (name); '' matches all.
         :param kind: optional filter ('agg', 'sev', 'port', 'distortion'); ''
@@ -3305,7 +3305,7 @@ class Underwriter(HelpMixin):
         :param tags: one or more tag slugs (comma- and/or space-separated). An
             entry matches when it carries **every** tag given, so tags narrow
             rather than widen. '' matches all. Shipped tags are namespaced
-            ``topic:`` / ``role:`` / ``check:`` (plus the bare ``slow``).
+            ``topic:`` / ``role:`` (plus the bare ``slow``).
         :param plot: build each match and call its ``.plot()``.
         :param describe: build each match and ``qd()`` its summary table.
         :param return_objects: when building, also return the list of built

@@ -418,11 +418,12 @@ def test_plot_smoke():
 def test_describe_and_info_netceded():
     a = _build(OCC_BOUNDED)
     b = a.occ_bivariate()
-    df = b.summary_df
+    df = b.validation_df
     assert {('Ceded', 'Agg'), ('Net', 'Agg'),
             ('total', 'Agg')}.issubset(set(df.index))
     assert np.isclose(float(df.loc[('total', 'Agg'), 'EX']),
                       float(df.loc[('Ceded', 'Agg'), 'EX'])
                       + float(df.loc[('Net', 'Agg'), 'EX']))
+    assert list(b.summary_df.index) == ['Net', 'Ceded', 'total']
     assert np.isclose(float(b.dependency_df.loc['Agg', 'corr']), b.corr)
     assert 'netceded' in b.info

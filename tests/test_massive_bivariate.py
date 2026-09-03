@@ -211,7 +211,8 @@ def test_update_store_dir_matches_incore_copula(tmp_path):
     # reporting surface runs
     assert 'disk-backed' in repr(mv)
     assert mv.info
-    assert mv.summary_df.shape[0] == 7
+    assert mv.summary_df.shape[0] == 3          # two marginals plus total
+    assert mv.validation_df.shape[0] == 7       # Freq + 2 x Sev/Agg + total
     assert np.isfinite(mv.dependency_df.loc['Sev', 'corr'])
 
 

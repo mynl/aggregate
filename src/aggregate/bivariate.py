@@ -2843,7 +2843,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``skew -> -skew``). Empirical moments come from the realised marginal
         density on the (possibly P&L-relabelled) axis grid. The joint dependence
         (cov / corr / tau) lives in :attr:`dependency_df`; the ``total`` aggregate
-        and the validation errors are in :attr:`summary_df`.
+        and the validation errors are in :attr:`validation_df`.
         """
         self._require_density()
         m0, m1 = self.marginals
@@ -2879,29 +2879,100 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
     @property
     def summary_df(self):
-        """Two-unit ``Portfolio``-shape validation summary (theory vs realised).
+        """At-a-glance risk view: moments and key percentiles, marginals and total.
 
-        A bivariate is a two-unit portfolio plus a dependency structure, so this
-        frame mirrors :attr:`Portfolio.summary_df`: a shared ``Freq`` block on
-        top, a ``Sev`` / ``Agg`` block per component, then a ``total`` ``Sev`` /
-        ``Agg`` block (the genuine ``X + Y`` aggregate). The eight columns are the
-        portfolio validation view -- ``EX | Est EX | Err EX | <spread> | Est
-        <spread> | Err <spread> | Sk | Est Sk`` -- with ``Est`` the realised
-        (model-output) value and ``Err`` the noise-aware relative error.
+        The daily-driver headline, matching :attr:`Aggregate.summary_df` and
+        :attr:`Portfolio.summary_df` in role and columns. Until ``1.0.0a329``
+        this name published the moment audit, which now lives at
+        :attr:`validation_df` (the two names were crossed relative to the rest
+        of the library; ``[Bivariate-Punchup]`` swapped them). One row per
+        marginal, by resolved label, then a ``total`` row: the realized
+        **dependent** ``X + Y``, which is the number the joint was built for.
 
-        ``Est`` is populated only where it is observable from the joint density --
-        the per-component and ``total`` **Agg** rows. ``Freq`` and ``Sev`` rows
-        are theory-only (the 2-D convolution yields the joint aggregate, never an
-        independent frequency or severity sample), and the shared ``Freq`` is
-        reported once. The ``total Agg`` theory carries only the additive mean
-        ``E[X] + E[Y]``; its spread and skew are emergent from the modeled
-        dependence, so they appear on the ``Est`` side only. The spread column is
-        **CV**, or **SD** when any component is a signed (``pnl``) axis whose mean
-        can sit near zero -- the choice is frame-wide, as in ``Portfolio``.
+        **Columns** ``Mean | SD | CV | Skew | P01 | Median | P99``. ``SD`` and
+        ``CV`` are both always present (stable layout); ``CV`` blanks per row
+        when ``|Mean|`` is ~0 relative to ``SD`` (a signed, near break even
+        ``pnl`` axis; see :meth:`Aggregate._cv_or_nan`), and ``SD`` never
+        blanks. Marginal rows carry the realized grid moments and exact grid
+        percentiles read off :meth:`marginal`; the ``total`` row's moments
+        come exact from the joint mixed moments
+        (:meth:`_total_agg_empirical`, no grid formed) and its percentiles
+        from the realized :attr:`total` distribution.
 
-        Dependence (cov / corr / tau) is **not** here -- see
-        :attr:`dependency_df`. The raw per-component marginal moments are in
-        :attr:`stats_df`.
+        Dependence (cov / corr / tau) is in :attr:`dependency_df`; the theory
+        against realized audit is :attr:`validation_df`.
+
+        Returns
+        -------
+        DataFrame
+            Rows: the two marginals plus ``total`` (index named ``unit``);
+            columns as above; the total mean rides in ``.attrs['mean']``.
+        """
+        from ._aggregate import (Aggregate, SUMMARY_PERCENTILES,
+                                 _summary_pct_label)
+        self._require_density()
+        pcols = [_summary_pct_label(p) for p in SUMMARY_PERCENTILES]
+
+        def _mcs(x, p):
+            # realized central moments off one marginal's own grid; the mass
+            # is normalized so a tail deficit does not read as a moment shift
+            tot = p.sum()
+            m1 = float(x @ p) / tot
+            var = float(((x - m1) ** 2) @ p) / tot
+            sd = float(np.sqrt(var)) if var > 0 else 0.0
+            mu3 = float(((x - m1) ** 3) @ p) / tot
+            return m1, sd, (mu3 / sd ** 3 if sd > 0 else np.nan)
+
+        rows = {}
+        for i in range(2):
+            gd = self.marginal(i)
+            m1, sd, skew = _mcs(gd.x, gd.p)
+            rows[self.unit_names[i]] = [
+                m1, sd, Aggregate._cv_or_nan(m1, sd), skew,
+                *(gd.q(q) for q in SUMMARY_PERCENTILES)]
+        tm, tsd, tsk = self._total_agg_empirical()
+        t = self.total
+        rows['total'] = [tm, tsd, Aggregate._cv_or_nan(tm, tsd), tsk,
+                         *(t.q(q) for q in SUMMARY_PERCENTILES)]
+        df = pd.DataFrame.from_dict(
+            rows, orient='index', columns=['Mean', 'SD', 'CV', 'Skew',
+                                           *pcols])
+        df.index.name = 'unit'
+        for c in ('Mean', 'SD', 'Skew', *pcols):
+            df[c] = _snap_noise(df[c])
+        df = self._relabel(df)
+        df.attrs['mean'] = tm
+        return df
+
+    @property
+    def validation_df(self):
+        """Moment audit: reference against realized, Freq / Sev / Agg blocks.
+
+        The bivariate answer to :attr:`Aggregate.validation_df` and
+        :attr:`Portfolio.validation_df`. Until ``1.0.0a329`` this frame was
+        published as ``summary_df`` (see there for the swap). A shared
+        ``Freq`` block on top, a ``Sev`` / ``Agg`` block per component, then a
+        ``total`` ``Sev`` / ``Agg`` block (the genuine ``X + Y`` aggregate).
+        The eight columns are ``EX | Est EX | Err EX | <spread> | Est
+        <spread> | Err <spread> | Sk | Est Sk``, with ``Est`` the realized
+        (model output) value and ``Err`` the noise-aware relative error.
+
+        ``Est`` is populated only where it is observable from the joint
+        density: the per-component and ``total`` **Agg** rows. ``Freq`` and
+        ``Sev`` rows are theory only (the 2-D convolution yields the joint
+        aggregate, never an independent frequency or severity sample), and
+        the shared ``Freq`` is reported once. The ``total Agg`` theory
+        carries only the additive mean ``E[X] + E[Y]``; its spread and skew
+        are emergent from the modeled dependence, so they appear on the
+        ``Est`` side only. The spread column is **CV**, or **SD** when the
+        book is signed (a ``pnl`` axis, a component with signed severity, or
+        a signed netceded source; see :meth:`_signed`); the choice is frame
+        wide, as in ``Portfolio``.
+
+        The pass/fail gates are not here: they live behind the private
+        ``_gate_checks`` and reach the reader through :attr:`info`,
+        :attr:`validation_description` and :attr:`validation_explanation`,
+        the way ``Aggregate`` manages its ``Validation`` flags.
 
         Returns
         -------
@@ -3017,10 +3088,21 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return df
 
     def _signed(self):
-        """Any component is a signed (``pnl``) axis -> the frame uses SD not CV."""
+        """Whether the audit frame spreads by SD rather than CV.
+
+        True when any axis can sit near or below a zero mean, which makes CV
+        meaningless: a ``pnl`` affine on either axis, a component aggregate
+        that is itself signed (``ssev``, or a ``dsev`` with a negative atom;
+        see :meth:`Aggregate._signed`), or, in netceded mode, a signed source
+        aggregate (an occurrence view pair built on a signed gross book has
+        signed views). Mirrors :meth:`Portfolio._signed`, which asks each
+        component. Frame wide by design, as in ``Portfolio``; the per-row
+        blanking lives in :attr:`summary_df` via ``_cv_or_nan``.
+        """
         if self.mode == 'netceded':
-            return False
-        return any(r or s for r, s in self._affine)
+            return self._nc_agg._signed()
+        return (any(r or s for r, s in self._affine)
+                or any(a._signed() for a in self.units))
 
     def _shared_freq_moms(self):
         """Raw moments ``(f1, f2, f3)`` of the shared outer frequency."""
@@ -3182,14 +3264,17 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
     #: any deficit means a clipped or aliased window.
     TAIL_DEFICIT_GATE = 1e-5
 
-    @property
-    def validation_df(self):
-        """The joint grid's QA table: is this bivariate calculating correctly?
+    def _gate_checks(self):
+        """The joint grid's private gate table: is this bivariate calculating correctly?
 
-        The bivariate answer to :attr:`Aggregate.validation_df`, and the **one**
-        computation behind the ``validation`` row of :attr:`info`,
-        :attr:`validation_explanation`, and this frame (a172
-        [FCC-Contract-Gaps]; the three used to compute it three times).
+        The **one** computation behind the ``validation`` row of :attr:`info`,
+        :attr:`validation_description` and :attr:`validation_explanation`
+        (a172 [FCC-Contract-Gaps]; the three used to compute it three times).
+        Public through those narrations only, the way ``Aggregate`` keeps its
+        ``Validation`` flags behind ``explain_validation()``: the public
+        :attr:`validation_df` is the moment audit, matching the other first
+        class classes, and the exhibit layer derives its row emphasis from
+        this table (``exhibits/_bivariate.py``).
 
         One row per check, in escalating order of severity:
 
@@ -3209,12 +3294,12 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Notes
         -----
-        Distinct from :attr:`summary_df`, which is the full theory-vs-realized
-        moment block over Freq / Sev / Agg. This frame carries only what can
-        *fail*, so a reader who wants the verdict does not have to know which of
-        twenty numbers is load-bearing. The unit differs by row (currency for a
-        mean, probability for the deficit) because a check table is a list of
-        checks, not one measurement repeated.
+        Distinct from :attr:`validation_df`, which is the full theory against
+        realized moment block over Freq / Sev / Agg. This table carries only
+        what can *fail*, so a reader who wants the verdict does not have to
+        know which of twenty numbers is load-bearing. The unit differs by row
+        (currency for a mean, probability for the deficit) because a check
+        table is a list of checks, not one measurement repeated.
         """
         self._require_density()
         rows, index = [], []
@@ -3240,10 +3325,10 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
     def _explain_oneline(self):
         """One-unit validation summary for the ``info`` ``validation`` row.
 
-        Reads the verdicts off :attr:`validation_df` rather than recomputing
-        them, so the one-liner, the narrative and the frame cannot disagree.
+        Reads the verdicts off :meth:`_gate_checks` rather than recomputing
+        them, so the one-liner, the narrative and the table cannot disagree.
         """
-        df = self.validation_df
+        df = self._gate_checks()
         bad = []
         if not df.loc[df.index.str.startswith('marginal mean'), 'Pass'].all():
             bad.append('marginal mean')
@@ -3519,8 +3604,8 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """One-line validation verdict, naming any check that failed.
 
         The short half of the pair (a172 [FCC-Contract-Gaps]); the verbose form
-        is :attr:`validation_explanation` and the frame behind both is
-        :attr:`validation_df`.
+        is :attr:`validation_explanation` and the table behind both is the
+        private :meth:`_gate_checks`.
         """
         return self._explain_oneline()
 
@@ -3537,13 +3622,13 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         reproduces its standalone aggregate** (the showpiece invariant). The
         marginal check is deliberately loose: the budget-dependent
         bs-discretization error is expected, and the exact per-axis errors are in
-        :attr:`summary_df`.
+        :attr:`validation_df`.
 
-        Reads :attr:`validation_df` rather than recomputing, so the frame and the
+        Reads :meth:`_gate_checks` rather than recomputing, so the table and the
         prose always agree.
         """
         out = []
-        df = self.validation_df
+        df = self._gate_checks()
         for check, r in df.iterrows():
             verdict = 'passes' if r['Pass'] else 'fails'
             if check == 'tail deficit':

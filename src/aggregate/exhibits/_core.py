@@ -727,9 +727,10 @@ validation = _make_exhibit_function(
     Registered for all five first class classes. The INSURER view
     emphasizes failing rows: moment failures from the object's
     ``Validation`` flags on Aggregate and Portfolio (``Sev`` / ``Agg`` rows,
-    per unit and total on a portfolio), and ``Pass == False`` check rows on
-    Distortion and BivariateAggregate. The PnL audit frame has no failure
-    gate and passes through unchanged.
+    per unit and total on a portfolio), ``Pass == False`` check rows on
+    Distortion (the one class still serving a check-shaped frame), and, on
+    BivariateAggregate, ``Agg`` rows flagged by its private gate checks. The
+    PnL audit frame has no failure gate and passes through unchanged.
 
     Parameters
     ----------

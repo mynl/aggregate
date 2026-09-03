@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a329
+
+**[Summary-Validation-Swap] the bivariate frames take their first-class names: `summary_df` is the at-a-glance headline, `validation_df` the moment audit, and the gate table goes private.** `BivariateAggregate.summary_df` is now `Mean | SD | CV | Skew | P01 | Median | P99` over the two marginals (by resolved label) and the realized dependent `total`, matching `Aggregate` and `Portfolio`; the old audit body (Freq / Sev / Agg blocks, eight columns) moved verbatim to `validation_df`; the old check table (`Est | Ref | Err | Gate | Pass`) became the private `_gate_checks()`, still feeding `info`, `validation_description` and `validation_explanation` unchanged, and the `validation.insurer` exhibit now serves the moment audit with gate-derived row emphasis. `qd(bv)` prints the new headline frame. `[Signed-Spread-Fix]` rides along: `_signed()` now asks each component (an `ssev` or negative-atom `dsev` component flips the audit to SD columns, as does a signed netceded source), where it previously saw only `pnl` affines.
+
+Breaking for readers of the old frames: code indexing `summary_df` by `(component, part)` tuples must read `validation_df`, and the check table is no longer public (only `Distortion` still serves a check-shaped `validation_df`; a later `[FCC-Validation-Uniformity]` pass is logged in `dev/TODO.md`).
+
 ## 1.0.0a328
 
 **[Bivariate-Punchup] the probability accessors land: `marginal`, `conditional` and `total` on `BivariateAggregate` and both joint containers.** `marginal(axis)` returns the axis marginal as a `GridDistribution` (axis by index, `'x'`/`'y'`, or component name, case insensitive; a `pnl` axis comes back payoff oriented); `conditional(kind, value, report=None)` returns the full conditional law for `kind` in `x | y | x+y | x-y` (the diagonal kinds condition on the total-grid bucket containing `value`, and `report=` picks which axis's law is returned); `total` is a cached property holding the realized law of `X + Y` (exact anti-diagonal fold on a shared `bs`, mean-preserving scatter otherwise). All three live on `JointBandsMixin`, so the in-core and massive containers expose one identical probability surface (`MassiveBivariateDistribution.marginal(i)` is unchanged in behavior but now served by the mixin); full `pushforward` signature unification stays deferred as `[Bivariate-Pushforward-Parity]` in `dev/TODO.md`. From `dev/plan-bivariate-punchup.md`, first of three bumps.

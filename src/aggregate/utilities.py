@@ -330,6 +330,7 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     from .distributions import Aggregate
     from .portfolio import Portfolio
     from ._pnl import PnL
+    from .bivariate import BivariateAggregate
     from .results import CalibrationResult, EvaluationResult
     if ff is None:
         ff = lambda x: f'{x:.5g}'
@@ -355,6 +356,14 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             # range percentiles; the footing sheet is economic_df).
             print(repr(x))
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
+        elif isinstance(x, BivariateAggregate):
+            # bivariate headline: the repr then the marginals-and-total
+            # at-a-glance frame ([Bivariate-Punchup]); the moment audit is
+            # validation_df, served on demand. Before update() there is no
+            # joint density and the repr alone is the honest answer.
+            print(repr(x))
+            if x.density is not None or x._massive is not None:
+                qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, CalibrationResult):
             # the receipt reads as the two frames it always was: the per
             # family shapes, then the one target they share

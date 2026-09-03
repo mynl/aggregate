@@ -418,3 +418,34 @@ Divergences, each what the plan specified, what the code does, and why:
 New DecL program `bivariate MV.DBVIndep ...` added to
 `src/aggregate/agg/decl-testers.agg` (DBVSEV block) per the corpus rule; it
 round-trips (corpus suites green).
+
+### Phase 2 (`1.0.0a329`): the summary / validation swap and the signed spread
+
+Divergences:
+
+1. **`qd()` gained a bivariate branch.** The plan said to verify which
+   branch the bivariate takes and leave the HTML repr alone; it took the
+   fall-through (`print(repr)`), which contradicts the acceptance check
+   ("`qd(bv)` shows the new at-a-glance frame"). Resolved toward the
+   acceptance check: `qd` now prints the repr line then `summary_df`,
+   mirroring the `PnL` branch, with a pre-update guard (repr only, no
+   density to summarize). The HTML repr (`.bivariate._repr_html_()`) is
+   untouched.
+2. **`tests/test_create_pnl.py` needed no change.** The plan lists lines
+   ~43 and ~110 to 112 as readers of the old audit columns; they are PnL
+   tests reading `PnL.summary_df` / `economic_df` and never touch the
+   bivariate. Left alone.
+3. **Two readers the plan's file list missed**, found by the suites and
+   switched: `tests/test_massive_bivariate.py` (the 7-row `summary_df`
+   shape assertion, now 3-row summary plus 7-row `validation_df`) and
+   `tests/test_reins_bivariate.py::test_describe_and_info_netceded` (tuple
+   indexing moved to `validation_df`).
+4. **The exhibit snapshot was recaptured selectively.** A full recapture
+   would also have re-baselined the eight pricing blocks that fail at
+   baseline for reasons in the author's uncommitted scope, silently
+   absorbing that drift. A merge script (session scratchpad) ran the
+   capture and copied across only the four `*/BivariateAggregate` keys;
+   the committed file differs from `HEAD` in exactly those four, verified
+   by key-level comparison, and each was read: `summary` is the 3-row
+   headline, `validation` the 7-row audit with the gate-derived emphasis
+   caption on the insurer view.

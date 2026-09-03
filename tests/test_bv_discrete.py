@@ -110,10 +110,10 @@ def test_dbvsev_marginal_reproduction_exact():
         assert np.allclose(th.to_numpy(dtype=float),
                            em.to_numpy(dtype=float), rtol=1e-6, atol=1e-9)
     # the validation frame's per-component Agg errors are ~0
-    summ = mv.summary_df
+    vdf = mv.validation_df
     for unit in mv.unit_names:
-        assert abs(summ.loc[(unit, 'Agg'), 'Err EX']) < 1e-6
-        assert abs(summ.loc[(unit, 'Agg'), 'Err CV']) < 1e-6
+        assert abs(vdf.loc[(unit, 'Agg'), 'Err EX']) < 1e-6
+        assert abs(vdf.loc[(unit, 'Agg'), 'Err CV']) < 1e-6
 
 
 def test_dbvsev_marginal_equals_standalone_compound():

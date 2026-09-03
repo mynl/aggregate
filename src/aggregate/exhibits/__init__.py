@@ -164,8 +164,9 @@ register_simple_exhibit(
             'closed form where one exists, with the error between them.')
 register_simple_exhibit(
     'summary', 'Summary', 'summary_df', [BivariateAggregate],
-    caption='Reference against realized moments for the shared frequency, '
-            'each marginal, and their total.')
+    caption='Headline moments and key percentiles for each marginal and for '
+            'the realized dependent total. Percentiles are exact grid '
+            'values; the total row reads the folded X + Y distribution.')
 
 # ---- stats -----------------------------------------------------------------
 register_simple_exhibit(
@@ -195,10 +196,14 @@ register_simple_exhibit(
     caption='Ledger QA: each declared amount against the realized estimate, '
             'with absolute and relative error.')
 register_simple_exhibit(
-    'validation', 'Validation', 'validation_df',
-    [Distortion, BivariateAggregate],
+    'validation', 'Validation', 'validation_df', [Distortion],
     caption='Identity checks: the realized value against its reference, the '
             'gate it has to clear, and whether it cleared it.')
+register_simple_exhibit(
+    'validation', 'Validation', 'validation_df', [BivariateAggregate],
+    caption='Moment QA: the reference moment against the realized FFT '
+            'estimate, with noise aware relative errors, for the shared '
+            'frequency, each marginal, and the realized total.')
 
 # ---- tail and economics ----------------------------------------------------
 register_simple_exhibit(

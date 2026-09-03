@@ -708,9 +708,14 @@ def test_portfolio_retains_its_whole_decl_trailer():
     assert p.log2 == 16                     # retention did not break the effect
 
 
-def test_bivariate_validation_df_is_the_check_table(biv):
-    """a172: one row per check, with the gate and the verdict."""
-    df = biv.validation_df
+def test_bivariate_gate_checks_is_the_check_table(biv):
+    """a172, reshaped by [Bivariate-Punchup]: the check table went private.
+
+    One row per check with the gate and the verdict, now behind
+    ``_gate_checks()``; the public ``validation_df`` is the moment audit
+    matching the other first class classes.
+    """
+    df = biv._gate_checks()
     assert list(df.columns) == ['Est', 'Ref', 'Err', 'Gate', 'Pass']
     assert df.index.name == 'check'
     assert 'tail deficit' in df.index
@@ -719,6 +724,10 @@ def test_bivariate_validation_df_is_the_check_table(biv):
     assert df['Pass'].all(), 'the fixture bivariate should validate'
     # the gates are the declared class constants, not magic numbers inline
     assert df.loc['tail deficit', 'Gate'] == biv.TAIL_DEFICIT_GATE
+    # and the public frame is the audit, not the check table
+    vdf = biv.validation_df
+    assert isinstance(vdf.index, pd.MultiIndex)
+    assert 'Pass' not in vdf.columns
 
 
 def test_bivariate_narratives_agree_with_the_frame(biv):
@@ -731,7 +740,7 @@ def test_bivariate_narratives_agree_with_the_frame(biv):
         assert unit in txt
 
 
-def test_bivariate_validation_df_fails_the_deficit_gate(biv):
+def test_bivariate_gate_checks_fail_the_deficit_gate(biv):
     """A deficit over the gate fails the row, the one-liner and the prose.
 
     Drives the gate by setting :attr:`deficit` on the module fixture rather than
@@ -744,12 +753,12 @@ def test_bivariate_validation_df_fails_the_deficit_gate(biv):
     good = biv.deficit
     biv.deficit = 10 * biv.TAIL_DEFICIT_GATE
     try:
-        assert not biv.validation_df.loc['tail deficit', 'Pass']
+        assert not biv._gate_checks().loc['tail deficit', 'Pass']
         assert 'tail deficit' in biv.validation_description
         assert 'fails' in biv.validation_explanation
     finally:
         biv.deficit = good
-    assert biv.validation_df['Pass'].all()      # and the fixture is left clean
+    assert biv._gate_checks()['Pass'].all()     # and the fixture is left clean
 
 
 def test_distortion_validation_df_checks_the_identities():

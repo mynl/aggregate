@@ -223,16 +223,23 @@ def test_mv_pnl_component_rejected():
 def test_mv_reporting_smoke():
     mv = _mv()
     assert 'bivariate object name' in mv.info
-    df = mv.summary_df                      # property: Portfolio-shape validation
-    assert ('shared', 'Freq') in df.index
+    df = mv.summary_df                    # property: at-a-glance headline
+    assert list(df.index) == ['A', 'B', 'total']
+    assert list(df.columns) == ['Mean', 'SD', 'CV', 'Skew',
+                                'P01', 'Median', 'P99']
+    assert np.isclose(float(df.loc['total', 'Mean']),
+                      mv._total_agg_empirical()[0])
+    assert float(df.loc['total', 'P99']) == mv.total.q(0.99)
+    vdf = mv.validation_df                # property: Portfolio-shape audit
+    assert ('shared', 'Freq') in vdf.index
     assert {('A', 'Agg'), ('B', 'Agg'),
-            ('total', 'Agg')}.issubset(set(df.index))
-    assert set(df.columns) == {'EX', 'Est EX', 'Err EX', 'CV', 'Est CV',
-                               'Err CV', 'Sk', 'Est Sk'}
+            ('total', 'Agg')}.issubset(set(vdf.index))
+    assert set(vdf.columns) == {'EX', 'Est EX', 'Err EX', 'CV', 'Est CV',
+                                'Err CV', 'Sk', 'Est Sk'}
     # total agg theory mean is the additive E[X] + E[Y]
-    assert np.isclose(float(df.loc[('total', 'Agg'), 'EX']),
-                      float(df.loc[('A', 'Agg'), 'EX'])
-                      + float(df.loc[('B', 'Agg'), 'EX']))
+    assert np.isclose(float(vdf.loc[('total', 'Agg'), 'EX']),
+                      float(vdf.loc[('A', 'Agg'), 'EX'])
+                      + float(vdf.loc[('B', 'Agg'), 'EX']))
     dep = mv.dependency_df                # property: dependence structure
     assert list(dep.index) == ['Sev', 'Agg']
     assert np.isclose(float(dep.loc['Agg', 'corr']), mv.corr)
@@ -279,7 +286,7 @@ def test_mv_info_netceded_catalogue():
 
 
 def test_mv_marginal_reproduces_standalone():
-    """The Agg rows of ``summary_df`` validate each marginal vs its standalone.
+    """The Agg rows of ``validation_df`` validate each marginal vs its standalone.
 
     The mean error here is vs the *analytic* standalone, so it carries the
     coarse-grid discretization (a few %); the invariant (marginal reproduces the
@@ -287,7 +294,7 @@ def test_mv_marginal_reproduces_standalone():
     one-line validation passes.
     """
     mv = _mv('gumbel 0.4', 'mixed gamma .5')
-    df = mv.summary_df
+    df = mv.validation_df
     for name in ('A', 'B'):
         assert abs(float(df.loc[(name, 'Agg'), 'Err EX'])) < 0.10
     assert mv.deficit < 1e-6
@@ -474,9 +481,10 @@ def test_netceded_reporting_and_plot():
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     mv = build(f'netceded {NC_PROG}')
-    df = mv.summary_df
+    df = mv.validation_df
     assert {('Ceded', 'Agg'), ('Net', 'Agg'),
             ('total', 'Agg')}.issubset(set(df.index))
+    assert list(mv.summary_df.index) == ['Net', 'Ceded', 'total']
     dep = mv.dependency_df
     assert np.isnan(dep.loc['Sev', 'tau'])           # no copula in netceded
     assert 'netceded' in mv.info
@@ -737,7 +745,7 @@ def test_shuffle_plugs_into_bivariate_and_reproduces():
     mv.copula = CopulaShuffle(perm=[3, 2, 1, 0])
     mv.update()
     assert isinstance(mv.copula, CopulaShuffle)
-    df = mv.summary_df
+    df = mv.validation_df
     assert all(abs(float(df.loc[(n, 'Agg'), 'Err EX'])) < 0.10
                for n in mv.unit_names)
     assert mv.deficit < 1e-6
@@ -787,7 +795,7 @@ def test_clash_builds_and_derives_shared_count():
 def test_clash_marginals_reproduce_standalone():
     """Each clash marginal reproduces its standalone aggregate (the invariant)."""
     mv = build(CLASH_PROG)
-    df = mv.summary_df
+    df = mv.validation_df
     assert all(abs(float(df.loc[(n, 'Agg'), 'Err EX'])) < 0.10
                for n in mv.unit_names)
     assert mv.deficit < 1e-6
@@ -926,3 +934,36 @@ def test_netceded_answers_all_new_accessors():
     v = gn.q(0.5)
     assert np.isclose(mv.conditional('x', v).p.sum(), 1.0)
     assert np.isclose(mv.conditional('x+y', mv.total.q(0.5)).p.sum(), 1.0)
+
+
+# ----------------------------------------------------------------------
+# [Bivariate-Punchup] the summary / validation swap and the signed spread
+# ----------------------------------------------------------------------
+
+def test_mv_ssev_component_flips_audit_to_sd():
+    """[Signed-Spread-Fix] an ``ssev`` component spreads the audit by SD.
+
+    ``_signed()`` used to look only at the ``pnl`` affines, so a copula pair
+    with a signed-severity component kept CV columns over a mean that can sit
+    near zero. It now asks each component, as ``Portfolio._signed`` does.
+    """
+    mv = build('''bivariate SG 5 claims
+        agg A dfreq [1] ssev uniform - .3
+        agg B dfreq [1] sev lognorm 10 cv .5
+        poisson''')
+    assert mv._signed()
+    df = mv.validation_df
+    assert {'SD', 'Est SD', 'Err SD'}.issubset(df.columns)
+    assert 'CV' not in df.columns
+
+
+def test_mv_summary_total_row_reads_the_folded_total():
+    """``summary_df``'s total row is the realized dependent X + Y."""
+    mv = _mv()
+    df = mv.summary_df
+    m, sd, sk = mv._total_agg_empirical()
+    assert float(df.loc['total', 'Mean']) == pytest.approx(m)
+    assert float(df.loc['total', 'SD']) == pytest.approx(sd)
+    assert float(df.loc['total', 'Skew']) == pytest.approx(sk)
+    for pc, p in (('P01', 0.01), ('Median', 0.5), ('P99', 0.99)):
+        assert float(df.loc['total', pc]) == mv.total.q(p)

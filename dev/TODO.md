@@ -1081,6 +1081,16 @@
   `conditional` / `total` / `slice`) is already one implementation on
   `JointBandsMixin`. Plot-surface parity (`contour` vs `plot` / `explore`)
   rides along here too.
+- **[FCC-Validation-Uniformity]** (logged `1.0.0a329`, from
+  `dev/plan-bivariate-punchup.md`) — `Distortion.validation_df` is now the
+  only public check-shaped frame (`Est | Ref | Err | Gate | Pass` rows) after
+  the bivariate swapped to the moment-audit shape. Decide whether the
+  distortion identities move behind a private gate table with a narrated
+  verdict, the way `Aggregate` (flags), `BivariateAggregate`
+  (`_gate_checks()`) and the others manage gates, or whether a distortion's
+  identity checks are genuinely its audit and the frame stays. The
+  `exhibits/_core.py` validation docstring and `_check_table_emphasis` are
+  the coupled surfaces.
 - **[Massive-Kappa-Second-Sweep]** (from `[PnL-Punchups-01]`, `1.0.0a134`) — bring
   the kappa scenario percentiles to the massive one-sweep P&L route.
   Conditioning needs the joint per atom *and* the grand-result quantiles before

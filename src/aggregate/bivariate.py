@@ -1306,6 +1306,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._sev_xs = [None, None]
         self._sev_moms = [None, None]      # per-axis per-event severity raw moms
         self._marg_theory = [None, None]   # per-axis (mean, sd, skew)
+        self._total = None                 # cached .total GridDistribution
         self.figure = None                 # set by plot()
 
         if mode == 'netceded':
@@ -1810,6 +1811,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # a re-update replaces any previous result surface, either kind
         self._massive = None
         self._massive_dist = None
+        self._total = None
         if self.mode == 'netceded':
             return self._update_netceded(log2=log2, bs=bs, store_dir=store_dir,
                                          row_chunk=row_chunk,
@@ -2261,6 +2263,129 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self._massive is not None:
             return self._massive.marg0, self._massive.marg1
         return self.density.sum(axis=1), self.density.sum(axis=0)
+
+    def marginal(self, axis=0):
+        """Axis marginal as a :class:`~aggregate._grid_distribution.GridDistribution`.
+
+        The probability-object companion to the raw-array :attr:`marginals`:
+        quantiles, TVaR and return periods on one axis are one call away.
+
+        Parameters
+        ----------
+        axis : int or str, default 0
+            ``0`` / ``1``, the aliases ``'x'`` / ``'y'``, or a component name
+            from :attr:`unit_names` (case insensitive, so a netceded joint
+            answers ``marginal('net')`` / ``marginal('ceded')``).
+
+        Returns
+        -------
+        GridDistribution
+            The realized marginal law on the axis grid, named with the
+            component's resolved label. A ``pnl`` axis is returned with
+            ``is_loss_value=False`` so its return periods read the correct
+            tail.
+
+        Notes
+        -----
+        Delegates through :attr:`bivariate`, so the in-core and massive
+        routes share one entry point (the massive marginal is the free
+        pass-3 accumulator, no disk read). Each marginal reproduces the
+        standalone aggregate for its component up to the joint grid's
+        rebucketing, which is the showpiece invariant of the 2-D FFT.
+        """
+        i = _resolve_axis(axis, self.unit_names)
+        self._require_density()
+        return self.bivariate.marginal(
+            i, name=self._resolve_handle_label(self.unit_names[i]),
+            is_loss_value=self._axis_kind(i) != 'pnl')
+
+    def conditional(self, kind, value, report=None):
+        """Conditional law of one axis given an event on the joint.
+
+        Parameters
+        ----------
+        kind : {'x', 'y', 'x+y', 'x-y'}
+            The conditioning variable: one axis (``'x'`` conditions on axis 0
+            and reports axis 1; ``'y'`` the transpose), the total, or the
+            difference; the event is the bucket containing ``value``.
+        value : float
+            The conditioning value, snapped to its bucket.
+        report : int or str, optional
+            Which axis's law the returned distribution is expressed in
+            (``0`` / ``1`` / ``'x'`` / ``'y'`` or a name from
+            :attr:`unit_names`). Determined for ``'x'`` / ``'y'`` (the non
+            conditioning axis; a contradiction raises); defaults to axis 0
+            for the diagonal kinds, whose two readings are affine images of
+            each other (``y = value - x`` on the band).
+
+        Returns
+        -------
+        GridDistribution
+            The normalized conditional law on the reported axis's grid, with
+            the orientation flag of that axis (``is_loss_value=False`` for a
+            ``pnl`` axis).
+
+        Raises
+        ------
+        ValueError
+            On an unknown ``kind``, a contradictory ``report``, or a
+            conditioning event carrying no mass.
+
+        Notes
+        -----
+        Delegates to :meth:`JointBandsMixin.conditional`, which owns the
+        band arithmetic and its documentation. The related sweeps:
+        :meth:`exeqa_df` is the conditional **mean** over the whole
+        conditioning grid, this is the full law at one point;
+        ``[Bivariate-Total-Exeqa]`` (deferred) is the mean sweep on the
+        total's own grid, whose band extraction the diagonal kinds here
+        already implement one value at a time.
+        """
+        kindn = str(kind).lower().replace(' ', '')
+        if kindn not in _CONDITIONAL_KINDS:
+            raise ValueError(
+                f'kind must be one of {_CONDITIONAL_KINDS}; got {kind!r}.')
+        self._require_density()
+        if kindn in ('x', 'y'):
+            rep = 1 if kindn == 'x' else 0
+        else:
+            rep = 0 if report is None else _resolve_axis(report,
+                                                         self.unit_names)
+        return self.bivariate.conditional(
+            kindn, value, report=report,
+            is_loss_value=self._axis_kind(rep) != 'pnl')
+
+    @property
+    def total(self):
+        """Realized law of ``X + Y`` as a cached ``GridDistribution``.
+
+        The full distribution of the dependent total, not just its moments
+        (those are :meth:`_total_agg_empirical`): percentiles, TVaR and
+        return periods of the sum are read off this object.
+
+        Returns
+        -------
+        GridDistribution
+            The realized total on its own grid, named ``'total'``. Cached;
+            recomputed after :meth:`update`, the same discipline as the
+            other realized frames. Orientation: a loss unless **both** axes
+            are ``pnl`` (payoff) axes.
+
+        Notes
+        -----
+        Computed by :meth:`JointBandsMixin.total`: an exact anti-diagonal
+        fold where the axes share a ``bs`` (the netceded and discrete
+        modes), and mean-preserving :func:`_scatter_1d` routing onto
+        ``bs_total = max(bs0, bs1)`` where they differ. In netceded mode
+        the total has an exact reference, the gross aggregate
+        (``ceded + net = gross`` per occurrence), which the tests pin.
+        """
+        if self._total is None:
+            self._require_density()
+            is_loss = any(self._axis_kind(i) != 'pnl' for i in range(2))
+            self._total = self.bivariate.total(name='total',
+                                               is_loss_value=is_loss)
+        return self._total
 
     def moments(self, max_order=3):
         """Mixed raw moments ``E[A0^i A1^j]`` (delegates to the bivariate view)."""
@@ -3495,6 +3620,57 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return self.bivariate._repr_html_()
 
 
+#: Conditioning kinds accepted by :meth:`JointBandsMixin.conditional` (and the
+#: engine-level :meth:`BivariateAggregate.conditional` that delegates to it).
+_CONDITIONAL_KINDS = ('x', 'y', 'x+y', 'x-y')
+
+
+def _resolve_axis(axis, names):
+    """Resolve an axis specification to the integer axis 0 or 1.
+
+    The one resolver behind :meth:`JointBandsMixin.marginal`,
+    :meth:`JointBandsMixin.conditional` and their engine-level twins, so every
+    accessor accepts the same spellings.
+
+    Parameters
+    ----------
+    axis : int or str
+        ``0`` or ``1``; the aliases ``'x'`` (axis 0) and ``'y'`` (axis 1); or
+        an axis name from ``names``. Name matching is case insensitive so a
+        netceded view answers to its natural spelling (``'net'`` for the unit
+        name ``'Net'``).
+    names : sequence of str
+        The two axis names, in axis order.
+
+    Returns
+    -------
+    int
+        The resolved axis, 0 or 1.
+
+    Raises
+    ------
+    ValueError
+        If ``axis`` is none of 0, 1, ``'x'``, ``'y'``, or a name in
+        ``names``.
+    """
+    if isinstance(axis, str):
+        low = axis.lower()
+        if low == 'x':
+            return 0
+        if low == 'y':
+            return 1
+        lows = [str(n).lower() for n in names]
+        if low in lows:
+            return lows.index(low)
+        raise ValueError(
+            f"axis must be 0, 1, 'x', 'y' or one of {tuple(names)}; "
+            f'got {axis!r}.')
+    axis = int(axis)
+    if axis not in (0, 1):
+        raise ValueError(f'axis must be 0 or 1, not {axis!r}')
+    return axis
+
+
 class JointBandsMixin:
     """Row-wise reads of a joint density, wherever the density lives.
 
@@ -3603,6 +3779,191 @@ class JointBandsMixin:
                 'inside the support (see .marginal()).')
         return GridDistribution(other, row / tot, bs=steps[1 - axis],
                                 name=name)
+
+    def marginal(self, axis=0, *, name=None, is_loss_value=True):
+        """Axis marginal as a :class:`~aggregate._grid_distribution.GridDistribution`.
+
+        Parameters
+        ----------
+        axis : int or str, default 0
+            ``0`` / ``1``, the aliases ``'x'`` / ``'y'``, or an axis name from
+            :attr:`axis_names` (case insensitive); see :func:`_resolve_axis`.
+        name : str, optional
+            Display name for the returned distribution; defaults to the axis
+            name.
+        is_loss_value : bool, default True
+            Orientation flag passed through to the ``GridDistribution``
+            (``False`` for a payoff axis, where more is better).
+
+        Returns
+        -------
+        GridDistribution
+            The realized marginal law on the axis grid.
+
+        Notes
+        -----
+        Reads :meth:`marginals`, so the cost follows the route: one density
+        fold in core, and the free pass-3 accumulators on the massive route
+        (no disk read). The raw arrays stay available from :meth:`marginals`
+        as the zero-copy primitive.
+        """
+        i = _resolve_axis(axis, self.axis_names)
+        dens = np.asarray(self.marginals()[i], dtype=float)
+        grid = (self.axis0, self.axis1)[i]
+        bs = (self.bs0, self.bs1)[i]
+        if name is None:
+            name = str(self.axis_names[i])
+        return GridDistribution(grid, dens, bs=bs, name=name,
+                                is_loss_value=is_loss_value)
+
+    def conditional(self, kind, value, report=None, *, is_loss_value=True):
+        r"""Conditional law of one axis given an event, as a ``GridDistribution``.
+
+        The full one-point conditional, where :meth:`~BivariateAggregate.exeqa_df`
+        is the conditional **mean** swept over the whole conditioning grid.
+
+        Parameters
+        ----------
+        kind : {'x', 'y', 'x+y', 'x-y'}
+            The conditioning variable. ``'x'`` conditions on axis 0 and
+            reports the law of axis 1 (delegating to :meth:`slice`); ``'y'``
+            is the transpose. ``'x+y'`` and ``'x-y'`` condition on the total
+            or the difference landing in the bucket containing ``value``.
+        value : float
+            The conditioning value, snapped to the bucket containing it.
+        report : int or str, optional
+            Which axis's law the returned distribution is expressed in
+            (``0`` / ``1`` / ``'x'`` / ``'y'`` or an axis name). For
+            ``'x'`` / ``'y'`` the reported axis is determined (the non
+            conditioning axis) and a contradictory ``report`` raises; for the
+            diagonal kinds it defaults to axis 0. The two diagonal readings
+            are affine images of each other (``y = value - x`` on the band),
+            so this is a fold-axis choice, not a second computation.
+        is_loss_value : bool, default True
+            Orientation flag for the returned ``GridDistribution``.
+
+        Returns
+        -------
+        GridDistribution
+            The normalized conditional law on the reported axis's grid.
+
+        Raises
+        ------
+        ValueError
+            On an unknown ``kind``, a contradictory ``report``, or a
+            conditioning event carrying no mass.
+
+        Notes
+        -----
+        The conditioning event for the diagonal kinds is the **total-grid
+        bucket**: cells with ``round((x_i + s y_j - value) / bs_total) == 0``
+        where ``s`` is the sign of the ``y`` term. Where the axes share a
+        ``bs`` this is the exact lattice anti-diagonal (``bs_total = bs``);
+        where they differ, ``bs_total = max(bs0, bs1)`` and the event is
+        honest (a bucket of the total), consistent with :meth:`slice`
+        conditioning on a bucket rather than on a measure-zero line. This is
+        the single-value version of the deferred ``[Bivariate-Total-Exeqa]``
+        sweep and shares its band arithmetic.
+
+        Cost by route: ``'x'`` reads one row band (cheap on disk); ``'y'``
+        and the diagonal kinds sweep :meth:`_row_bands` accumulating the
+        masked fold, bounded memory, no new storage.
+        """
+        kind = str(kind).lower().replace(' ', '')
+        if kind not in _CONDITIONAL_KINDS:
+            raise ValueError(
+                f'kind must be one of {_CONDITIONAL_KINDS}; got {kind!r}.')
+        names = self.axis_names
+        if kind in ('x', 'y'):
+            determined = 1 if kind == 'x' else 0
+            if report is not None and \
+                    _resolve_axis(report, names) != determined:
+                raise ValueError(
+                    f'conditional({kind!r}, ...) reports the law of the '
+                    f'other axis (axis {determined}); report={report!r} '
+                    'contradicts that.')
+            gd = self.slice(x=value) if kind == 'x' else self.slice(y=value)
+            if is_loss_value:
+                return gd
+            return GridDistribution(gd.x, gd.p, bs=gd.bs, name=gd.name,
+                                    is_loss_value=False)
+        rep = 0 if report is None else _resolve_axis(report, names)
+        sign = 1.0 if kind == 'x+y' else -1.0
+        x0 = np.asarray(self.axis0, dtype=float)
+        x1 = np.asarray(self.axis1, dtype=float)
+        bs_total = (self.bs0 if self.bs0 == self.bs1
+                    else max(self.bs0, self.bs1))
+        value = float(value)
+        out = np.zeros(len(x0) if rep == 0 else len(x1))
+        for r0, r1, block in self._row_bands(axis=0):
+            t = x0[r0:r1, None] + sign * x1[None, :]
+            masked = np.where(np.round((t - value) / bs_total) == 0,
+                              block, 0.0)
+            if rep == 0:
+                out[r0:r1] += masked.sum(axis=1)
+            else:
+                out += masked.sum(axis=0)
+        op = '+' if kind == 'x+y' else '-'
+        cname = f'{names[rep]} | {names[0]} {op} {names[1]}={value:g}'
+        tot = out.sum()
+        if tot <= 0:
+            raise ValueError(
+                f'no mass on the conditioning band ({cname}); pick a value '
+                'the joint actually reaches (see .total()).')
+        return GridDistribution((x0, x1)[rep], out / tot,
+                                bs=(self.bs0, self.bs1)[rep], name=cname,
+                                is_loss_value=is_loss_value)
+
+    def total(self, *, name='total', is_loss_value=True):
+        r"""Law of the sum of the two axes as a ``GridDistribution``.
+
+        Parameters
+        ----------
+        name : str, default 'total'
+            Display name for the returned distribution.
+        is_loss_value : bool, default True
+            Orientation flag for the returned ``GridDistribution``.
+
+        Returns
+        -------
+        GridDistribution
+            The realized law of ``X + Y`` on the total grid.
+
+        Notes
+        -----
+        Where the two axes share a ``bs`` the anti-diagonal is lattice
+        aligned and the fold is **exact**: the mass at total index ``k`` is
+        ``sum_i d[i, k - i]``, accumulated row by row with no rebucketing.
+        Where the ``bs`` differ, each cell's mass is routed onto the total
+        grid (``bs_total = max(bs0, bs1)``) through the mean-preserving
+        linear scatter :func:`_scatter_1d`, the ``[Bivariate-Total-Exeqa]``
+        routing. Either way the sweep runs over :meth:`_row_bands`, so a
+        disk-backed joint answers at bounded memory in one pass, and the
+        cost is ``O(n m)``.
+        """
+        x0 = np.asarray(self.axis0, dtype=float)
+        x1 = np.asarray(self.axis1, dtype=float)
+        z0 = float(x0[0] + x1[0])
+        if self.bs0 == self.bs1:
+            bs_t = float(self.bs0)
+            n_out = len(x0) + len(x1) - 1
+            out = np.zeros(n_out)
+            n1 = len(x1)
+            for r0, r1, block in self._row_bands(axis=0):
+                for i in range(r0, r1):
+                    out[i:i + n1] += block[i - r0]
+        else:
+            bs_t = float(max(self.bs0, self.bs1))
+            hi = float(x0[-1] + x1[-1])
+            n_out = int(np.ceil((hi - z0) / bs_t)) + 1
+            out = np.zeros(n_out)
+            for r0, r1, block in self._row_bands(axis=0):
+                t = (x0[r0:r1, None] + x1[None, :]).ravel()
+                mass, _ = _scatter_1d(t, block.ravel(), z0, bs_t, n_out)
+                out += mass
+        z = z0 + bs_t * np.arange(n_out)
+        return GridDistribution(z, out, bs=bs_t, name=name,
+                                is_loss_value=is_loss_value)
 
 
 class BivariateDistribution(JointBandsMixin):
@@ -4062,16 +4423,6 @@ class MassiveBivariateDistribution(JointBandsMixin):
     # ------------------------------------------------------------------
     # accumulator-backed surface (no disk reads)
     # ------------------------------------------------------------------
-    def marginal(self, i):
-        """Axis-``i`` marginal as a :class:`~aggregate._grid_distribution.GridDistribution`.
-
-        Exact (the pass-3 fold), precomputed -- no disk read.
-        """
-        xs = (self.xs0, self.xs1)[i]
-        dens = (self.marg0, self.marg1)[i]
-        bs = (self.bs0, self.bs1)[i]
-        return GridDistribution(xs, dens, bs=bs, name=str(self.axis_names[i]))
-
     def marginals(self):
         """Return the two marginal densities (exact, precomputed)."""
         return self.marg0, self.marg1
@@ -4138,9 +4489,11 @@ class MassiveBivariateDistribution(JointBandsMixin):
     # ------------------------------------------------------------------
     # streamed probes
     # ------------------------------------------------------------------
-    # ``slice`` and ``_row_bands`` live on JointBandsMixin: a conditional law
-    # is two lines either side of the disk boundary, and it should be the same
-    # two lines under the same name on both containers.
+    # The probability surface (``marginal`` / ``conditional`` / ``total`` /
+    # ``slice`` / ``_row_bands``) lives on JointBandsMixin: the same
+    # implementation on both sides of the disk boundary, folding over row
+    # bands. ``marginal`` reads :meth:`marginals`, which here returns the
+    # free pass-3 accumulators, so it still costs no disk read.
 
     def pushforward(self, functions, bs, *, bs_total=None, total_key='total',
                     windows=None, scheme='linear', is_loss_value=True):

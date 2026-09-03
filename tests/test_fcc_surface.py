@@ -945,3 +945,21 @@ def test_frequency_prob_eq_0_raises_without_a_mean():
         freq.prob_eq_0
     freq.en = 3.0                       # what the owning Aggregate stamps
     assert freq.prob_eq_0 == pytest.approx(np.exp(-3.0))
+
+
+def test_bivariate_container_probability_surface_parity():
+    """[Bivariate-Punchup] one probability API on both joint containers.
+
+    The in-core and massive containers share the probability surface through
+    ``JointBandsMixin``: not merely the same names, the same functions.
+    """
+    from aggregate.bivariate import (
+        BivariateDistribution, MassiveBivariateDistribution, JointBandsMixin)
+    for member in ('marginal', 'conditional', 'total', 'slice', '_row_bands'):
+        assert getattr(BivariateDistribution, member) \
+            is getattr(MassiveBivariateDistribution, member) \
+            is getattr(JointBandsMixin, member), member
+    # the per-container primitives exist on both, whatever their route
+    for member in ('marginals', 'moments', 'corr', 'pushforward'):
+        assert callable(getattr(BivariateDistribution, member)), member
+        assert callable(getattr(MassiveBivariateDistribution, member)), member

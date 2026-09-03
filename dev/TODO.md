@@ -1066,7 +1066,21 @@
   (`a277` to `a285`): the kappa band conditions on an **axis**, which is the
   easy case and the one the netceded question asks, so nothing there touches
   this. What did land next to it is `JointBandsMixin._row_bands`, the row-wise
-  iterator this would fold over on the massive route.
+  iterator this would fold over on the massive route. **The band primitive now
+  exists** (`1.0.0a328`, `[Bivariate-Punchup]`): `JointBandsMixin.conditional`
+  extracts the diagonal band at one value (both `bs` regimes, both routes) and
+  `JointBandsMixin.total` is the value fold onto the total grid; the sweep here
+  is those two run over the whole total grid with the ratio taken.
+- **[Bivariate-Pushforward-Parity]** (logged `1.0.0a328`, from
+  `dev/plan-bivariate-punchup.md`) — unify the two `pushforward` signatures.
+  The in-core container auto-sizes its output grid (`bs` optional); the massive
+  container requires an explicit `bs` because auto-sizing needs a min/max
+  pre-sweep over the on-disk density before scattering, so parity means either
+  paying that sweep or adding a refusal path. Accepted as an understandable
+  residual difference for now; the shared probability surface (`marginal` /
+  `conditional` / `total` / `slice`) is already one implementation on
+  `JointBandsMixin`. Plot-surface parity (`contour` vs `plot` / `explore`)
+  rides along here too.
 - **[Massive-Kappa-Second-Sweep]** (from `[PnL-Punchups-01]`, `1.0.0a134`) — bring
   the kappa scenario percentiles to the massive one-sweep P&L route.
   Conditioning needs the joint per atom *and* the grand-result quantiles before

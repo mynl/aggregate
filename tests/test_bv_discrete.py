@@ -203,3 +203,38 @@ def test_dbvsev_unnormalised_renormalises(caplog):
 ])
 def test_lattice_bs(xs, expected):
     assert np.isclose(_lattice_bs(xs), expected)
+
+
+# ----------------------------------------------------------------------
+# [Bivariate-Punchup] independent pair: accessors match hand arithmetic
+# ----------------------------------------------------------------------
+
+# One claim always; S = outer([.5 .3 .2], [.6 .3 .1]) on the shared lattice
+# [0 1 2] x [0 1 2], so the joint aggregate IS the severity matrix and every
+# accessor has a closed form. Mirrored in decl-testers.agg (DBVSEV block).
+INDEP = ('bv DBVIndep dfreq [1] dbvsev [0 1 2] [0 1 2] '
+         '[[.30 .15 .05] [.18 .09 .03] [.12 .06 .02]]')
+
+
+def test_dbvsev_independent_pair_hand_arithmetic():
+    mv = build(INDEP)
+    px = np.array([.5, .3, .2])
+    py = np.array([.6, .3, .1])
+    # marginals (the dyadic grid pads with zeros past the support)
+    np.testing.assert_allclose(mv.marginal(0).p[:3], px, atol=1e-12)
+    np.testing.assert_allclose(mv.marginal(1).p[:3], py, atol=1e-12)
+    assert mv.marginal(0).p[3:].sum() == 0
+    # independence: the conditional given X = 1 is the Y marginal
+    np.testing.assert_allclose(mv.conditional('x', 1).p[:3], py, atol=1e-12)
+    # the total is the convolution
+    t = mv.total
+    np.testing.assert_allclose(t.p[:5], np.convolve(px, py), atol=1e-12)
+    assert t.p[5:].sum() == 0
+    np.testing.assert_allclose(t.x[:5], np.arange(5.0))
+    # law of X given X + Y = 2: [.05 .09 .12] / .26, and its report=1 mirror
+    d0 = mv.conditional('x+y', 2)
+    np.testing.assert_allclose(d0.p[:3], np.array([.05, .09, .12]) / .26,
+                               atol=1e-12)
+    d1 = mv.conditional('x+y', 2, report=1)
+    np.testing.assert_allclose(d1.p[:3], np.array([.12, .09, .05]) / .26,
+                               atol=1e-12)

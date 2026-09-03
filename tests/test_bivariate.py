@@ -815,3 +815,114 @@ def test_clash_roundtrips_through_unparser():
     assert text.startswith('clash Cat 8 5 2 claims ')
     kind2, name2, spec2 = uw.parser.parse(text)
     assert spec_to_decl(spec2, kind2, name2) == text
+
+
+# ----------------------------------------------------------------------
+# [Bivariate-Punchup] probability accessors: marginal / conditional / total
+# ----------------------------------------------------------------------
+
+def test_mv_marginal_accessor_reproduces_standalone():
+    """``marginal(i)`` matches the thinned standalone compound's quantiles.
+
+    The thinned standalone of axis 0 is compound Poisson with mean
+    ``25 * 0.7`` and the same lognormal severity; built at the joint's own
+    grid, its quantiles agree to grid tolerance (the joint marginal IS that
+    compound up to the rebucketing scatter).
+    """
+    mv = _mv()
+    g0 = mv.marginal(0)
+    stand = build('agg Athin 17.5 claims sev lognorm 40 cv 1.2 poisson',
+                  bs=mv.bs[0], log2=int(np.log2(len(mv.axis_xs[0]))))
+    for p in (0.5, 0.9, 0.99):
+        assert abs(g0.q(p) - stand.q(p)) <= 2 * mv.bs[0]
+    # spelling parity: index, alias and (case-insensitive) name resolve alike
+    assert np.allclose(mv.marginal('x').p, g0.p)
+    assert np.allclose(mv.marginal('a').p, g0.p)
+
+
+def test_mv_conditional_axis_agrees_with_slice():
+    """``conditional('x', v)`` is the container ``slice(x=v)``; 'y' the transpose."""
+    mv = _mv()
+    v = mv.marginal(0).q(0.6)
+    c = mv.conditional('x', v)
+    s = mv.bivariate.slice(x=v)
+    np.testing.assert_allclose(c.p, s.p)
+    np.testing.assert_allclose(c.x, s.x)
+    w = mv.marginal(1).q(0.6)
+    np.testing.assert_allclose(mv.conditional('y', w).p,
+                               mv.bivariate.slice(y=w).p)
+    # the reported axis is determined; a contradictory report= raises
+    with pytest.raises(ValueError, match='contradicts'):
+        mv.conditional('x', v, report=0)
+
+
+def test_mv_conditional_diagonal_affine_mirror():
+    """``conditional('x+y', s, report=1)`` is the affine mirror of ``report=0``.
+
+    On the equal-``bs`` netceded lattice the band is one exact anti-diagonal:
+    the two readings carry the same masses (at ``y = s - x``), so the means
+    add to the conditioning total and the mass multisets coincide.
+    """
+    mv = build(f'netceded {NC_PROG}')
+    assert mv.bs[0] == mv.bs[1]
+    s = mv.total.q(0.9)
+    d0 = mv.conditional('x+y', s)
+    d1 = mv.conditional('x+y', s, report=1)
+    assert np.isclose(d0.p.sum(), 1.0)
+    assert np.isclose(d1.p.sum(), 1.0)
+    assert np.isclose(d0.mean() + d1.mean(), s, atol=mv.bs[0])
+    np.testing.assert_allclose(np.sort(d0.p[d0.p > 0]),
+                               np.sort(d1.p[d1.p > 0]))
+
+
+def test_mv_conditional_difference_supported():
+    """``conditional('x-y', v)`` returns a normalized law (signed event ok)."""
+    mv = _mv()
+    d = mv.conditional('x-y', 0.0)
+    assert np.isclose(d.p.sum(), 1.0)
+    # support lies inside axis 0's grid
+    assert d.x[0] >= mv.axis_xs[0][0] and d.x[-1] <= mv.axis_xs[0][-1]
+
+
+def test_mv_total_agrees_with_mixed_moments():
+    """Equal and unequal ``bs``: ``.total`` mean / SD match the mixed moments.
+
+    The moments come straight off ``E[X^i Y^j]`` (no grid), the distribution
+    off the fold; linear scattering preserves the mean exactly and the SD to
+    grid tolerance.
+    """
+    for mv in (_mv(),                       # copula mode, unequal bs allowed
+               build(f'netceded {NC_PROG}')):   # equal bs, exact fold
+        t = mv.total
+        m, sd, _ = mv._total_agg_empirical()
+        assert np.isclose(t.mean(), m, rtol=1e-8)
+        t_sd = float(np.sqrt((t.x ** 2 * t.p).sum() - t.mean() ** 2))
+        assert np.isclose(t_sd, sd, rtol=1e-6)
+    # and the cache is a cache
+    assert mv.total is mv.total
+
+
+def test_netceded_total_matches_gross_aggregate():
+    """netceded ``.total`` is the gross aggregate (ceded + net per occurrence)."""
+    a = build(NC_PROG, bs=1, log2=16)
+    mv = a.occ_bivariate()
+    t = mv.total
+    gross = a._reins_view_density('gross')
+    from aggregate._grid_distribution import GridDistribution
+    g = GridDistribution(np.asarray(gross.index, dtype=float),
+                         gross.to_numpy(), bs=a.bs)
+    assert np.isclose(t.mean(), g.mean(), rtol=2e-3)
+    for p in (0.5, 0.9, 0.99):
+        assert abs(t.q(p) - g.q(p)) <= 2 * max(mv.bs[0], a.bs)
+
+
+def test_netceded_answers_all_new_accessors():
+    """The netceded views roll through: every new accessor answers."""
+    mv = build(f'netceded {NC_PROG}')
+    gn = mv.marginal('net')
+    gc = mv.marginal('ceded')
+    assert gn.name == 'Net' and gc.name == 'Ceded'
+    assert np.isclose(gn.p.sum(), 1.0, atol=1e-6)
+    v = gn.q(0.5)
+    assert np.isclose(mv.conditional('x', v).p.sum(), 1.0)
+    assert np.isclose(mv.conditional('x+y', mv.total.q(0.5)).p.sum(), 1.0)

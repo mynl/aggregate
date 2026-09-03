@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a330
+
+**[Stats-Frame-Parallel] `BivariateAggregate.stats_df` becomes the Portfolio-parallel moment store.** Rows are Portfolio's `(component, measure)` MultiIndex (a `meta` block, then `freq` / `sev` / `agg` each with `ex1`..`ex3`, `mean`, `cv`, `skew`); columns are one per marginal (theoretical moments), then `independent` (the moments X + Y would have were the axes independent, the dependence benchmark) and `total` (the realized dependent total from the joint mixed moments; in netceded mode it matches gross theory and inherits the gross meta terms, and a declared el / premium / lr exposure fills the meta rows in copula mode). Portfolio's `empirical` / `error` columns are omitted (they would duplicate `validation_df`). Breaking for readers of the old `(basis, stat)` frame: the theoretical against empirical comparison it carried is `validation_df`'s job since `1.0.0a329`. Closes `dev/done/plan-bivariate-punchup.md` (three bumps, `a328` to `a330`).
+
 ## 1.0.0a329
 
 **[Summary-Validation-Swap] the bivariate frames take their first-class names: `summary_df` is the at-a-glance headline, `validation_df` the moment audit, and the gate table goes private.** `BivariateAggregate.summary_df` is now `Mean | SD | CV | Skew | P01 | Median | P99` over the two marginals (by resolved label) and the realized dependent `total`, matching `Aggregate` and `Portfolio`; the old audit body (Freq / Sev / Agg blocks, eight columns) moved verbatim to `validation_df`; the old check table (`Est | Ref | Err | Gate | Pass`) became the private `_gate_checks()`, still feeding `info`, `validation_description` and `validation_explanation` unchanged, and the `validation.insurer` exhibit now serves the moment audit with gate-derived row emphasis. `qd(bv)` prints the new headline frame. `[Signed-Spread-Fix]` rides along: `_signed()` now asks each component (an `ssev` or negative-atom `dsev` component flips the audit to SD columns, as does a signed netceded source), where it previously saw only `pnl` affines.

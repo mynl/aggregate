@@ -102,13 +102,14 @@ def test_dbvsev_independence_matches_copula_independent():
 
 def test_dbvsev_marginal_reproduction_exact():
     mv = build(DENSE)
-    # theoretical == empirical to FFT tolerance on every marginal stat
+    # theory (stats_df) == realized marginal moments to FFT tolerance: the
+    # unit marginals ARE the row / col sums of the given severity matrix
     stats = mv.stats_df
-    for unit in mv.unit_names:
-        th = stats[unit].xs('theoretical')
-        em = stats[unit].xs('empirical')
-        assert np.allclose(th.to_numpy(dtype=float),
-                           em.to_numpy(dtype=float), rtol=1e-6, atol=1e-9)
+    for i, unit in enumerate(mv.unit_names):
+        gd = mv.marginal(i)
+        me = float(gd.x @ gd.p)
+        assert me == pytest.approx(
+            float(stats.loc[('agg', 'mean'), unit]), rel=1e-6)
     # the validation frame's per-component Agg errors are ~0
     vdf = mv.validation_df
     for unit in mv.unit_names:

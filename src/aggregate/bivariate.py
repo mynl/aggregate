@@ -63,7 +63,7 @@ from .constants import (DefectiveDistributionWarning, info_row, INFO_NA,
                         warn_once)
 from .config import get_settings
 from ._validation import DEFICIT_MATERIALITY
-from .moments import (MomentAggregator, xsden_to_mwrangler, xsden_to_meancvskew,
+from .moments import (MomentAggregator, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import round_bucket, balanced_window
 from ._grid_distribution import GridDistribution
@@ -1307,6 +1307,24 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._sev_moms = [None, None]      # per-axis per-event severity raw moms
         self._marg_theory = [None, None]   # per-axis (mean, sd, skew)
         self._total = None                 # cached .total GridDistribution
+        # declared exposure terms for the stats_df meta rows
+        # ([Stats-Frame-Parallel]); the count itself is resolved by
+        # _resolve_en. lr is derived so el = prem * lr foots by construction.
+        self._exp_el = (float(np.sum(np.asarray(exp_el, dtype=float)))
+                        if exp_el is not None else np.nan)
+        if exp_premium is not None:
+            self._exp_prem = float(np.sum(np.asarray(exp_premium,
+                                                     dtype=float)))
+            if not np.isfinite(self._exp_el) and exp_lr is not None:
+                self._exp_el = float(np.sum(
+                    np.asarray(exp_premium, dtype=float)
+                    * np.asarray(exp_lr, dtype=float)))
+        else:
+            self._exp_prem = np.nan
+        self._exp_lr = (self._exp_el / self._exp_prem
+                        if np.isfinite(self._exp_el)
+                        and np.isfinite(self._exp_prem)
+                        and self._exp_prem > 0 else np.nan)
         self.figure = None                 # set by plot()
 
         if mode == 'netceded':
@@ -2825,43 +2843,120 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         out.attrs['rho_gap'] = rho_joint - rho_fine
         return out
 
+    @staticmethod
+    def _mcs_to_raw(m, sd, skew):
+        """Raw moments ``(ex1, ex2, ex3)`` from ``(mean, sd, skew)``.
+
+        The inverse of ``static_moments_to_mcvsk``: ``ex2 = sd^2 + m^2`` and
+        ``ex3 = mu3 + 3 m ex2 - 2 m^3`` with ``mu3 = skew sd^3``. ``nan``
+        inputs propagate, so a partial theory fills a partial column.
+        """
+        ex2 = sd * sd + m * m
+        ex3 = skew * sd ** 3 + 3.0 * m * ex2 - 2.0 * m ** 3
+        return float(m), float(ex2), float(ex3)
+
     @property
     def stats_df(self):
-        """Per-component marginal moments (theoretical vs empirical).
+        """Canonical moment store, parallel to :attr:`Portfolio.stats_df`.
 
-        Returns
-        -------
-        DataFrame
-            Columns: the two component names. Rows: ``mean`` / ``sd`` / ``cv`` /
-            ``skew`` per component on a ``theoretical`` and an ``empirical``
-            basis (the realised marginal).
+        Restructured by ``[Bivariate-Punchup]`` (``1.0.0a330``): until then
+        this frame was theoretical against empirical per marginal, a
+        comparison that now lives in :attr:`validation_df`.
+
+        **Rows** are Portfolio's ``(component, measure)`` MultiIndex: a
+        ``meta`` block (limit, attachment, el, prem, lr, ...), then ``freq`` /
+        ``sev`` / ``agg`` blocks each carrying the raw moments ``ex1``..``ex3``
+        and ``mean`` / ``cv`` / ``skew``. Cells the mode does not carry hold
+        ``NaN``, exactly as Portfolio leaves non-applicable cells.
+
+        **Columns**: one per marginal (that component's theoretical moments,
+        the analog of Portfolio copying each unit's ``stats_df['mixed']``),
+        then ``independent``, then ``total``:
+
+        * ``independent``: the moments ``X + Y`` would have were the axes
+          independent, from the marginal theory (means, variances and third
+          central moments add). Purely analytic, and the natural benchmark:
+          ``total`` against ``independent`` reads off the dependence lift,
+          which is the point of building a joint.
+        * ``total``: the realized dependent total, from the joint mixed
+          moments (:meth:`_total_agg_raw_moments`; no ``X + Y`` grid is
+          formed). In netceded mode this column has an exact analytic
+          reference, the gross aggregate.
 
         Notes
         -----
-        Theoretical moments are the analytic loss-marginal moments, P&L-adjusted
-        for a ``pnl`` axis (``mean -> shift - E[A]``, ``sd`` unchanged,
-        ``skew -> -skew``). Empirical moments come from the realised marginal
-        density on the (possibly P&L-relabelled) axis grid. The joint dependence
-        (cov / corr / tau) lives in :attr:`dependency_df`; the ``total`` aggregate
-        and the validation errors are in :attr:`validation_df`.
+        The ``freq`` block repeats the **shared** outer frequency in every
+        column: by construction each marginal is that count compounded with
+        its own per-event severity, so the count is one fact, not four. The
+        ``sev`` blocks are per-event: each marginal's own severity, the
+        independent sum (cross moments factorize), and the dependent total
+        off the joint per-claim matrix (:meth:`_total_sev_raw_moms`). The
+        ``agg`` marginal columns carry the displayed theory
+        (:meth:`_axis_theory`, any ``pnl`` affine applied), converted to raw
+        moments by :meth:`_mcs_to_raw` so one column reports one variable on
+        one basis. Portfolio's ``empirical`` / ``error`` columns are omitted
+        deliberately: they would duplicate :attr:`validation_df`.
         """
+        from ._portfolio import _PORT_STATS_ROW_INDEX
         self._require_density()
-        m0, m1 = self.marginals
-        cols = {}
-        for i, (name, dens) in enumerate(zip(self.unit_names, (m0, m1))):
-            mt, sdt, skt = self._axis_theory(i)
-            cvt = sdt / mt if mt else np.nan
-            mw = xsden_to_mwrangler(self.axis_xs[i], dens)
-            me, cve, ske = mw.mcvsk
-            sde = cve * me if np.isfinite(cve) else np.nan
-            cols[name] = pd.Series({
-                ('theoretical', 'mean'): mt, ('theoretical', 'sd'): sdt,
-                ('theoretical', 'cv'): cvt, ('theoretical', 'skew'): skt,
-                ('empirical', 'mean'): me, ('empirical', 'sd'): sde,
-                ('empirical', 'cv'): cve, ('empirical', 'skew'): ske,
-            })
-        df = pd.DataFrame(cols)
-        df.index = pd.MultiIndex.from_tuples(df.index, names=['basis', 'stat'])
+        cols = list(self.unit_names) + ['independent', 'total']
+        df = pd.DataFrame(np.nan, index=_PORT_STATS_ROW_INDEX,
+                          columns=cols, dtype=float)
+
+        def put(col, comp, raw):
+            m1, m2, m3 = raw
+            m, cv, sk = MomentAggregator.static_moments_to_mcvsk(m1, m2, m3)
+            df.loc[(comp, 'ex1'), col] = m1
+            df.loc[(comp, 'ex2'), col] = m2
+            df.loc[(comp, 'ex3'), col] = m3
+            df.loc[(comp, 'mean'), col] = m
+            df.loc[(comp, 'cv'), col] = cv
+            df.loc[(comp, 'skew'), col] = sk
+
+        # the shared outer count is one fact, repeated per column
+        fmoms = self._shared_freq_moms()
+        for col in cols:
+            put(col, 'freq', fmoms)
+
+        # per-event severity: each marginal, the independent sum, the total
+        svs = [self._sev_raw_moms(i) for i in range(2)]
+        for i, name in enumerate(self.unit_names):
+            if svs[i] is not None:
+                put(name, 'sev', svs[i])
+        if svs[0] is not None and svs[1] is not None:
+            (a1, a2, a3), (b1, b2, b3) = svs
+            put('independent', 'sev', (a1 + b1,
+                                       a2 + 2.0 * a1 * b1 + b2,
+                                       a3 + 3.0 * a2 * b1
+                                       + 3.0 * a1 * b2 + b3))
+        tsev = self._total_sev_raw_moms()
+        if tsev is not None:
+            put('total', 'sev', tsev)
+
+        # aggregate: displayed marginal theory, the independent-sum
+        # benchmark (central moments add), and the realized dependent total
+        theories = [self._axis_theory(i) for i in range(2)]
+        for i, name in enumerate(self.unit_names):
+            put(name, 'agg', self._mcs_to_raw(*theories[i]))
+        (m0, sd0, sk0), (m1_, sd1, sk1) = theories
+        var = sd0 * sd0 + sd1 * sd1
+        sd = float(np.sqrt(var)) if var > 0 else np.nan
+        mu3 = sk0 * sd0 ** 3 + sk1 * sd1 ** 3
+        put('independent', 'agg', self._mcs_to_raw(
+            m0 + m1_, sd, mu3 / sd ** 3 if sd and np.isfinite(sd) else np.nan))
+        put('total', 'agg', self._total_agg_raw_moments())
+
+        # meta: the terms the mode carries; NaN otherwise
+        if self.mode == 'netceded':
+            gross = self._nc_agg.stats_df['mixed']
+            for key in ('limit', 'attachment', 'el', 'prem', 'lr'):
+                if ('meta', key) in gross.index:
+                    df.loc[('meta', key), 'total'] = float(gross[('meta',
+                                                                  key)])
+        else:
+            df.loc[('meta', 'el'), 'total'] = self._exp_el
+            df.loc[('meta', 'prem'), 'total'] = self._exp_prem
+            df.loc[('meta', 'lr'), 'total'] = self._exp_lr
         return df
 
     def _axis_theory(self, i):
@@ -3110,35 +3205,46 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             return self._nc_agg.frequency.freq_moms(float(self._nc_agg.n))
         return self.frequency.freq_moms(self.en)
 
-    def _sev_mcvsk(self, i):
-        """Per-event severity ``(mean, cv, skew)`` for component ``i``.
+    def _sev_raw_moms(self, i):
+        """Per-event severity raw moments ``(s1, s2, s3)`` for component ``i``.
 
-        Uses the analytic per-event severity raw moments (copula mode); falls
-        back to the per-event severity marginal of the joint severity matrix
-        ``self._S`` (e.g. ``netceded``, where the net / ceded per-claim severity
-        is read off the comonotone scatter).
+        The analytic per-event severity raw moments (copula mode); falls back
+        to the per-event severity marginal of the joint severity matrix
+        ``self._S`` (e.g. ``netceded``, where the net / ceded per-claim
+        severity is read off the comonotone scatter). ``None`` when neither
+        source is available.
         """
         sm = self._sev_moms[i] if self._sev_moms else None
         if sm is not None:
-            return MomentAggregator.static_moments_to_mcvsk(*sm)
+            return tuple(float(v) for v in sm)
         if self._S is not None and self._sev_xs[i] is not None:
             x = np.asarray(self._sev_xs[i], dtype=float)
             g = _dense_1d(self._S.sum(axis=1 - i))
-            return MomentAggregator.static_moments_to_mcvsk(
-                x @ g, (x ** 2) @ g, (x ** 3) @ g)
-        return np.nan, np.nan, np.nan
+            return (float(x @ g), float((x ** 2) @ g), float((x ** 3) @ g))
+        return None
 
-    def _total_sev_mcvsk(self):
-        """``(mean, cv, skew)`` of the total per-event severity ``S0 + S1``.
+    def _sev_mcvsk(self, i):
+        """Per-event severity ``(mean, cv, skew)`` for component ``i``.
 
-        From the modeled joint per-claim severity ``self._S`` (exact). The cross
-        moments ``E[S0^p S1^q]`` are formed as ``x0**p @ S @ x1**q`` so no dense
-        ``n x n`` grid of pairwise sums is materialised. Returns ``nan`` when the
-        severity matrix is unavailable.
+        The mcvsk view of :meth:`_sev_raw_moms`; ``nan`` triple when the raw
+        moments are unavailable.
+        """
+        sm = self._sev_raw_moms(i)
+        if sm is None:
+            return np.nan, np.nan, np.nan
+        return MomentAggregator.static_moments_to_mcvsk(*sm)
+
+    def _total_sev_raw_moms(self):
+        """Raw moments ``(m1, m2, m3)`` of the total per-event severity ``S0 + S1``.
+
+        From the modeled joint per-claim severity ``self._S`` (exact,
+        dependence included). The cross moments ``E[S0^p S1^q]`` are formed as
+        ``x0**p @ S @ x1**q`` so no dense ``n x n`` grid of pairwise sums is
+        materialised. ``None`` when the severity matrix is unavailable.
         """
         S = self._S
         if S is None or self._sev_xs[0] is None:
-            return np.nan, np.nan, np.nan
+            return None
         x0 = np.asarray(self._sev_xs[0], dtype=float)
         x1 = np.asarray(self._sev_xs[1], dtype=float)
         s0, s1 = _dense_1d(S.sum(axis=1)), _dense_1d(S.sum(axis=0))
@@ -3149,14 +3255,25 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         m1 = eA + eB
         m2 = eA2 + 2 * eAB + eB2
         m3 = eA3 + 3 * eA2B + 3 * eAB2 + eB3
-        return MomentAggregator.static_moments_to_mcvsk(m1, m2, m3)
+        return float(m1), float(m2), float(m3)
 
-    def _total_agg_empirical(self):
-        """Realised ``(mean, sd, skew)`` of the total ``X + Y`` aggregate.
+    def _total_sev_mcvsk(self):
+        """``(mean, cv, skew)`` of the total per-event severity ``S0 + S1``.
+
+        The mcvsk view of :meth:`_total_sev_raw_moms`; ``nan`` triple when the
+        severity matrix is unavailable.
+        """
+        m = self._total_sev_raw_moms()
+        if m is None:
+            return np.nan, np.nan, np.nan
+        return MomentAggregator.static_moments_to_mcvsk(*m)
+
+    def _total_agg_raw_moments(self):
+        """Realized raw moments ``(m1, m2, m3)`` of the total ``X + Y`` aggregate.
 
         From the joint mixed moments ``E[X^i Y^j]`` (:meth:`moments`), so the
-        ``X + Y`` grid is never formed -- the central moments of the sum follow
-        from the marginal and cross raw moments.
+        ``X + Y`` grid is never formed: the raw moments of the sum follow from
+        the marginal and cross raw moments by the binomial expansion.
         """
         mom = self.moments(3).to_numpy()
         tot = mom[0, 0]
@@ -3167,6 +3284,14 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         m1 = eX + eY
         m2 = eX2 + 2 * eXY + eY2
         m3 = eX3 + 3 * eX2Y + 3 * eXY2 + eY3
+        return float(m1), float(m2), float(m3)
+
+    def _total_agg_empirical(self):
+        """Realised ``(mean, sd, skew)`` of the total ``X + Y`` aggregate.
+
+        The central-moment view of :meth:`_total_agg_raw_moments`.
+        """
+        m1, m2, m3 = self._total_agg_raw_moments()
         var = m2 - m1 * m1
         sd = float(np.sqrt(var)) if var > 0 else np.nan
         if sd and np.isfinite(sd) and sd > 0:

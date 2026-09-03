@@ -32217,9 +32217,527 @@
     {
      "cells": [
       {
-       "rowspan": 4,
-       "text": "theoretical"
+       "rowspan": 8,
+       "text": "meta"
       },
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      },
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      },
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      },
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      },
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      },
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      },
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      },
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      },
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      },
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      },
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      },
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      },
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      {
+       "raw": 15.0,
+       "text": "15"
+      },
+      {
+       "raw": 1.6,
+       "text": "1.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 250.0,
+       "text": "250"
+      },
+      {
+       "raw": 3.2,
+       "text": "3.2"
+      },
+      {
+       "raw": 301.2,
+       "text": "301.2"
+      },
+      {
+       "raw": 305.2,
+       "text": "305.2"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 4500.0,
+       "text": "4,500"
+      },
+      {
+       "raw": 7.6,
+       "text": "7.6"
+      },
+      {
+       "raw": 5851.6,
+       "text": "5,851.6"
+      },
+      {
+       "raw": 6055.6,
+       "text": "6,055.6"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 15.0,
+       "text": "15"
+      },
+      {
+       "raw": 1.6,
+       "text": "1.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.3333333333333333,
+       "text": "0.3333333"
+      },
+      {
+       "raw": 0.4999999999999999,
+       "text": "0.5"
+      },
+      {
+       "raw": 0.3050358771366782,
+       "text": "0.3050359"
+      },
+      {
+       "raw": 0.3279676527425586,
+       "text": "0.3279677"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.8437499999999978,
+       "text": "0.84375"
+      },
+      {
+       "raw": 0.0033274130498479274,
+       "text": "0.003327413"
+      },
+      {
+       "raw": 0.03242279395239999,
+       "text": "0.03242279"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      {
+       "raw": 19.499999999999996,
+       "text": "19.5"
+      },
+      {
+       "raw": 2.0799999999999996,
+       "text": "2.08"
+      },
+      {
+       "raw": 21.579999999999995,
+       "text": "21.58"
+      },
+      {
+       "raw": 21.58,
+       "text": "21.58"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 460.0,
+       "text": "460"
+      },
+      {
+       "raw": 5.696,
+       "text": "5.696"
+      },
+      {
+       "raw": 546.8159999999998,
+       "text": "546.816"
+      },
+      {
+       "raw": 562.096,
+       "text": "562.096"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 12600.0,
+       "text": "12,600"
+      },
+      {
+       "raw": 19.096000000000007,
+       "text": "19.096"
+      },
+      {
+       "raw": 15822.711999999992,
+       "text": "15,822.71"
+      },
+      {
+       "raw": 16991.656000000003,
+       "text": "16,991.66"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
       "mean",
       {
        "raw": 19.499999999999996,
@@ -32228,20 +32746,14 @@
       {
        "raw": 2.0799999999999996,
        "text": "2.08"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "sd",
-      {
-       "raw": 8.930285549745882,
-       "text": "8.930286"
       },
       {
-       "raw": 1.1702991070662239,
-       "text": "1.170299"
+       "raw": 21.579999999999995,
+       "text": "21.58"
+      },
+      {
+       "raw": 21.58,
+       "text": "21.58"
       }
      ]
     },
@@ -32256,6 +32768,14 @@
       {
        "raw": 0.5626438014741462,
        "text": "0.5626438"
+      },
+      {
+       "raw": 0.4173606113786473,
+       "text": "0.4173606"
+      },
+      {
+       "raw": 0.454973577241179,
+       "text": "0.4549736"
       }
      ]
     },
@@ -32264,77 +32784,25 @@
      "cells": [
       "skew",
       {
-       "raw": 0.7297909280734887,
+       "raw": 0.7297909280734912,
        "text": "0.7297909"
       },
       {
-       "raw": 0.9675216470639391,
+       "raw": 0.9675216470639413,
        "text": "0.9675216"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 4,
-       "text": "empirical"
-      },
-      "mean",
-      {
-       "raw": 19.5,
-       "text": "19.5"
       },
       {
-       "raw": 2.08,
-       "text": "2.08"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "sd",
-      {
-       "raw": 8.930285549745875,
-       "text": "8.930286"
+       "raw": 0.7135093643738498,
+       "text": "0.7135094"
       },
       {
-       "raw": 1.1702991070662232,
-       "text": "1.170299"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "cv",
-      {
-       "raw": 0.4579633615254295,
-       "text": "0.4579634"
-      },
-      {
-       "raw": 0.5626438014741457,
-       "text": "0.5626438"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "skew",
-      {
-       "raw": 0.729790928073493,
-       "text": "0.7297909"
-      },
-      {
-       "raw": 0.9675216470639386,
-       "text": "0.9675216"
+       "raw": 0.7406551790088546,
+       "text": "0.7406552"
       }
      ]
     }
    ],
-   "caption": "Theoretical against realized moments, one column per axis.",
+   "caption": "The canonical moment store: shared frequency, per-event severity and aggregate moments for each marginal, the independent-sum benchmark, and the realized dependent total. Total against independent reads off the dependence lift.",
    "columns": [
     {
      "align": "l",
@@ -32347,7 +32815,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "basis"
+      "component"
      ],
      "role": "stub",
      "wrap": true
@@ -32363,7 +32831,7 @@
      "key": "c1",
      "level": 1,
      "name": [
-      "stat"
+      "measure"
      ],
      "role": "stub",
      "wrap": true
@@ -32395,21 +32863,55 @@
       "Y"
      ],
      "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "total"
+     ],
+     "raw": true
     }
    ],
    "head": [
     [
      {
-      "text": "basis"
+      "text": "component"
      },
      {
-      "text": "stat"
+      "text": "measure"
      },
      {
       "text": "X"
      },
      {
       "text": "Y"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "total"
      }
     ]
    ],
@@ -39674,9 +40176,527 @@
     {
      "cells": [
       {
-       "rowspan": 4,
-       "text": "theoretical"
+       "rowspan": 8,
+       "text": "meta"
       },
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      },
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      },
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      },
+      {
+       "raw": 1.9,
+       "text": "1.9"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      },
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      },
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      },
+      {
+       "raw": 3.0999999999999996,
+       "text": "3.1"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      },
+      {
+       "raw": 1.2999999999999998,
+       "text": "1.3"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      },
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      },
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      },
+      {
+       "raw": 0.3525058226889112,
+       "text": "0.3525058"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      },
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      },
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      },
+      {
+       "raw": 0.8728715609439632,
+       "text": "0.8728716"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      {
+       "raw": 15.0,
+       "text": "15"
+      },
+      {
+       "raw": 1.6,
+       "text": "1.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 250.0,
+       "text": "250"
+      },
+      {
+       "raw": 3.2,
+       "text": "3.2"
+      },
+      {
+       "raw": 301.2,
+       "text": "301.2"
+      },
+      {
+       "raw": 305.2,
+       "text": "305.2"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 4500.0,
+       "text": "4,500"
+      },
+      {
+       "raw": 7.6,
+       "text": "7.6"
+      },
+      {
+       "raw": 5851.6,
+       "text": "5,851.6"
+      },
+      {
+       "raw": 6055.6,
+       "text": "6,055.6"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 15.0,
+       "text": "15"
+      },
+      {
+       "raw": 1.6,
+       "text": "1.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      },
+      {
+       "raw": 16.6,
+       "text": "16.6"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.3333333333333333,
+       "text": "0.3333333"
+      },
+      {
+       "raw": 0.4999999999999999,
+       "text": "0.5"
+      },
+      {
+       "raw": 0.3050358771366782,
+       "text": "0.3050359"
+      },
+      {
+       "raw": 0.3279676527425586,
+       "text": "0.3279677"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.8437499999999978,
+       "text": "0.84375"
+      },
+      {
+       "raw": 0.0033274130498479274,
+       "text": "0.003327413"
+      },
+      {
+       "raw": 0.03242279395239999,
+       "text": "0.03242279"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      {
+       "raw": 19.499999999999996,
+       "text": "19.5"
+      },
+      {
+       "raw": 2.0799999999999996,
+       "text": "2.08"
+      },
+      {
+       "raw": 21.579999999999995,
+       "text": "21.58"
+      },
+      {
+       "raw": 21.58,
+       "text": "21.58"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 460.0,
+       "text": "460"
+      },
+      {
+       "raw": 5.696,
+       "text": "5.696"
+      },
+      {
+       "raw": 546.8159999999998,
+       "text": "546.816"
+      },
+      {
+       "raw": 562.096,
+       "text": "562.096"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 12600.0,
+       "text": "12,600"
+      },
+      {
+       "raw": 19.096000000000007,
+       "text": "19.096"
+      },
+      {
+       "raw": 15822.711999999992,
+       "text": "15,822.71"
+      },
+      {
+       "raw": 16991.656000000003,
+       "text": "16,991.66"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
       "mean",
       {
        "raw": 19.499999999999996,
@@ -39685,20 +40705,14 @@
       {
        "raw": 2.0799999999999996,
        "text": "2.08"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "sd",
-      {
-       "raw": 8.930285549745882,
-       "text": "8.930286"
       },
       {
-       "raw": 1.1702991070662239,
-       "text": "1.170299"
+       "raw": 21.579999999999995,
+       "text": "21.58"
+      },
+      {
+       "raw": 21.58,
+       "text": "21.58"
       }
      ]
     },
@@ -39713,6 +40727,14 @@
       {
        "raw": 0.5626438014741462,
        "text": "0.5626438"
+      },
+      {
+       "raw": 0.4173606113786473,
+       "text": "0.4173606"
+      },
+      {
+       "raw": 0.454973577241179,
+       "text": "0.4549736"
       }
      ]
     },
@@ -39721,77 +40743,25 @@
      "cells": [
       "skew",
       {
-       "raw": 0.7297909280734887,
+       "raw": 0.7297909280734912,
        "text": "0.7297909"
       },
       {
-       "raw": 0.9675216470639391,
+       "raw": 0.9675216470639413,
        "text": "0.9675216"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      {
-       "rowspan": 4,
-       "text": "empirical"
-      },
-      "mean",
-      {
-       "raw": 19.5,
-       "text": "19.5"
       },
       {
-       "raw": 2.08,
-       "text": "2.08"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "sd",
-      {
-       "raw": 8.930285549745875,
-       "text": "8.930286"
+       "raw": 0.7135093643738498,
+       "text": "0.7135094"
       },
       {
-       "raw": 1.1702991070662232,
-       "text": "1.170299"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "cv",
-      {
-       "raw": 0.4579633615254295,
-       "text": "0.4579634"
-      },
-      {
-       "raw": 0.5626438014741457,
-       "text": "0.5626438"
-      }
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "skew",
-      {
-       "raw": 0.729790928073493,
-       "text": "0.7297909"
-      },
-      {
-       "raw": 0.9675216470639386,
-       "text": "0.9675216"
+       "raw": 0.7406551790088546,
+       "text": "0.7406552"
       }
      ]
     }
    ],
-   "caption": "Theoretical against realized moments, one column per axis.",
+   "caption": "The canonical moment store: shared frequency, per-event severity and aggregate moments for each marginal, the independent-sum benchmark, and the realized dependent total. Total against independent reads off the dependence lift.",
    "columns": [
     {
      "align": "l",
@@ -39804,7 +40774,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "basis"
+      "component"
      ],
      "role": "stub",
      "wrap": true
@@ -39820,7 +40790,7 @@
      "key": "c1",
      "level": 1,
      "name": [
-      "stat"
+      "measure"
      ],
      "role": "stub",
      "wrap": true
@@ -39852,21 +40822,55 @@
       "Y"
      ],
      "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "total"
+     ],
+     "raw": true
     }
    ],
    "head": [
     [
      {
-      "text": "basis"
+      "text": "component"
      },
      {
-      "text": "stat"
+      "text": "measure"
      },
      {
       "text": "X"
      },
      {
       "text": "Y"
+     },
+     {
+      "text": "independent"
+     },
+     {
+      "text": "total"
      }
     ]
    ],

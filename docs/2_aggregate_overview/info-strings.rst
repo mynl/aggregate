@@ -168,7 +168,7 @@ Value enumerations:
   each marginal reproduces its standalone aggregate; the full per-axis errors
   are in :attr:`explain`.
 
-The companion frames mirror the 1-D surfaces as per-axis summaries, since the bivariate measures its grid rather than running the 1-D method ladder: :attr:`explain` (per-axis marginal against standalone mean and cv error), :attr:`bs_window_df` and :attr:`bs_description` (the realized per-axis grid), and :attr:`axis_support_df` and :attr:`tail_description` (per-axis realized support and moments). ``summary_df`` and ``stats_df`` carry the per-component moment block, theoretical against empirical, and the joint dependence footer of correlation and copula tau.
+The companion frames mirror the 1-D surfaces as per-axis summaries, since the bivariate measures its grid rather than running the 1-D method ladder: :attr:`explain` (per-axis marginal against standalone mean and cv error), :attr:`bs_window_df` and :attr:`bs_description` (the realized per-axis grid), and :attr:`axis_support_df` and :attr:`tail_description` (per-axis realized support and moments). ``summary_df`` is the at-a-glance headline (marginals and the realized total), ``validation_df`` the theory against realized moment audit, ``stats_df`` the Portfolio-parallel moment store, and ``dependency_df`` the joint dependence footer of correlation and copula tau.
 
 Severity
 --------

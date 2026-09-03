@@ -243,8 +243,15 @@ def test_mv_reporting_smoke():
     dep = mv.dependency_df                # property: dependence structure
     assert list(dep.index) == ['Sev', 'Agg']
     assert np.isclose(float(dep.loc['Agg', 'corr']), mv.corr)
-    sd = mv.stats_df                      # property: marginal moments only
-    assert set(sd.columns) == {'A', 'B'}   # joint block moved to dependency_df
+    sd = mv.stats_df                      # property: canonical moment store
+    assert list(sd.columns) == ['A', 'B', 'independent', 'total']
+    assert list(sd.index.names) == ['component', 'measure']
+    # the dependent total against the independent benchmark, both exact
+    assert np.isclose(float(sd.loc[('agg', 'mean'), 'independent']),
+                      float(sd.loc[('agg', 'mean'), 'A'])
+                      + float(sd.loc[('agg', 'mean'), 'B']))
+    assert float(sd.loc[('agg', 'cv'), 'total']) > \
+        float(sd.loc[('agg', 'cv'), 'independent'])   # positive dependence
     dd = mv.density_df                    # property: wrapper around density
     assert dd.shape == mv.density.shape
     assert np.isclose(dd.to_numpy().sum(), 1.0, atol=1e-6)
@@ -967,3 +974,25 @@ def test_mv_summary_total_row_reads_the_folded_total():
     assert float(df.loc['total', 'Skew']) == pytest.approx(sk)
     for pc, p in (('P01', 0.01), ('Median', 0.5), ('P99', 0.99)):
         assert float(df.loc['total', pc]) == mv.total.q(p)
+
+
+def test_stats_df_netceded_total_matches_gross_theory():
+    """[Stats-Frame-Parallel] the netceded ``total`` column is gross theory.
+
+    ``ceded + net = gross`` per occurrence, so the realized dependent total
+    equals the gross aggregate; the ``total`` column's agg mean matches the
+    inner aggregate's own theory and the meta rows inherit the gross terms.
+    """
+    a = build(NC_PROG, bs=1, log2=16)
+    mv = a.occ_bivariate()
+    sd = mv.stats_df
+    assert list(sd.columns) == ['Net', 'Ceded', 'independent', 'total']
+    gross = a.stats_df['mixed']
+    assert float(sd.loc[('agg', 'mean'), 'total']) == pytest.approx(
+        float(gross[('agg', 'mean')]), rel=2e-3)
+    assert float(sd.loc[('meta', 'el'), 'total']) == pytest.approx(
+        float(gross[('meta', 'el')]))
+    # the marginal columns add to the total on the mean (exact split)
+    assert float(sd.loc[('agg', 'mean'), 'Net']) \
+        + float(sd.loc[('agg', 'mean'), 'Ceded']) == pytest.approx(
+            float(sd.loc[('agg', 'mean'), 'total']), rel=1e-9)

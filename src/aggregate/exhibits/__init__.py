@@ -182,7 +182,10 @@ register_simple_exhibit(
             'one exists, with the error between them.')
 register_simple_exhibit(
     'stats', 'Statistics', 'stats_df', [BivariateAggregate],
-    caption='Theoretical against realized moments, one column per axis.')
+    caption='The canonical moment store: shared frequency, per-event '
+            'severity and aggregate moments for each marginal, the '
+            'independent-sum benchmark, and the realized dependent total. '
+            'Total against independent reads off the dependence lift.')
 
 # ---- validation ------------------------------------------------------------
 register_simple_exhibit(

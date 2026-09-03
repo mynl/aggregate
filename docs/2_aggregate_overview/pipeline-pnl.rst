@@ -401,7 +401,7 @@ Runtime, every build
 #. Mass and deficit bookkeeping. ``build_netceded_joint`` computes ``deficit = 1 - sum(density)`` and carries it in the joint's ``meta``, the same convention as the 1-D engine's clipped-tail reporting. ``padding=1`` means no FFT wrap-around.
 #. Structural correctness of the dependence. Mass cannot appear off the feasible region: each claim's atom sits exactly on the cession curve, and the one frequency PGF wraps the 2-D severity transform, so the shared claim count and the shared mixing are exact by construction rather than approximated.
 #. :class:`CoarseJointGridWarning`. ``check_joint_grid_adequacy`` fires when a treaty kink region spans fewer than 20 joint buckets, the one error mode the internal bookkeeping cannot see.
-#. Theory-against-realized audit on demand. The returned holder is a :class:`BivariateAggregate`, and its ``summary_df`` is the Portfolio-shaped validation frame, exact moments from ``_netceded_theory`` against realized, with noise-aware ``Err`` columns.
+#. Theory-against-realized audit on demand. The returned holder is a :class:`BivariateAggregate`, and its ``validation_df`` is the Portfolio-shaped audit frame, exact moments from ``_netceded_theory`` against realized, with noise-aware ``Err`` columns.
 
 One line away, any time
 ~~~~~~~~~~~~~~~~~~~~~~~

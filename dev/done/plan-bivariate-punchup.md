@@ -449,3 +449,50 @@ Divergences:
    by key-level comparison, and each was read: `summary` is the 3-row
    headline, `validation` the 7-row audit with the gate-derived emphasis
    caption on the insurer view.
+
+### Phase 3 (`1.0.0a330`): the Portfolio-parallel stats frame
+
+Divergences:
+
+1. **The `freq` block repeats the shared outer frequency in every column.**
+   The plan does not say what the per-marginal frequency rows hold. In the
+   engine's canonical decomposition each marginal is the shared outer count
+   compounded with that component's per-event severity (the per-event zero
+   mass carries the thinning), so the shared count is the honest per-column
+   frequency; a thinned per-component count would be a different
+   decomposition than the one the engine computes with.
+2. **The `sev` blocks are filled for `independent` and `total` too.** The
+   plan defines only the agg-level arithmetic for the two derived columns;
+   the per-event analogues are exact and one line each (cross moments
+   factorize under independence; the dependent per-event total comes off
+   the joint per-claim matrix via the new `_total_sev_raw_moms`), so
+   leaving them NaN would have been a gap rather than a ruling.
+3. **`agg` marginal columns carry the displayed (affine-applied) theory**,
+   `_axis_theory`, converted to raw moments by the new `_mcs_to_raw`, so a
+   `pnl` axis reports one variable on one basis throughout its column. The
+   plan is silent; this matches what the old frame displayed.
+4. **Declared exposure lands on the `total` column.** The DecL exposure
+   clause (`el` / premium / lr) is written at the bivariate level, so the
+   copula-mode meta rows fill `total` and leave the unit columns NaN; new
+   private slots `_exp_el` / `_exp_prem` / `_exp_lr` store the parsed
+   terms (they were consumed by `_resolve_en` and discarded before).
+   Netceded inherits the gross aggregate's meta into `total` likewise.
+5. **Two doc passages updated in lockstep** (`info-strings.rst`,
+   `pipeline-pnl.rst`); the docs build itself is left to the author per
+   the standing rule.
+
+Refactors riding along: `_sev_raw_moms` / `_total_sev_raw_moms` /
+`_total_agg_raw_moments` now carry the raw-moment computations and the
+existing mcvsk methods are views over them; `xsden_to_mwrangler` dropped
+from the imports with the old frame, its only user.
+
+### Closing state
+
+Three bumps, `1.0.0a328` to `1.0.0a330`, one phase each, per the plan's
+commit slicing. The gate at every bump was the full tier 3 suite; its only
+failures are the pre-plan baseline set (eight pricing exhibit snapshots and
+two `library.agg` entry tests), all in the author's uncommitted scope and
+byte-identical before and after each phase. The `RuntimeWarning` gate ran
+at `a328` and `a330`; the one finding is pre-existing and not this plan's
+(`sqrt` of a negative variance reached from the `a327` library entry
+`RenewalDeterministicWait`, `moments.py:500`), reported to the author.

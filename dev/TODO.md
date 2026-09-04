@@ -252,6 +252,11 @@
   decompiler: detect the dense shape and raise pointing at the parser spec.
   A real object-to-DecL decompiler needs a per-key inverse of the constructor's
   defaulting and is a separate, larger question — do not conflate them.
+  `dev/plan-approximate-punchup.md` deferred the same gap as
+  `[Spec-Decompile-Robustness]` (a331); it folds in here rather than becoming a
+  second entry. Since a331 the `approximate` object mode is `build`-born and
+  carries a `program`, so no library path hands a user a program-less object;
+  the guard remains the fix for a user's own `Aggregate(**kwargs).spec`.
 - **[Windowed-Cdf-Nan]**, **needs the author's ruling**: diagnosed a289 and
   deliberately left unfixed. On a windowed grid `cdf` returns `nan` below the
   window instead of 0: on the `[Windowed-Grid-Breaks-Calibration]` repro,

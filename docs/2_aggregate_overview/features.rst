@@ -685,10 +685,13 @@ Number literals: ``_`` digit separators (a52)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 For very-high-frequency books the exact convolution is overkill. The
-``approximate sgamma | slognorm | exact`` directive (placed **after** the
-frequency clause) replaces the frequency by severity convolution with a single
-shifted gamma or shifted lognormal fitted to the aggregate's first three moments,
-matching mean, CV and skew to about 7 significant figures. There is no special
+``approximate norm | lognorm | gamma | sgamma | slognorm | exact`` directive
+(placed **after** the frequency clause) replaces the frequency by severity
+convolution with a single continuous severity fitted to the aggregate's
+moments. The shifted families ``sgamma`` / ``slognorm`` match mean, CV and
+skew to about 7 significant figures; ``lognorm`` and ``gamma`` match mean and
+CV only (the declared aggregate's skew is not reproduced); ``norm`` matches
+mean and CV with zero skew. There is no special
 compute path: the object is rewritten as a fixed-1-claim aggregate of the fitted
 severity, so everything downstream (validation, ``pnl``, Portfolio combine) works
 unchanged. Incompatible with occurrence reinsurance (rejected with a clear

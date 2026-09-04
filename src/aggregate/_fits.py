@@ -174,7 +174,7 @@ def lognorm_approx(ser):
 
 
 def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output,
-                           warn_degenerate=False):
+                           warn_degenerate=False, signed_input=False):
     """Dispatch ``(m, cv, skew)`` to a method-of-moments fit, in the requested form.
 
     Backs ``Aggregate.approximate`` and ``Portfolio.approximate``. A thin
@@ -191,18 +191,30 @@ def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output
         skewness.
     name, agg_str, note : str
         Naming / note scaffolding for the DecL and Aggregate output forms.
+        ``agg_str`` is the program prefix up to but **excluding** the severity
+        keyword (``'agg NM 1 claim '``); the adapter chooses ``sev`` or
+        ``ssev`` from ``signed_input``.
     approx_type : {'norm', 'lognorm', 'gamma', 'sgamma', 'slognorm'}
         The fitted family. ``'all'`` is handled by the calling method, not here.
     output : str
         ``'scipy'`` -> frozen ``scipy.stats`` rv; ``'sev_kwargs'`` -> the
         ``Severity`` kwargs dict; ``'sev_decl'`` -> a DecL severity fragment;
-        ``'agg_decl'`` -> a full ``agg ... fixed`` DecL program; any other string
-        -> a fixed-frequency :class:`Aggregate`.
+        ``'agg_decl'`` -> a full ``agg ... fixed`` DecL program;
+        ``'agg'`` (or any other string) -> a fixed-frequency
+        :class:`Aggregate` built from the ``agg_decl`` program via ``build``,
+        so it is parser-born: it carries ``program``, decompiles, and lands in
+        the underwriter's knowledge under the fit name.
     warn_degenerate : bool
         When ``True`` (the interactive ``.approximate()`` method) emit a
         ``UserWarning`` if an explicitly-requested *shifted* family
         (``slognorm`` / ``sgamma``) degenerates to a normal because the
         distribution is symmetric.
+    signed_input : bool
+        Whether the **source object** is signed (``Aggregate._signed()`` /
+        ``Portfolio._signed()``). The emitted severity keyword mirrors the
+        input, not the fit: ``ssev`` when ``True``, plain ``sev`` when
+        ``False``. ``output='sev_kwargs'`` mirrors the same rule through the
+        ``sev_signed`` flag.
 
     Returns
     -------
@@ -211,11 +223,19 @@ def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output
 
     Notes
     -----
-    A left-skewed (reflected) shifted fit has no native frozen ``scipy`` or
-    one-line DecL representation, so ``output='scipy'`` / ``'sev_decl'`` /
-    ``'agg_decl'`` raise ``ValueError`` for it -- use ``output='sev_kwargs'`` or
-    the default Aggregate object (both carry ``sev_reflect``), or
-    ``approx_type='norm'``.
+    **The emitted keyword mirrors the input.** A loss aggregate stays a loss:
+    a fit whose law reaches below zero (the normal, or a reflected shifted
+    fit) emitted under plain ``sev`` clamps its sub-zero tail to an atom at 0,
+    at the cost of a small moment drift that ``validation_df`` of the built
+    object reports like any other discretization error. An ``ssev`` input
+    keeps the fitted law exact. The fit core keeps returning its own
+    ``sev_signed`` / ``sev_reflect`` flags; the adapters decide the keyword.
+
+    A left-skewed (reflected) fit renders in DecL through the ordinary
+    reflection syntax ``loc - scale * name shape``, so every output form
+    serves it except ``output='scipy'``: scipy has no frozen reflected rv, so
+    that one still raises ``ValueError``; use the ``'agg_decl'`` or object
+    outputs, or ``approx_type='norm'``.
     """
     sev = _approximate_sev_kwargs(m, cv, skew, approx_type,
                                   warn_degenerate=warn_degenerate)
@@ -226,19 +246,31 @@ def approximate_from_mcvsk(m, cv, skew, name, agg_str, note, approx_type, output
             raise ValueError(
                 f"approx_type={approx_type!r} for this left-skewed distribution "
                 f"(skew={skew:.3g}) is a reflected fit with no native frozen scipy "
-                f"representation; use output='sev_kwargs' or the default Aggregate "
-                f"object (both reflect), or approx_type='norm'.")
+                f"representation; use output='agg_decl' or the Aggregate object "
+                f"output (both render the reflection in DecL), or "
+                f"approx_type='norm'.")
         return _sev_kwargs_to_scipy(sev)
     if output == 'sev_kwargs':
+        # Mirror the input's signedness, so the kwargs and DecL forms describe
+        # the same distribution (clamp included).
+        sev = dict(sev)
+        if signed_input:
+            sev['sev_signed'] = True
+        else:
+            sev.pop('sev_signed', None)
         return sev
-    if output in ('sev_decl', 'agg_decl'):
-        decl = _sev_kwargs_to_decl(sev, reflected, approx_type, skew)
-        return decl if output == 'sev_decl' else f'{agg_str}{decl} fixed'
-    # any other string -> a fixed-frequency Aggregate carrying the fitted sev.
-    # Local import: _fits is a leaf; Aggregate lives downstream in _aggregate.
-    from ._aggregate import Aggregate
-    return Aggregate(**{'name': name, 'note': note, 'exp_en': 1, **sev,
-                        'freq_name': 'fixed'})
+    sev_keyword = 'ssev' if signed_input else 'sev'
+    decl = _sev_kwargs_to_decl(sev, reflected, approx_type, skew)
+    if output == 'sev_decl':
+        return decl
+    program = f'{agg_str}{sev_keyword} {decl}fixed'
+    if output == 'agg_decl':
+        return program
+    # 'agg' (or any other string) -> build the program, so the returned object
+    # is parser-born (nonempty ``program``, decompiles, round-trips). Local
+    # import: _fits is a leaf; the underwriter lives downstream.
+    from .underwriter import build
+    return build(f'{program} note{{{note}}}')
 
 
 def _sev_kwargs_to_scipy(sev):
@@ -262,21 +294,21 @@ def _sev_kwargs_to_scipy(sev):
 def _sev_kwargs_to_decl(sev, reflected, approx_type, skew):
     """DecL severity fragment from method-of-moments ``sev_*`` kwargs.
 
-    A reflected (left-skew) fit has no clean one-line DecL form, so it raises --
-    use ``output='sev_kwargs'`` or the default Aggregate object instead.
+    Every fit has a one-line DecL form. An unshifted or shifted fit renders as
+    ``scale * name shape [+ loc]`` (the normal, shape-free, as
+    ``scale * norm + loc``); a reflected (left-skew) fit rides the ordinary
+    DecL reflection syntax, ``loc - scale * name shape`` (the law
+    ``Y = sev_loc - X`` with the base ``X`` built at loc 0), per
+    dev/done/plan-reflected-loss-severity.md. Fragments carry a trailing space
+    so the caller can append the frequency clause directly.
     """
-    if reflected:
-        raise ValueError(
-            f"approx_type={approx_type!r} for this left-skewed distribution "
-            f"(skew={skew:.3g}) is a reflected fit with no one-line DecL form; "
-            f"use output='sev_kwargs' or the default Aggregate object, or "
-            f"approx_type='norm'.")
     nm = sev['sev_name']
     scale = sev['sev_scale']
     loc = sev.get('sev_loc')
-    if nm == 'norm':
-        return f'{scale} @ norm 1 # {loc} '
-    frag = f'{scale} * {nm} {sev["sev_a"]} '
+    shape = '' if nm == 'norm' else f' {sev["sev_a"]}'
+    if reflected:
+        return f'{loc} - {scale} * {nm}{shape} '
+    frag = f'{scale} * {nm}{shape} '
     if loc not in (None, 0, 0.0):
         frag += f'+ {loc} '
     return frag

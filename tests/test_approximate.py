@@ -1,19 +1,23 @@
 """Tests for the ``approximate`` keyword -- method-of-moments aggregates.
 
-``approximate sgamma | slognorm`` replaces the freq x sev FFT convolution, at
-construction, with a single continuous severity fitted to the aggregate's first
-three moments (shifted gamma / shifted lognormal, normal as the symmetric limit,
-a reflected fit for left skew) carried on a fixed frequency of 1 claim. The
+``approximate norm | lognorm | gamma | sgamma | slognorm`` replaces the freq x
+sev FFT convolution, at construction, with a single continuous severity fitted
+to the aggregate's moments (the shifted pair match mean, cv and skew, with
+normal as the symmetric limit and a reflected fit for left skew; the unshifted
+three match mean and cv) carried on a fixed frequency of 1 claim. The
 substitution happens in ``Aggregate.__init__`` so the resulting object is an
 ordinary 1-claim aggregate: ``density_df``, validation, the ``pnl`` affine, and
-the ``Portfolio`` combine all work with no special-casing. See
-dev/done/plan-approximate.md.
+the ``Portfolio`` combine all work with no special-casing. The emitted severity
+type mirrors the input (``sev`` clamps at 0, ``ssev`` stays signed). See
+dev/done/plan-approximate.md and dev/plan-approximate-punchup.md.
 
 Covers: moment fidelity vs the exact aggregate across all three skew regimes
-(right / symmetric / left, the last via the reflect path), the negative-loc but
+(right / symmetric / left, the last via the reflect path, clamped under a plain
+``sev`` input and exact under ``ssev``), the negative-loc but
 positive-mass case (must NOT be marked signed), occurrence-reinsurance rejection
 (parse-time and direct constructor) with aggregate reinsurance allowed, the
-``pnl`` combination, the Portfolio combine, and the unknown-kind error.
+``pnl`` combination, the Portfolio combine, the unknown-kind error, the DecL
+reach of the unshifted families, the parser-born object mode, and the survey.
 
 The DecL programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` (section P).
 """
@@ -75,12 +79,17 @@ def test_negative_loc_positive_mass_not_signed():
 
 
 @pytest.mark.parametrize("kind", ["sgamma", "slognorm"])
-def test_left_skew_reflect_matches_exact(kind):
-    """A genuinely left-skewed aggregate uses the reflect path and still matches.
+def test_left_skew_reflect_clamps_under_sev(kind):
+    """A left-skewed plain ``sev`` aggregate reflects, then clamps at 0.
 
-    Fixed frequency + a left-skewed severity (beta(5, 1.3) is left-skewed) gives
-    a negative aggregate skew, so the fit is performed on the reflected (right-
-    skewed) aggregate and mapped back via ``sev_reflect``.
+    Fixed frequency + a left-skewed severity (beta(5, 1.3) is left-skewed)
+    gives a negative aggregate skew, so the fit reflects. The emitted severity
+    type mirrors the INPUT (author ruling 2026-09-04,
+    dev/plan-approximate-punchup.md): a plain ``sev`` input stays unsigned, so
+    the reflected fit's sub-zero tail is clamped to an atom at 0 and the
+    matched moments drift by the clamp mass, visibly (the point of the
+    ruling). The ``ssev`` twin keeps the fit exact; see
+    ``test_ssev_input_mirrors_ssev_and_is_exact``.
     """
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
@@ -88,7 +97,33 @@ def test_left_skew_reflect_matches_exact(kind):
         approx = build(f"agg AL 1 claim sev 100 * beta 5 1.3 fixed approximate {kind}")
     assert exact.actual_skew < 0
     assert approx.sevs[0].sev_reflect is True
+    # mirrors the unsigned input: NOT signed, despite the reflected fit
+    assert approx._signed_sev is False
+    # the clamp is an atom at 0 (mass a few e-4 for this fixture)
+    assert float(approx.density_df.p_total.iloc[0]) > 1e-5
+    # moments drift by the clamp: mean stays tight, cv and skew degrade in
+    # order (measured ~5e-5 / ~2e-3 / ~3e-2 relative on this fixture)
+    t, e = _theory(exact), _empirical(approx)
+    assert e[0] == pytest.approx(t[0], rel=1e-3)
+    assert e[1] == pytest.approx(t[1], rel=1e-2)
+    assert e[2] == pytest.approx(t[2], rel=1e-1)
+
+
+@pytest.mark.parametrize("kind", ["sgamma", "slognorm"])
+def test_ssev_input_mirrors_ssev_and_is_exact(kind):
+    """An ``ssev`` (signed) input mirrors to ``ssev`` and reproduces exactly.
+
+    The signed twin of ``test_left_skew_reflect_clamps_under_sev``: with the
+    input declared signed the reflected fit is carried unclamped, so the
+    matched moments reproduce to fit tolerance.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        exact = build("agg ELS 1 claim ssev 100 * beta 5 1.3 fixed")
+        approx = build(f"agg ALS 1 claim ssev 100 * beta 5 1.3 fixed approximate {kind}")
+    assert approx.sevs[0].sev_reflect is True
     assert approx._signed_sev is True
+    assert approx._signed() is True
     np.testing.assert_allclose(_empirical(approx), _theory(exact), rtol=REL)
 
 
@@ -101,7 +136,10 @@ def test_symmetric_uses_normal_limit():
     assert abs(exact.actual_skew) < 1e-9
     assert approx.sevs[0].sev_name == "norm"
     np.testing.assert_allclose(_empirical(approx)[:2], _theory(exact)[:2], rtol=REL)
-    assert abs(approx.est_skew) < 1e-6
+    # the unsigned input clamps the normal's tiny sub-zero tail (~1e-5 mass)
+    # to an atom at 0, which lifts the realized skew off exact zero
+    # (dev/plan-approximate-punchup.md mirroring ruling); measured ~1.3e-4
+    assert abs(approx.est_skew) < 1e-3
 
 
 # ----------------------------------------------------------------------
@@ -304,23 +342,43 @@ def test_method_all_symmetric_is_quiet_and_admissible():
 
 
 def test_method_reflected_fit_representability():
-    """A left-skewed fit reflects: sev_kwargs works, frozen-scipy/decl error.
+    """A left-skewed fit reflects: every output serves it except scipy.
 
     Driven straight through the fit core / adapter with a negative skew so the
-    test does not depend on a particular signed-severity DecL program.
+    test does not depend on a particular signed-severity DecL program. The
+    reflected fit renders in DecL through the ordinary reflection syntax
+    ``loc - scale * name shape`` (dev/plan-approximate-punchup.md); only
+    ``output='scipy'`` still raises, because scipy has no frozen reflected rv.
     """
     from aggregate.distributions import (approximate_from_mcvsk,
                                           _approximate_sev_kwargs)
     sev = _approximate_sev_kwargs(100.0, 0.3, -0.8, "slognorm")
     assert sev.get("sev_reflect") is True              # reflected fit
-    # no native frozen scipy / one-line DecL form -> explicit error
-    for out in ("scipy", "sev_decl", "agg_decl"):
-        with pytest.raises(ValueError, match="reflected"):
-            approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "agg n 1 claim sev ",
-                                   "note", "slognorm", out)
-    # but the kwargs / Aggregate-object surfaces represent it fine
-    assert approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "a", "nt",
-                                  "slognorm", "sev_kwargs").get("sev_reflect")
+    with pytest.raises(ValueError, match="reflected"):
+        approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "agg n 1 claim ",
+                               "note", "slognorm", "scipy")
+    # the DecL outputs render the reflection as the rsub form and build;
+    # a signed input carries the fit unclamped, so the moments reproduce
+    frag = approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "agg n 1 claim ",
+                                  "note", "slognorm", "sev_decl",
+                                  signed_input=True)
+    assert " - " in frag and "lognorm" in frag
+    prog = approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "agg n 1 claim ",
+                                  "note", "slognorm", "agg_decl",
+                                  signed_input=True)
+    assert prog.startswith("agg n 1 claim ssev ")
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        r = build(prog)
+    np.testing.assert_allclose(_empirical(r), [100.0, 0.3, -0.8], rtol=REL)
+    # the kwargs surface mirrors signedness through sev_signed
+    kw_signed = approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "a", "nt",
+                                       "slognorm", "sev_kwargs",
+                                       signed_input=True)
+    assert kw_signed.get("sev_reflect") and kw_signed.get("sev_signed")
+    kw_plain = approximate_from_mcvsk(100.0, 0.3, -0.8, "n", "a", "nt",
+                                      "slognorm", "sev_kwargs")
+    assert kw_plain.get("sev_reflect") and "sev_signed" not in kw_plain
 
 
 def test_method_one_fit_core_shared():
@@ -349,3 +407,129 @@ def test_portfolio_method_symmetric_warns_too():
     with pytest.warns(UserWarning, match="symmetric"):
         fz = p.approximate("sgamma", output="scipy")
     assert np.isfinite(fz.mean())
+
+
+# ----------------------------------------------------------------------
+# Punchup (dev/plan-approximate-punchup.md): all five families in DecL,
+# the norm DecL fragment fix, sev/ssev mirroring, the parser-born object
+# mode, and the survey after reflected fits render.
+# ----------------------------------------------------------------------
+@pytest.mark.parametrize("kind", ["norm", "lognorm", "gamma"])
+def test_decl_unshifted_families_build(kind):
+    """``approximate norm | lognorm | gamma`` build from DecL and match m, cv.
+
+    The unshifted families are two-moment fits: the declared aggregate's skew
+    is not reproduced (``norm`` targets zero skew).
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        exact = build("agg EU 100 claims sev lognorm 50 cv 1 poisson")
+        approx = build(f"agg AU 100 claims sev lognorm 50 cv 1 poisson approximate {kind}")
+    assert approx.approximation == kind
+    assert approx.frequency.freq_name == "fixed"
+    t, e = _theory(exact), _empirical(approx)
+    assert e[0] == pytest.approx(t[0], rel=1e-3)
+    assert e[1] == pytest.approx(t[1], rel=1e-2)
+
+
+def test_unknown_kind_error_names_all_six():
+    """The parse-time kind error enumerates every accepted kind."""
+    with pytest.raises(Exception) as exc_info:
+        build("agg U6 100 claims sev lognorm 100 cv 2 poisson approximate wibble")
+    msg = str(exc_info.value)
+    for kind in ("exact", "norm", "lognorm", "gamma", "sgamma", "slognorm"):
+        assert kind in msg
+
+
+def test_norm_agg_decl_parses_and_builds():
+    """``approximate('norm', output='agg_decl')`` speaks today's DecL (the bug).
+
+    The norm branch used to emit the pre-refactor ``{scale} @ norm 1 # {loc}``
+    spelling, which the current grammar rejects. The modern form is
+    ``{scale} * norm + {loc}``.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = build("agg NB 10 claims sev lognorm 50 cv 1 poisson")
+        prog = a.approximate("norm", output="agg_decl")
+        assert "@" not in prog and "#" not in prog and "* norm +" in prog
+        surrogate = build(prog)
+    # mean survives the clamp to ~the clamp mass; cv to grid tolerance
+    assert surrogate.est_m == pytest.approx(a.est_m, rel=1e-2)
+
+
+def test_sev_type_mirrors_input_on_method_outputs():
+    """``sev`` in, ``sev`` out; ``ssev`` in, ``ssev`` out (all method outputs)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        plain = build("agg MP 10 claims sev lognorm 50 cv 1 poisson")
+        signed = build("agg MS 10 claims ssev -lognorm 10 cv 0.5 poisson")
+    prog_plain = plain.approximate("norm", output="agg_decl")
+    assert " sev " in prog_plain and " ssev " not in prog_plain
+    prog_signed = signed.approximate("slognorm", output="agg_decl")
+    assert " ssev " in prog_signed
+    # sev_kwargs mirrors through sev_signed
+    assert "sev_signed" not in plain.approximate("norm", output="sev_kwargs")
+    assert signed.approximate("slognorm", output="sev_kwargs").get("sev_signed") is True
+    # the built surrogates carry the mirrored signedness
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        sp = build(prog_plain)
+        ss = build(prog_signed)
+    assert sp._signed() is False
+    # the clamped normal carries an atom at 0
+    assert float(sp.density_df.p_total.iloc[0]) > 0
+    assert ss._signed() is True
+
+
+def test_object_mode_is_parser_born():
+    """``output='agg'`` returns a ``build``-born object carrying a program."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = build("agg OB 10 claims sev lognorm 50 cv 1 poisson")
+        ob = a.approximate("slognorm", output="agg")
+        assert ob.program
+        assert "note{" in ob.program
+        rb = build(ob.program)
+    assert rb.est_m == pytest.approx(ob.est_m, rel=1e-9)
+    assert rb.est_cv == pytest.approx(ob.est_cv, rel=1e-9)
+
+
+def test_object_mode_reflected_fixture():
+    """The object mode serves a left-skew (reflected) fit too."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        left = build("agg OL 1 claim ssev 100 * beta 5 1.3 fixed")
+        ob = left.approximate("slognorm", output="agg")
+        assert ob.program and " ssev " in ob.program
+        rb = build(ob.program)
+    np.testing.assert_allclose(_empirical(rb), _theory(left), rtol=REL)
+
+
+def test_all_survey_object_and_scipy_outputs():
+    """``approximate('all')``: five families on 'agg'; scipy skips reflection only."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        right = build("agg SR 100 claims sev lognorm 50 cv 1 poisson")
+        allobj = right.approximate("all", output="agg")
+        assert set(allobj) == {"norm", "gamma", "lognorm", "sgamma", "slognorm"}
+        assert all(ob.program for ob in allobj.values())
+        left = build("agg SL 1 claim sev 100 * beta 5 1.3 fixed")
+        # scipy: the shifted fits reflect and are skipped, the rest serve
+        assert set(left.approximate("all", output="scipy")) == \
+            {"norm", "gamma", "lognorm"}
+        # agg_decl: everything serves once the reflection renders
+        assert set(left.approximate("all", output="agg_decl")) == \
+            {"norm", "gamma", "lognorm", "sgamma", "slognorm"}
+
+
+def test_portfolio_object_mode_parser_born():
+    """``Portfolio.approximate`` object mode is ``build``-born likewise."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        p = build("port POB agg U1 50 claims sev lognorm 100 cv 1 poisson "
+                  "agg U2 40 claims sev lognorm 80 cv 1.2 poisson")
+        ob = p.approximate("slognorm", output="agg")
+        assert ob.program
+        rb = build(ob.program)
+    assert rb.est_m == pytest.approx(ob.est_m, rel=1e-9)

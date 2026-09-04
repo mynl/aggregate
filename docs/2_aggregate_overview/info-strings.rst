@@ -57,7 +57,8 @@ Value enumerations:
 - ``value_type`` :math:`\in` the configured label pair, by default
   ``{loss, payoff}``, from the ``[labels]`` section of the config; see
   :mod:`aggregate.config`.
-- ``approximate`` :math:`\in` ``{exact, sgamma, slognorm}``.
+- ``approximate`` :math:`\in` ``{exact, norm, lognorm, gamma, sgamma,
+  slognorm}``.
 - ``dsev_bucket`` :math:`\in` ``{linear, nearest}``.
 - ``normalize`` :math:`\in` ``{True, False}``.
 - ``sev_calc`` :math:`\in` ``{discrete (= round), forward (= continuous),

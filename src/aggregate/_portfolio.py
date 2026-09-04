@@ -2250,9 +2250,15 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         A shifted family (``slognorm`` / ``sgamma``) requested for a symmetric
         portfolio total degenerates to its normal limit and emits a
         ``UserWarning`` (pass ``approx_type='norm'`` for the normal explicitly).
-        A left-skewed total is fitted by reflection, which has no native frozen
-        ``scipy`` / one-line DecL form; use ``output='sev_kwargs'`` or the
-        default Aggregate object for that case. Mirrors
+        A left-skewed total is fitted by reflection and renders in DecL through
+        the ordinary reflection syntax; only ``output='scipy'`` raises for it
+        (scipy has no frozen reflected rv). ``output='agg'`` (or any other
+        unrecognized string) returns an Aggregate built from the ``agg_decl``
+        program via ``build``, so it is parser-born and carries a ``program``.
+        The emitted severity keyword mirrors the portfolio's own signedness
+        (:meth:`_signed`, any unit signed): ``ssev`` when signed, else plain
+        ``sev``, which clamps any fitted sub-zero mass to an atom at 0 and
+        reports the drift in the surrogate's ``validation_df``. Mirrors
         :meth:`Aggregate.approximate`.
         """
         emp_mean = self.stats_df.loc[('agg', 'mean'), 'empirical']
@@ -2270,8 +2276,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         def _one(kind, warn):
             nm = f'{kind[0:4]}.{self.name[0:5]}'
-            return approximate_from_mcvsk(m, cv, skew, nm, f'agg {nm} 1 claim sev ',
-                                          note, kind, output, warn_degenerate=warn)
+            return approximate_from_mcvsk(m, cv, skew, nm, f'agg {nm} 1 claim ',
+                                          note, kind, output, warn_degenerate=warn,
+                                          signed_input=self._signed())
 
         if approx_type == 'all':
             # Survey: quiet about degeneration; skip a family that cannot be

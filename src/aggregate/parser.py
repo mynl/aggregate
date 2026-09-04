@@ -1450,7 +1450,7 @@ class UnderwritingTransformer(Transformer):
         return {}
 
     # ----- approximate (method-of-moments) directive ----------------
-    _APPROX_KINDS = ("exact", "sgamma", "slognorm")
+    _APPROX_KINDS = ("exact", "norm", "lognorm", "gamma", "sgamma", "slognorm")
 
     def approx_set(self, c):
         """``approximate KIND`` -> ``{'approximate': KIND}`` (kind validated)."""

@@ -100,11 +100,13 @@
                |          -> orientation_none
     
     // Method-of-moments approximation directive. ``approximate KIND`` (KIND in
-    // {exact, sgamma, slognorm}) replaces the freq x sev convolution with a single
-    // continuous severity fitted to the aggregate's first three moments (shifted
-    // gamma / shifted lognormal), carried on a fixed-1 frequency. ``exact`` (or the
-    // omitted clause) is the inert default. Validated in the transformer; the kind
-    // word is an ordinary ID. See dev/done/plan-approximate.md.
+    // {exact, norm, lognorm, gamma, sgamma, slognorm}) replaces the freq x sev
+    // convolution with a single continuous severity fitted to the aggregate's
+    // moments, carried on a fixed-1 frequency: the shifted sgamma / slognorm match
+    // mean, cv and skew; lognorm and gamma match mean and cv only; norm matches
+    // mean and cv with zero skew. ``exact`` (or the omitted clause) is the inert
+    // default. Validated in the transformer; the kind word is an ordinary ID. See
+    // dev/done/plan-approximate.md and dev/plan-approximate-punchup.md.
     approx_clause: APPROXIMATE ID   -> approx_set
                  |                  -> approx_none
     

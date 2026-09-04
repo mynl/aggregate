@@ -2303,14 +2303,23 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                                 premium-minus-loss position is the separate
                                 :class:`PnL` veneer (see ``make_pnl``), not a
                                 value on the aggregate.
-        :param approximate:     ``'exact'`` (default), ``'sgamma'`` or ``'slognorm'``.
+        :param approximate:     ``'exact'`` (default), ``'norm'``, ``'lognorm'``,
+                                ``'gamma'``, ``'sgamma'`` or ``'slognorm'``.
                                 When not ``'exact'``, the freq x sev convolution is
                                 replaced at construction by a single continuous
-                                severity fitted to the aggregate's first three
-                                moments (method of moments: shifted gamma / shifted
-                                lognormal, with normal as the symmetric limit and a
-                                reflected fit for left skew), carried on a fixed
-                                frequency of 1. The original program is preserved in
+                                severity fitted to the aggregate's moments (method
+                                of moments), carried on a fixed frequency of 1.
+                                The shifted families ``sgamma`` / ``slognorm``
+                                match mean, cv and skew (normal as the symmetric
+                                limit, a reflected fit for left skew); ``lognorm``
+                                and ``gamma`` match mean and cv only (the declared
+                                aggregate's skew is not reproduced); ``norm``
+                                matches mean and cv with zero skew. The fitted
+                                severity's signedness mirrors the input's: an
+                                unsigned (plain ``sev``) input clamps any fitted
+                                sub-zero mass to an atom at 0, and the moment
+                                drift shows in ``validation_df``. The original
+                                program is preserved in
                                 ``note``. Incompatible with occurrence reinsurance
                                 (which acts pre-convolution); aggregate reinsurance
                                 rides along unchanged. Set by the ``approximate``
@@ -2399,10 +2408,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # returns, so it is not yet visible at construction. See
         # ``_approx_description`` and the note finalisation in ``Underwriter``.
         self._approx_fit = None
-        if approximate not in ('exact', 'sgamma', 'slognorm'):
+        if approximate not in ('exact', 'norm', 'lognorm', 'gamma',
+                               'sgamma', 'slognorm'):
             raise ValueError(
-                f"approximate must be 'exact', 'sgamma' or 'slognorm', "
-                f"not {approximate!r}")
+                f"approximate must be 'exact', 'norm', 'lognorm', 'gamma', "
+                f"'sgamma' or 'slognorm', not {approximate!r}")
         if approximate != 'exact':
             if occ_reins is not None:
                 raise ValueError(
@@ -2422,11 +2432,18 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             sev_a = _fit.get('sev_a', np.nan)
             sev_b = 0.0
             sev_mean, sev_cv = 0.0, 0.0
-            sev_loc = _fit['sev_loc']
+            # the unshifted lognorm / gamma fits carry no loc
+            sev_loc = _fit.get('sev_loc', 0.0)
             sev_scale = _fit['sev_scale']
             sev_xs = sev_ps = None
             sev_wt = 1.0
-            sev_signed = bool(_fit.get('sev_signed', False))
+            # The emitted severity type mirrors the INPUT's signedness, not the
+            # fit's (author ruling 2026-09-04, dev/plan-approximate-punchup.md):
+            # a loss aggregate stays a loss, so a fit reaching below zero under
+            # an unsigned input clamps its sub-zero tail to an atom at 0. The
+            # moment drift the clamp introduces is displayed, not hidden, in
+            # validation_df and approximation_df.
+            sev_signed = _orig._signed_severity()
             sev_reflect = bool(_fit.get('sev_reflect', False))
             # Record the fit for a lazy, program-aware description (rendered in
             # ``info`` and folded into ``note`` once ``self.program`` is set).
@@ -6927,25 +6944,36 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Compare to Portfolio.approximate which returns a single sev fixed freq agg, this
         returns a scipy dist by default.
 
-        Use case: exam questions with the normal approacimation!
+        Use case: exam questions with the normal approximation!
 
         :param approx_type: norm, lognorm, slognorm (shifted lognormal), gamma, sgamma. If 'all'
             then returns a dictionary of each admissible approx (families that
             cannot be represented for this distribution/output are skipped).
         :param output: scipy - frozen scipy.stats continuous rv object;
-          sev_decl - DecL program for severity (to substituate into an agg ; no name)
+          sev_decl - DecL severity fragment (to substitute into an agg; no name)
           sev_kwargs - dictionary of parameters to create Severity
-          agg_decl - Decl program agg T 1 claim sev_decl fixed
-          any other string - created Aggregate object
+          agg_decl - DecL program ``agg NM 1 claim sev ... fixed``
+          agg (or any other string) - Aggregate object built from the agg_decl
+          program via ``build``, so it is parser-born: nonempty ``program``,
+          decompiles, and lands in the underwriter's knowledge under the fit
+          name.
         :return: as above.
 
         A shifted family (``slognorm`` / ``sgamma``) requested for a symmetric
         distribution degenerates to its normal limit and emits a ``UserWarning``
         (pass ``approx_type='norm'`` to select the normal explicitly). A
-        left-skewed distribution is fitted by reflection, which has no native
-        frozen ``scipy`` / one-line DecL form -- ``output='scipy'`` /
-        ``'sev_decl'`` / ``'agg_decl'`` raise ``ValueError`` for it; use
-        ``output='sev_kwargs'`` or the default Aggregate object.
+        left-skewed distribution is fitted by reflection and renders in DecL
+        through the ordinary reflection syntax ``loc - scale * name shape``;
+        only ``output='scipy'`` raises ``ValueError`` for it (scipy has no
+        frozen reflected rv).
+
+        **The emitted severity keyword mirrors the input.** The DecL and object
+        outputs spell the severity ``ssev`` when this aggregate is signed
+        (:meth:`_signed`), else plain ``sev``; ``output='sev_kwargs'`` mirrors
+        the same rule through ``sev_signed``. A fit whose law reaches below
+        zero emitted under plain ``sev`` clamps its sub-zero tail to an atom at
+        0 (a loss stays a loss), at the cost of a small moment drift that the
+        built surrogate's ``validation_df`` reports.
         """
         # Prefer empirical moments (post-update) over theoretical (pre-update).
         emp = self.stats_df['empirical']
@@ -6958,13 +6986,15 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         def _one(kind, warn):
             nm = f'{kind[0:4]}.{self.name[0:5]}'
-            return approximate_from_mcvsk(m, cv, skew, nm, f'agg {nm} 1 claim sev ',
-                                          note, kind, output, warn_degenerate=warn)
+            return approximate_from_mcvsk(m, cv, skew, nm, f'agg {nm} 1 claim ',
+                                          note, kind, output, warn_degenerate=warn,
+                                          signed_input=self._signed())
 
         if approx_type == 'all':
             # Survey: stay quiet about degeneration, and skip a family that
-            # cannot be represented for this distribution/output (e.g. a
-            # reflected fit requested as a frozen scipy rv).
+            # cannot be represented for this distribution/output (after the
+            # reflected DecL rendering landed, only a reflected fit requested
+            # as a frozen scipy rv).
             out = {}
             for kind in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']:
                 try:

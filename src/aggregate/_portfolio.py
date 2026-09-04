@@ -48,7 +48,8 @@ from .utilities import (ft, ift,
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
 from ._aggregate import (return_period_frame, SUMMARY_PERCENTILES,
-                         _summary_pct_label)
+                         _summary_pct_label, approximation_frame,
+                         approximation_density_frame)
 from . import _pricing
 from . import _reinsurance
 from . import _bucket_window
@@ -1613,6 +1614,48 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         df = pd.concat(blocks, keys=keys, names=['unit', 'P'])
         df.attrs['mean'] = float(self.est_m)
         return df
+
+    @property
+    def approximation_df(self):
+        """All five method-of-moments fits against the exact total (a property).
+
+        The portfolio twin of :attr:`Aggregate.approximation_df`, read on
+        the **total**: the fit targets are the realized total moments (the
+        same moments :meth:`approximate` fits), the ``exact`` column reads
+        the total grid, and the mirrored clamp follows :meth:`_signed`
+        (any unit signed). See :func:`~aggregate._aggregate.approximation_frame`.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``None`` before :meth:`update`.
+        """
+        if self.density_df is None:
+            return None
+        return approximation_frame(
+            self.est_m, self.est_cv, self.est_skew, self._signed(),
+            self.density_df.loss.to_numpy(dtype=float),
+            self.density_df.p_total.to_numpy(dtype=float), self.q)
+
+    @property
+    def approximation_density_df(self):
+        """Grid-mass densities of the five fits beside the exact total.
+
+        The portfolio twin of :attr:`Aggregate.approximation_density_df`,
+        on the total's grid. See
+        :func:`~aggregate._aggregate.approximation_density_frame`.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``None`` before :meth:`update`.
+        """
+        if self.density_df is None:
+            return None
+        return approximation_density_frame(
+            self.est_m, self.est_cv, self.est_skew, self._signed(),
+            self.density_df.loss.to_numpy(dtype=float),
+            self.density_df.p_total.to_numpy(dtype=float), self.bs)
 
     # ================================================================
     # Reinsurance reporting (end-to-end gcn; see dev/reins-reporting.md)

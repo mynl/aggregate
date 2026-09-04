@@ -72,8 +72,9 @@ _WALK_EXHIBITS = ['summary', 'stats', 'validation', 'economic',
 AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
 
-# Exhibit names served per fixture after [Exhibits-Reins-Insurer].
-_DIAG = ['bs_window', 'tail_behavior']
+# Exhibit names served per fixture after [Exhibits-Reins-Insurer];
+# 'approximation' joined the diagnostics at a332 ([Approximate-Punchup]).
+_DIAG = ['bs_window', 'tail_behavior', 'approximation']
 EXPECTED_EXHIBITS = {
     'Aggregate': ['summary', 'tail', 'stats', 'validation', *_DIAG],
     'Portfolio': ['summary', 'tail', 'stats', 'validation', *_DIAG],

@@ -469,3 +469,61 @@ Divergences:
    edits stashed): 8 `pricing.stand_alone` / `pricing.allocate` exhibit
    snapshot cases and `test_split_limit_policy_prices_the_per_accident_limit`
    (the author's in-flight `library.agg` Capstone picks edit). Not touched.
+
+### Bump 2, `1.0.0a332` (scope 2, 2026-09-04)
+
+Landed: [Approximation-Frame], [Approximation-Density-Frame],
+[Approximation-Exhibit], [Approximation-Chart].
+
+Divergences:
+
+1. **The shared frame engine lives in `_aggregate.py` at module level**
+   (`approximation_frame`, `approximation_density_frame`,
+   `_approximation_laws`, `APPROXIMATION_FAMILIES`), the
+   `return_period_frame` arrangement, imported by `_portfolio.py`; the
+   plan's files list named only the two property hosts.
+2. **The chart registers with no `primary`.** The plan's
+   [Approximation-Chart] says `primary=Aggregate`, but `register_chart`'s
+   `primary` means "the object's own picture" (`primary_chart` returns the
+   first claimant in registration order) and the `agg` chart already
+   claims Aggregate; a second claimant would be order-fragile and
+   semantically wrong. Registered like `reins` / `kappa`: dispatch on
+   Aggregate, `_updated` predicate, no primary. `primary_chart` verified
+   unchanged.
+3. **Inadmissible families are served as NaN columns and skipped by the
+   chart.** On a negative-mean (signed) subject the unshifted `gamma` /
+   `lognorm` fits have no valid law; the frame keeps their NaN columns
+   (self-describing) and the chart drops the non-finite curves, since NaN
+   cannot travel in canonical JSON. The implied-tail curve is likewise
+   trimmed to where `E[N] * S_X(x) <= 1` and above `SURVIVAL_FLOOR`.
+4. **Exhibit snapshots merged additively.** The committed
+   `exhibit_snapshots.json` carries drifted `pricing.stand_alone` /
+   `pricing.allocate` entries (8 pre-existing failures, see bump 1 note
+   5); a full recapture would have silently absorbed that drift into this
+   commit, so only the 8 new `approximation/*` keys were computed and
+   merged, leaving every existing entry byte-identical.
+5. **`dev/FEATURES.csv` is hand-curated** (`regen_features.py` is an
+   auditor, not a generator); the two property rows were added by hand and
+   the auditor passes.
+
+Findings for the author (not acted on):
+
+- **Half-bucket bias on coarse grids.** The plan's grid-mass convention
+  (`F(x_k) = P(X <= x_k)`, family mass `diff(G(xs))`) reads a continuous
+  law's mass at the bucket's right edge, a systematic `+bs/2` mean shift
+  visible on coarse discrete fixtures (the dice portfolio reads family
+  mean 8.5 against exact 8.0 at `bs=1`). Negligible on production grids
+  and it is the convention the plan specifies; flagging in case the
+  teaching frame meets a discrete example.
+- The 8 pricing exhibit snapshot failures and the 2 `library.agg`
+  Capstone failures pre-exist this plan (verified by stashing); they ride
+  the author's in-flight work.
+
+RuntimeWarning gate (numerics-touching bump): after guarding the frame's
+deliberate probe of inadmissible families with `np.errstate` (divergence
+3's companion; Notes paragraph in `_approximation_laws`), the plan's code
+is green under `-W error::RuntimeWarning`. One pre-existing emission
+surfaced, a third finding for the author: **`moments.py:500` sqrt of a
+negative on `agg:RenewalDeterministicWait`** (an a327 library entry;
+nothing in this plan touches moments or renewal), which fails
+`test_every_library_entry_builds` under the gate only.

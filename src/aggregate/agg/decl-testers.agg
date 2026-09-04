@@ -433,7 +433,7 @@ agg GH.PoissonLevy 20 claim sev levy poisson                                    
 # of 1. `exact` (or omitting the clause) is the inert default. Incompatible with
 # occurrence reinsurance (the fit bypasses the per-occurrence convolution);
 # aggregate reinsurance rides along. See tests/test_approximate.py,
-# dev/done/plan-approximate.md and dev/plan-approximate-punchup.md.
+# dev/done/plan-approximate.md and dev/done/plan-approximate-punchup.md.
 agg APX.RightSgamma 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma;
 agg APX.RightSlognorm 5000 claim sev lognorm 100 cv 2 poisson approximate slognorm;
 agg APX.Norm 5000 claim sev lognorm 100 cv 2 poisson approximate norm;

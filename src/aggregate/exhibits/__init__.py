@@ -116,7 +116,7 @@ __all__ = [
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
-    'bs_window', 'sharpen', 'tail_behavior',
+    'bs_window', 'sharpen', 'tail_behavior', 'approximation',
     'pricing_calibrate', 'pricing_stand_alone', 'pricing_allocate',
     'pricing_evaluate',
     'STAT_SLICES', 'STAT_SLICE_FORMATS', 'STAT_SLICE_TITLES',
@@ -299,3 +299,14 @@ tail_behavior = register_simple_exhibit(
             'law is bounded, and the coefficient of variation. A different '
             'question from the return period ladder, which is the tail '
             'exhibit.')
+approximation = register_simple_exhibit(
+    'approximation', 'Approximation', 'approximation_df',
+    [Aggregate, Portfolio], predicate=_perspectives_updated,
+    caption='The five method-of-moments fits read against the exact law '
+            '(the total, on a portfolio): the fitted DecL fragment and '
+            'parameters, the achieved moments of each emitted law with its '
+            'Kolmogorov distance to the realized cumulative, and the '
+            'quantiles on the return period ladder. The shifted families '
+            'match three moments, the unshifted two; a fit reaching below '
+            'zero on a loss book is clamped at 0 and the clamp shows in its '
+            'achieved moments.')

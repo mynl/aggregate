@@ -9,7 +9,7 @@ substitution happens in ``Aggregate.__init__`` so the resulting object is an
 ordinary 1-claim aggregate: ``density_df``, validation, the ``pnl`` affine, and
 the ``Portfolio`` combine all work with no special-casing. The emitted severity
 type mirrors the input (``sev`` clamps at 0, ``ssev`` stays signed). See
-dev/done/plan-approximate.md and dev/plan-approximate-punchup.md.
+dev/done/plan-approximate.md and dev/done/plan-approximate-punchup.md.
 
 Covers: moment fidelity vs the exact aggregate across all three skew regimes
 (right / symmetric / left, the last via the reflect path, clamped under a plain
@@ -85,7 +85,7 @@ def test_left_skew_reflect_clamps_under_sev(kind):
     Fixed frequency + a left-skewed severity (beta(5, 1.3) is left-skewed)
     gives a negative aggregate skew, so the fit reflects. The emitted severity
     type mirrors the INPUT (author ruling 2026-09-04,
-    dev/plan-approximate-punchup.md): a plain ``sev`` input stays unsigned, so
+    dev/done/plan-approximate-punchup.md): a plain ``sev`` input stays unsigned, so
     the reflected fit's sub-zero tail is clamped to an atom at 0 and the
     matched moments drift by the clamp mass, visibly (the point of the
     ruling). The ``ssev`` twin keeps the fit exact; see
@@ -138,7 +138,7 @@ def test_symmetric_uses_normal_limit():
     np.testing.assert_allclose(_empirical(approx)[:2], _theory(exact)[:2], rtol=REL)
     # the unsigned input clamps the normal's tiny sub-zero tail (~1e-5 mass)
     # to an atom at 0, which lifts the realized skew off exact zero
-    # (dev/plan-approximate-punchup.md mirroring ruling); measured ~1.3e-4
+    # (dev/done/plan-approximate-punchup.md mirroring ruling); measured ~1.3e-4
     assert abs(approx.est_skew) < 1e-3
 
 
@@ -347,7 +347,7 @@ def test_method_reflected_fit_representability():
     Driven straight through the fit core / adapter with a negative skew so the
     test does not depend on a particular signed-severity DecL program. The
     reflected fit renders in DecL through the ordinary reflection syntax
-    ``loc - scale * name shape`` (dev/plan-approximate-punchup.md); only
+    ``loc - scale * name shape`` (dev/done/plan-approximate-punchup.md); only
     ``output='scipy'`` still raises, because scipy has no frozen reflected rv.
     """
     from aggregate.distributions import (approximate_from_mcvsk,
@@ -410,7 +410,7 @@ def test_portfolio_method_symmetric_warns_too():
 
 
 # ----------------------------------------------------------------------
-# Punchup (dev/plan-approximate-punchup.md): all five families in DecL,
+# Punchup (dev/done/plan-approximate-punchup.md): all five families in DecL,
 # the norm DecL fragment fix, sev/ssev mirroring, the parser-born object
 # mode, and the survey after reflected fits render.
 # ----------------------------------------------------------------------
@@ -533,3 +533,124 @@ def test_portfolio_object_mode_parser_born():
         assert ob.program
         rb = build(ob.program)
     assert rb.est_m == pytest.approx(ob.est_m, rel=1e-9)
+
+
+# ----------------------------------------------------------------------
+# Second scope (dev/done/plan-approximate-punchup.md): the approximation frames.
+# ----------------------------------------------------------------------
+_FRAME_COLUMNS = ["exact", "norm", "gamma", "lognorm", "sgamma", "slognorm"]
+
+
+def _right_skew_fixture():
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        return build("agg FR 10 claims sev lognorm 50 cv 1 poisson")
+
+
+def test_approximation_df_shape():
+    """Six family columns over the meta / stats / quantiles row blocks."""
+    a = _right_skew_fixture()
+    df = a.approximation_df
+    assert list(df.columns) == _FRAME_COLUMNS
+    assert df.columns.name == "approximation"
+    assert df.index.names == ["component", "measure"]
+    assert list(dict.fromkeys(df.index.get_level_values(0))) == [
+        "meta", "stats", "quantiles"]
+    assert list(df.loc["meta"].index) == ["distribution", "shape", "loc",
+                                          "scale"]
+    assert list(df.loc["stats"].index) == ["mean", "cv", "skew", "ks"]
+    # the quantile rows ride the tail_df ladder
+    ps = df.loc["quantiles"].index.to_list()
+    assert ps == a.tail_df.index.to_list()
+
+
+def test_approximation_df_exact_column_and_ks():
+    """The exact column reads the grid; ks is 0 there, positive elsewhere,
+    and smaller for the shifted three-moment families than for norm."""
+    a = _right_skew_fixture()
+    df = a.approximation_df
+    st = df.loc["stats"]
+    assert st.loc["mean", "exact"] == pytest.approx(a.est_m)
+    assert st.loc["cv", "exact"] == pytest.approx(a.est_cv)
+    assert st.loc["ks", "exact"] == 0.0
+    for kind in _FRAME_COLUMNS[1:]:
+        assert st.loc["ks", kind] > 0
+    assert st.loc["ks", "norm"] > st.loc["ks", "sgamma"]
+    assert st.loc["ks", "norm"] > st.loc["ks", "slognorm"]
+    # the exact quantiles read the grid
+    q = df.loc["quantiles"]
+    for p in (0.5, 0.99):
+        assert q.loc[p, "exact"] == pytest.approx(a.q(p))
+
+
+def test_approximation_df_clamp_shows_and_fragment_builds():
+    """On a plain ``sev`` fixture the normal fit's clamp lift is displayed
+    and the meta fragment builds under ``sev``."""
+    a = _right_skew_fixture()
+    df = a.approximation_df
+    # the clamped normal's achieved mean sits above the exact mean by the
+    # clamp mass at 0 (the ruling: displayed, not hidden)
+    assert df.loc[("stats", "mean"), "norm"] > df.loc[("stats", "mean"),
+                                                      "exact"]
+    frag = df.loc[("meta", "distribution"), "norm"]
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        surrogate = build(f"agg FRN 1 claim sev {frag} fixed")
+    assert surrogate.est_m == pytest.approx(
+        df.loc[("stats", "mean"), "norm"], rel=1e-3)
+    # the clamped normal's low quantiles floor at 0
+    assert df.loc[("quantiles", 0.001), "norm"] == 0.0
+
+
+def test_approximation_df_ssev_no_clamp_matches():
+    """On an ``ssev`` fixture the shifted columns reproduce the exact
+    moments to fit tolerance while the two-parameter columns miss skew."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        a = build("agg FS 1 claim ssev 100 * beta 5 1.3 fixed")
+    df = a.approximation_df
+    st = df.loc["stats"]
+    for kind in ("sgamma", "slognorm"):
+        assert st.loc["mean", kind] == pytest.approx(st.loc["mean", "exact"],
+                                                     rel=1e-3)
+        assert st.loc["cv", kind] == pytest.approx(st.loc["cv", "exact"],
+                                                   rel=1e-2)
+        assert st.loc["skew", kind] == pytest.approx(st.loc["skew", "exact"],
+                                                     rel=5e-2)
+    # left skew: the two-parameter families cannot go negative
+    assert st.loc["skew", "exact"] < 0
+    assert st.loc["skew", "gamma"] > 0
+    assert st.loc["skew", "lognorm"] > 0
+    # the reflected fragments spell the rsub form
+    assert " - " in df.loc[("meta", "distribution"), "slognorm"]
+
+
+def test_approximation_density_df_columns_sum_to_one():
+    """Each density column sums to ~1 (clamped and reflected included)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        right = build("agg FDR 10 claims sev lognorm 50 cv 1 poisson")
+        left = build("agg FDL 1 claim sev 100 * beta 5 1.3 fixed")
+    for a in (right, left):
+        d = a.approximation_density_df
+        assert list(d.columns) == _FRAME_COLUMNS
+        assert d.index.name == "loss"
+        sums = d.sum()
+        # a clamped family misses only its atom at 0, a few percent at worst
+        # on these fixtures; exact sums to 1 by construction
+        assert sums["exact"] == pytest.approx(1.0, abs=1e-6)
+        for kind in _FRAME_COLUMNS[1:]:
+            assert sums[kind] == pytest.approx(1.0, abs=0.05)
+
+
+def test_portfolio_approximation_df_reads_the_total():
+    """The Portfolio frame reads the total's grid and moments."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        p = build("port FP agg U1 5 claims sev lognorm 100 cv 1 poisson "
+                  "agg U2 4 claims sev lognorm 80 cv 1.2 poisson")
+    df = p.approximation_df
+    assert list(df.columns) == _FRAME_COLUMNS
+    assert df.loc[("stats", "mean"), "exact"] == pytest.approx(p.est_m)
+    d = p.approximation_density_df
+    assert d["exact"].sum() == pytest.approx(1.0, abs=1e-6)

@@ -104,7 +104,7 @@ orientation: PAYOFF   -> orientation_payoff
 // mean, cv and skew; lognorm and gamma match mean and cv only; norm matches
 // mean and cv with zero skew. ``exact`` (or the omitted clause) is the inert
 // default. Validated in the transformer; the kind word is an ordinary ID. See
-// dev/done/plan-approximate.md and dev/plan-approximate-punchup.md.
+// dev/done/plan-approximate.md and dev/done/plan-approximate-punchup.md.
 approx_clause: APPROXIMATE ID   -> approx_set
              |                  -> approx_none
 

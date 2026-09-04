@@ -48,7 +48,8 @@ from .spectral import choquet_weights
 from . import tail as _tail
 from .tail import TailClass
 
-from ._fits import (_approximate_sev_kwargs, approximate_from_mcvsk)
+from ._fits import (_approximate_sev_kwargs, _sev_kwargs_to_decl,
+                    approximate_from_mcvsk)
 from ._frequency import Frequency, FrequencyEmpirical, FrequencyRenewal
 from ._renewal import ruin_cepstral
 from ._severity import Severity
@@ -186,6 +187,226 @@ def return_period_frame(q, tvar, mean, periods=None):
         index=pd.Index(p, name='P'),
     )
     df.attrs['mean'] = mean
+    return df
+
+
+#: Column order of ``approximation_df`` / ``approximation_density_df`` after
+#: the ``exact`` anchor column: the method-of-moments families, two-moment
+#: fits first.
+APPROXIMATION_FAMILIES = ('norm', 'gamma', 'lognorm', 'sgamma', 'slognorm')
+
+
+def _approximation_laws(m, cv, skew, signed_input):
+    """One emitted law per family: closed forms with reflect and clamp applied.
+
+    The engine behind :attr:`Aggregate.approximation_df`,
+    :attr:`Aggregate.approximation_density_df` and their ``Portfolio`` twins.
+    For each family in :data:`APPROXIMATION_FAMILIES` it runs the single fit
+    core (:func:`~aggregate._fits._approximate_sev_kwargs`) and wraps the
+    result as the law of the **emitted program**: the severity keyword mirrors
+    the input (``signed_input``), so an unsigned input clamps any fitted
+    sub-zero mass to an atom at 0, exactly as the built surrogate would.
+
+    Parameters
+    ----------
+    m, cv, skew : float
+        The subject's realized aggregate moments (the same moments
+        ``approximate`` fits).
+    signed_input : bool
+        The subject's own signedness (``_signed()``). ``False`` applies the
+        plain ``sev`` clamp at 0 to quantiles; the cdf needs no adjustment
+        on an unsigned grid because ``G(x)`` for ``x >= 0`` already includes
+        the clamp atom.
+
+    Returns
+    -------
+    dict of str -> dict
+        Per family: ``fragment`` (the DecL severity fragment), ``shape`` /
+        ``loc`` / ``scale`` (``NaN`` where the family has none), ``cdf`` /
+        ``pdf`` / ``ppf`` (vectorized callables of the emitted law).
+
+    Notes
+    -----
+    A reflected (left-skew) fit is the law ``Y = loc - X`` with the base
+    ``X`` built at loc 0, so ``F_Y(x) = S_X(loc - x)``,
+    ``f_Y(x) = f_X(loc - x)`` and ``q_Y(p) = loc - q_X(1 - p)``. The clamp
+    transform is ``Z = max(0, Y)``: on quantiles ``q_Z = max(0, q_Y)``; the
+    cdf is unchanged for ``x >= 0`` (the atom at 0 is the mass ``F_Y(0)``);
+    the pdf ignores the atom, which is why a clamped density column sums to
+    ``1 -`` the clamp mass rather than exactly 1.
+
+    The fit call is guarded with ``np.errstate``: the frame probes **all**
+    five families by design, and on a negative-mean (signed) subject the
+    unshifted ``lognorm`` / ``gamma`` fits are inadmissible (``log`` of a
+    negative mean). Their ``NaN`` parameters are the answer, the column's
+    self-describing "no such fit", not a numerical accident to warn about.
+    """
+    laws = {}
+    for kind in APPROXIMATION_FAMILIES:
+        with np.errstate(invalid='ignore', divide='ignore'):
+            sev = _approximate_sev_kwargs(m, cv, skew, kind)
+        reflected = bool(sev.get('sev_reflect', False))
+        name = sev['sev_name']
+        shape = float(sev['sev_a']) if 'sev_a' in sev else np.nan
+        loc = float(sev['sev_loc']) if 'sev_loc' in sev else np.nan
+        scale = float(sev['sev_scale'])
+        base_loc = 0.0 if (reflected or np.isnan(loc)) else loc
+        if name == 'norm':
+            base = ss.norm(loc=base_loc, scale=scale)
+        elif name == 'lognorm':
+            base = ss.lognorm(shape, loc=base_loc, scale=scale)
+        else:
+            base = ss.gamma(shape, loc=base_loc, scale=scale)
+        if reflected:
+            def cdf(x, b=base, L=loc):
+                return np.asarray(b.sf(L - np.asarray(x, dtype=float)),
+                                  dtype=float)
+
+            def pdf(x, b=base, L=loc):
+                return np.asarray(b.pdf(L - np.asarray(x, dtype=float)),
+                                  dtype=float)
+
+            def ppf(p, b=base, L=loc):
+                return np.asarray(
+                    L - b.ppf(1.0 - np.asarray(p, dtype=float)), dtype=float)
+        else:
+            def cdf(x, b=base):
+                return np.asarray(b.cdf(x), dtype=float)
+
+            def pdf(x, b=base):
+                return np.asarray(b.pdf(x), dtype=float)
+
+            def ppf(p, b=base):
+                return np.asarray(b.ppf(p), dtype=float)
+        if not signed_input:
+            ppf = (lambda p, f=ppf:
+                   np.maximum(0.0, f(p)))
+        laws[kind] = dict(
+            fragment=_sev_kwargs_to_decl(sev, reflected, kind, skew).strip(),
+            shape=shape, loc=loc, scale=scale, cdf=cdf, pdf=pdf, ppf=ppf)
+    return laws
+
+
+def _approximation_ladder():
+    """The symmetric non-exceedance ladder ``tail_df`` uses.
+
+    Both ``1/T`` and ``1 - 1/T`` per rung of
+    :data:`DEFAULT_RETURN_PERIODS`, deduplicated at the median, so ``P``
+    runs 0.001 to 0.999 and the quantile block reads beside ``tail_df``.
+    """
+    T = np.asarray(DEFAULT_RETURN_PERIODS, dtype=float)
+    return np.unique(np.concatenate([1.0 / T, 1.0 - 1.0 / T]))
+
+
+def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact):
+    """Build the ``approximation_df`` frame: all five fits against exact.
+
+    Shared by :attr:`Aggregate.approximation_df` and
+    :attr:`Portfolio.approximation_df` (the latter on the total), so both
+    read one implementation, the ``return_period_frame`` arrangement.
+
+    Parameters
+    ----------
+    m, cv, skew : float
+        The subject's realized aggregate moments (the fit targets).
+    signed_input : bool
+        The subject's ``_signed()``; decides the mirrored clamp.
+    xs : ndarray
+        The realized output grid (the total's grid on a portfolio).
+    exact_density : ndarray
+        The realized aggregate density on ``xs`` (sums to ~1).
+    q_exact : callable
+        The subject's grid quantile function ``q(p)``.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Columns ``exact`` then :data:`APPROXIMATION_FAMILIES` (axis named
+        ``approximation``); rows a ``(component, measure)`` MultiIndex with
+        blocks ``meta`` (the DecL ``distribution`` fragment and the
+        ``shape`` / ``loc`` / ``scale`` parameters), ``stats`` (achieved
+        ``mean`` / ``cv`` / ``skew`` of the emitted law, clamp included,
+        and ``ks``, the Kolmogorov distance to the realized cumulative)
+        and ``quantiles`` (one row per ``P`` of the ``tail_df`` ladder).
+
+    Notes
+    -----
+    Everything a family column reports is the law of the **emitted
+    program** (mirrored keyword, clamp included): one law per column, no
+    mixing of the fit target and the fit result. The achieved moments come
+    from the grid-mass evaluation ``diff(G(xs), prepend=0)`` (whose first
+    element carries any clamp atom at 0), the same cumulative that feeds
+    ``ks``, so the ``stats`` and ``quantiles`` blocks cannot disagree about
+    which law they describe. Both cumulatives are compared at the bucket
+    convention ``F(x_k) = P(X <= x_k)``. An error column is a subtraction
+    against ``exact``, the reading ``stats_df`` gives its columns, so no
+    separate error block is carried.
+    """
+    xs = np.asarray(xs, dtype=float)
+    exact_density = np.asarray(exact_density, dtype=float)
+    F = np.cumsum(exact_density)
+    ps = _approximation_ladder()
+    laws = _approximation_laws(m, cv, skew, signed_input)
+
+    rows = ([('meta', 'distribution'), ('meta', 'shape'), ('meta', 'loc'),
+             ('meta', 'scale'),
+             ('stats', 'mean'), ('stats', 'cv'), ('stats', 'skew'),
+             ('stats', 'ks')]
+            + [('quantiles', float(p)) for p in ps])
+    index = pd.MultiIndex.from_tuples(rows, names=('component', 'measure'))
+
+    data = {'exact': ['', np.nan, np.nan, np.nan,
+                      float(m), float(cv), float(skew), 0.0]
+            + [float(q_exact(float(p))) for p in ps]}
+    for kind, law in laws.items():
+        with np.errstate(divide='ignore', invalid='ignore'):
+            G = law['cdf'](xs)
+            mass = np.diff(G, prepend=0.0)
+            mean_a = float(mass @ xs)
+            var_a = float(mass @ (xs - mean_a) ** 2)
+            sd_a = math.sqrt(max(var_a, 0.0))
+            cv_a = sd_a / mean_a if mean_a != 0 else np.nan
+            skew_a = (float(mass @ (xs - mean_a) ** 3) / sd_a ** 3
+                      if sd_a > 0 else np.nan)
+            ks = float(np.max(np.abs(F - G)))
+            quantiles = [float(v) for v in law['ppf'](ps)]
+        data[kind] = ([law['fragment'], law['shape'], law['loc'],
+                       law['scale'], mean_a, cv_a, skew_a, ks]
+                      + quantiles)
+    df = pd.DataFrame(data, index=index)
+    df.columns.name = 'approximation'
+    return df
+
+
+def approximation_density_frame(m, cv, skew, signed_input, xs, exact_density,
+                                bs):
+    """Build the ``approximation_density_df`` plotting feed.
+
+    Parameters
+    ----------
+    m, cv, skew, signed_input, xs, exact_density
+        As :func:`approximation_frame`.
+    bs : float
+        Bucket size; family densities are expressed as grid mass
+        ``pdf(x) * bs`` so the columns overlay the discrete density
+        directly.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by the grid (named ``loss``); column ``exact`` (the
+        realized density) then one column per family (axis named
+        ``approximation``). A clamped family's column sums to ``1 -`` its
+        clamp atom at 0, which the pdf does not carry.
+    """
+    xs = np.asarray(xs, dtype=float)
+    laws = _approximation_laws(m, cv, skew, signed_input)
+    data = {'exact': np.asarray(exact_density, dtype=float)}
+    with np.errstate(divide='ignore', invalid='ignore'):
+        for kind, law in laws.items():
+            data[kind] = law['pdf'](xs) * float(bs)
+    df = pd.DataFrame(data, index=pd.Index(xs, name='loss'))
+    df.columns.name = 'approximation'
     return df
 
 
@@ -2438,7 +2659,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             sev_xs = sev_ps = None
             sev_wt = 1.0
             # The emitted severity type mirrors the INPUT's signedness, not the
-            # fit's (author ruling 2026-09-04, dev/plan-approximate-punchup.md):
+            # fit's (author ruling 2026-09-04, dev/done/plan-approximate-punchup.md):
             # a loss aggregate stays a loss, so a fit reaching below zero under
             # an unsigned input clamps its sub-zero tail to an atom at 0. The
             # moment drift the clamp introduces is displayed, not hidden, in
@@ -5824,6 +6045,63 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self.agg_density is None:
             return None
         return return_period_frame(self.q, self.tvar, self.est_m, periods)
+
+    @property
+    def approximation_df(self):
+        """All five method-of-moments fits against the exact law (a property).
+
+        Columns ``exact`` (the anchor, the realized grid) then
+        :data:`APPROXIMATION_FAMILIES`; rows the ``meta`` / ``stats`` /
+        ``quantiles`` blocks of :func:`approximation_frame`, the last on
+        the ``tail_df`` ladder. On demand, no options, always all five
+        families: an error is a column subtraction against ``exact``, the
+        reading ``stats_df`` gives its columns.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``None`` before :meth:`update`.
+
+        Notes
+        -----
+        Each family column is the law of the **emitted program** under the
+        mirroring rule (`dev/done/plan-approximate-punchup.md`): an unsigned
+        (plain ``sev``) subject clamps a fit's sub-zero mass to an atom at
+        0, so even a three-parameter (shifted) family can differ from the
+        ``exact`` column, which is exactly what the frame teaches; the
+        two-parameter ``lognorm`` / ``gamma`` differ in ``skew`` by
+        construction, ``norm`` targets zero. ``ks`` is the Kolmogorov
+        distance ``sup |F - G|`` on the grid at the bucket convention
+        ``F(x_k) = P(X <= x_k)``, the Berry-Esseen quantity.
+        """
+        if self.agg_density is None:
+            return None
+        return approximation_frame(
+            self.est_m, self.est_cv, self.est_skew, self._signed(),
+            self.density_df.loss.to_numpy(dtype=float),
+            self.density_df.p_total.to_numpy(dtype=float), self.q)
+
+    @property
+    def approximation_density_df(self):
+        """Grid-mass densities of the five fits beside the exact (a property).
+
+        The plotting feed for the ``approximation`` chart: index the output
+        grid, column ``exact`` the realized density, then one column per
+        family holding ``pdf(x) * bs`` of the emitted law (reflect and
+        mirror-clamp applied), so the columns overlay the discrete density
+        directly. See :func:`approximation_density_frame`.
+
+        Returns
+        -------
+        pandas.DataFrame or None
+            ``None`` before :meth:`update`.
+        """
+        if self.agg_density is None:
+            return None
+        return approximation_density_frame(
+            self.est_m, self.est_cv, self.est_skew, self._signed(),
+            self.density_df.loss.to_numpy(dtype=float),
+            self.density_df.p_total.to_numpy(dtype=float), self.bs)
 
     def _describe(self, force_reins_label=None, force_sd=False):
         """Build the ``validation_df`` frame, optionally forced into reins view.

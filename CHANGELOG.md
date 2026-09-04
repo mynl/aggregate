@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a333
+
+**[Approximation-Centered-Mass] `approximation_df` numbers move: family columns are discretized under the library's own centered (`round`) convention.** The family cumulatives are now read at the bucket's upper half-edge, `G(x_k + bs/2)`, removing a systematic `+bs/2` mean shift against the `exact` column that was glaring on coarse grids (a mean-8 book at `bs = 1` reported its normal fit as 8.5, now 8.0); `ks` and the `approximation` chart's tail curves read at the same points, and the `approximation` exhibit snapshots are recaptured. `approximation_frame` gains a required `bs` argument. Quantile rows are unchanged (analytic, never biased). Follow-up to `a332`, recorded in `dev/done/plan-approximate-punchup.md`.
+
 ## 1.0.0a332
 
 **[Approximate-Punchup] the approximation frames, exhibit and chart land: `approximation_df` and `approximation_density_df` on `Aggregate` and `Portfolio`, an `approximation` exhibit, and an `approximation` chart.** `approximation_df` reads all five method-of-moments fits against the exact law (the total, on a portfolio): columns `exact | norm | gamma | lognorm | sgamma | slognorm` over `meta` (the DecL fragment and parameters), `stats` (achieved moments of each emitted law, mirror-clamp included, plus the Kolmogorov distance `ks`) and `quantiles` (the `tail_df` ladder); `approximation_density_df` is the grid-mass plotting feed (`pdf * bs` per family beside the realized density). Both are on-demand properties, no options. The `approximation` exhibit serves the frame through the registry (`predicate` updated; snapshot keys additive); the `approximation` chart (Aggregate only) draws the realized mass with the five family densities and an exceedance panel adding the sub-exponential implied tail `E[N] * S_X(x)` from the exact severity functions. A family the subject cannot admit (unshifted `gamma` / `lognorm` on a negative-mean book) reports NaN in the frame and is not drawn. The standalone `oep` chart proposal is dropped by ruling. Closes `dev/done/plan-approximate-punchup.md` (two bumps, `a331` to `a332`).

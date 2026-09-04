@@ -654,3 +654,22 @@ def test_portfolio_approximation_df_reads_the_total():
     assert df.loc[("stats", "mean"), "exact"] == pytest.approx(p.est_m)
     d = p.approximation_density_df
     assert d["exact"].sum() == pytest.approx(1.0, abs=1e-6)
+
+
+def test_approximation_df_no_half_bucket_bias():
+    """Family moments are read under the round convention, no +bs/2 shift.
+
+    Regression for [Approximation-Centered-Mass] (a333): reading a family
+    cumulative at the grid points assigns each bucket's mass to its right
+    endpoint, shifting the achieved mean by +bs/2 against the exact
+    column, glaring on a coarse grid (a mean-6 dice book at bs = 1 read
+    its normal fit as 6.5). The frame now reads G(x + bs/2), the round
+    discretization of the emitted law, so the fit's true mean survives.
+    """
+    a = build("agg FB dfreq [3] dsev [1 2 3]")
+    assert a.bs == 1.0
+    st = a.approximation_df.loc["stats"]
+    # the normal fit of a symmetric book has mean exactly E[X]; before the
+    # fix this row read 6.5
+    assert st.loc["mean", "norm"] == pytest.approx(st.loc["mean", "exact"],
+                                                   rel=1e-6)

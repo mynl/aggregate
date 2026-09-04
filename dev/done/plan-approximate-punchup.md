@@ -527,3 +527,20 @@ surfaced, a third finding for the author: **`moments.py:500` sqrt of a
 negative on `agg:RenewalDeterministicWait`** (an a327 library entry;
 nothing in this plan touches moments or renewal), which fails
 `test_every_library_entry_builds` under the gate only.
+
+### Follow-up, `1.0.0a333` (2026-09-04, author request after review)
+
+The half-bucket finding (bump 2, finding 1) is fixed rather than left
+standing: `approximation_frame` reads each family cumulative at the
+bucket's upper half-edge, `G(x_k + bs/2)`, which is the library's own
+`round` discretization of the emitted law, so the family and `exact`
+columns share one convention and the `+bs/2` mean shift is gone (the dice
+portfolio's family means read 8.0, not 8.5; unclamped fits on the
+continuous fixture now read the exact mean to the digit). `ks` compares
+the two cumulatives at the same shifted points, and the chart's tail
+panel reads its continuous curves (families and implied tail) at the same
+half-edge so the drawn curves sit on the exact staircase. The plan's
+stated `F(x_k) = P(X <= x_k)` convention is superseded by this entry.
+The 8 `approximation/*` exhibit snapshot keys were recaptured (again
+leaving every other entry untouched); a regression test pins the dice
+mean.

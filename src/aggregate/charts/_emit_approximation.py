@@ -117,16 +117,22 @@ def _approximation(agg, xmax=None):
             **lattice_payload(x, agg.bs)))
 
     # Tail panel: exceedance of the exact law and of each emitted law, and
-    # the implied tail off the exact severity functions.
+    # the implied tail off the exact severity functions. The exact running
+    # sum under the round convention means P(X <= x_k + bs/2), so every
+    # continuous curve is read at the same upper half-edge; a curve read at
+    # the grid points themselves would sit half a bucket to the right of
+    # the staircase it is compared against (see ``approximation_frame``).
     from .._aggregate import _approximation_laws
     laws = _approximation_laws(agg.est_m, agg.est_cv, agg.est_skew,
                                agg._signed())
+    edges = x + 0.5 * float(agg.bs)
     exact_survival = 1.0 - np.cumsum(exact_mass)
     tail = [_tail_series('Exact', x, exact_survival)]
     with np.errstate(divide='ignore', invalid='ignore'):
         for kind in families:
-            tail.append(_tail_series(kind, x, 1.0 - laws[kind]['cdf'](x)))
-        implied = float(agg.n) * np.asarray(agg.sev.sf(x), dtype=float)
+            tail.append(_tail_series(kind, x,
+                                     1.0 - laws[kind]['cdf'](edges)))
+        implied = float(agg.n) * np.asarray(agg.sev.sf(edges), dtype=float)
     implied = np.where(implied <= 1.0, implied, np.nan)
     tail.append(_tail_series('Implied tail', x, implied, role='ceiling'))
     tail = [s for s in tail if s is not None]

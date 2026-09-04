@@ -1635,7 +1635,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return approximation_frame(
             self.est_m, self.est_cv, self.est_skew, self._signed(),
             self.density_df.loss.to_numpy(dtype=float),
-            self.density_df.p_total.to_numpy(dtype=float), self.q)
+            self.density_df.p_total.to_numpy(dtype=float), self.q, self.bs)
 
     @property
     def approximation_density_df(self):

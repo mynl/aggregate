@@ -298,7 +298,8 @@ def _approximation_ladder():
     return np.unique(np.concatenate([1.0 / T, 1.0 - 1.0 / T]))
 
 
-def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact):
+def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact,
+                        bs):
     """Build the ``approximation_df`` frame: all five fits against exact.
 
     Shared by :attr:`Aggregate.approximation_df` and
@@ -317,6 +318,9 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact):
         The realized aggregate density on ``xs`` (sums to ~1).
     q_exact : callable
         The subject's grid quantile function ``q(p)``.
+    bs : float
+        Bucket size; each family cumulative is read at the bucket's upper
+        half-edge so its discretization matches the exact column's.
 
     Returns
     -------
@@ -334,17 +338,29 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact):
     Everything a family column reports is the law of the **emitted
     program** (mirrored keyword, clamp included): one law per column, no
     mixing of the fit target and the fit result. The achieved moments come
-    from the grid-mass evaluation ``diff(G(xs), prepend=0)`` (whose first
-    element carries any clamp atom at 0), the same cumulative that feeds
-    ``ks``, so the ``stats`` and ``quantiles`` blocks cannot disagree about
-    which law they describe. Both cumulatives are compared at the bucket
-    convention ``F(x_k) = P(X <= x_k)``. An error column is a subtraction
+    from the grid-mass evaluation ``diff(G(xs + bs/2), prepend=0)`` (whose
+    first element carries any clamp atom at 0), the same cumulative that
+    feeds ``ks``, so the ``stats`` and ``quantiles`` blocks cannot
+    disagree about which law they describe.
+
+    **The half-bucket edge is load bearing.** The realized density is
+    built under the library's ``round`` (centered) convention,
+    ``p_k = P(x_k - bs/2 < X <= x_k + bs/2)``, so its running sum means
+    ``F(x_k) = P(X <= x_k + bs/2)``. A family cumulative read at the grid
+    points themselves, ``G(x_k)``, would assign each bucket's mass to its
+    right endpoint, a systematic ``+bs/2`` mean shift against the exact
+    column (visible on a coarse grid: a normal fit of a mean-8 book at
+    ``bs = 1`` reported mean 8.5). Reading ``G(x_k + bs/2)`` instead is
+    exactly the ``round`` discretization of the emitted law, so both
+    columns describe the same convention and both cumulatives compared by
+    ``ks`` mean ``P(X <= x_k + bs/2)``. An error column is a subtraction
     against ``exact``, the reading ``stats_df`` gives its columns, so no
     separate error block is carried.
     """
     xs = np.asarray(xs, dtype=float)
     exact_density = np.asarray(exact_density, dtype=float)
     F = np.cumsum(exact_density)
+    edges = xs + 0.5 * float(bs)
     ps = _approximation_ladder()
     laws = _approximation_laws(m, cv, skew, signed_input)
 
@@ -360,7 +376,7 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact):
             + [float(q_exact(float(p))) for p in ps]}
     for kind, law in laws.items():
         with np.errstate(divide='ignore', invalid='ignore'):
-            G = law['cdf'](xs)
+            G = law['cdf'](edges)
             mass = np.diff(G, prepend=0.0)
             mean_a = float(mass @ xs)
             var_a = float(mass @ (xs - mean_a) ** 2)
@@ -6079,7 +6095,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return approximation_frame(
             self.est_m, self.est_cv, self.est_skew, self._signed(),
             self.density_df.loss.to_numpy(dtype=float),
-            self.density_df.p_total.to_numpy(dtype=float), self.q)
+            self.density_df.p_total.to_numpy(dtype=float), self.q, self.bs)
 
     @property
     def approximation_density_df(self):

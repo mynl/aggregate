@@ -303,10 +303,11 @@ approximation = register_simple_exhibit(
     'approximation', 'Approximation', 'approximation_df',
     [Aggregate, Portfolio], predicate=_perspectives_updated,
     caption='The five method-of-moments fits read against the exact law '
-            '(the total, on a portfolio): the fitted DecL fragment and '
-            'parameters, the achieved moments of each emitted law with its '
-            'Kolmogorov distance to the realized cumulative, and the '
-            'quantiles on the return period ladder. The shifted families '
+            '(the total, on a portfolio): the fitted parameters, the '
+            'achieved moments of each emitted law with its Kolmogorov '
+            'distance to the realized cumulative, and the quantiles on the '
+            'return period ladder with their relative errors against '
+            'exact. The shifted families '
             'match three moments, the unshifted two; a fit reaching below '
             'zero on a loss book is clamped at 0 and the clamp shows in its '
             'achieved moments.')

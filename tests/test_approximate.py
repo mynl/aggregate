@@ -29,6 +29,7 @@ import numpy as np
 import pytest
 
 from aggregate import Aggregate, build
+from aggregate._aggregate import _approximation_laws
 
 # The approximate object's empirical moments are the fit's own moments computed
 # on a well-resolved grid, so they reproduce the exact aggregate's analytic
@@ -548,20 +549,27 @@ def _right_skew_fixture():
 
 
 def test_approximation_df_shape():
-    """Six family columns over the meta / stats / quantiles row blocks."""
+    """Six family columns over the meta / stats / quantiles / rel err blocks."""
     a = _right_skew_fixture()
     df = a.approximation_df
     assert list(df.columns) == _FRAME_COLUMNS
     assert df.columns.name == "approximation"
     assert df.index.names == ["component", "measure"]
     assert list(dict.fromkeys(df.index.get_level_values(0))) == [
-        "meta", "stats", "quantiles"]
-    assert list(df.loc["meta"].index) == ["distribution", "shape", "loc",
-                                          "scale"]
+        "meta", "stats", "quantiles", "rel err"]
+    assert list(df.loc["meta"].index) == ["shape", "loc", "scale"]
     assert list(df.loc["stats"].index) == ["mean", "cv", "skew", "ks"]
-    # the quantile rows ride the tail_df ladder
+    # the quantile and rel err rows ride the tail_df ladder
     ps = df.loc["quantiles"].index.to_list()
     assert ps == a.tail_df.index.to_list()
+    assert df.loc["rel err"].index.to_list() == ps
+    # every column is numeric: no string row survives (formatting relies on it)
+    assert all(df[c].dtype.kind == "f" for c in df.columns)
+    # a family without a parameter reports 0, not NaN: norm has no shape,
+    # the unshifted gamma / lognorm no loc
+    assert df.loc[("meta", "shape"), "norm"] == 0.0
+    assert df.loc[("meta", "loc"), "gamma"] == 0.0
+    assert df.loc[("meta", "loc"), "lognorm"] == 0.0
 
 
 def test_approximation_df_exact_column_and_ks():
@@ -581,18 +589,27 @@ def test_approximation_df_exact_column_and_ks():
     q = df.loc["quantiles"]
     for p in (0.5, 0.99):
         assert q.loc[p, "exact"] == pytest.approx(a.q(p))
+    # rel err is the quantile block read against exact: 0 in the exact
+    # column, q_fam / q_exact - 1 elsewhere
+    r = df.loc["rel err"]
+    assert (r["exact"] == 0.0).all()
+    for kind in ("sgamma", "norm"):
+        assert r.loc[0.99, kind] == pytest.approx(
+            q.loc[0.99, kind] / q.loc[0.99, "exact"] - 1.0)
 
 
 def test_approximation_df_clamp_shows_and_fragment_builds():
     """On a plain ``sev`` fixture the normal fit's clamp lift is displayed
-    and the meta fragment builds under ``sev``."""
+    and the law's DecL fragment builds under ``sev``."""
     a = _right_skew_fixture()
     df = a.approximation_df
     # the clamped normal's achieved mean sits above the exact mean by the
     # clamp mass at 0 (the ruling: displayed, not hidden)
     assert df.loc[("stats", "mean"), "norm"] > df.loc[("stats", "mean"),
                                                       "exact"]
-    frag = df.loc[("meta", "distribution"), "norm"]
+    # the frame is all-numeric since a334; the fragment lives on the laws
+    laws = _approximation_laws(a.est_m, a.est_cv, a.est_skew, a._signed())
+    frag = laws["norm"]["fragment"]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         surrogate = build(f"agg FRN 1 claim sev {frag} fixed")
@@ -622,7 +639,8 @@ def test_approximation_df_ssev_no_clamp_matches():
     assert st.loc["skew", "gamma"] > 0
     assert st.loc["skew", "lognorm"] > 0
     # the reflected fragments spell the rsub form
-    assert " - " in df.loc[("meta", "distribution"), "slognorm"]
+    laws = _approximation_laws(a.est_m, a.est_cv, a.est_skew, a._signed())
+    assert " - " in laws["slognorm"]["fragment"]
 
 
 def test_approximation_density_df_columns_sum_to_one():

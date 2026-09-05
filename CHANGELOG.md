@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a334
+
+**[Approximate-Punchup] `approximation_df` goes all-numeric and gains a `rel err` block.** The `(meta, distribution)` fragment row is dropped, so every column is float and the table formats as one numeric block (the DecL fragment of each fit remains available from `_approximation_laws`); a family without a parameter now reports 0 rather than NaN (`norm` shape, unshifted `gamma` / `lognorm` loc); and a new `rel err` block reads each family quantile as a relative error against `exact` on the same ladder (`NaN` where the exact quantile is 0, 0 in the `exact` column). The exhibit caption follows and the eight `approximation` exhibit snapshots regenerate.
+
 ## 1.0.0a333
 
 **[Approximation-Centered-Mass] `approximation_df` numbers move: family columns are discretized under the library's own centered (`round`) convention.** The family cumulatives are now read at the bucket's upper half-edge, `G(x_k + bs/2)`, removing a systematic `+bs/2` mean shift against the `exact` column that was glaring on coarse grids (a mean-8 book at `bs = 1` reported its normal fit as 8.5, now 8.0); `ks` and the `approximation` chart's tail curves read at the same points, and the `approximation` exhibit snapshots are recaptured. `approximation_frame` gains a required `bs` argument. Quantile rows are unchanged (analytic, never biased). Follow-up to `a332`, recorded in `dev/done/plan-approximate-punchup.md`.

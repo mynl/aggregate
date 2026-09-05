@@ -222,8 +222,10 @@ def _approximation_laws(m, cv, skew, signed_input):
     -------
     dict of str -> dict
         Per family: ``fragment`` (the DecL severity fragment), ``shape`` /
-        ``loc`` / ``scale`` (``NaN`` where the family has none), ``cdf`` /
-        ``pdf`` / ``ppf`` (vectorized callables of the emitted law).
+        ``loc`` / ``scale`` (0 where the family has no such parameter, so
+        every parameter row is numeric; a failed fit stays ``NaN``),
+        ``cdf`` / ``pdf`` / ``ppf`` (vectorized callables of the emitted
+        law).
 
     Notes
     -----
@@ -247,10 +249,10 @@ def _approximation_laws(m, cv, skew, signed_input):
             sev = _approximate_sev_kwargs(m, cv, skew, kind)
         reflected = bool(sev.get('sev_reflect', False))
         name = sev['sev_name']
-        shape = float(sev['sev_a']) if 'sev_a' in sev else np.nan
-        loc = float(sev['sev_loc']) if 'sev_loc' in sev else np.nan
+        shape = float(sev['sev_a']) if 'sev_a' in sev else 0.0
+        loc = float(sev['sev_loc']) if 'sev_loc' in sev else 0.0
         scale = float(sev['sev_scale'])
-        base_loc = 0.0 if (reflected or np.isnan(loc)) else loc
+        base_loc = 0.0 if reflected else loc
         if name == 'norm':
             base = ss.norm(loc=base_loc, scale=scale)
         elif name == 'lognorm':
@@ -327,11 +329,15 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact,
     pandas.DataFrame
         Columns ``exact`` then :data:`APPROXIMATION_FAMILIES` (axis named
         ``approximation``); rows a ``(component, measure)`` MultiIndex with
-        blocks ``meta`` (the DecL ``distribution`` fragment and the
-        ``shape`` / ``loc`` / ``scale`` parameters), ``stats`` (achieved
-        ``mean`` / ``cv`` / ``skew`` of the emitted law, clamp included,
-        and ``ks``, the Kolmogorov distance to the realized cumulative)
-        and ``quantiles`` (one row per ``P`` of the ``tail_df`` ladder).
+        blocks ``meta`` (the ``shape`` / ``loc`` / ``scale`` parameters, 0
+        where a family has no such parameter, ``NaN`` on ``exact``),
+        ``stats`` (achieved ``mean`` / ``cv`` / ``skew`` of the emitted
+        law, clamp included, and ``ks``, the Kolmogorov distance to the
+        realized cumulative), ``quantiles`` (one row per ``P`` of the
+        ``tail_df`` ladder) and ``rel err`` (each family quantile as a
+        relative error against ``exact`` on the same ladder). Every value
+        is a float, so the frame formats as one numeric table; the DecL
+        fragment of each fit is available from :func:`_approximation_laws`.
 
     Notes
     -----
@@ -353,9 +359,10 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact,
     ``bs = 1`` reported mean 8.5). Reading ``G(x_k + bs/2)`` instead is
     exactly the ``round`` discretization of the emitted law, so both
     columns describe the same convention and both cumulatives compared by
-    ``ks`` mean ``P(X <= x_k + bs/2)``. An error column is a subtraction
-    against ``exact``, the reading ``stats_df`` gives its columns, so no
-    separate error block is carried.
+    ``ks`` mean ``P(X <= x_k + bs/2)``. The ``rel err`` block reads each
+    family quantile against the exact one as ``q_fam / q_exact - 1``; a 0
+    exact quantile (a low rung on a loss book with mass at 0) reports
+    ``NaN``, since no relative reading exists there.
     """
     xs = np.asarray(xs, dtype=float)
     exact_density = np.asarray(exact_density, dtype=float)
@@ -364,16 +371,17 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact,
     ps = _approximation_ladder()
     laws = _approximation_laws(m, cv, skew, signed_input)
 
-    rows = ([('meta', 'distribution'), ('meta', 'shape'), ('meta', 'loc'),
-             ('meta', 'scale'),
+    rows = ([('meta', 'shape'), ('meta', 'loc'), ('meta', 'scale'),
              ('stats', 'mean'), ('stats', 'cv'), ('stats', 'skew'),
              ('stats', 'ks')]
-            + [('quantiles', float(p)) for p in ps])
+            + [('quantiles', float(p)) for p in ps]
+            + [('rel err', float(p)) for p in ps])
     index = pd.MultiIndex.from_tuples(rows, names=('component', 'measure'))
 
-    data = {'exact': ['', np.nan, np.nan, np.nan,
+    q_ex = np.asarray([float(q_exact(float(p))) for p in ps])
+    data = {'exact': [np.nan, np.nan, np.nan,
                       float(m), float(cv), float(skew), 0.0]
-            + [float(q_exact(float(p))) for p in ps]}
+            + list(q_ex) + [0.0] * len(ps)}
     for kind, law in laws.items():
         with np.errstate(divide='ignore', invalid='ignore'):
             G = law['cdf'](edges)
@@ -385,10 +393,11 @@ def approximation_frame(m, cv, skew, signed_input, xs, exact_density, q_exact,
             skew_a = (float(mass @ (xs - mean_a) ** 3) / sd_a ** 3
                       if sd_a > 0 else np.nan)
             ks = float(np.max(np.abs(F - G)))
-            quantiles = [float(v) for v in law['ppf'](ps)]
-        data[kind] = ([law['fragment'], law['shape'], law['loc'],
-                       law['scale'], mean_a, cv_a, skew_a, ks]
-                      + quantiles)
+            quantiles = np.asarray([float(v) for v in law['ppf'](ps)])
+            rel_err = np.where(q_ex != 0.0, quantiles / q_ex - 1.0, np.nan)
+        data[kind] = ([law['shape'], law['loc'], law['scale'],
+                       mean_a, cv_a, skew_a, ks]
+                      + list(quantiles) + [float(v) for v in rel_err])
     df = pd.DataFrame(data, index=index)
     df.columns.name = 'approximation'
     return df
@@ -6068,10 +6077,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Columns ``exact`` (the anchor, the realized grid) then
         :data:`APPROXIMATION_FAMILIES`; rows the ``meta`` / ``stats`` /
-        ``quantiles`` blocks of :func:`approximation_frame`, the last on
-        the ``tail_df`` ladder. On demand, no options, always all five
-        families: an error is a column subtraction against ``exact``, the
-        reading ``stats_df`` gives its columns.
+        ``quantiles`` / ``rel err`` blocks of :func:`approximation_frame`,
+        the last two on the ``tail_df`` ladder. On demand, no options,
+        always all five families; ``rel err`` reads each family quantile
+        as a relative error against ``exact``.
 
         Returns
         -------

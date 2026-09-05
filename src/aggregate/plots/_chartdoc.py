@@ -91,11 +91,42 @@ def _decade_floor(values):
 def _axis_scale(axis, log):
     """The scale this axis is drawn on: its default, or its log reading.
 
-    ``log`` acts on every axis that declares a log reading and on no other,
-    which is the surfacing rule the app's control strip follows: one switch,
-    applied wherever the document says a log reading is meaningful.
+    ``log`` here is the resolved flag for the one direction this axis is
+    drawn in (see :func:`_log_directions`). It acts on an axis that
+    declares a log reading and on no other, which is the surfacing rule
+    the app's control strip follows: a switch applies wherever the
+    document says a log reading is meaningful, and nowhere else.
     """
     return 'log' if (log and 'log' in axis.scales) else axis.scale
+
+
+def _log_directions(log):
+    """Resolve the ``log`` switch to its ``(x, y)`` direction pair.
+
+    ``True`` asks for the log reading in both drawing directions, ``'x'``
+    or ``'y'`` in that one, ``False`` in neither. The declaration rule is
+    unchanged: a direction's flag still acts only on an axis that declares
+    a log reading, so ``log='y'`` on a document whose ordinate declares
+    none draws identically to the plain call.
+
+    Notes
+    -----
+    Mirrors the app renderer's per-panel ``logX`` / ``logY`` controls,
+    which exist because one log button could not draw a log ordinate over
+    a linear loss axis, the reading wanted most often. The directions are
+    the *drawn* directions: under ``invert`` the exchanged axes carry
+    their flags with the direction they are drawn in, not the one the
+    panel declared them under.
+    """
+    if log in (True, 'xy', 'yx'):
+        return True, True
+    if log in (False, None):
+        return False, False
+    if log == 'x':
+        return True, False
+    if log == 'y':
+        return False, True
+    raise ValueError(f"log must be a bool, 'x', 'y' or 'xy', got {log!r}")
 
 
 def _surface_window(surf, x, y, z):
@@ -284,14 +315,18 @@ def _render_grid_panel(ax, doc, panel, series_list, log=False):
 
     ``log`` acts on the z axis when the document declares a log reading of
     it, which for a joint density is where tail dependence lives, and on
-    the plane axes on the same terms.
+    the plane axes on the same terms. The z axis rides the ``y``
+    direction of a directional ``log`` (the app's rule: the color field
+    is an ordinate), so ``log='y'`` reads the mass on log over linear
+    plane axes.
     """
     surf = next(s for s in series_list if s.surface is not None).surface
     x = np.asarray(surf.x, dtype=float)
     y = np.asarray(surf.y, dtype=float)
     z = np.asarray(surf.z, dtype=float)
     axes = {a.id: a for a in doc.axes}
-    log_z = _axis_scale(axes[panel.z_axis], log) == 'log'
+    log_x, log_y = _log_directions(log)
+    log_z = _axis_scale(axes[panel.z_axis], log_y) == 'log'
     # The mesh is drawn whole and the color scale is read off the window:
     # what is served beyond it is there to be panned to and to compute on,
     # not to set the scale for the part that is the subject.
@@ -331,8 +366,9 @@ def _render_grid_panel(ax, doc, panel, series_list, log=False):
     ax.set(xlim=xlim, ylim=ylim,
            xlabel=_typeset(doc, axes[panel.x_axis].label),
            ylabel=_typeset(doc, axes[panel.y_axis].label))
-    for which, axis_id in (('x', panel.x_axis), ('y', panel.y_axis)):
-        if _axis_scale(axes[axis_id], log) == 'log':
+    for which, axis_id, flag in (('x', panel.x_axis, log_x),
+                                 ('y', panel.y_axis, log_y)):
+        if _axis_scale(axes[axis_id], flag) == 'log':
             getattr(ax, f'set_{which}scale')('log')
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
@@ -685,7 +721,8 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     # itself, so it re-slices nothing and the companion window must stand;
     # and the reflected axis carries its own window from the emitter,
     # which is the whole point of declaring it as a paired axis.
-    x_scale, y_scale = _axis_scale(x_axis, log), _axis_scale(y_axis, log)
+    log_x, log_y = _log_directions(log)
+    x_scale, y_scale = _axis_scale(x_axis, log_x), _axis_scale(y_axis, log_y)
     y_window = None if x_period else _axis_window(y_axis, full)
     x_only = None if y_period else x_window
     if panel.aspect == 'equal' and x_scale == y_scale:
@@ -733,10 +770,15 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         Raise :class:`~aggregate.charts.ir.ChartCapabilityError` for any
         panel this renderer can only degrade, instead of drawing the
         declared degradation.
-    log : bool
-        Read every axis that declares a log scale on log. An axis that
-        declares one reading is untouched, so a document with nothing to
-        say about log draws identically either way.
+    log : bool or {'x', 'y', 'xy'}
+        ``True`` reads every axis that declares a log scale on log; ``'x'``
+        or ``'y'`` confines the reading to that drawing direction, so
+        ``log='y'`` draws a log ordinate over a linear abscissa (the
+        reading the app's per-panel ``logX`` / ``logY`` controls exist
+        for). An axis that declares one reading is untouched whichever is
+        asked, so a document with nothing to say about log draws
+        identically either way. On a grid panel the z (color) axis rides
+        the ``'y'`` direction.
     full_range : bool
         Read every axis that carries a ``full_range`` at its full extent
         instead of at the window it suggests. Axes carrying only a

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a342
+
+**[Chartdoc-Log-Per-Direction] `plot_chartdoc`'s `log` switch takes a direction.** `log` now accepts `True` (both directions, unchanged), `'x'`, `'y'`, or `'xy'`, so `log='y'` draws a log ordinate over a linear abscissa, the reading the app's per-panel `logX` / `logY` controls already offer. The declaration rule is unchanged: a direction's flag acts only on an axis that declares a log reading, and under `invert` the flags follow the drawn direction. On a grid panel the z (color) axis rides `'y'`, the app's rule. Boolean callers are unaffected; an unknown direction raises `ValueError`.
+
 ## 1.0.0a341
 
 **[Ruin-Chart] new chart `ruin` on `Aggregate`: sample surplus paths and the exact `psi(u)` curve, downsampled by construction.** Predicate: updated with a poisson or renewal frequency. Panel `paths` carries about fifty decimated sample paths (role `sample`; each interval's running minimum is preserved so a dip below zero survives thinning, and a ruined path ends on its exact ruin point carrying its ruin time as the series `value`), the two-point expected trend, the LIL funnel band and the rug of simulated ruin times; panel `psi` carries the exact `psi(u)` on about 256 log-spaced grid points plus a one-point `marker` series at the resolved `(u, psi(u))`; `meta` carries the exhibit's scalars. Options `rho` or `lr`, `p` or `u`, `log2`, `seed` (fixed default so documents are hash-stable; `None` draws and reports a fresh one), `n_plot`, `detail` (per-path point budget, default 192); a bare call draws the teaching default `rho=0.2, p=0.05`; the simulation size is pinned at 1000 by ruling. Default documents measure about 155 kB canonical JSON against the 200 kB acceptance. New DecL tester `AD.Ruin.Negbin`. Third LIB phase of `dev/plan-pk-tab.md`: the LIB half is complete, the API half (route, pane, Sample) is open in the API repo.

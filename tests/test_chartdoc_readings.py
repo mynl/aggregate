@@ -61,6 +61,41 @@ def test_log_acts_only_where_it_is_declared():
     close(fig)
 
 
+def test_log_takes_a_direction():
+    # both axes declare the log reading; the direction confines the switch
+    doc = one_panel(
+        ChartAxis(id='loss', label='Loss', suggested_range=(1.0, 100.0),
+                  scales=('linear', 'log')),
+        ChartAxis(id='mass', label='Mass', scales=('linear', 'log')),
+        x=(1.0, 10.0, 100.0), y=(0.5, 0.3, 0.2))
+    for log, want in ((True, ('log', 'log')), ('xy', ('log', 'log')),
+                      ('x', ('log', 'linear')), ('y', ('linear', 'log')),
+                      (False, ('linear', 'linear'))):
+        ax, fig = drawn(doc, log=log)
+        assert (ax.get_xscale(), ax.get_yscale()) == want, log
+        close(fig)
+
+
+def test_log_direction_still_honors_the_declaration():
+    # the ordinate declares no log reading, so log='y' changes nothing
+    doc = one_panel(
+        ChartAxis(id='loss', label='Loss', suggested_range=(1.0, 100.0),
+                  scales=('linear', 'log')),
+        ChartAxis(id='dens', label='Density'),
+        x=(1.0, 10.0, 100.0), y=(0.5, 0.3, 0.2))
+    ax, fig = drawn(doc, log='y')
+    assert (ax.get_xscale(), ax.get_yscale()) == ('linear', 'linear')
+    close(fig)
+
+
+def test_log_rejects_an_unknown_direction():
+    doc = one_panel(ChartAxis(id='s', label='s'),
+                    ChartAxis(id='g', label='g'),
+                    x=(0.0, 1.0), y=(0.0, 1.0))
+    with pytest.raises(ValueError, match="log must be"):
+        drawn(doc, log='z')
+
+
 def test_a_document_that_declares_nothing_draws_the_same_either_way():
     doc = one_panel(ChartAxis(id='s', label='s', suggested_range=(0.0, 1.0)),
                     ChartAxis(id='g', label='g(s)'),

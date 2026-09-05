@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a344
+
+**[Approximation-Tails-Chart] new chart `approximation_tails` on `Aggregate`: the exceedance picture the `approximation` chart dropped at `1.0.0a337`, returned as its own document.** One `tails` panel: the exact tail, one survival curve per admissible family (read at the upper half-edge, trimmed at the float-dust floor, lattice x), and the sub-exponential implied tail `E[N] * S_X(x)` (role `ceiling`). Each law ships one curve: the cdf is the declared complement axis reading, the return period the declared reciprocal axis, and the exchanged panel is the upper Lee (quantile) plot, so nothing travels twice. Same `xmax` option as the `agg` and `approximation` charts; predicate updated; registers on `Aggregate` only (the implied tail needs a single severity). The `approximation` chart is unchanged. Downstream: `available_charts` gains a name, the a252 `load_chart_doc` reader needs nothing.
+
 ## 1.0.0a343
 
 **[Approximation-Frame-Cache] `approximation_df` and `approximation_density_df` are cached on `Aggregate` and `Portfolio`.** The frames build on first access and return the same object until invalidated, at exactly the sites that invalidate `density_df` (`update`, and on `Aggregate` the `dsev_bucket` setter). Treat the returned frames as read-only. Groundwork for the `approximation_tails` chart, which reads the same view as the `approximation` chart and the exhibit.

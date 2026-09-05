@@ -648,6 +648,26 @@
       "freq_name": "geometric"
     }
   },
+  "agg Ca.Freq05a.GeometricTrials 10 claims sev.One geometric !     note{Number-of-trials geometric on 1, 2, ...; sugar for geometric zt}": {
+    "kind": "agg",
+    "name": "Ca.Freq05a.GeometricTrials",
+    "spec": {
+      "name": "Ca.Freq05a.GeometricTrials",
+      "exp_en": 10.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0
+      ],
+      "sev_ps": [
+        1.0
+      ],
+      "note": "Number-of-trials geometric on 1, 2, ...; sugar for geometric zt",
+      "hints": "",
+      "freq_name": "geometric",
+      "freq_zm": true,
+      "freq_p0": 0.0
+    }
+  },
   "agg Ca.Freq06.Pascal       10 claims sev.One pascal .8 3": {
     "kind": "agg",
     "name": "Ca.Freq06.Pascal",

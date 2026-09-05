@@ -833,6 +833,7 @@ agg AC.ZT.PoissonPin 4 claims dsev [1] poisson zt                               
 agg AC.ZM.Deflate 4 claims dsev [1] poisson zm 0.005 !                                          note{Zero DEFLATION: p0 below the natural exp(-4) = 0.0183 raises the mean};
 agg AC.ZM.Negbin 4 claims dsev [1] negbin 3 zm .5 !                                             note{ZM negative binomial; freq_a is the variance multiplier 1+beta};
 agg AC.ZM.Geometric 4 claims dsev [1] geometric zm .5 !                                         note{ZM geometric};
+agg AC.Trials.Geometric 4 claims dsev [1] geometric !                                           note{Number-of-trials geometric, support 1, 2, ..., p = 1/4; identical law to geometric zt};
 agg AC.ZM.Binomial 4 claims dsev [1] binomial 0.6 zm .5 !                                       note{ZM binomial, per-trial probability 0.6};
 agg AC.ZM.Logarithmic 4 claims dsev [1] logarithmic zm .5 !                                     note{Logarithmic already has p0 = 0, so zm only adds mass at zero};
 agg AC.ZM.LossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5                              note{Monetary exposure, default reading: hits E[X] = 1000; append ! and it warns and delivers 500};

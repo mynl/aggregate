@@ -183,6 +183,33 @@ def test_decl_round_trips_the_bang():
     assert '!' not in plain.pprogram.split('zm')[1]
 
 
+def test_decl_geometric_bang_is_the_trials_variant():
+    """``geometric !`` is the number-of-trials geometric: support 1, 2, ...,
+    mean ``n``, ``p = 1/n``, and (by memorylessness) the same law as
+    ``geometric zt``, which is what the writer renders it back as."""
+    a = build('agg GTrials 10 claims dsev [1] geometric !', log2=10)
+    b = build('agg GZt 10 claims dsev [1] geometric zt', log2=10)
+    assert a.spec['freq_name'] == 'geometric'
+    assert a.spec.get('freq_zm') is True
+    assert float(a.spec.get('freq_p0')) == 0.0
+    assert a.n == pytest.approx(10.0)
+    # support starts at 1 and P(N=1) = p = 1/n (trials pmf p(1-p)^(k-1))
+    d = a.density_df.p_total
+    assert float(d.iloc[0]) == pytest.approx(0.0, abs=1e-10)
+    assert float(d.iloc[1]) == pytest.approx(0.1, rel=1e-8)
+    # identical law to the zt spelling
+    np.testing.assert_allclose(d.to_numpy(), b.density_df.p_total.to_numpy(),
+                               atol=1e-14)
+    # the writer renders the shared spec as zt
+    assert 'geometric zt' in ' '.join(a.pprogram.split())
+
+
+def test_decl_bang_rejected_off_geometric():
+    """``poisson !`` (or any non-geometric) has no trials reading."""
+    with pytest.raises(Exception, match='number-of-trials'):
+        build('agg PBang 10 claims dsev [1] poisson !')
+
+
 # ---------------------------------------------------------------------------
 # The monetary-exposure warning
 # ---------------------------------------------------------------------------

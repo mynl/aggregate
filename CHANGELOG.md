@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a335
+
+**[Geometric-Trials] DecL gains `geometric !`, the number-of-trials geometric.** Support 1, 2, ..., success probability `p = 1/n` for clause mean `n`, against the default number-of-failures convention on 0, 1, 2, .... By memorylessness the zero-truncated geometric is the trials variant, so the marker is sugar for `geometric zt` (one shared spec; the writer renders it back as `geometric zt`) and the mean calibrates exactly as `zt` does. Any other frequency followed by `!` raises, since no trials reading exists there. Corpus lines added to `_test_suite.agg` and `decl-testers.agg`; `expected_specs.json` and the grammar reference regenerate.
+
 ## 1.0.0a334
 
 **[Approximate-Punchup] `approximation_df` goes all-numeric and gains a `rel err` block.** The `(meta, distribution)` fragment row is dropped, so every column is float and the table formats as one numeric block (the DecL fragment of each fit remains available from `_approximation_laws`); a family without a parameter now reports 0 rather than NaN (`norm` shape, unshifted `gamma` / `lognorm` loc); and a new `rel err` block reads each family quantile as a relative error against `exact` on the same ladder (`NaN` where the exact quantile is 0, 0 in the `exact` column). The exhibit caption follows and the eight `approximation` exhibit snapshots regenerate.

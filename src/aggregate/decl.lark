@@ -318,6 +318,13 @@ sev_out: SEV name as_label sev trailer    -> sev_out_sev
 // in, mean out. The marker swapped meaning at 1.0.0a325; it used to mark the
 // pinned reading and now marks the un-pinned one
 // ([ZT-ZM-Recalibrate-Default]).
+//
+// ``geometric !`` is the number-of-trials geometric, support 1, 2, ...,
+// success probability p = 1/n for clause mean n. By memorylessness the
+// zero-truncated (failures) geometric IS the trials variant (G | G >= 1 =
+// 1 + G'), so the sugar lowers to the ``zt`` spec and the writer renders it
+// back as ``geometric zt``. Rejected for every other frequency, where no
+// trials reading exists.
 freq: freq ZM expr "!"         -> freq_zm_pin
     | freq ZM expr             -> freq_zm
     | freq ZT "!"              -> freq_zt_pin
@@ -326,6 +333,7 @@ freq: freq ZM expr "!"         -> freq_zm_pin
     | MIXED ID expr            -> freq_mixed_one
     | FREQ expr expr           -> freq_two
     | FREQ expr                -> freq_one
+    | FREQ "!"                 -> freq_zero_bang
     | FREQ                     -> freq_zero
 
 // Renewal waiting-time clause (sits in the freq slot of ``agg_body_renewal``).

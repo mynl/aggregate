@@ -1713,6 +1713,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             self._dsev_bucket = value
             self._density_df = None
             self._sev_density_df = None
+            self._approximation_df = None
+            self._approximation_density_df = None
 
     def _severity_in_window(self):
         """Whether the severity support overlaps the output window ``[x_min, x_max]``.
@@ -2937,6 +2939,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self.fzapprox = None
         self._density_df = None
         self._sev_density_df = None
+        self._approximation_df = None
+        self._approximation_density_df = None
 
         # Empirical moment estimates (set by update_work; consumed by q / tvar)
         self.est_m = 0
@@ -4362,6 +4366,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         self._density_df = None  # invalidate
         self._sev_density_df = None
+        self._approximation_df = None
+        self._approximation_density_df = None
         self._reins_density_df = None
         self._reins_stats_df = None
         self._reins_view_stats_cache = None
@@ -6511,13 +6517,20 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         construction, ``norm`` targets zero. ``ks`` is the Kolmogorov
         distance ``sup |F - G|`` on the grid at the bucket convention
         ``F(x_k) = P(X <= x_k)``, the Berry-Esseen quantity.
+
+        Cached after the first access (the exhibit and the two
+        ``approximation*`` charts all read it); invalidated wherever
+        ``density_df`` is. Treat the returned frame as read-only.
         """
         if self.agg_density is None:
             return None
-        return approximation_frame(
-            self.est_m, self.est_cv, self.est_skew, self._signed(),
-            self.density_df.loss.to_numpy(dtype=float),
-            self.density_df.p_total.to_numpy(dtype=float), self.q, self.bs)
+        if self._approximation_df is None:
+            self._approximation_df = approximation_frame(
+                self.est_m, self.est_cv, self.est_skew, self._signed(),
+                self.density_df.loss.to_numpy(dtype=float),
+                self.density_df.p_total.to_numpy(dtype=float),
+                self.q, self.bs)
+        return self._approximation_df
 
     @property
     def approximation_density_df(self):
@@ -6533,13 +6546,19 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame or None
             ``None`` before :meth:`update`.
+
+        Cached after the first access (both ``approximation*`` charts read
+        it); invalidated wherever ``density_df`` is. Treat the returned
+        frame as read-only.
         """
         if self.agg_density is None:
             return None
-        return approximation_density_frame(
-            self.est_m, self.est_cv, self.est_skew, self._signed(),
-            self.density_df.loss.to_numpy(dtype=float),
-            self.density_df.p_total.to_numpy(dtype=float), self.bs)
+        if self._approximation_density_df is None:
+            self._approximation_density_df = approximation_density_frame(
+                self.est_m, self.est_cv, self.est_skew, self._signed(),
+                self.density_df.loss.to_numpy(dtype=float),
+                self.density_df.p_total.to_numpy(dtype=float), self.bs)
+        return self._approximation_density_df
 
     def _describe(self, force_reins_label=None, force_sd=False):
         """Build the ``validation_df`` frame, optionally forced into reins view.

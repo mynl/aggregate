@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a343
+
+**[Approximation-Frame-Cache] `approximation_df` and `approximation_density_df` are cached on `Aggregate` and `Portfolio`.** The frames build on first access and return the same object until invalidated, at exactly the sites that invalidate `density_df` (`update`, and on `Aggregate` the `dsev_bucket` setter). Treat the returned frames as read-only. Groundwork for the `approximation_tails` chart, which reads the same view as the `approximation` chart and the exhibit.
+
 ## 1.0.0a342
 
 **[Chartdoc-Log-Per-Direction] `plot_chartdoc`'s `log` switch takes a direction.** `log` now accepts `True` (both directions, unchanged), `'x'`, `'y'`, or `'xy'`, so `log='y'` draws a log ordinate over a linear abscissa, the reading the app's per-panel `logX` / `logY` controls already offer. The declaration rule is unchanged: a direction's flag acts only on an axis that declares a log reading, and under `invert` the flags follow the drawn direction. On a grid panel the z (color) axis rides `'y'`, the app's rule. Boolean callers are unaffected; an unknown direction raises `ValueError`.

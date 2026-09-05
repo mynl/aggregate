@@ -292,6 +292,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_density_df = None
         self._reins_stats_df = None
         self._reins_describe = None
+        self._approximation_df = None
+        self._approximation_density_df = None
         self.sev_calc = ''
         self._remove_fuzz = 0
         self.discretization_calc = ''
@@ -1629,13 +1631,19 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame or None
             ``None`` before :meth:`update`.
+
+        Cached after the first access; invalidated on :meth:`update`.
+        Treat the returned frame as read-only.
         """
         if self.density_df is None:
             return None
-        return approximation_frame(
-            self.est_m, self.est_cv, self.est_skew, self._signed(),
-            self.density_df.loss.to_numpy(dtype=float),
-            self.density_df.p_total.to_numpy(dtype=float), self.q, self.bs)
+        if self._approximation_df is None:
+            self._approximation_df = approximation_frame(
+                self.est_m, self.est_cv, self.est_skew, self._signed(),
+                self.density_df.loss.to_numpy(dtype=float),
+                self.density_df.p_total.to_numpy(dtype=float),
+                self.q, self.bs)
+        return self._approximation_df
 
     @property
     def approximation_density_df(self):
@@ -1649,13 +1657,18 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame or None
             ``None`` before :meth:`update`.
+
+        Cached after the first access; invalidated on :meth:`update`.
+        Treat the returned frame as read-only.
         """
         if self.density_df is None:
             return None
-        return approximation_density_frame(
-            self.est_m, self.est_cv, self.est_skew, self._signed(),
-            self.density_df.loss.to_numpy(dtype=float),
-            self.density_df.p_total.to_numpy(dtype=float), self.bs)
+        if self._approximation_density_df is None:
+            self._approximation_density_df = approximation_density_frame(
+                self.est_m, self.est_cv, self.est_skew, self._signed(),
+                self.density_df.loss.to_numpy(dtype=float),
+                self.density_df.p_total.to_numpy(dtype=float), self.bs)
+        return self._approximation_density_df
 
     # ================================================================
     # Reinsurance reporting (end-to-end gcn; see dev/reins-reporting.md)
@@ -2475,6 +2488,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_density_df = None
         self._reins_stats_df = None
         self._reins_describe = None
+        self._approximation_df = None
+        self._approximation_density_df = None
 
         # Per-unit state for the kappa construction in ``add_exa``: the
         # unit's native grid / pmf plus the padded FT of its pmf. Captured

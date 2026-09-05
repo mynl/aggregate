@@ -691,3 +691,36 @@ def test_approximation_df_no_half_bucket_bias():
     # fix this row read 6.5
     assert st.loc["mean", "norm"] == pytest.approx(st.loc["mean", "exact"],
                                                    rel=1e-6)
+
+
+def test_approximation_frames_cached_and_invalidated():
+    """The frames build once, then return the same object until invalidated.
+
+    Both ``approximation*`` charts and the exhibit read the frames, so they
+    are cached like ``density_df`` and reset at the same sites (update and
+    the ``dsev_bucket`` setter).
+    """
+    a = build("agg CA dfreq [3] dsev [1 2 3]")
+    assert a.approximation_df is a.approximation_df
+    d = a.approximation_density_df
+    assert a.approximation_density_df is d
+    a.dsev_bucket = "nearest"
+    assert a.approximation_density_df is not d
+    d = a.approximation_density_df
+    a.update(log2=a.log2, bs=a.bs)
+    assert a.approximation_density_df is not d
+
+
+def test_portfolio_approximation_frames_cached():
+    """The Portfolio twins cache identically."""
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        p = build("port CP agg U1 5 claims sev lognorm 100 cv 1 poisson "
+                  "agg U2 4 claims sev lognorm 80 cv 1.2 poisson")
+    assert p.approximation_df is p.approximation_df
+    d = p.approximation_density_df
+    assert p.approximation_density_df is d
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        p.update(log2=p.log2, bs=p.bs)
+    assert p.approximation_density_df is not d

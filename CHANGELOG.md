@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a337
+
+**[Approximate-Punchup] the `approximation` chart drops its tail panel.** The chart is now the single density panel: realized mass with the five family curves in grid-mass terms, mean marked. The exceedance panel (twelve full-grid survival curves plus the implied tail `E[N] * S_X(x)`, shipped `a332`) is removed by ruling: the tail reading lives in the frame's `quantiles` / `rel err` blocks, and the panel dominated the document's byte count (measured 11.1 MB to 8.1 MB on a `log2 = 16` book; the rest is the density y arrays, a plan-payload item). `approximation_df` and `approximation_density_df` are unchanged. The survival and return-period axes and the `Implied tail` series leave the doc; a consumer keying on panel `tail` must re-sync.
+
 ## 1.0.0a336
 
 **[Geometric-Trials] `geometric !` is removed; the trials variant's spelling is `geometric zt`.** The sugar shipped at `1.0.0a335` and is withdrawn by ruling before any consumer used it: it added a second meaning of `!` for one family and inherited every zt edge case anyway (a realized mean of 1 is the degenerate boundary either way). `geometric !` is a parse error again. The corpus lines and tests stay, respelled to `zt`; docstrings and the grammar comment now record that zero truncation is the trials convention by memorylessness.

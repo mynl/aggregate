@@ -648,7 +648,7 @@
       "freq_name": "geometric"
     }
   },
-  "agg Ca.Freq05a.GeometricTrials 10 claims sev.One geometric !     note{Number-of-trials geometric on 1, 2, ...; sugar for geometric zt}": {
+  "agg Ca.Freq05a.GeometricTrials 10 claims sev.One geometric zt    note{Number-of-trials geometric on 1, 2, ...; zt is the trials variant by memorylessness}": {
     "kind": "agg",
     "name": "Ca.Freq05a.GeometricTrials",
     "spec": {
@@ -661,7 +661,7 @@
       "sev_ps": [
         1.0
       ],
-      "note": "Number-of-trials geometric on 1, 2, ...; sugar for geometric zt",
+      "note": "Number-of-trials geometric on 1, 2, ...; zt is the trials variant by memorylessness",
       "hints": "",
       "freq_name": "geometric",
       "freq_zm": true,

@@ -87,8 +87,8 @@ class Frequency(HelpMixin):
     - ``poisson``: Poisson(n)
     - ``geometric``: geometric(1/(n + 1)), supported on 0, 1, 2, ... (the
       number-of-failures convention). The number-of-trials variant on
-      1, 2, ... with p = 1/n is DecL ``geometric !``, sugar for
-      ``geometric zt``, the same law by memorylessness.
+      1, 2, ... with p = 1/n is ``geometric zt``, the same law by
+      memorylessness.
     - ``logarithmci``: logarithmic(theta), supported on 1, 2, ...; theta solved numerically
     - ``neymana``: Po(n/freq_a) stopped sum of Po(freq_a) freq_a = "eggs per cluster"
     - ``negbin``: freq_a is the variance multiplier, ratio of variance to mean
@@ -890,7 +890,7 @@ class FrequencyGeometric(Frequency):
     (support 1, 2, ..., mean ``n``, ``p = 1/n``) is the zero-truncated form
     of this class: by memorylessness ``G | G >= 1 = 1 + G'``, so
     conditioning on a claim is the same law as counting the trial that
-    succeeds. DecL spells it ``geometric !`` (sugar for ``geometric zt``).
+    succeeds. DecL spells it ``geometric zt``.
     """
 
     freq_name = 'geometric'

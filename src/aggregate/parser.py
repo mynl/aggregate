@@ -1357,25 +1357,6 @@ class UnderwritingTransformer(Transformer):
             )
         return {"freq_name": freq}
 
-    def freq_zero_bang(self, c):
-        """``geometric !``: the number-of-trials geometric, support 1, 2, ...
-
-        Success probability ``p = 1/n`` for clause mean ``n``. By
-        memorylessness the zero-truncated (failures) geometric IS the trials
-        variant (``G | G >= 1 = 1 + G'``), so the sugar lowers to the ``zt``
-        spec; the writer renders it back as ``geometric zt``, the same law.
-        No other frequency has a trials reading, so the marker is rejected
-        for the rest.
-        """
-        freq = c[0]
-        if freq != "geometric":
-            raise ValueError(
-                f"'{freq} !' is not defined: only geometric has a "
-                "number-of-trials variant. Use zt to zero-truncate other "
-                "frequencies."
-            )
-        return {"freq_name": "geometric", "freq_zm": True, "freq_p0": 0.0}
-
     # ----- reinsurance ----------------------------------------------
     @staticmethod
     def _split_reins(triples, which, kind):

@@ -61,7 +61,7 @@ agg Ca.Freq02.Poisson      10 claims sev.One poisson;
 agg Ca.Freq03.Bernoulli    .8 claims sev.One bernoulli;
 agg Ca.Freq04.Binomial     10 claims sev.One binomial 0.5;
 agg Ca.Freq05.Geometric    10 claims sev.One geometric;
-agg Ca.Freq05a.GeometricTrials 10 claims sev.One geometric !     note{Number-of-trials geometric on 1, 2, ...; sugar for geometric zt};
+agg Ca.Freq05a.GeometricTrials 10 claims sev.One geometric zt    note{Number-of-trials geometric on 1, 2, ...; zt is the trials variant by memorylessness};
 agg Ca.Freq06.Pascal       10 claims sev.One pascal .8 3;
 agg Ca.Freq07.NegBin       10 claims sev.One negbin 3               note{shape paramter equals variance multiplier};
 agg Ca.Freq08.Logarithmic  10 claims sev.One logarithmic;

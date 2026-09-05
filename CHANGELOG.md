@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a336
+
+**[Geometric-Trials] `geometric !` is removed; the trials variant's spelling is `geometric zt`.** The sugar shipped at `1.0.0a335` and is withdrawn by ruling before any consumer used it: it added a second meaning of `!` for one family and inherited every zt edge case anyway (a realized mean of 1 is the degenerate boundary either way). `geometric !` is a parse error again. The corpus lines and tests stay, respelled to `zt`; docstrings and the grammar comment now record that zero truncation is the trials convention by memorylessness.
+
 ## 1.0.0a335
 
 **[Geometric-Trials] DecL gains `geometric !`, the number-of-trials geometric.** Support 1, 2, ..., success probability `p = 1/n` for clause mean `n`, against the default number-of-failures convention on 0, 1, 2, .... By memorylessness the zero-truncated geometric is the trials variant, so the marker is sugar for `geometric zt` (one shared spec; the writer renders it back as `geometric zt`) and the mean calibrates exactly as `zt` does. Any other frequency followed by `!` raises, since no trials reading exists there. Corpus lines added to `_test_suite.agg` and `decl-testers.agg`; `expected_specs.json` and the grammar reference regenerate.

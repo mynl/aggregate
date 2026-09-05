@@ -537,6 +537,14 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Pr-Ruin-Pill]** (`plan-pk-tab.md`, execution notes
+  `plan-pk-tab-LIB.md`): the Pricing > Pr Ruin pill, probability of eventual
+  ruin for poisson and renewal frequencies. LIB half: [Ruin-Engine] landed
+  `a339` (`Aggregate._ruin_paths`, `ruin_example` thinned); [Ruin-Exhibit]
+  (`RuinResult` plus `Aggregate.eventual_ruin`, the `ruin` exhibit) and
+  [Ruin-Chart] (the `ruin` chart with mandatory downsampling) follow, one
+  bump each. API half open in the API repo.
+
 - **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
   stats frames into greater_tables IR envelopes. `Perspective` enum
   (raw/insured/insurer/reinsurer), singledispatch generics (summary, tail, stats,

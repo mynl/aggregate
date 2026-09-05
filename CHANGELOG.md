@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a339
+
+**[Ruin-Engine] the ruin simulation core moves into `Aggregate._ruin_paths`; `pedagogy.ruin_example` becomes a thin matplotlib consumer of it.** The new private method returns the `_RuinPaths` named tuple: the exact eventual-ruin function via the frequency-dispatched solver, the full simulated reasonableness check, the drawable sample paths, and the trend and LIL funnel arrays. New module constant `_RUIN_SEED` is the helper's fixed default seed so served ruin documents will be hash-stable; `seed=None` draws a fresh seed and reports it. `ruin_example`'s signature, defaults and figure are unchanged. First LIB phase of `dev/plan-pk-tab.md` (the Pricing Pr Ruin pill); the `ruin` exhibit and chart follow.
+
 ## 1.0.0a338
 
 **[Snapshot-Float-Dust] the pricing difference rows clamp float dust to exact 0, and the exhibit snapshot comparison tolerates last-ulp raw drift.** A `basis less view` row whose amounts agree to relative 1e-12 now reads exactly 0 instead of machine-dependent dust rendering `-0.00` with a negative flag. `test_canonical_snapshot` compares floats to relative 1e-9 (structure, text and flags stay exact): raw values downstream of an iterative calibration reproduce only to the last ulp across CPUs (non-associative summation under different SIMD dispatch), which had 8 pricing snapshot tests failing on this machine against a snapshot captured on another. No snapshot regeneration needed; the stored values now match everywhere.

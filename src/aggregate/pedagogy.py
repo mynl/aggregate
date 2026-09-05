@@ -985,150 +985,45 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
         left, ``psi(u)`` against initial surplus on the right (linear
         solid, log-scale dashed twin, marker at ``(u0, psi(u0))``).
     """
-    if rho <= 0:
-        raise ValueError(
-            f'net profit condition requires rho > 0, got {rho}')
-    rng = np.random.default_rng(seed)
-
-    # --- exact eventual ruin probability (dispatch on frequency) ------
-    fname = getattr(agg.frequency, 'freq_name', '')
-    if log2 is not None and fname != 'renewal':
-        raise ValueError(
-            'log2 applies to the renewal (wiener_hopf) path only')
-    if fname == 'renewal':
-        rf = agg.wiener_hopf(rho, kind='index', log2=log2)
-    else:
-        rf = _ruin_function(agg, rho, kind='index')
-    ruin = rf.ruin
+    # every number here comes from the shared simulation core, so this
+    # figure and the served ruin exhibit and chart cannot drift
+    rp = agg._ruin_paths(rho, u0, log2=log2, n_sims=n_sims, n_plot=n_plot,
+                         n_steps=n_steps, t_plot=t_plot, seed=seed)
+    fname, ruin = rp.fname, rp.rf.ruin
     psi = ruin.to_numpy()
-    bs = agg.bs
-    n = len(ruin)
-    iu = int(round(u0 / bs))
-    if iu >= n:
-        raise ValueError(
-            f'u0 = {u0} lies beyond the represented grid top '
-            f'{ruin.index[-1]:.6g}')
-    psi_u0 = psi[iu]
-
-    # --- model moments (discretized severity; exact wait mixture) -----
-    bit = agg.sev_density_df.p_sev
-    p_x = bit.to_numpy()
-    xs_x = bit.index.to_numpy()
-    mx = float(p_x @ xs_x)
-    var_x = float(p_x @ xs_x ** 2) - mx * mx
-    if fname == 'renewal':
-        freq = agg.frequency
-        ws = np.atleast_1d(np.asarray(freq.wait_weights, dtype=float))
-        moms = np.array([list(sev.moms())[:2]
-                         for sev, *_ in freq.wait_components], dtype=float)
-        mw = float(ws @ moms[:, 0])
-        var_w = float(ws @ moms[:, 1]) - mw * mw
-    else:
-        # poisson rate agg.n per year: exponential waits
-        mw = 1.0 / agg.n
-        var_w = mw * mw
-    c = (1.0 + rho) * mx / mw            # premium rate per unit time
-    # per-claim step Y = X - cW: drift and sd, analytic moments
-    mu = c * mw - mx                     # = rho * mx > 0
-    sd = np.sqrt(var_x + c * c * var_w)
-
-    # --- samplers: the discretized model, not the continuum -----------
-    cdf_x = np.cumsum(p_x / p_x.sum())
-    if fname == 'renewal':
-        fcw = agg._discretize_wait_pmf(c, n)
-        tw = np.arange(n, dtype=float) * bs / c    # time units
-        cdf_w = np.cumsum(fcw / fcw.sum())
-
-        def sample_w(size):
-            return tw[np.searchsorted(cdf_w, rng.random(size))]
-    else:
-        def sample_w(size):
-            return rng.exponential(mw, size)
-
-    def sample_x(size):
-        return xs_x[np.searchsorted(cdf_x, rng.random(size))]
-
-    # --- simulation check (ruin can only occur at claim instants) -----
-    if n_steps is None:
-        # Horizon such that a surviving path is, with ~3 sigma margin,
-        # deep enough that its residual ruin probability is < 1e-5:
-        # solve |P(Y)| n - 3 sd sqrt(n) = u_safe for n, where u_safe is
-        # read off the exact psi just computed.
-        i_safe = np.searchsorted(-psi, -1e-5)     # psi is decreasing
-        u_safe = max(u0 + i_safe * bs, 10 * mx)
-        r = (3 * sd + np.sqrt(9 * sd ** 2 + 4 * mu * u_safe)) / (2 * mu)
-        n_steps = min(int(np.ceil(r ** 2)), 50_000)
-    ruined = np.zeros(n_sims, dtype=bool)
-    ruin_time = np.full(n_sims, np.nan)           # calendar time of ruin
-    chunk = max(1, int(2e7) // n_steps)           # cap memory use
-    for lo in range(0, n_sims, chunk):
-        m = min(chunk, n_sims - lo)
-        w = sample_w((m, n_steps))
-        x = sample_x((m, n_steps))
-        t = np.cumsum(w, axis=1)
-        surplus = u0 + c * t - np.cumsum(x, axis=1)
-        below = surplus < 0
-        hit = below.any(axis=1)
-        ruined[lo:lo + m] = hit
-        first = np.argmax(below, axis=1)
-        ruin_time[lo:lo + m] = np.where(hit, t[np.arange(m), first], np.nan)
-    n_ruin = int(ruined.sum())
-    p_sim = n_ruin / n_sims
-    se_sim = np.sqrt(p_sim * (1 - p_sim) / n_sims)
-
-    # --- plot horizon -------------------------------------------------
-    if t_plot is None:
-        # residual ruin beyond the window ~ 1e-3, invisible at n_plot scale
-        i3 = np.searchsorted(-psi, -1e-3 * max(psi_u0, 1e-6))
-        u3 = max(u0 + i3 * bs, 10 * mx)
-        r3 = (3 * sd + np.sqrt(9 * sd ** 2 + 4 * mu * u3)) / (2 * mu)
-        t_plot = min(int(np.ceil(r3 ** 2)), n_steps) * mw
-    # claims needed to cover t_plot with a fluctuation margin
-    n_steps_plot = int(np.ceil(t_plot / mw
-                               + 6 * np.sqrt(t_plot * var_w / mw ** 3)
-                               + 10))
+    bs, n = agg.bs, len(ruin)
+    c, mx, mw, var_w = rp.c, rp.mx, rp.mw, rp.var_w
+    mu, sigma2, psi_u0 = rp.mu, rp.sigma2, rp.psi_u0
+    p_sim, se_sim, n_ruin = rp.p_sim, rp.se_sim, rp.n_ruin
+    n_steps, t_plot, ruin_time = rp.n_steps, rp.t_plot, rp.ruin_time
 
     # --- plot n_plot sample paths (left) + psi(u) (right) -------------
     fig, (ax, ax_psi) = plt.subplots(1, 2, figsize=(FIG_W * 2, FIG_H),
                                      width_ratios=[1, 1],
                                      layout='constrained')
     n_fail = 0
-    for i in range(n_plot):
-        w = sample_w(n_steps_plot)
-        x = sample_x(n_steps_plot)
-        t = np.cumsum(w)
-        u_pre = u0 + c * t - np.concatenate(([0.0], np.cumsum(x)[:-1]))
-        u_post = u_pre - x                        # surplus just after claim
-        # interleave (pre, post) values at each claim time for the path
-        tt = np.repeat(t, 2)
-        uu = np.empty(2 * n_steps_plot)
-        uu[0::2], uu[1::2] = u_pre, u_post
-        tt = np.concatenate(([0.0], tt))
-        uu = np.concatenate(([u0], uu))
-        hit = np.argmax(uu < 0) if (uu < 0).any() else 0
-        if hit and tt[hit] <= t_plot:
+    for tt, uu, ruined_at in rp.paths:
+        if ruined_at:
             n_fail += 1
-            ax.plot(tt[:hit + 1], uu[:hit + 1], lw=0.6, alpha=0.6, c='C3')
-            ax.plot(tt[hit], 0, '|', c='C3', ms=6, mew=0.5,
+            ax.plot(tt[:ruined_at + 1], uu[:ruined_at + 1],
+                    lw=0.6, alpha=0.6, c='C3')
+            ax.plot(tt[ruined_at], 0, '|', c='C3', ms=6, mew=0.5,
                     clip_on=False, zorder=5)
         else:
             ax.plot(tt, uu, lw=0.6, alpha=0.5, c='C0')
 
     # --- expected trend and LIL funnel --------------------------------
-    # renewal-reward CLT rate: sigma2 = Var(X - (PX/PW) W) / PW
-    sigma2 = (var_x + (mx / mw) ** 2 * var_w) / mw
-    tg = np.linspace(0, t_plot, 400)
-    trend = u0 + (c - mx / mw) * tg
+    tg, trend, tl, band = rp.tg, rp.trend, rp.tl, rp.band
     ax.plot(tg, trend, 'k--', lw=1.5, label='expected trend')
-    tl = tg[tg > np.e]                            # ln ln t defined
-    band = np.sqrt(2 * sigma2 * tl * np.log(np.log(tl)))
     base = u0 + (c - mx / mw) * tl
     ax.plot(tl, base + band, c='green', lw=1.2, label='LIL upper')
     ax.plot(tl, base - band, c='orange', lw=1.2, label='LIL lower')
 
     # --- rug of ruin times from the full simulation -------------------
     if show_default_times:
-        rt = ruin_time[ruined & (ruin_time <= t_plot)]
+        # ruin_time is NaN on the survivors, so finite marks the ruins
+        ruined = np.isfinite(ruin_time)
+        rt = ruin_time[ruined & (np.where(ruined, ruin_time, 0.0) <= t_plot)]
         ax.plot(rt, -u0 * np.ones(len(rt)), '|', c='C3', ms=6, mew=0.5,
                 alpha=0.10, clip_on=False, zorder=4)
 

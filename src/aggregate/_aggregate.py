@@ -910,6 +910,26 @@ _STATS_ROW_INDEX = pd.MultiIndex.from_tuples(
 RuinFunction = namedtuple('RuinFunction', ['ruin', 'find_u', 'mean', 'density'])
 
 
+#: Fixed default seed for the ruin simulation (:meth:`Aggregate._ruin_paths`).
+#: A constant rather than ``None`` so a served ruin document is hash-stable
+#: and cacheable; pass ``seed=None`` explicitly to draw a fresh seed (the
+#: Sample action). See ``dev/plan-pk-tab.md`` ruling 2.
+_RUIN_SEED = 20260905
+
+#: Return type of :meth:`Aggregate._ruin_paths`, the simulation core shared
+#: by :func:`aggregate.pedagogy.ruin_example`, the ``ruin`` exhibit and the
+#: ``ruin`` chart. Groups, in order: identity (``fname``, the solver's
+#: :data:`RuinFunction`, the seed actually used); the premium and moment
+#: scalars; the full-simulation estimate; and the drawable material (the
+#: horizon, the sampled paths, the trend line and LIL funnel arrays).
+_RuinPaths = namedtuple('_RuinPaths', [
+    'fname', 'rf', 'seed',
+    'rho', 'u0', 'psi_u0', 'c', 'mx', 'var_x', 'mw', 'var_w', 'mu', 'sd',
+    'sigma2',
+    'n_sims', 'n_steps', 'n_ruin', 'p_sim', 'se_sim', 'ruin_time',
+    't_plot', 'paths', 'tg', 'trend', 'tl', 'band'])
+
+
 #: Return type of :meth:`Aggregate.sev`, the *exact* continuous severity: the
 #: en-weighted mixture of the component :class:`~aggregate.Severity` objects,
 #: evaluated from the input distributions rather than from the discretized
@@ -5380,6 +5400,220 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ruin = pd.Series(psi[:n], index=np.arange(n, dtype=float) * bs)
         find_u = _ruin_find_u(ruin, kind)
         return RuinFunction(ruin, find_u, mean, pmf_max[:n])
+
+    def _ruin_paths(self, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
+                    n_steps=None, t_plot=None, seed=_RUIN_SEED):
+        """Simulation core of the eventual-ruin example: arrays, not a figure.
+
+        Computes the exact eventual-ruin function (dispatching on the
+        frequency: Poisson to :meth:`pollaczeck_khinchine`, renewal to
+        :meth:`wiener_hopf`; anything else raises), runs the full simulated
+        reasonableness check, and samples ``n_plot`` drawable surplus paths.
+        :func:`aggregate.pedagogy.ruin_example`, the ``ruin`` exhibit and
+        the ``ruin`` chart all consume this one helper, so the docs figure
+        and the served documents cannot drift.
+
+        Parameters
+        ----------
+        rho : float
+            Margin-to-loss ratio; the premium rate is
+            ``c = (1 + rho) E[X] / E[W]``. Must be positive (net profit).
+        u0 : float
+            Initial surplus at which the exact and simulated ruin
+            probabilities are compared.
+        log2 : int, optional
+            Renewal path only: half-grid exponent forwarded to
+            :meth:`wiener_hopf` for heavy tails. Raises if supplied with a
+            Poisson frequency.
+        n_sims : int, default 100_000
+            Number of simulated paths for the reasonableness check.
+        n_plot : int, default 50
+            Number of drawable sample paths returned.
+        n_steps : int, optional
+            Claims per simulated path (horizon); if None, chosen so the
+            remaining drift makes late ruin negligible.
+        t_plot : float, optional
+            Calendar-time horizon of the drawable paths; if None, derived
+            from the exact psi curve (residual ruin beyond it ~ 1e-3).
+        seed : int or None, default :data:`_RUIN_SEED`
+            rng seed. The default is a fixed constant so a served document
+            is hash-stable and cacheable. ``None`` draws a fresh seed,
+            which is materialized and reported in the returned ``seed``
+            field so the consumer can still say what it used.
+
+        Returns
+        -------
+        _RuinPaths
+            Named tuple of scalars and arrays; see its module comment for
+            the field groups. ``paths`` is a tuple of ``(tt, uu,
+            ruined_at)`` triples, the interleaved pre/post-claim surplus of
+            one drawable path, with ``ruined_at`` the index of its ruin
+            point within the horizon (0 when it survives the window).
+            ``ruin_time`` is the calendar ruin time per simulated path,
+            NaN for survivors.
+
+        Notes
+        -----
+        The simulation samples the **discretized** severity
+        (``sev_density_df.p_sev``) and, on the renewal path, the
+        discretized wait law (:meth:`_discretize_wait_pmf`), so the
+        simulated model is exactly the model the psi computation prices
+        and the sim-vs-exact comparison is apples-to-apples. Ruin can only
+        occur at claim instants, so paths are simulated claim by claim; the
+        horizon ``n_steps`` is chosen so a surviving path is, with a 3
+        sigma margin, deep enough that its residual ruin probability is
+        below 1e-5. The funnel is the law of the iterated logarithm under
+        the renewal-reward CLT rate ``sigma2 = Var(X - (E[X]/E[W]) W) /
+        E[W]``.
+        """
+        if rho <= 0:
+            raise ValueError(
+                f'net profit condition requires rho > 0, got {rho}')
+        if seed is None:
+            # the Sample action: draw a real seed so the document can
+            # still report what it used (plan-pk-tab ruling 2)
+            seed = int(np.random.default_rng().integers(2 ** 31))
+        rng = np.random.default_rng(seed)
+
+        # --- exact eventual ruin probability (dispatch on frequency) ------
+        fname = getattr(self.frequency, 'freq_name', '')
+        if log2 is not None and fname != 'renewal':
+            raise ValueError(
+                'log2 applies to the renewal (wiener_hopf) path only')
+        if fname == 'renewal':
+            rf = self.wiener_hopf(rho, kind='index', log2=log2)
+        elif fname == 'poisson':
+            rf = self.pollaczeck_khinchine(rho, kind='index')
+        else:
+            raise ValueError(
+                f'no eventual-ruin solver for a {fname!r} frequency: need '
+                f'poisson (pollaczeck_khinchine) or renewal (wiener_hopf)')
+        ruin = rf.ruin
+        psi = ruin.to_numpy()
+        bs = self.bs
+        n = len(ruin)
+        iu = int(round(u0 / bs))
+        if iu >= n:
+            raise ValueError(
+                f'u0 = {u0} lies beyond the represented grid top '
+                f'{ruin.index[-1]:.6g}')
+        psi_u0 = psi[iu]
+
+        # --- model moments (discretized severity; exact wait mixture) -----
+        bit = self.sev_density_df.p_sev
+        p_x = bit.to_numpy()
+        xs_x = bit.index.to_numpy()
+        mx = float(p_x @ xs_x)
+        var_x = float(p_x @ xs_x ** 2) - mx * mx
+        if fname == 'renewal':
+            freq = self.frequency
+            ws = np.atleast_1d(np.asarray(freq.wait_weights, dtype=float))
+            moms = np.array([list(sev.moms())[:2]
+                             for sev, *_ in freq.wait_components], dtype=float)
+            mw = float(ws @ moms[:, 0])
+            var_w = float(ws @ moms[:, 1]) - mw * mw
+        else:
+            # poisson rate self.n per year: exponential waits
+            mw = 1.0 / self.n
+            var_w = mw * mw
+        c = (1.0 + rho) * mx / mw            # premium rate per unit time
+        # per-claim step Y = X - cW: drift and sd, analytic moments
+        mu = c * mw - mx                     # = rho * mx > 0
+        sd = np.sqrt(var_x + c * c * var_w)
+
+        # --- samplers: the discretized model, not the continuum -----------
+        cdf_x = np.cumsum(p_x / p_x.sum())
+        if fname == 'renewal':
+            fcw = self._discretize_wait_pmf(c, n)
+            tw = np.arange(n, dtype=float) * bs / c    # time units
+            cdf_w = np.cumsum(fcw / fcw.sum())
+
+            def sample_w(size):
+                return tw[np.searchsorted(cdf_w, rng.random(size))]
+        else:
+            def sample_w(size):
+                return rng.exponential(mw, size)
+
+        def sample_x(size):
+            return xs_x[np.searchsorted(cdf_x, rng.random(size))]
+
+        # --- simulation check (ruin can only occur at claim instants) -----
+        if n_steps is None:
+            # Horizon such that a surviving path is, with ~3 sigma margin,
+            # deep enough that its residual ruin probability is < 1e-5:
+            # solve |P(Y)| n - 3 sd sqrt(n) = u_safe for n, where u_safe is
+            # read off the exact psi just computed.
+            i_safe = np.searchsorted(-psi, -1e-5)     # psi is decreasing
+            u_safe = max(u0 + i_safe * bs, 10 * mx)
+            r = (3 * sd + np.sqrt(9 * sd ** 2 + 4 * mu * u_safe)) / (2 * mu)
+            n_steps = min(int(np.ceil(r ** 2)), 50_000)
+        ruined = np.zeros(n_sims, dtype=bool)
+        ruin_time = np.full(n_sims, np.nan)           # calendar time of ruin
+        chunk = max(1, int(2e7) // n_steps)           # cap memory use
+        for lo in range(0, n_sims, chunk):
+            m = min(chunk, n_sims - lo)
+            w = sample_w((m, n_steps))
+            x = sample_x((m, n_steps))
+            t = np.cumsum(w, axis=1)
+            surplus = u0 + c * t - np.cumsum(x, axis=1)
+            below = surplus < 0
+            hit = below.any(axis=1)
+            ruined[lo:lo + m] = hit
+            first = np.argmax(below, axis=1)
+            ruin_time[lo:lo + m] = np.where(hit, t[np.arange(m), first],
+                                            np.nan)
+        n_ruin = int(ruined.sum())
+        p_sim = n_ruin / n_sims
+        se_sim = np.sqrt(p_sim * (1 - p_sim) / n_sims)
+
+        # --- plot horizon -------------------------------------------------
+        if t_plot is None:
+            # residual ruin beyond the window ~ 1e-3, invisible at n_plot
+            # scale
+            i3 = np.searchsorted(-psi, -1e-3 * max(psi_u0, 1e-6))
+            u3 = max(u0 + i3 * bs, 10 * mx)
+            r3 = (3 * sd + np.sqrt(9 * sd ** 2 + 4 * mu * u3)) / (2 * mu)
+            t_plot = min(int(np.ceil(r3 ** 2)), n_steps) * mw
+        # claims needed to cover t_plot with a fluctuation margin
+        n_steps_plot = int(np.ceil(t_plot / mw
+                                   + 6 * np.sqrt(t_plot * var_w / mw ** 3)
+                                   + 10))
+
+        # --- n_plot drawable sample paths ---------------------------------
+        paths = []
+        for i in range(n_plot):
+            w = sample_w(n_steps_plot)
+            x = sample_x(n_steps_plot)
+            t = np.cumsum(w)
+            u_pre = u0 + c * t - np.concatenate(([0.0], np.cumsum(x)[:-1]))
+            u_post = u_pre - x                    # surplus just after claim
+            # interleave (pre, post) values at each claim time for the path
+            tt = np.repeat(t, 2)
+            uu = np.empty(2 * n_steps_plot)
+            uu[0::2], uu[1::2] = u_pre, u_post
+            tt = np.concatenate(([0.0], tt))
+            uu = np.concatenate(([u0], uu))
+            hit = np.argmax(uu < 0) if (uu < 0).any() else 0
+            # a dip beyond the horizon reads as a survivor of the window
+            ruined_at = hit if (hit and tt[hit] <= t_plot) else 0
+            paths.append((tt, uu, ruined_at))
+
+        # --- expected trend and LIL funnel --------------------------------
+        # renewal-reward CLT rate: sigma2 = Var(X - (PX/PW) W) / PW
+        sigma2 = (var_x + (mx / mw) ** 2 * var_w) / mw
+        tg = np.linspace(0, t_plot, 400)
+        trend = u0 + (c - mx / mw) * tg
+        tl = tg[tg > np.e]                        # ln ln t defined
+        band = np.sqrt(2 * sigma2 * tl * np.log(np.log(tl)))
+
+        return _RuinPaths(
+            fname=fname, rf=rf, seed=seed,
+            rho=rho, u0=u0, psi_u0=psi_u0, c=c, mx=mx, var_x=var_x, mw=mw,
+            var_w=var_w, mu=mu, sd=sd, sigma2=sigma2,
+            n_sims=n_sims, n_steps=n_steps, n_ruin=n_ruin, p_sim=p_sim,
+            se_sim=se_sim, ruin_time=ruin_time,
+            t_plot=t_plot, paths=tuple(paths), tg=tg, trend=trend, tl=tl,
+            band=band)
 
     def plot(self, xmax=None, log=False, full_range=False, reflect=False,
              return_period=False, invert=False):

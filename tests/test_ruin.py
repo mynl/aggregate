@@ -217,3 +217,19 @@ def test_ruin_example_guards(po_agg, re_agg):
         ruin_example(po_agg, 0.2, 5.0, log2=14)
     with pytest.raises(ValueError, match='beyond the represented'):
         ruin_example(re_agg, 0.2, 1e9)
+
+
+def test_ruin_paths_deterministic(re_agg):
+    # fixed default seed: two calls are identical, hash-stable documents
+    from aggregate._aggregate import _RUIN_SEED
+    rp1 = re_agg._ruin_paths(0.2, 8.0, n_sims=500, n_plot=5)
+    rp2 = re_agg._ruin_paths(0.2, 8.0, n_sims=500, n_plot=5)
+    assert rp1.seed == _RUIN_SEED == rp2.seed
+    assert rp1.p_sim == rp2.p_sim
+    assert np.array_equal(rp1.paths[0][1], rp2.paths[0][1])
+    # exact side matches the solver directly
+    wh = re_agg.wiener_hopf(0.2)
+    assert rp1.psi_u0 == wh.ruin.loc[8.0]
+    # explicit seed=None draws a fresh seed and reports it (Sample action)
+    rp3 = re_agg._ruin_paths(0.2, 8.0, n_sims=500, n_plot=5, seed=None)
+    assert isinstance(rp3.seed, int)

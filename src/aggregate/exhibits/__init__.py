@@ -82,6 +82,7 @@ from .._aggregate import Aggregate
 from .._pnl import PnL
 from .._portfolio import Portfolio
 from ..bivariate import BivariateAggregate
+from ..results import RuinResult
 from ..spectral import Distortion
 
 from ._core import (
@@ -116,7 +117,7 @@ __all__ = [
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
     'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
-    'bs_window', 'sharpen', 'tail_behavior', 'approximation',
+    'bs_window', 'sharpen', 'tail_behavior', 'approximation', 'ruin',
     'pricing_calibrate', 'pricing_stand_alone', 'pricing_allocate',
     'pricing_evaluate',
     'STAT_SLICES', 'STAT_SLICE_FORMATS', 'STAT_SLICE_TITLES',
@@ -311,3 +312,12 @@ approximation = register_simple_exhibit(
             'match three moments, the unshifted two; a fit reaching below '
             'zero on a loss book is clamped at 0 and the clamp shows in its '
             'achieved moments.')
+ruin = register_simple_exhibit(
+    'ruin', 'Eventual ruin', 'ruin_df', [RuinResult],
+    caption='One eventual-ruin reading: the premium margin stated as '
+            'safety loading, loss ratio and premium rate, the model '
+            'moments, the resolved initial surplus, and the exact '
+            'probability of eventual ruin there beside a simulated check '
+            'with its standard error. Poisson books add the Lundberg '
+            'exponent and bound when the adjustment equation has a root '
+            'on the grid.')

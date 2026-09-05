@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a340
+
+**[Ruin-Exhibit] new `Aggregate.eventual_ruin` returning the new `RuinResult`, and the `ruin` exhibit serving it.** The method states a margin (`rho` or `lr`, exactly one) and a capital level (`p` or `u`, exactly one), computes the exact probability of eventual ruin through the frequency-dispatched solver, validates it with a capped simulation (default `n_sims=1000`, fixed seed; `seed=None` draws and reports a fresh one), and returns `RuinResult` carrying the one-column `ruin_df` stats strip. The `ruin` exhibit registers on the result, the `[Pricing-Keyed-On-Result]` pattern, so `build_exhibit(result, 'ruin')` serves the strip; the Poisson path adds the Lundberg exponent and bound when the adjustment equation brackets a root on the grid. `_ruin_paths` gains `p=` as the alternative to `u0`. Second LIB phase of `dev/plan-pk-tab.md`; the `ruin` chart follows.
+
 ## 1.0.0a339
 
 **[Ruin-Engine] the ruin simulation core moves into `Aggregate._ruin_paths`; `pedagogy.ruin_example` becomes a thin matplotlib consumer of it.** The new private method returns the `_RuinPaths` named tuple: the exact eventual-ruin function via the frequency-dispatched solver, the full simulated reasonableness check, the drawable sample paths, and the trend and LIL funnel arrays. New module constant `_RUIN_SEED` is the helper's fixed default seed so served ruin documents will be hash-stable; `seed=None` draws a fresh seed and reports it. `ruin_example`'s signature, defaults and figure are unchanged. First LIB phase of `dev/plan-pk-tab.md` (the Pricing Pr Ruin pill); the `ruin` exhibit and chart follow.

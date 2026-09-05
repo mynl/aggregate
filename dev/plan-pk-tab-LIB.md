@@ -75,3 +75,38 @@ verified pre-existing by stashing this phase's three edited files and
 re-running (fails identically at the a338 baseline; `library.agg` and
 `test_library_entries.py` are the author's in-flight modifications).
 `tests/test_ruin.py` 15 passed including the new determinism case.
+
+## Phase [Ruin-Exhibit], a340
+
+What landed: `RuinResult` in `results.py`; `Aggregate.eventual_ruin(rho
+| lr, p | u, log2, n_sims=1000, seed)` returning it; the `ruin` exhibit
+registered on `RuinResult` as a manifest passthrough of `ruin_df`;
+`_lundberg_exponent` (module level, beside `_ruin_find_u`);
+`_ruin_paths` gains `p=` as the alternative to `u0`; a `dev/FEATURES.csv`
+row and the `a340` table-version stamp; four new tests in `test_ruin.py`.
+
+Divergences:
+
+- **The frequency predicate moved into the method.** The plan gated the
+  exhibit on `Aggregate` with "updated and frequency in {poisson,
+  renewal}". Keyed on the result, the gate is `eventual_ruin` itself
+  raising on any other frequency (and on a stale grid, through the
+  solvers); `available_exhibits` on a `RuinResult` always lists `ruin`,
+  matching the pricing exhibits' mechanics. The app-side `can_ruin`
+  capability flag still derives from the frequency, unchanged.
+- **`p` resolves inside `_ruin_paths`**, not in the caller, so the ruin
+  function is solved once rather than twice; `find_u` uses the `'index'`
+  kind, which is what "the achieved psi at the grid point" asks for.
+- **Lundberg "if cheap"** is a `brentq` root of the discretized
+  adjustment equation under a `700 / max(x)` overflow guard; when the
+  bracket fails (a heavy tail on a wide grid) the two rows are simply
+  omitted, and the renewal path never carries them.
+- **The strip omits the plot horizons** (`t_plot` is a figure fact, not a
+  reading); it carries the simulation horizon in claims.
+- The exhibit joins no snapshot corpus; its coverage is direct assertions
+  in `test_ruin.py`.
+
+Gate: tier 3, 5108 passed, 1 failed: the same pre-existing
+`test_library_entries` failure as a339, the author's in-flight
+`library.agg` work. `test_ruin.py` 19 passed; `test_exhibits.py`,
+`test_exhibit_formats.py`, `test_pricing_results.py` 290 passed.

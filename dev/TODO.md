@@ -541,9 +541,9 @@
   `plan-pk-tab-LIB.md`): the Pricing > Pr Ruin pill, probability of eventual
   ruin for poisson and renewal frequencies. LIB half: [Ruin-Engine] landed
   `a339` (`Aggregate._ruin_paths`, `ruin_example` thinned); [Ruin-Exhibit]
-  (`RuinResult` plus `Aggregate.eventual_ruin`, the `ruin` exhibit) and
-  [Ruin-Chart] (the `ruin` chart with mandatory downsampling) follow, one
-  bump each. API half open in the API repo.
+  landed `a340` (`RuinResult`, `Aggregate.eventual_ruin`, the `ruin`
+  exhibit); [Ruin-Chart] (the `ruin` chart with mandatory downsampling)
+  follows. API half open in the API repo.
 
 - **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
   stats frames into greater_tables IR envelopes. `Perspective` enum

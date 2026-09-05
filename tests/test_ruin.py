@@ -233,3 +233,71 @@ def test_ruin_paths_deterministic(re_agg):
     # explicit seed=None draws a fresh seed and reports it (Sample action)
     rp3 = re_agg._ruin_paths(0.2, 8.0, n_sims=500, n_plot=5, seed=None)
     assert isinstance(rp3.seed, int)
+
+
+# ---------------------------------------------------------------------------
+# eventual_ruin and the ruin exhibit (plan-pk-tab, [Ruin-Exhibit])
+# ---------------------------------------------------------------------------
+
+def test_eventual_ruin_result(re_agg):
+    from aggregate.results import RuinResult
+    r = re_agg.eventual_ruin(0.2, u=8.0)
+    assert isinstance(r, RuinResult)
+    # exact side matches the solver directly (plan acceptance)
+    wh = re_agg.wiener_hopf(0.2)
+    assert r.psi == wh.ruin.loc[8.0]
+    # simulated within 3 standard errors at the capped default n_sims
+    assert abs(r.psi_sim - r.psi) <= 3 * r.se_sim
+    assert r.freq_kind == 'renewal' and r.u == 8.0 and r.lr is None
+    # p input resolves u through the capital lookup, on the grid
+    r2 = re_agg.eventual_ruin(0.2, p=0.05)
+    assert r2.u == wh.find_u(0.05)
+    assert r2.p == 0.05
+    # lr states the same margin
+    r3 = re_agg.eventual_ruin(lr=1 / 1.2, u=8.0)
+    assert r3.rho == pytest.approx(0.2)
+    assert r3.psi == pytest.approx(r.psi)
+    # identity borrowed from the source
+    assert r.name == re_agg.name
+
+
+def test_eventual_ruin_guards(re_agg):
+    with pytest.raises(ValueError, match='exactly one of rho and lr'):
+        re_agg.eventual_ruin(0.2, lr=0.8, u=8.0)
+    with pytest.raises(ValueError, match='exactly one of rho and lr'):
+        re_agg.eventual_ruin(u=8.0)
+    with pytest.raises(ValueError, match='exactly one of p and u'):
+        re_agg.eventual_ruin(0.2)
+    with pytest.raises(ValueError, match='exactly one of p and u'):
+        re_agg.eventual_ruin(0.2, p=0.05, u=8.0)
+    with pytest.raises(ValueError, match='loss ratio'):
+        re_agg.eventual_ruin(lr=1.2, u=8.0)
+    with pytest.raises(ValueError, match='rho > 0'):
+        re_agg.eventual_ruin(-0.1, u=8.0)
+
+
+def test_ruin_exhibit(po_agg):
+    from aggregate.exhibits import (available_exhibits, build_exhibit,
+                                    exhibit_frames)
+    r = po_agg.eventual_ruin(0.2, u=8.0)
+    assert [name for name, _ in available_exhibits(r)] == ['ruin']
+    (bname, df, kw), = exhibit_frames(r, 'ruin')
+    assert bname == 'ruin_df'
+    v = df['value']
+    assert v['frequency kind'] == 'poisson'
+    assert v['psi(u) exact'] == r.psi
+    # the Poisson path carries the Lundberg pair (gamma-2 severity: the
+    # adjustment equation has a bracketed root)
+    assert 'Lundberg exponent R' in v.index
+    assert 0 < v['Lundberg bound exp(-Ru)'] <= 1
+    # the bound really bounds the exact psi
+    assert r.psi <= v['Lundberg bound exp(-Ru)'] + 1e-9
+    ex = build_exhibit(r, 'ruin')
+    assert len(ex.ir_blocks) == 1
+
+
+def test_ruin_exhibit_renewal_no_lundberg(re_agg):
+    from aggregate.exhibits import exhibit_frames
+    r = re_agg.eventual_ruin(0.2, u=8.0)
+    (_, df, _), = exhibit_frames(r, 'ruin')
+    assert 'Lundberg exponent R' not in df.index

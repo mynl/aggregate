@@ -13,6 +13,7 @@ Currently defined:
   ``Portfolio`` twin.
 - ``EvaluationResult``: :meth:`Aggregate.evaluate` and its ``Portfolio`` and
   ``PnL`` twins.
+- ``RuinResult``: :meth:`Aggregate.eventual_ruin`.
 
 Every result carries ``_source``, the object it was computed from, and borrows
 that object's identity through :class:`SourcedMixin`. Two reasons, and the
@@ -446,4 +447,63 @@ class EvaluationResult(SourcedMixin):
     p: float = None
     a: float = None
     names: tuple = ()
+    _source: object = None
+
+
+@dataclass
+class RuinResult(SourcedMixin):
+    """Return type for :meth:`Aggregate.eventual_ruin`.
+
+    The receipt of one eventual-ruin reading: the margin the premium
+    states, the capital level it was read at (as asked and as resolved on
+    the grid), the exact probability of eventual ruin there, and the
+    simulated check beside it. The ``ruin`` exhibit dispatches on this
+    type, the pricing-result pattern (``[Pricing-Keyed-On-Result]``): a
+    ruin reading is a calculation, not stored state, and giving it a type
+    is what lets it serve through the ordinary exhibit registry.
+
+    Attributes
+    ----------
+    ruin_df : pandas.DataFrame
+        The one-column stats strip: frequency kind, the margin restated
+        as safety loading, loss ratio and premium rate, the model moments,
+        the resolved capital, exact and simulated psi with the standard
+        error and horizons, the seed, and on the Poisson path the Lundberg
+        exponent and bound when a root is bracketed.
+    rho : float
+        Margin-to-loss ratio the reading was made at (derived when the
+        caller stated ``lr``).
+    lr : float or None
+        The loss ratio as the caller stated it, or ``None`` when the
+        caller stated ``rho``.
+    p : float or None
+        The probability of eventual default asked for, or ``None`` when
+        the caller stated ``u`` directly.
+    u : float
+        The resolved initial surplus, on the grid.
+    psi : float
+        Exact probability of eventual ruin at ``u``.
+    psi_sim : float
+        The simulated estimate of the same probability.
+    se_sim : float
+        Binomial standard error of ``psi_sim``.
+    seed : int
+        The rng seed the simulation actually used, whether defaulted,
+        given, or freshly drawn under ``seed=None``.
+    freq_kind : str
+        ``'poisson'`` or ``'renewal'``, which solver priced the reading.
+    _source : Aggregate, optional
+        The book this was computed from; see :class:`SourcedMixin`.
+    """
+
+    ruin_df: pd.DataFrame
+    rho: float
+    lr: float = None
+    p: float = None
+    u: float = None
+    psi: float = None
+    psi_sim: float = None
+    se_sim: float = None
+    seed: int = None
+    freq_kind: str = None
     _source: object = None

@@ -66,7 +66,7 @@ from . import _validation
 from . import _reinsurance
 from ._aggregate_compute import discretize_severities, freq_sev_convolution
 from . import _pricing
-from .results import EvaluationResult
+from .results import EvaluationResult, RuinResult
 
 logger = logging.getLogger(__name__)
 
@@ -1042,6 +1042,54 @@ def _ruin_find_u(ruin, kind):
             p_above = ruin.iloc[above]
             return q_below + (p - p_below) / (p_above - p_below) * (q_above - q_below)
     return find_u
+
+
+def _lundberg_exponent(p_x, xs_x, rho):
+    """Adjustment coefficient ``R`` of the compound Poisson surplus process.
+
+    Parameters
+    ----------
+    p_x : ndarray
+        Discretized severity pmf (normalized inside).
+    xs_x : ndarray
+        The severity outcomes the pmf sits on.
+    rho : float
+        Margin-to-loss ratio; the premium rate is ``c = (1 + rho) lambda
+        E[X]``.
+
+    Returns
+    -------
+    float or None
+        The positive Lundberg root, or ``None`` when no root is bracketed
+        under the overflow guard.
+
+    Notes
+    -----
+    ``R`` solves ``M_X(R) = 1 + (1 + rho) E[X] R`` (the Cramer-Lundberg
+    adjustment equation with the Poisson rate cancelled), giving the
+    classical bound ``psi(u) <= exp(-R u)``. On the discretized pmf the
+    mgf is a finite sum, so a root exists whenever the bracket top
+    ``R_max = 700 / max(x)`` (the ``exp`` overflow guard) reaches past it;
+    a heavy-tailed book discretized on a wide grid can fail the bracket,
+    and ``None`` is the honest answer there rather than a spurious root.
+    """
+    p = np.asarray(p_x, dtype=float)
+    p = p / p.sum()
+    x = np.asarray(xs_x, dtype=float)
+    mx = float(p @ x)
+    x_top = float(x.max())
+    if not x_top > 0:
+        return None
+
+    def h(r):
+        return float(p @ np.exp(r * x)) - 1.0 - (1.0 + rho) * mx * r
+
+    r_max = 700.0 / x_top
+    # h(0) = 0 with negative slope -rho E[X]; a usable bracket needs
+    # h(r_max) > 0
+    if h(r_max) <= 0:
+        return None
+    return float(brentq(h, 1e-12, r_max))
 
 
 class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
@@ -5401,7 +5449,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         find_u = _ruin_find_u(ruin, kind)
         return RuinFunction(ruin, find_u, mean, pmf_max[:n])
 
-    def _ruin_paths(self, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
+    def _ruin_paths(self, rho, u0=None, *, p=None, log2=None,
+                    n_sims=100_000, n_plot=50,
                     n_steps=None, t_plot=None, seed=_RUIN_SEED):
         """Simulation core of the eventual-ruin example: arrays, not a figure.
 
@@ -5418,9 +5467,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         rho : float
             Margin-to-loss ratio; the premium rate is
             ``c = (1 + rho) E[X] / E[W]``. Must be positive (net profit).
-        u0 : float
+        u0 : float, optional
             Initial surplus at which the exact and simulated ruin
-            probabilities are compared.
+            probabilities are compared. Exactly one of ``u0`` or ``p``.
+        p : float, optional
+            Probability of eventual default; resolved to a surplus through
+            the ruin function's capital lookup ``find_u(p)`` on the grid.
+            Exactly one of ``u0`` or ``p``.
         log2 : int, optional
             Renewal path only: half-grid exponent forwarded to
             :meth:`wiener_hopf` for heavy tails. Raises if supplied with a
@@ -5469,6 +5522,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if rho <= 0:
             raise ValueError(
                 f'net profit condition requires rho > 0, got {rho}')
+        if (u0 is None) == (p is None):
+            raise ValueError('exactly one of u0 and p is required')
         if seed is None:
             # the Sample action: draw a real seed so the document can
             # still report what it used (plan-pk-tab ruling 2)
@@ -5492,6 +5547,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         psi = ruin.to_numpy()
         bs = self.bs
         n = len(ruin)
+        if p is not None:
+            u0 = float(rf.find_u(p))
         iu = int(round(u0 / bs))
         if iu >= n:
             raise ValueError(
@@ -5614,6 +5671,106 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             se_sim=se_sim, ruin_time=ruin_time,
             t_plot=t_plot, paths=tuple(paths), tg=tg, trend=trend, tl=tl,
             band=band)
+
+    def eventual_ruin(self, rho=None, *, lr=None, p=None, u=None, log2=None,
+                      n_sims=1000, seed=_RUIN_SEED):
+        """Probability of eventual ruin at one capital level: the receipt.
+
+        States a premium margin (``rho`` or ``lr``, exactly one) and a
+        capital level (``p`` or ``u``, exactly one), computes the exact
+        probability of eventual ruin there (Poisson frequency via
+        :meth:`pollaczeck_khinchine`, renewal via :meth:`wiener_hopf`;
+        anything else raises), validates it with a capped simulation of the
+        same discretized model, and returns the
+        :class:`~aggregate.results.RuinResult` the ``ruin`` exhibit
+        dispatches on.
+
+        Parameters
+        ----------
+        rho : float, optional
+            Margin-to-loss ratio; the premium rate is
+            ``c = (1 + rho) E[X] / E[W]``. Must be positive (net profit).
+            Exactly one of ``rho`` or ``lr``.
+        lr : float, optional
+            The same margin stated as a loss ratio, ``lr = 1 / (1 + rho)``,
+            in ``(0, 1)``. Exactly one of ``rho`` or ``lr``.
+        p : float, optional
+            Probability of eventual default; resolved to an initial surplus
+            through the ruin function's capital lookup ``find_u(p)`` on the
+            grid. Exactly one of ``p`` or ``u``.
+        u : float, optional
+            Initial surplus directly. Exactly one of ``p`` or ``u``.
+        log2 : int, optional
+            Renewal path only: forwarded to :meth:`wiener_hopf` for heavy
+            tails.
+        n_sims : int, default 1000
+            Simulated paths for the reasonableness check. The small default
+            follows the teaching-aid sizing ruling (``dev/plan-pk-tab.md``
+            ruling 4); raise it for a tighter standard error.
+        seed : int or None, default fixed
+            rng seed. The fixed default keeps served documents hash-stable;
+            ``None`` draws a fresh seed and reports it on the result.
+
+        Returns
+        -------
+        RuinResult
+            Carrying ``ruin_df`` (the one-column stats strip), the resolved
+            ``u`` and exact ``psi`` beside the simulated estimate and its
+            standard error, the margin both ways, and the seed used.
+
+        Notes
+        -----
+        On the Poisson path the frame also carries the Lundberg exponent
+        ``R`` and the classical bound ``exp(-R u)`` when the adjustment
+        equation ``M_X(R) = 1 + (1 + rho) E[X] R`` has a bracketed root on
+        the discretized severity (see :func:`_lundberg_exponent`); a book
+        whose grid puts the root past the overflow guard simply omits the
+        two rows. The simulation samples the discretized severity and wait
+        laws, so the simulated model is exactly the model the exact psi
+        prices.
+
+        .. versionadded:: 1.0
+           Provisional companion to the ``ruin`` exhibit and chart
+           (``dev/plan-pk-tab.md``).
+        """
+        if (rho is None) == (lr is None):
+            raise ValueError('exactly one of rho and lr is required')
+        if lr is not None:
+            if not 0 < lr < 1:
+                raise ValueError(f'loss ratio must be in (0, 1), got {lr}')
+            rho = 1.0 / lr - 1.0
+        if (p is None) == (u is None):
+            raise ValueError('exactly one of p and u is required')
+        rp = self._ruin_paths(rho, u, p=p, log2=log2, n_sims=n_sims,
+                              n_plot=0, seed=seed)
+        rows = {
+            'frequency kind': rp.fname,
+            'safety loading rho': rp.rho,
+            'loss ratio': 1.0 / (1.0 + rp.rho),
+            'premium rate c': rp.c,
+            'mean severity E[X]': rp.mx,
+            'mean wait E[W]': rp.mw,
+            'initial surplus u': rp.u0,
+            'psi(u) exact': rp.psi_u0,
+            'psi(u) simulated': rp.p_sim,
+            'sim std error': rp.se_sim,
+            'sim trials': rp.n_sims,
+            'sim ruins': rp.n_ruin,
+            'sim horizon (claims)': rp.n_steps,
+            'seed': rp.seed,
+        }
+        if rp.fname == 'poisson':
+            bit = self.sev_density_df.p_sev
+            r_lund = _lundberg_exponent(bit.to_numpy(),
+                                        bit.index.to_numpy(), rp.rho)
+            if r_lund is not None:
+                rows['Lundberg exponent R'] = r_lund
+                rows['Lundberg bound exp(-Ru)'] = np.exp(-r_lund * rp.u0)
+        ruin_df = pd.DataFrame({'value': rows})
+        return RuinResult(
+            ruin_df=ruin_df, rho=rp.rho, lr=lr, p=p, u=rp.u0,
+            psi=rp.psi_u0, psi_sim=rp.p_sim, se_sim=rp.se_sim,
+            seed=rp.seed, freq_kind=rp.fname, _source=self)
 
     def plot(self, xmax=None, log=False, full_range=False, reflect=False,
              return_period=False, invert=False):

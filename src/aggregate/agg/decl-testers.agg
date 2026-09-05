@@ -862,6 +862,7 @@ agg AD.Ruin.ExponSev 5 years sev 10 * expon wait gamma 2                        
 agg AD.Ruin.MixWait 5 years sev 10 * expon wait [.6 .4] * expon wts [.5 .5]                   note{Hyperexponential mixture wait through the multi-component _discretize_wait_pmf path; Lundberg form still exact};
 agg AD.Ruin.Fixed 10 claims sev gamma 2 fixed                                                 note{Rejected by BOTH solvers (neither poisson nor renewal)};
 agg AD.Ruin.Binomial 10 claims sev gamma 2 binomial 0.5                                       note{Rejected by pollaczeck_khinchine (strict poisson guard)};
+agg AD.Ruin.Negbin 10 claims sev gamma 2 negbin 2                                             note{Rejected by both solvers; the ruin chart and exhibit predicates grey it};
 agg AD.Ruin.Defective 2 years dsev [1] dwait [1 2] [.4 .5] !                                  note{Rejected by wiener_hopf: defective (terminating) wait law};
 
 # ============================================================

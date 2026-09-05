@@ -301,3 +301,56 @@ def test_ruin_exhibit_renewal_no_lundberg(re_agg):
     r = re_agg.eventual_ruin(0.2, u=8.0)
     (_, df, _), = exhibit_frames(r, 'ruin')
     assert 'Lundberg exponent R' not in df.index
+
+
+# ---------------------------------------------------------------------------
+# the ruin chart (plan-pk-tab, [Ruin-Chart] with [Ruin-Downsampling])
+# ---------------------------------------------------------------------------
+
+def test_ruin_chart_registry(po_agg, re_agg):
+    from aggregate.charts import CHARTS, available_charts
+    assert 'ruin' in CHARTS
+    assert 'ruin' in available_charts(po_agg)
+    assert 'ruin' in available_charts(re_agg)
+    nb = build('agg RuNb 10 claims sev gamma 2 negbin 2', log2=10)
+    assert 'ruin' not in available_charts(nb)
+
+
+def test_ruin_chart_doc(re_agg):
+    from aggregate.charts import build_chart_doc, canonical_json
+    doc = build_chart_doc(re_agg, 'ruin', rho=0.2, u=8.0)
+    assert [pl.id for pl in doc.panels] == ['paths', 'psi']
+    # meta matches the solver directly (plan acceptance)
+    wh = re_agg.wiener_hopf(0.2)
+    assert doc.meta['psi_exact'] == wh.ruin.loc[8.0]
+    assert doc.meta['u'] == 8.0
+    roles = {s.role for s in doc.series}
+    assert {'sample', 'mean', 'band', 'survival', 'marker'} <= roles
+    # fixed default seed: the document is hash-stable (cacheable)
+    assert build_chart_doc(re_agg, 'ruin', rho=0.2, u=8.0).hash == doc.hash
+    # the two-tests-sweep contract: a bare call draws the teaching default
+    bare = build_chart_doc(re_agg, 'ruin')
+    assert bare.meta['rho'] == 0.2 and bare.meta['p'] == 0.05
+    # under the 200 kB acceptance at default settings
+    assert len(canonical_json(bare)) < 200_000
+
+
+def test_ruin_chart_downsampling(re_agg):
+    from aggregate.charts import build_chart_doc
+    doc = build_chart_doc(re_agg, 'ruin', rho=0.2, u=2.0, detail=64)
+    samples = [s for s in doc.series if s.role == 'sample']
+    # the budget is honored (chunk min + chunk end can collide, so <=)
+    assert samples and all(len(s.x) <= 66 for s in samples)
+    # a ruined path keeps its exact ruin point: it ends on the dip below 0
+    # and carries its ruin time as the series value
+    ruined = [s for s in samples if s.value is not None]
+    assert ruined and all(s.y[-1] < 0 for s in ruined)
+    # the resolved reading is a series plus meta, not a Mark
+    assert doc.marks == ()
+
+
+def test_ruin_chart_sample_reseeds(re_agg):
+    from aggregate.charts import build_chart_doc
+    doc = build_chart_doc(re_agg, 'ruin', rho=0.2, u=8.0, seed=None)
+    # the Sample action: a fresh seed is drawn and reported
+    assert isinstance(doc.meta['seed'], int)

@@ -262,8 +262,10 @@ from ._emit_distortion import chart_distortion  # noqa: E402
 from ._emit_pnl import chart_pnl  # noqa: E402
 from ._emit_portfolio import chart_port  # noqa: E402
 from ._emit_reins import chart_reins  # noqa: E402
+from ._emit_ruin import chart_ruin  # noqa: E402
 from ._emit_severity import chart_severity  # noqa: E402
 
 __all__ += ['chart_agg', 'chart_approximation', 'chart_distortion',
             'chart_envelope', 'chart_joint_surface', 'chart_kappa',
-            'chart_pnl', 'chart_reins', 'chart_port', 'chart_severity']
+            'chart_pnl', 'chart_reins', 'chart_port', 'chart_ruin',
+            'chart_severity']

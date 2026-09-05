@@ -1044,6 +1044,33 @@ def _ruin_find_u(ruin, kind):
     return find_u
 
 
+def _resolve_margin(rho, lr):
+    """The premium margin stated one of two ways, resolved to ``rho``.
+
+    Parameters
+    ----------
+    rho : float or None
+        Margin-to-loss ratio. Exactly one of ``rho`` or ``lr``.
+    lr : float or None
+        The same margin as a loss ratio ``lr = 1 / (1 + rho)`` in
+        ``(0, 1)``. Exactly one of ``rho`` or ``lr``.
+
+    Returns
+    -------
+    float
+        ``rho``, whichever way it was stated. Shared by
+        :meth:`Aggregate.eventual_ruin` and the ``ruin`` chart emitter so
+        the two cannot diverge on what a loss ratio means.
+    """
+    if (rho is None) == (lr is None):
+        raise ValueError('exactly one of rho and lr is required')
+    if lr is not None:
+        if not 0 < lr < 1:
+            raise ValueError(f'loss ratio must be in (0, 1), got {lr}')
+        rho = 1.0 / lr - 1.0
+    return rho
+
+
 def _lundberg_exponent(p_x, xs_x, rho):
     """Adjustment coefficient ``R`` of the compound Poisson surplus process.
 
@@ -5733,12 +5760,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
            Provisional companion to the ``ruin`` exhibit and chart
            (``dev/plan-pk-tab.md``).
         """
-        if (rho is None) == (lr is None):
-            raise ValueError('exactly one of rho and lr is required')
-        if lr is not None:
-            if not 0 < lr < 1:
-                raise ValueError(f'loss ratio must be in (0, 1), got {lr}')
-            rho = 1.0 / lr - 1.0
+        rho = _resolve_margin(rho, lr)
         if (p is None) == (u is None):
             raise ValueError('exactly one of p and u is required')
         rp = self._ruin_paths(rho, u, p=p, log2=log2, n_sims=n_sims,

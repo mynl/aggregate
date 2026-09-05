@@ -110,3 +110,66 @@ Gate: tier 3, 5108 passed, 1 failed: the same pre-existing
 `test_library_entries` failure as a339, the author's in-flight
 `library.agg` work. `test_ruin.py` 19 passed; `test_exhibits.py`,
 `test_exhibit_formats.py`, `test_pricing_results.py` 290 passed.
+
+## Phase [Ruin-Chart] with [Ruin-Downsampling], a341
+
+What landed: `charts/_emit_ruin.py` registering chart `ruin` on
+`Aggregate` (predicate: updated and frequency poisson or renewal), the
+`_resolve_margin` helper shared with `eventual_ruin`, four chart tests,
+and the `AD.Ruin.Negbin` tester line.
+
+Divergences:
+
+- **Bare-call defaults `rho=0.2, p=0.05`.** The plan lists the options
+  but no defaults; the registry's own contract ("`available_charts`
+  answers what *can* be drawn") and two existing sweeps
+  (`test_load_chart_doc_round_trips_every_emitted_document`,
+  `test_chart_marks`) call every available chart with no options, so a
+  chart that raises bare would break the contract and both tests.
+- **No `Mark`s.** `test_no_emitter_marks_a_percentile` constrains mark
+  roles to `mean` / `break_even` across every emitted document. The
+  resolved `(u, psi(u))` reading rides as the one-point `marker` series
+  plus the `meta` scalars; pedagogy's faint guide lines are renderer
+  sugar, not document meaning.
+- **`detail` defaults to 192, not the plan's "about 256 to 1024".**
+  Measured: 256 points per path puts the bare poisson document at 204 kB
+  canonical JSON, over the plan's own 200 kB acceptance; 192 lands both
+  fixture books at about 155 kB. The two plan numbers conflict and the
+  acceptance won.
+- **Path coordinates are rounded to six significant figures** (the
+  psi(u) law is not), roughly halving byte weight at far below drawing
+  resolution. The plan is silent on rounding; recorded here because
+  `charts/_payload.py`'s philosophy is "nothing rounds", and sample
+  paths are illustrative draws rather than the law.
+- **`n_sims` is pinned at the module constant `RUIN_SIMS = 1000`**, not
+  exposed as an option, reading ruling 4 as a serving cap.
+- The trend is a two-point line (it is straight); the LIL funnel is one
+  band series (`y` / `y2`) at 64 samples; the rug thins to at most 256
+  ticks at ``y = 0``. Roles `sample` / `mean` / `band` / `survival` /
+  `marker` / `rug` use the IR's open vocabulary.
+
+Gate: tier 3 combined with the RuntimeWarning gate
+(`uv run pytest -m 'slow or not slow' -W error::RuntimeWarning`), this
+being a numerics-touching phase: 5112 passed, 2 failed, both the
+author's in-flight `library.agg` work and both verified at baseline with
+this phase's edits stashed. One is the same split-limit pricing failure
+as a339/a340; the other,
+`test_every_library_entry_builds[agg:RenewalDeterministicWait]`, is a
+`RuntimeWarning: invalid value encountered in sqrt` from
+`moments.py` `mcvsk` (a slightly negative numerical variance) that only
+the `-W error::RuntimeWarning` gate surfaces, worth the author's
+attention against the `[RuntimeWarning-Census]` policy.
+`tests/test_ruin.py` 23 passed; the two registry sweeps
+(`test_charts_ir.py`, `test_chart_marks.py`) and the DecL corpus
+(`test_decl_parser.py`, `test_decl_unparser.py`, 984 cases) pass with
+the new chart and tester line.
+
+## LIB half status
+
+COMPLETE at `a341`, three bumps `a339` to `a341`, one per phase as
+ruled. The plan and this notes file stay in `dev/` until the API half
+([Ruin-Route], [Ruin-Pane], [Ruin-Sample]) lands, the
+plan-pricing-natural-allocation precedent for a cross-repo plan whose
+LIB half finishes first. Owed to the API side: nothing beyond the plan
+itself; the chart route needs no reader change (`load_chart_doc`
+round-trips the ruin document, covered by the registry sweep).

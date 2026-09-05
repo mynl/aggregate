@@ -539,11 +539,13 @@
 
 - **[Pr-Ruin-Pill]** (`plan-pk-tab.md`, execution notes
   `plan-pk-tab-LIB.md`): the Pricing > Pr Ruin pill, probability of eventual
-  ruin for poisson and renewal frequencies. LIB half: [Ruin-Engine] landed
-  `a339` (`Aggregate._ruin_paths`, `ruin_example` thinned); [Ruin-Exhibit]
-  landed `a340` (`RuinResult`, `Aggregate.eventual_ruin`, the `ruin`
-  exhibit); [Ruin-Chart] (the `ruin` chart with mandatory downsampling)
-  follows. API half open in the API repo.
+  ruin for poisson and renewal frequencies. LIB half COMPLETE `a339` to
+  `a341`: [Ruin-Engine] `a339` (`Aggregate._ruin_paths`, `ruin_example`
+  thinned), [Ruin-Exhibit] `a340` (`RuinResult`,
+  `Aggregate.eventual_ruin`, the `ruin` exhibit), [Ruin-Chart] `a341`
+  (the `ruin` chart with [Ruin-Downsampling] inside). API half open in
+  the API repo ([Ruin-Route], [Ruin-Pane], [Ruin-Sample]); the plan and
+  its LIB execution notes stay in `dev/` until it lands.
 
 - **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
   stats frames into greater_tables IR envelopes. `Perspective` enum

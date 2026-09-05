@@ -303,8 +303,20 @@ def _difference_rows(block, basis, views, distortion, names):
     for view in views:
         if view == basis or view not in block.index:
             continue
-        rows.append([block.loc[basis, stat] - block.loc[view, stat]
-                     for stat in ('L', 'M', 'P', 'Q')])
+        diffs = []
+        for stat in ('L', 'M', 'P', 'Q'):
+            x = float(block.loc[basis, stat])
+            y = float(block.loc[view, stat])
+            d = x - y
+            # Sub-ulp cancellation reads as exactly 0. Two measurements
+            # agreeing to relative 1e-12 differ by float dust whose sign is
+            # an accident of the machine's reduction order (SIMD width,
+            # FMA), and without the clamp the row renders '-0.00' with a
+            # negative flag on one machine and '0.00' on another.
+            if d != 0.0 and abs(d) <= 1e-12 * max(abs(x), abs(y)):
+                d = 0.0
+            diffs.append(d)
+        rows.append(diffs)
         index.append((distortion, f'{basis} less {view}'))
     if not rows:
         return None

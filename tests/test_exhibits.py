@@ -1501,6 +1501,38 @@ def test_snapshot_coverage(objects):
         'snapshot file out of sync; run capture_exhibit_snapshots.py'
 
 
+def _assert_snapshot_close(got, want, path=''):
+    """Structural and text equality, floats to relative 1e-9.
+
+    Raw values travel in the canonical dict (``include_raw``, a246), and
+    anything downstream of an iterative calibration reproduces them only to
+    the last ulp across machines: float summation is non-associative and
+    numpy's SIMD dispatch (AVX-512 vs AVX2 blocking, FMA) reorders it, so a
+    snapshot captured on one CPU held raw ``8.0`` where another computes
+    ``7.999999999999999``. Exact equality therefore guards nothing but the
+    capture machine. Structure, keys, formatted text and flags stay exact,
+    which is what the snapshot is for: translation and IR drift, not float
+    reproduction.
+    """
+    if isinstance(got, dict) and isinstance(want, dict):
+        assert set(got) == set(want), f'{path}: keys {set(got) ^ set(want)}'
+        for k in got:
+            _assert_snapshot_close(got[k], want[k], f'{path}.{k}')
+    elif isinstance(got, list) and isinstance(want, list):
+        assert len(got) == len(want), f'{path}: len {len(got)} != {len(want)}'
+        for i, (g, w) in enumerate(zip(got, want)):
+            _assert_snapshot_close(g, w, f'{path}[{i}]')
+    elif (isinstance(got, (int, float)) and isinstance(want, (int, float))
+            and not isinstance(got, bool) and not isinstance(want, bool)
+            and (isinstance(got, float) or isinstance(want, float))):
+        # json round-trips a whole float as int, so mixed int/float compares
+        # numerically too; int-vs-int stays exact in the else branch
+        assert got == pytest.approx(want, rel=1e-9, abs=1e-12, nan_ok=True), \
+            f'{path}: {got} != {want}'
+    else:
+        assert got == want, f'{path}: {got!r} != {want!r}'
+
+
 @pytest.mark.parametrize('key', _SNAPSHOT_KEYS)
 def test_canonical_snapshot(key, objects):
     """Committed canonical_dict snapshots guard translation and IR drift."""
@@ -1508,4 +1540,4 @@ def test_canonical_snapshot(key, objects):
     exhibit, perspective, obj_key = key.split('/')
     e = build_exhibit(objects[obj_key], exhibit, perspective)
     got = [gt.canonical_dict(doc, include_hash=False) for doc in e.ir_blocks]
-    assert got == snapshots[key]
+    _assert_snapshot_close(got, snapshots[key])

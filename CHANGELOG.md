@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a338
+
+**[Snapshot-Float-Dust] the pricing difference rows clamp float dust to exact 0, and the exhibit snapshot comparison tolerates last-ulp raw drift.** A `basis less view` row whose amounts agree to relative 1e-12 now reads exactly 0 instead of machine-dependent dust rendering `-0.00` with a negative flag. `test_canonical_snapshot` compares floats to relative 1e-9 (structure, text and flags stay exact): raw values downstream of an iterative calibration reproduce only to the last ulp across CPUs (non-associative summation under different SIMD dispatch), which had 8 pricing snapshot tests failing on this machine against a snapshot captured on another. No snapshot regeneration needed; the stored values now match everywhere.
+
 ## 1.0.0a337
 
 **[Approximate-Punchup] the `approximation` chart drops its tail panel.** The chart is now the single density panel: realized mass with the five family curves in grid-mass terms, mean marked. The exceedance panel (twelve full-grid survival curves plus the implied tail `E[N] * S_X(x)`, shipped `a332`) is removed by ruling: the tail reading lives in the frame's `quantiles` / `rel err` blocks, and the panel dominated the document's byte count (measured 11.1 MB to 8.1 MB on a `log2 = 16` book; the rest is the density y arrays, a plan-payload item). `approximation_df` and `approximation_density_df` are unchanged. The survival and return-period axes and the `Implied tail` series leave the doc; a consumer keying on panel `tail` must re-sync.

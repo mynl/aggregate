@@ -139,8 +139,11 @@ VALIDATION_BASELINE = {
     'LayerPicks.Uniform': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
     'LayerPicks.Compare':
         'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW',
+    # The bottom-layer pick derives from the original expected loss (13500
+    # became 14900), so the sum of loss by layer preserves the mean and the
+    # two mean flags cleared; cv and skew remain what picking moved.
     'Capstone.SelectedLosses':
-        'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW',
+        'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW',
     # --- Signed severity on a wrapped window ----------------------------
     # A signed window aliases at the ends; the numerics section exists to
     # show that behavior rather than to hide it. Three entries left this list

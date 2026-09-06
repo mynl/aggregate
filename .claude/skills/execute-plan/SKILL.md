@@ -46,7 +46,7 @@ Then read everything the plan is attached to, because a plan is rarely alone:
   `git ls-files -s dev/<file>`. Shared plans are canonical in the API repo with
   a link here (`plan-3d-plot.md` and `plan-pricing-natural-allocation.md` were
   both this shape). Read the canonical copy at
-  `T:/worktrees/aggregate_api/dev/<file>`.
+  `V:/dev/aggregate-api/dev/<file>`.
 - **Is there a paired half?** Two arrangements are in use. The symlink, one file
   seen from both repos. And the reflection, a copy in each repo stating its own
   side as requirements (`plan-2d-punchup-requirements.md` here against
@@ -55,7 +55,7 @@ Then read everything the plan is attached to, because a plan is rarely alone:
 - **Is there an existing execution notes file?** `dev/plan-<stem>-LIB.md`. If it
   exists, part of this plan has already run. Read its divergences before
   touching anything.
-- **The control list.** `T:/worktrees/dev-files.md` carries a row per plan with
+- **The control list.** `V:/worktrees/dev-files.md` carries a row per plan with
   its real status, and its "Getting to 1.0" section is the author's master list.
   The row is more current than the plan's own header.
 - **The tracked item.** `dev/TODO.md`, the matching `[Bracket-Label]` entry.
@@ -66,8 +66,8 @@ Then read everything the plan is attached to, because a plan is rarely alone:
 ## 2. Read the ground truth, never assert it from memory
 
 ```
-git -C T:/worktrees/aggregate_REFACTOR status
-git -C T:/worktrees/aggregate_REFACTOR log --oneline -8
+git -C V:/worktrees/aggregate_REFACTOR status
+git -C V:/worktrees/aggregate_REFACTOR log --oneline -8
 grep -n '^version' pyproject.toml
 ```
 
@@ -116,7 +116,7 @@ read deliberately. If a public surface moves, `dev/FEATURES.csv` regenerates. If
 a public name the API imports moves, that is a ripple, not a local change.
 
 **Ripple to the app.** DecL grammar or keyword changes must be checked against
-`T:/worktrees/aggregate_api/web/src/decl-keywords.json`, which mirrors
+`V:/dev/aggregate-api/web/src/decl-keywords.json`, which mirrors
 `parser_errors._TERMINAL_LABELS` by hand. Exhibit and chart registry changes,
 and any capability flag, are the app's business too. State the ripple in the
 review even when nothing on this side has to change.
@@ -174,7 +174,7 @@ Three things this skill adds on top of it:
 
 - **The execution notes file** ships in the same commit as the phase it
   describes.
-- **The `dev-files.md` row** at `T:/worktrees/dev-files.md` gets the plan's new
+- **The `dev-files.md` row** at `V:/worktrees/dev-files.md` gets the plan's new
   status and version range. It is the control list the next session reads first.
 - **A numerics-touching phase also runs the `RuntimeWarning` gate**, per
   `test-tiers`.

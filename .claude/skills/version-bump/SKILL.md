@@ -28,8 +28,8 @@ common way this goes wrong.
 ## 2. Read git state, never assert it from memory
 
 ```
-git -C T:/worktrees/aggregate_REFACTOR status
-git -C T:/worktrees/aggregate_REFACTOR log --oneline -5
+git -C V:/worktrees/aggregate_REFACTOR status
+git -C V:/worktrees/aggregate_REFACTOR log --oneline -5
 ```
 
 The author commits frequently without announcing it, so any claim about what is

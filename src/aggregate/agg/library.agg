@@ -193,9 +193,9 @@ agg Capstone.SelectedLosses
   [2000 5000 10000 3000 1000] premium as GWP at [0.95 0.95 0.9 0.85 0.75] lr
   [500 1000 5000 10000 5000] xs [0 0 0 0 1000]
   sev sev.Capstone.Sev
-    picks [500 1000 2000 5000 10000] [13500 2250 1250 500 50]
+    picks [500 1000 2000 5000 10000] [14900 2250 1250 500 50]
   mixed gamma 0.125
-  note{Aggregate built using an adjusted capstone severity curve to achieve the desired blended experience and exposure rating loss picks by layer.}
+  note{Aggregate built using an adjusted capstone severity curve to achieve the desired blended experience and exposure rating loss picks by layer. Note that to preserve the adjusted mean the sum of loss by layer must equal the original expected loss. Usually the actuary selects the excess layers and derives the bottom layer to preserve the mean.}
   tags{topic:capstone, role:advanced};
 
 agg Capstone.LossPicksTest
@@ -221,6 +221,7 @@ xpnl Capstone.XOL.PnL
     agg.Capstone.XOL
   less
     25% premium expenses as "G&A"
+  peel bottom-up
   note{PnL (profit and loss) view of the capstone book with the XOL program only.}
   tags{topic:capstone, role:advanced};
 

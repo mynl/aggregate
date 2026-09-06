@@ -26,7 +26,16 @@
 > **Where plans live.** `dev/` = live · `dev/deferred/` = parked past the beta,
 > not closed · `dev/done/` = closed (shipped, `-REJECTED`, or `-SUPERSEDED`).
 >
-> **Last updated: 2026-08-09.** `[Exhibits-Module]` and `[Chart-IR]` moved out
+> **Last updated: 2026-09-05.** Currency review against `a315` to `a341`:
+> `[Library-Round-Two]` item 9 closed (zero note-less entries of 195),
+> `[Session-Build-Clobbers-The-Trailer]`, `[Unparser-Reference-Gaps]`,
+> `[Range-Sugar-Round-Trip]` and `[Multi-Window-Splice-Conditional]` annotated
+> with landed progress. **Post-v1.0 ideas** gains three entries from the
+> missing-features discussion of 2026-09-05 (`[Data-To-Dsev-Preprocessors]`,
+> `[Parameter-Risk-Predictive]`, `[Individual-Risk-Model-Census]`), and the
+> rejected footer records the never-Panjer ruling.
+>
+> **Previous update, 2026-08-09.** `[Exhibits-Module]` and `[Chart-IR]` moved out
 > of the beta gate into their own **Provisional modules** section. They were
 > filed under the gate when they were added on 2026-08-05, which was a
 > transcription error against the original design: both are additive side
@@ -315,14 +324,10 @@
      scale factor, `SevReversed` is a lognormal by scale and shape.
   8. **Inner engine names in the P&L block follow no rule**: `PnLprem.Vec_e`,
      `PnLsigned.Asym_e`, `E.PNL_e`, `APX.PnL_e`.
-  9. **Sixteen entries carry tags but no `note{}`.** A note is the norm and is
-     the SPA dropdown blurb, so each is a small gap: `ApproximateAggReins`,
-     `ApproximateLeftReflect`, `ApproximatePnL`, `ApproximateRightSlognorm`,
-     `BivariateClaytonMixed`, `BivariateIndependent`, `BivariateNormal`,
-     `BivariatePnLAxis`, `CCoCDistortion`, `MinimumDistortion`,
-     `PHDistortionSimple`, `PnLBook`, `SignedPortfolioMixed`, `TVaRDistortion`,
-     `UnitSeverity`, `WindowContinuous`. Regenerate the list with
-     `build.recipes.query('not note')`.
+  9. ~~**Sixteen entries carry tags but no `note{}`.**~~ **DONE** by the
+     `[Library-Roles]` pass and `a327`: measured 2026-09-05, every one of the
+     195 entries carries a note (`build.recipes.query('not note')` is empty).
+     Items 1 to 8 above remain the open author calls.
 - ~~**[Aliasing-Test-Misfires-On-A-Reference-Severity]**~~ **DONE `1.0.0a311`**
   (part one of `dev/done/plan-validation-punchup.md`): the ratio is gone, so
   there is no denominator left to collapse. Original entry, for the record.
@@ -365,11 +370,21 @@
   **not** close the item: a single-process user, the Jupyter case, still
   overwrites the trailer in the one base they have, and the other two arms
   (warn, or merge the trailer) are still the open question there.
+  **Adjacent fix, `a318` `[Reference-Trailer-Preservation]`:** a builtin
+  *reference* build no longer writes a blanked trailer back into the recipe
+  base, closing one route into this bug; a user's own rebuild of a library
+  name still replaces the trailer, so the item stands.
 - **[Unparser-Reference-Gaps]** (surfaced by `[Library-Canonical-Layout]`, a178)
   — `decl_writer` cannot render three constructs back to what was written, so 13
   `library.agg` entries are exempt from the canonical layout and hand-written.
   The list is `UNPARSER_EXEMPT` in `tests/test_agg_libraries.py`; shrinking it
-  is progress. The `tweedie` clause was the fourth and is **done** (`a231`,
+  is progress. **Two updates since:** `a320` taught `_render_splice` the
+  compact one-list form for contiguous bands, so `SevSpliced` and
+  `BivariateCatPair` match their source byte for byte; and the `a327` example
+  wave grew `UNPARSER_EXEMPT` into a catalogue of every source spelling the
+  unparser cannot recover, covering 27 pre-existing offenders that bracket
+  padding had been hiding (execution notes in
+  `dev/done/new-examples-added.md`). The `tweedie` clause was the fourth and is **done** (`a231`,
   `dev/done/plan-tweedie.md`): it carries a `_tweedie` provenance key, renders
   its clause back, and no longer overwrites the author's `note{}`. The pattern
   it established, record what was declared and render from that, is what item 1
@@ -1262,6 +1277,10 @@
   progression after the fact is the wrong answer: it would re-fold a list the
   author wrote out longhand, exactly the canonicalizing-with-opinions failure
   the tweedie work was careful to avoid.
+  **Related, `a320` `[Recipe-Seq-As-Read]`:** `Recipe.as_read` now preserves
+  the source spelling (`dsev [1:6]`, `ph 2/3`) at the recipe level, so the
+  written form is no longer lost entirely; the spec-level round trip this
+  item wants is unchanged.
 - **[Power-Variance-Family]** (from `dev/done/plan-tweedie.md`, 2026-08-09) — the
   `tweedie` clause covers only the `1 < p < 2` slice of the power variance
   family, but the `Tweedie` class already spans the whole p range: Gaussian at
@@ -1363,14 +1382,69 @@
   severity mean `8.8909`), out-of-order windows build, and the two cases that
   do raise report from a layer below, `lb > ub` as zero probability mass and a
   length mismatch as a raw numpy broadcast error.
-  No library entry exercises a multi-window splice and none was added while
-  this stands (author, 2026-08-26): an example written today would have to
-  carry the `wts` workaround and would bake it in.
+  No library entry exercised a multi-window splice when this was logged
+  (author, 2026-08-26): an example written then would have had to carry the
+  `wts` workaround and would have baked it in. **Update `a327`:**
+  `SplicedDisjointSegments` joined the library as a genuine disjoint
+  two-segment splice carrying explicit `wts [0.7 0.3]`, the deliberate
+  declared-weights mixture reading rather than the equal-weight default this
+  item indicts, and its note says so; the `a327` execution notes
+  (`dev/done/new-examples-added.md`) also record the improper one-component
+  two-list splice as a finding for later.
+
+- **[Data-To-Dsev-Preprocessors]** (logged 2026-09-05, from the
+  missing-features review; author framing: two related preprocessors turning
+  data into a (big) `dsev`, with nothing FFT-core changing). Two limbs.
+  **Observed-loss resimulation:** the preferred data on-ramp is Kaplan-Meier
+  improved resimulation from observed losses, the nonparametric survival
+  curve corrected for left truncation (deductibles) and right censoring
+  (limits), resampled into an empirical `dsev`. Explicitly instead of a
+  parametric MLE fitting module: plenty of tools do that, it is not core for
+  aggregate, and truncation and censoring are exactly what the KM correction
+  gets around.
+  **Cat-model import:** the ELT/YLT importer, in progress at
+  `V:\dev\secondary-corrosion` and not yet integrated. An event loss table
+  with secondary uncertainty becomes compound Poisson DecL, a year loss table
+  becomes an empirical aggregate, and the multivariate secondary-uncertainty
+  case suggests a multivariate `dsev`. Operationalizes the seam
+  `[README-Scope-Statement]` names, top of the post-1.0 list as the biggest
+  audience win; that repo carries a number of related ideas.
+- **[Individual-Risk-Model-Census]** (logged 2026-09-05). A census to DecL
+  preprocessor for the individual risk model, the third preprocessor in the
+  family above. The total's transform `prod_j (1 - q_j + q_j phi_j(t))`
+  factorizes by cell: one forward FFT per distinct severity, a
+  count-weighted complex log-sum over the distinct `q` within a cell (the
+  branch choice is harmless, since the closing exp kills any `2 pi i k`),
+  and a cell with common `q` is exactly the binomial PGF applied to the
+  severity transform, so the engine already computes the exact model as a
+  `Portfolio` of binomial-frequency cells. Grouping is the exact
+  factorization, not an approximation; binning `q` to a lattice is the
+  optional knob. What is missing is the front door, a policy census (count,
+  `q`, severity reference) emitting the Portfolio DecL, plus attention to
+  per-unit bookkeeping overhead when cells run to the hundreds. Opens group
+  life, surety and credit; CreditRisk+ is this plus gamma mixing on `q` by
+  sector, so its full payoff waits on
+  `[Portfolio-Shared-Mixing-Dependence]`.
+- **[Parameter-Risk-Predictive]** (logged 2026-09-05; recorded, and the
+  author does not intend to build it). Predictive distributions under
+  parameter uncertainty: quadrature over the parameter vector, so a finite
+  mixture, the weighted sum of transforms `sum_k w_k phi(t; theta_k)` formed
+  in the transform domain with one inverse FFT at the end. Frequency mixing
+  already does this for counts; this is the severity-side and joint
+  analogue, and a posterior sample or a judgmental discrete distribution
+  supplies the nodes and weights. Ruled a good idea and kept here so the
+  design is not re-derived; treat it as a note for a future contributor
+  rather than queued work.
 
 > *Rejected, so it is not re-proposed cold:* DecL colorization (aesthetic-only,
 > structurally weak) and the `dev`/`user` **display mode** `ReprMixin` (not worth
 > the effort — both views are already one attribute away). Reasoning:
 > `dev/done/plans-considered-and-rejected.md`.
+> Also rejected, 2026-09-05: a **Panjer recursion second engine** as an FFT
+> cross-check. `panjer_ab` sits on five frequency classes and is deliberately
+> never consumed; never running Panjer is a feature, not a bug (author ruling,
+> proposed in the missing-features review precisely so it could be struck
+> down on the record).
 
 ---
 

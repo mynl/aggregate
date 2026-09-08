@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a345
+
+**[Dbvsev-Signed-Lattice] fix `dbvsev` with negative outcomes.** A signed lattice (e.g. `dbvsev [-3:3] [0:6]`) was scattered onto the FFT grid at raw negative indices, which the signed lay-in then wrapped a second time: every atom landed `i0` buckets low, the negative atoms fell off the output window, and the joint lost mass (4/7 on the example). The scatter now uses the natural signed convention (offset by the per-axis negative reach), fixing both the in-core and massive discrete paths. Non-negative lattices are unchanged. Regression tests in `tests/test_bv_discrete.py`; `MV.DBVSigned` added to `decl-testers.agg`.
+
 ## 1.0.0a344
 
 **[Approximation-Tails-Chart] new chart `approximation_tails` on `Aggregate`: the exceedance picture the `approximation` chart dropped at `1.0.0a337`, returned as its own document.** One `tails` panel: the exact tail, one survival curve per admissible family (read at the upper half-edge, trimmed at the float-dust floor, lattice x), and the sub-exponential implied tail `E[N] * S_X(x)` (role `ceiling`). Each law ships one curve: the cdf is the declared complement axis reading, the return period the declared reciprocal axis, and the exchanged panel is the upper Lee (quantile) plot, so nothing travels twice. Same `xmax` option as the `agg` and `approximation` charts; predicate updated; registers on `Aggregate` only (the implied tail needs a single severity). The `approximation` chart is unchanged. Downstream: `available_charts` gains a name, the a252 `load_chart_doc` reader needs nothing.

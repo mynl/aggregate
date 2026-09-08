@@ -2081,8 +2081,12 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             # (N0, N1) output grid at each lattice point's bucket index. The
             # lattice bs divides every atom (gcd), so the indices are exact and
             # the per-event-severity row/column sums reproduce g0 / g1 on the grid.
-            ix = np.round(self._dbv_xs / self.bs[0]).astype(int)
-            iy = np.round(self._dbv_ys / self.bs[1]).astype(int)
+            # The i0 offset puts the scatter in the natural signed convention
+            # the lay-in expects (row 0 = x_min = -i0*bs): _lay_signed_2d wraps
+            # the first i0 rows/columns itself, so scattering a negative atom at
+            # its raw (negative, numpy-wrapped) index would wrap it twice.
+            ix = np.round(self._dbv_xs / self.bs[0]).astype(int) + self._i0[0]
+            iy = np.round(self._dbv_ys / self.bs[1]).astype(int) + self._i0[1]
             if massive:
                 rows = np.repeat(ix, len(iy))
                 cols = np.tile(iy, len(ix))

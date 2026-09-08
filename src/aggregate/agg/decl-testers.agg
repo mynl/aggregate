@@ -340,6 +340,7 @@ bivariate MV.DBVSparse 5 claims dbvsev [[10 1 .4] [10 2 .1] [20 1 .2] [20 2 .1] 
 bivariate MV.DBVUniform 5 claims dbvsev [0 1 2] [0 5 10];
 bivariate MV.DBVRange 5 claims dbvsev [0:2] [0:2];
 bivariate MV.DBVIndep dfreq [1] dbvsev [0 1 2] [0 1 2] [[.30 .15 .05] [.18 .09 .03] [.12 .06 .02]];
+bivariate MV.DBVSigned dfreq [1] dbvsev [-3:3] [0:6];
 bivariate MV.DBV2 dfreq [1 2] [.7 .3] agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula gumbel 0.4
 
 # ============================================================

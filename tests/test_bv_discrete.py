@@ -239,3 +239,37 @@ def test_dbvsev_independent_pair_hand_arithmetic():
     d1 = mv.conditional('x+y', 2, report=1)
     np.testing.assert_allclose(d1.p[:3], np.array([.12, .09, .05]) / .26,
                                atol=1e-12)
+
+
+# ----------------------------------------------------------------------
+# signed lattice: negative outcomes survive the scatter (regression, a345)
+# ----------------------------------------------------------------------
+
+# Uniform 7x7 on a signed X lattice. Through a344 the scatter used raw
+# (negative, numpy-wrapped) indices while _lay_signed_2d wrapped the first
+# i0 rows again, so every X atom landed i0 buckets low and the negative
+# atoms fell off the output window (mass dropped to 4/7 on this example).
+SIGNED = ('bv DBVSigned dfreq [1] dbvsev [-3:3] [0:6] '
+          '[' + ' '.join(['[' + ' '.join(['0.02040816326530612'] * 7) + ']'] * 7) + ']')
+
+
+def test_dbvsev_signed_x_lattice():
+    mv = build(SIGNED)
+    assert np.isclose(mv.density.sum(), 1.0, atol=1e-9)
+    mx = mv.density.sum(axis=1)
+    my = mv.density.sum(axis=0)
+    assert float(mv.axis_xs[0] @ mx) == pytest.approx(0.0, abs=1e-9)
+    assert float(mv.axis_xs[1] @ my) == pytest.approx(3.0, rel=1e-9)
+    # one fixed claim: the joint IS the severity matrix, so every lattice
+    # atom carries exactly 1/49 at its own (x, y) location
+    for x in range(-3, 4):
+        ixx = int(np.searchsorted(mv.axis_xs[0], x))
+        assert mx[ixx] == pytest.approx(1.0 / 7.0, rel=1e-9), f'X atom {x}'
+
+
+def test_dbvsev_signed_both_axes_random_freq():
+    mat = '[' + ' '.join(['[' + ' '.join(['0.02040816326530612'] * 7) + ']'] * 7) + ']'
+    mv = build(f'bv DBVSigned2 dfreq [0 1 2] [.25 .5 .25] dbvsev [-3:3] [-3:3] {mat}')
+    assert np.isclose(mv.density.sum(), 1.0, atol=1e-9)
+    assert float(mv.axis_xs[0] @ mv.density.sum(axis=1)) == pytest.approx(0.0, abs=1e-9)
+    assert float(mv.axis_xs[1] @ mv.density.sum(axis=0)) == pytest.approx(0.0, abs=1e-9)

@@ -552,15 +552,15 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
-- **[Pr-Ruin-Pill]** (`plan-pk-tab.md`, execution notes
-  `plan-pk-tab-LIB.md`): the Pricing > Pr Ruin pill, probability of eventual
-  ruin for poisson and renewal frequencies. LIB half COMPLETE `a339` to
+- **[Pr-Ruin-Pill]** DONE (`dev/done/plan-pk-tab.md`, execution notes
+  `dev/done/plan-pk-tab-LIB.md`): the Pricing > Pr Ruin pill, probability
+  of eventual ruin for poisson and renewal frequencies. LIB half `a339` to
   `a341`: [Ruin-Engine] `a339` (`Aggregate._ruin_paths`, `ruin_example`
   thinned), [Ruin-Exhibit] `a340` (`RuinResult`,
   `Aggregate.eventual_ruin`, the `ruin` exhibit), [Ruin-Chart] `a341`
-  (the `ruin` chart with [Ruin-Downsampling] inside). API half open in
-  the API repo ([Ruin-Route], [Ruin-Pane], [Ruin-Sample]); the plan and
-  its LIB execution notes stay in `dev/` until it lands.
+  (the `ruin` chart with [Ruin-Downsampling] inside). API half landed at
+  API `a142` (route, chart, exhibit) and `a143` (the pill opens, Draw and
+  Sample); both repos' plan copies moved to `dev/done/` 2026-09-07.
 
 - **[Exhibits-Module]**: new `aggregate/exhibits.py` translating the raw FCC
   stats frames into greater_tables IR envelopes. `Perspective` enum

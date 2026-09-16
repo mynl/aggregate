@@ -37,8 +37,12 @@ styles:
   money: ',.2f'
 
 columns:
-  # A skewness is order one, so fixed decimals cost nothing here.
+  # A skewness is order one, so fixed decimals cost nothing here. Sk and
+  # Est Sk are the same measure in the eight column validation layout
+  # (validation_df, reins_summary_df), so they read the same way.
   Skew: '.3f'
+  Sk: '.3f'
+  'Est Sk': '.3f'
 
   # The calibration and acceptability receipts, read in fixed decimals.
   # `error` reads a premium miss, so this view rounds a very close fit to

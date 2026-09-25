@@ -197,7 +197,7 @@ Chart documents defined
 
 A chart emitter returns a :class:`~aggregate.charts.ir.ChartDoc`: axes, panels, series, marks and chart-level ``meta``, carrying semantics only. The boundary rule is semantics against realization, not data against display. Log or linear is statistical meaning, so ``scale`` lives on the axis; a sequential color ramp is presentation, so it has no field at all. There is no renderer passthrough of any kind: a need the schema cannot express changes the schema visibly, or the chart stays bespoke.
 
-Documents are deterministic. The canonical form gives the same bytes and the same 12 hex hash on any machine on any run, which is what lets a client cache on an ETag. ``CHART_IR_VERSION`` is how a consumer detects a schema change; the current version is 2.
+Documents are deterministic. The canonical form gives the same bytes and the same 12 hex hash on any machine on any run, which is what lets a client cache on an ETag. ``CHART_IR_VERSION`` is how a consumer detects a schema change; the current version is 3.
 
 Declared readings
 ~~~~~~~~~~~~~~~~~

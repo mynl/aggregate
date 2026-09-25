@@ -1,4 +1,4 @@
-"""Chart-document IR: frozen dataclasses, ``CHART_IR_VERSION`` 2.
+"""Chart-document IR: frozen dataclasses, ``CHART_IR_VERSION`` 3.
 
 .. warning::
 
@@ -79,6 +79,7 @@ __all__ = [
     'CHART_IR_VERSION', 'SUPPORT_KINDS', 'SURFACE_DTYPES', 'SURFACE_EDGES',
     'ChartAxis', 'ChartCapabilityError',
     'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData', 'SurfaceZBlock',
+    'TowerBlock',
     'canonical_dict', 'canonical_json', 'complete_tex', 'decode_z_block',
     'doc_hash', 'encode_z_block',
     'human_strings', 'load_chart_doc', 'stamp',
@@ -102,13 +103,23 @@ __all__ = [
 #: draw nothing, which is exactly the "would draw something wrong" case, so
 #: the version moves and an old reader refuses the document by name rather
 #: than drawing an empty panel.
-CHART_IR_VERSION = 2
+#:
+#: **Version 3** (1.0.0a349) adds the 'tower' panel kind and the
+#: :class:`TowerBlock` payload it draws (:attr:`ChartDoc.blocks`). A reader
+#: that does not know either sees a panel whose kind it cannot realize and a
+#: document whose rectangles are invisible to it, so the whole picture is
+#: missing rather than merely plainer, which is the "would draw something
+#: wrong" case again.
+CHART_IR_VERSION = 3
 
 #: Panel kinds. 'xy' is a family of curves over a shared pair of axes;
 #: 'heatmap' and 'surface' carry one z grid each (a ``SurfaceData``), read
-#: flat or in relief. A renderer that cannot realize a kind declares so
-#: (see :class:`ChartCapabilityError`) rather than approximating silently.
-PANEL_KINDS = ('xy', 'heatmap', 'surface')
+#: flat or in relief. 'tower' is a stack of labeled rectangles over one
+#: quantity axis and one placement axis (a reinsurance program's layers),
+#: carrying :class:`TowerBlock`s rather than series. A renderer that cannot
+#: realize a kind declares so (see :class:`ChartCapabilityError`) rather
+#: than approximating silently.
+PANEL_KINDS = ('xy', 'heatmap', 'surface', 'tower')
 
 #: Axis scales. Log or linear is statistical meaning (a heavy tail is
 #: legible only on log), never styling.
@@ -167,6 +178,19 @@ SERIES_ROLES = ('density', 'survival', 'cdf', 'identity', 'distortion',
 #: Mark roles: 'mean', 'break_even' (the zero of a signed outcome axis),
 #: 'capital_anchor' (a return-period quantile such as 1-in-200).
 MARK_ROLES = ('mean', 'break_even', 'capital_anchor')
+
+#: Block roles, the working vocabulary (open; documented additions only):
+#: 'layer' (a placed reinsurance layer), 'retention' (what the cedent keeps
+#: below and between cessions), 'co_participation' (the unplaced fraction of
+#: a layer, the part of its width nobody bought), 'gap' (a band inside the
+#: tower that no layer covers, which a reader must see because it is a hole
+#: in the program), 'gross' (the subject the tower is read against, drawn as
+#: one slab).
+#:
+#: 'gross' is in this vocabulary and in :data:`SERIES_ROLES`. They are
+#: different vocabularies over different objects and the overlap is
+#: intended: a gross curve and a gross slab name the same quantity.
+BLOCK_ROLES = ('layer', 'retention', 'co_participation', 'gap', 'gross')
 
 #: What a series' x values *are*, which is a fact about the law and not
 #: about the drawing. 'atomic': the points carry the whole distribution and
@@ -947,8 +971,9 @@ class Mark:
     faint : bool
         A de-emphasized mark, drawn as a scale to read the panel against
         rather than as an answer, versus a full-weight one (the mean).
-        Semantic emphasis, not a color choice. No shipped emitter sets it
-        at present, and a reader must still honor it.
+        Semantic emphasis, not a color choice. The structure chart sets it
+        on the rules that carry a tower's layer boundaries across to its
+        Lee curve: they are a scale, not a reading.
     """
 
     panel_id: str
@@ -961,6 +986,76 @@ class Mark:
     def __post_init__(self):
         if self.orient not in ('v', 'h'):
             raise ValueError("orient must be 'v' or 'h'")
+
+
+@dataclass(frozen=True)
+class TowerBlock:
+    """One labeled rectangle in a 'tower' panel: a layer, or what is not one.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
+    Parameters
+    ----------
+    panel_id : str
+        The panel the block draws in. Its kind must be 'tower'.
+    x0, x1 : float
+        The block's span on the placement axis, in ``[0, 1]``. Width **is**
+        share: a layer placed 60% spans ``[0, 0.6]`` and the unplaced 40%
+        is a separate ``'co_participation'`` block spanning ``[0.6, 1]``.
+    y0, y1 : float
+        The block's band on the quantity axis, in the axis' currency. For a
+        layer these are its attachment and its exhaustion point.
+    role : str
+        One of :data:`BLOCK_ROLES` (open vocabulary).
+    label : str, optional
+        The block's headline, the one line a renderer draws when it has room
+        for only one (a layer's resolved name, or its terms).
+    label_lines : tuple of str, optional
+        The annotation stack, already formatted by the emitter and in the
+        order it is to be read. Formatting a currency amount is the
+        emitter's job because the reading is ("at 100% terms", "placed")
+        rather than the renderer's, which knows no such thing.
+    open_top : bool
+        The band is unbounded above and ``y1`` is the drawn window's top
+        rather than a real exhaustion point. An unlimited top layer, whose
+        rectangle must be drawn without a top edge so the reader is not
+        told a limit exists.
+
+    Notes
+    -----
+    A block is not a series. It carries no law and nothing is interpolated
+    between its corners: it is an exact statement about a contract, which is
+    why it is its own payload rather than a degenerate two-point curve.
+
+    Coordinate order is validated because a reversed rectangle draws nothing
+    and reports nothing, which is the one class of emitter bug a picture
+    cannot show you.
+    """
+
+    panel_id: str
+    x0: float
+    x1: float
+    y0: float
+    y1: float
+    role: str
+    label: str = None
+    label_lines: tuple = ()
+    open_top: bool = False
+
+    def __post_init__(self):
+        if self.role not in BLOCK_ROLES:
+            raise ValueError(
+                f'unknown block role {self.role!r}; expected one of '
+                f'{BLOCK_ROLES}')
+        _freeze_seq(self, 'label_lines')
+        if self.x1 < self.x0:
+            raise ValueError(
+                f'block {self.label!r}: x1 = {self.x1} < x0 = {self.x0}')
+        if self.y1 < self.y0:
+            raise ValueError(
+                f'block {self.label!r}: y1 = {self.y1} < y0 = {self.y0}')
 
 
 @dataclass(frozen=True)
@@ -984,6 +1079,10 @@ class ChartDoc:
         Draw order is document order (a total drawn after its units sits
         on top; that ordering is meaning).
     marks : tuple of Mark
+    blocks : tuple of TowerBlock
+        The rectangles of every 'tower' panel, in draw order. Empty for a
+        document with no tower panel, which is every chart but the
+        structure diagram.
     meta : dict
         Chart-level semantic facts that are not drawable objects and belong
         to no single axis, panel or series: ``return_period_map`` (see
@@ -1019,6 +1118,7 @@ class ChartDoc:
     axes: tuple = ()
     series: tuple = ()
     marks: tuple = ()
+    blocks: tuple = ()
     meta: dict = field(default_factory=dict)
     tex: dict = field(default_factory=dict)
     ir_version: int = CHART_IR_VERSION
@@ -1034,6 +1134,7 @@ class ChartDoc:
         _freeze_seq(self, 'axes')
         _freeze_seq(self, 'series')
         _freeze_seq(self, 'marks')
+        _freeze_seq(self, 'blocks')
         object.__setattr__(self, 'meta', dict(self.meta))
         object.__setattr__(self, 'tex', dict(self.tex))
         panel_ids = [p.id for p in self.panels]
@@ -1131,6 +1232,19 @@ class ChartDoc:
                 raise ValueError(
                     f'mark {m.label!r} references unknown panel '
                     f'{m.panel_id!r}')
+        # A block on an 'xy' panel is the same class of mistake as a surface
+        # on one: the payload and the kind disagree, and the renderer that
+        # honors the kind would silently drop it.
+        for b in self.blocks:
+            if b.panel_id not in kinds:
+                raise ValueError(
+                    f'block {b.label!r} references unknown panel '
+                    f'{b.panel_id!r}')
+            if kinds[b.panel_id] != 'tower':
+                raise ValueError(
+                    f'block {b.label!r} draws in panel {b.panel_id!r}, '
+                    f'which is kind {kinds[b.panel_id]!r} rather than '
+                    "'tower'")
 
 
 # --------------------------------------------------------------------------
@@ -1169,6 +1283,10 @@ _ALWAYS = {
     ChartAxis: ('id', 'label', 'scales'),
     ChartSeries: ('name', 'role', 'panel_id', 'support'),
     Mark: ('panel_id', 'orient', 'at'),
+    # Every coordinate, because a zero is a real reading on both of a
+    # block's axes: a layer attaching at 0 and a placement starting at 0
+    # are the common cases, not absences.
+    TowerBlock: ('panel_id', 'x0', 'x1', 'y0', 'y1', 'role'),
     SurfaceData: ('x', 'y', 'z'),
     SurfaceZBlock: ('dtype', 'data', 'order'),
 }
@@ -1284,9 +1402,10 @@ def load_chart_doc(d):
     ----------
     d : dict
         A canonical dict, or what ``json.loads`` makes of
-        :func:`canonical_json` output. Panels, axes, series and marks arrive
-        as plain dicts and are rebuilt as their dataclasses; tuples arrive as
-        lists and are frozen by each class's ``__post_init__``.
+        :func:`canonical_json` output. Panels, axes, series, marks and
+        blocks arrive as plain dicts and are rebuilt as their dataclasses;
+        tuples arrive as lists and are frozen by each class's
+        ``__post_init__``.
 
     Returns
     -------
@@ -1346,6 +1465,8 @@ def load_chart_doc(d):
         'axes': tuple(_load_member(ChartAxis, a) for a in rest.pop('axes', ())),
         'series': tuple(_load_series(s) for s in rest.pop('series', ())),
         'marks': tuple(_load_member(Mark, m) for m in rest.pop('marks', ())),
+        'blocks': tuple(_load_member(TowerBlock, b)
+                        for b in rest.pop('blocks', ())),
     }
     return _load_member(ChartDoc, {**rest, **members})
 
@@ -1391,10 +1512,11 @@ def human_strings(doc):
     """Every human-facing string a document exposes, in document order.
 
     The document's title, each panel's title, each axis label, each series
-    name and each mark label: the strings a renderer puts in front of a
-    reader, and therefore exactly the strings :attr:`ChartDoc.tex` must
-    cover. Deduplicated, because the map is keyed by string value: one
-    entry covers a name and an axis label that read alike.
+    name, each mark label, and each block's headline and annotation line:
+    the strings a renderer puts in front of a reader, and therefore exactly
+    the strings :attr:`ChartDoc.tex` must cover. Deduplicated, because the
+    map is keyed by string value: one entry covers a name and an axis label
+    that read alike.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API
@@ -1413,7 +1535,9 @@ def human_strings(doc):
                  + [p.inverse_title for p in doc.panels]
                  + [a.label for a in doc.axes]
                  + [s.name for s in doc.series]
-                 + [m.label for m in doc.marks]):
+                 + [m.label for m in doc.marks]
+                 + [b.label for b in doc.blocks]
+                 + [line for b in doc.blocks for line in b.label_lines]):
         if text and text not in out:
             out.append(text)
     return tuple(out)

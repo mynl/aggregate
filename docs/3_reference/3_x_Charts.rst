@@ -59,6 +59,8 @@ A grid panel's data is a :class:`~aggregate.charts.ir.SurfaceData`, and it carri
 
 The z values travel twice: as the plain nested array, and as a :class:`~aggregate.charts.ir.SurfaceZBlock`, base64 of little-endian bytes under a declared dtype (:data:`~aggregate.charts.ir.SURFACE_DTYPES`), built and read with :func:`~aggregate.charts.ir.encode_z_block` and :func:`~aggregate.charts.ir.decode_z_block`. Naming the dtype is what lets the default change without a format change. The default is float32 and not float64, which points the other way from intuition: the low mantissa bits of an FFT-built density are genuine digits that no compressor touches, so a float64 payload measures about twice the size of the JSON text it replaces.
 
+A ``'tower'`` panel carries :class:`~aggregate.charts.ir.TowerBlock` rectangles on :attr:`~aggregate.charts.ir.ChartDoc.blocks` rather than series, because a reinsurance layer is an exact statement about a contract and not a sampled law: nothing is interpolated between a block's corners, and a degenerate two-point curve would invite a reader to think otherwise. Its placement axis is a share, so width **is** share, and the unplaced fraction of a layer is its own block (see :data:`~aggregate.charts.ir.BLOCK_ROLES`, which also names the retention, the gaps and the gross subject). A block's annotation lines arrive already formatted, because whether an amount is quoted at 100% terms or as placed is a fact the emitter knows and the renderer does not.
+
 Every human-facing string in a document is plain text, never markup in any renderer's language, and carries **both** forms: :attr:`~aggregate.charts.ir.ChartDoc.tex` is a total lookup from the plain string to its typeset form, a plain word mapping to itself. The analogy is alt text in HTML: you write both because they serve different consumers, and you do not make one consumer guess. matplotlib reads the typeset form, the browser reads the plain one, and neither derives one from the other. A missing entry is an emitter bug, so emitters build the map with :func:`~aggregate.charts.ir.complete_tex`, which fills the identities, and the contract is checked as a set difference against :func:`~aggregate.charts.ir.human_strings`. The plain form does not have to be ASCII: Unicode carries most actuarial labels honestly, and the dual distortion ``ǧ(s)`` is the working example.
 
 .. currentmodule:: aggregate.charts.ir
@@ -70,6 +72,7 @@ Every human-facing string in a document is plain text, never markup in any rende
    ChartSeries
    ChartAxis
    Mark
+   TowerBlock
    SurfaceData
    SurfaceZBlock
    ChartCapabilityError
@@ -87,6 +90,7 @@ Every human-facing string in a document is plain text, never markup in any rende
    SURFACE_DTYPES
    SURFACE_EDGES
    RETURN_PERIOD_MAPS
+   BLOCK_ROLES
 
 .. automodule:: aggregate.charts.ir
 

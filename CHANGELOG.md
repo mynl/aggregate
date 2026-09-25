@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a349
+
+**[Tower-Block-IR] the chart IR learns the `'tower'` panel kind, and `CHART_IR_VERSION` moves 2 to 3.** A tower panel carries `TowerBlock` rectangles on the new `ChartDoc.blocks` tuple rather than series: `panel_id`, `x0`/`x1` on a placement axis where width is share, `y0`/`y1` on a quantity axis, a `role` from the new `BLOCK_ROLES` vocabulary (`layer`, `retention`, `co_participation`, `gap`, `gross`), a `label`, a pre-formatted `label_lines` stack, and `open_top` for an unlimited layer. `TowerBlock` is exported from `aggregate.charts`, walked by `human_strings` so `ChartDoc.tex` stays total, rebuilt by `load_chart_doc`, and has every coordinate in the always-serialized set because a zero is a real reading on both axes. `Mark.faint` is no longer unused by shipped code. Nothing emits a tower yet; the emitter follows.
+
+**Every chart document's hash moves**, because `ir_version` is always serialized. A document with no tower still omits `blocks` entirely, so no other field changed. Consumers that pin `CHART_IR_VERSION = 2` and check it will refuse every document from this version until they are updated, which is the pin-and-check contract working as documented in `docs/3_reference/3_x_API_Stability.rst`: the `aggregate-api` SPA draws no charts at all until its companion plan lands.
+
 ## 1.0.0a348
 
 **[Closed-Support-Window] the bucket grid now strictly contains the window it was sized for.** The two "coarsen `bs` to fit the `log2` cap" fallbacks in `_bucket_window` divided the span by `2**cap` where the rest of the sizer counts inclusively and divides by `2**cap - 1`, so a span that was itself a power of two was not coarsened at all and the realized extent ended exactly on the support top, deleting the last half bucket of mass. Still not fixed, and now tracked as `[Bounded-Residual-Lump]` in `dev/TODO.md`: a `bs` the user pinned is honored verbatim, grid ending on the support top and all.

@@ -3079,14 +3079,14 @@ surface mirrors exhibits exactly:
     doc = charts.build_chart_doc(simple, 'agg')
     doc.name, [pan.id for pan in doc.panels], [a.id for a in doc.axes]
 
-A ``ChartDoc`` is panels over axes over series, plus marks, metadata and a ``tex``
-map, stamped with a content hash. ``CHART_IR_VERSION`` is 2. The governing
-principle, settled at a233, is that **which readings a quantity admits is a fact
-about the quantity, not about the drawing**: an axis declares the scales and
-ranges it may honestly be read on, and a panel the forms it may take. A log
-reading of a heavy tail is meaningful and a log reading of a distortion's unit
-square is not, so the document says so, and the renderer's switch acts wherever
-the declaration exists and nowhere else.
+A ``ChartDoc`` is panels over axes over series, plus marks, the rectangles of
+any tower panel, metadata and a ``tex`` map, stamped with a content hash.
+``CHART_IR_VERSION`` is 3. The governing principle, settled at a233, is that
+**which readings a quantity admits is a fact about the quantity, not about the
+drawing**: an axis declares the scales and ranges it may honestly be read on,
+and a panel the forms it may take. A log reading of a heavy tail is meaningful
+and a log reading of a distortion's unit square is not, so the document says so,
+and the renderer's switch acts wherever the declaration exists and nowhere else.
 
 .. ipython:: python
 

@@ -16,8 +16,9 @@ import pytest
 from aggregate import charts
 from aggregate.charts import (
     CHART_IR_VERSION, ChartAxis, ChartDoc, ChartSeries, Mark, Panel,
-    SurfaceData, available_charts, canonical_dict, canonical_json,
-    complete_tex, doc_hash, human_strings, load_chart_doc, stamp,
+    SurfaceData, TowerBlock, available_charts, canonical_dict,
+    canonical_json, complete_tex, doc_hash, human_strings,
+    load_chart_doc, stamp,
 )
 
 
@@ -80,6 +81,38 @@ def small_surface_doc():
                         panel_id='joint', surface=surf),
         ),
     )
+
+
+def small_tower_doc(**overrides):
+    """A minimal tower document: one placed layer over its retention."""
+    kw = dict(
+        name='structure',
+        title='Program',
+        axes=(
+            ChartAxis(id='place', label='Placement', unit='ratio',
+                      suggested_range=(0.0, 1.0)),
+            ChartAxis(id='loss', label='Occurrence loss', unit='currency',
+                      suggested_range=(0.0, 150.0)),
+        ),
+        panels=(
+            Panel(id='occ', kind='tower', x_axis='place', y_axis='loss',
+                  title='Occurrence'),
+        ),
+        blocks=(
+            TowerBlock(panel_id='occ', x0=0.0, x1=1.0, y0=0.0, y1=50.0,
+                       role='retention', label='Retained'),
+            TowerBlock(panel_id='occ', x0=0.0, x1=0.6, y0=50.0, y1=150.0,
+                       role='layer', label='Layer 1',
+                       label_lines=('60% po 100 xs 50', 'premium 18')),
+            TowerBlock(panel_id='occ', x0=0.6, x1=1.0, y0=50.0, y1=150.0,
+                       role='co_participation', label='Co-participation'),
+        ),
+        marks=(
+            Mark(panel_id='occ', orient='h', at=50.0, label='50', faint=True),
+        ),
+    )
+    kw.update(overrides)
+    return ChartDoc(**kw)
 
 
 # ---------------------------------------------------------------- structure
@@ -550,7 +583,7 @@ def test_the_lattice_form_is_why_the_version_moved():
     marks the point where a reader that ignores what it does not know would
     draw something wrong, and an unread lattice draws nothing.
     """
-    assert CHART_IR_VERSION == 2
+    assert CHART_IR_VERSION == 3
     with pytest.raises(ValueError, match='unsupported ir_version'):
         small_xy_doc(ir_version=1)
 
@@ -589,6 +622,108 @@ def test_empty_runs_collapse_only_when_they_pay():
     mass[:3] = 0.0
     kx, km = collapse_empty_runs(x, mass)
     assert len(kx) == len(x)
+
+
+# -------------------------------------------------------------------- tower
+
+def test_tower_block_role_vocabulary():
+    with pytest.raises(ValueError, match='unknown block role'):
+        TowerBlock(panel_id='occ', x0=0.0, x1=1.0, y0=0.0, y1=1.0,
+                   role='quota')
+
+
+def test_tower_block_coordinate_order():
+    """A reversed rectangle draws nothing and reports nothing."""
+    with pytest.raises(ValueError, match='x1'):
+        TowerBlock(panel_id='occ', x0=1.0, x1=0.0, y0=0.0, y1=1.0,
+                   role='layer')
+    with pytest.raises(ValueError, match='y1'):
+        TowerBlock(panel_id='occ', x0=0.0, x1=1.0, y0=1.0, y1=0.0,
+                   role='layer')
+
+
+def test_a_block_draws_only_in_a_tower_panel():
+    """The payload and the panel kind must agree, as for a surface."""
+    block = TowerBlock(panel_id='density', x0=0.0, x1=1.0, y0=0.0, y1=1.0,
+                       role='layer', label='L1')
+    with pytest.raises(ValueError, match="rather than 'tower'"):
+        small_xy_doc(blocks=(block,))
+
+
+def test_block_panel_reference_integrity():
+    block = TowerBlock(panel_id='nope', x0=0.0, x1=1.0, y0=0.0, y1=1.0,
+                       role='layer', label='L1')
+    with pytest.raises(ValueError, match='unknown panel'):
+        small_tower_doc(blocks=(block,))
+
+
+def test_block_coordinates_are_always_serialized():
+    """A zero is a real reading on both of a block's axes.
+
+    A layer attaching at 0 and a placement starting at 0 are the common
+    cases, so omit-at-default would drop the answer rather than a default.
+    """
+    data = canonical_dict(small_tower_doc())['blocks'][0]
+    for key in ('panel_id', 'x0', 'x1', 'y0', 'y1', 'role'):
+        assert key in data
+    assert data['x0'] == 0.0 and data['y0'] == 0.0
+    # and the genuinely optional fields stay out when they are at default
+    assert 'open_top' not in data
+    assert 'label_lines' not in data
+
+
+def test_a_document_with_no_blocks_omits_the_field():
+    """``blocks=()`` is its own default, so it never reaches the wire.
+
+    The hash of an existing document still moves with the version bump,
+    because ``ir_version`` is in ``_ALWAYS``. That is the field-level claim
+    worth asserting; hash equality across the bump cannot hold.
+    """
+    assert 'blocks' not in canonical_dict(small_xy_doc())
+    assert 'blocks' in canonical_dict(small_tower_doc())
+
+
+def test_blocks_round_trip_through_the_wire():
+    doc = stamp(small_tower_doc())
+    back = load_chart_doc(json.loads(canonical_json(doc)))
+    assert doc_hash(back) == doc.hash
+    assert all(isinstance(b, TowerBlock) for b in back.blocks)
+    assert back.blocks[1].label_lines == ('60% po 100 xs 50', 'premium 18')
+    assert back.blocks == doc.blocks
+
+
+def test_human_strings_walk_the_blocks():
+    """``ChartDoc.tex`` is total, so the block strings must be in the set."""
+    strings = human_strings(small_tower_doc())
+    assert 'Layer 1' in strings
+    assert '60% po 100 xs 50' in strings
+    assert 'premium 18' in strings
+
+
+def test_complete_tex_is_total_over_a_blocks_only_document():
+    """A document whose only human strings live in its blocks still completes."""
+    doc = ChartDoc(
+        name='structure',
+        axes=(ChartAxis(id='place', label=None, unit='ratio'),
+              ChartAxis(id='loss', label=None, unit='currency')),
+        panels=(Panel(id='occ', kind='tower', x_axis='place',
+                      y_axis='loss'),),
+        blocks=(TowerBlock(panel_id='occ', x0=0.0, x1=1.0, y0=0.0, y1=10.0,
+                           role='layer', label='Layer 1',
+                           label_lines=('el 4.0',)),),
+    )
+    done = complete_tex(doc, {'el 4.0': r'$\mathsf{P}L = 4.0$'})
+    assert set(done.tex) == set(human_strings(doc))
+    assert done.tex['Layer 1'] == 'Layer 1'
+    assert done.tex['el 4.0'] == r'$\mathsf{P}L = 4.0$'
+
+
+def test_the_tower_payload_is_why_the_version_moved_to_three():
+    """A reader that ignores blocks draws an empty panel, not a plainer one."""
+    assert 'tower' in charts.ir.PANEL_KINDS
+    assert small_tower_doc().blocks
+    with pytest.raises(ValueError, match='unsupported ir_version'):
+        small_tower_doc(ir_version=2)
 
 
 # -------------------------------------------------------------- determinism

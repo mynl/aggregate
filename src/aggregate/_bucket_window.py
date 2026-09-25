@@ -906,6 +906,19 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         ``log2`` is honored; if the window needs more than the cap, bs is
         coarsened to fit.
 
+        The realized extent must *strictly exceed* the window, because the
+        window top is a closed endpoint: a support that reaches ``x_hi``
+        carries mass at ``x_hi``, and a grid ending exactly there covers only
+        to ``x_hi - bs/2`` under the ``discrete`` convention, deleting the
+        last half bucket. So the coarsening divides by ``2**cap - 1``, one
+        bucket per grid interval plus the closing point, matching the
+        inclusive count in :func:`_need_log2`. Dividing by ``2**cap`` instead
+        reproduces the ``bs`` whose ``need`` had just overflowed the cap,
+        whenever ``span / 2**cap`` already sits on a ``round_bucket`` rung
+        (that is, whenever ``span`` is a power of two, which is the common
+        case for a severity bounded on its natural scale). See
+        ``dev/done/plan-closed-support-window.md``.
+
         ``force_origin`` makes the origin follow ``x_lo`` (snapped down to a
         multiple of ``bs``) even for a non-signed aggregate -- used by the
         ``windowed`` method, whose mass band sits far from 0 and is computed
@@ -951,7 +964,12 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                 # an integer-atom severity is not coarsened off its lattice.
                 l2 = need
             elif np.isfinite(span):
-                bs = round_bucket(span / N0)
+                # Inclusive count, matching ``_need_log2``: a closed window
+                # of width ``span`` needs ``span/bs + 1`` grid points, so
+                # coarsening divides by ``N0 - 1``. Dividing by ``N0`` is
+                # what let the realized extent land exactly on the support
+                # top, deleting the last half bucket of mass.
+                bs = round_bucket(span / max(N0 - 1, 1))
                 x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
                 l2 = log2
             else:
@@ -1253,7 +1271,8 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             if need <= log2:
                 _apply_floor(x0, floor_hi, keep_bs, max(need, sel_l2))
             else:
-                bs_f = round_bucket(span / (1 << log2))
+                # Inclusive count, as in the ``need`` test just above.
+                bs_f = round_bucket(span / max((1 << log2) - 1, 1))
                 x0_f = float(np.floor(floor_lo / bs_f) * bs_f)
                 _apply_floor(x0_f, floor_hi, bs_f, log2)
         elif not signed and _tail.is_thick(loss_right) and sbj_hi > win_hi:
@@ -1690,13 +1709,14 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
         bs = float(bs_in)
         port._bs_raw = None                      # pinned: no rounding to report
     else:
-        span = W_ext / N_cap if N_cap else W_ext
+        # Inclusive count, as in ``_need_log2`` and the ``need`` tests below.
+        span = W_ext / max(N_cap - 1, 1)
         if signed:
             # Wrap safety: every per-unit marginal is driven on the shared
             # grid, so N*bs must hold the widest unit too. Floor the span at
             # ``max_k W_k / N`` (the MM span is usually wider, but guard the
             # one-dominant-unit case).
-            span = max(span, (max(W_ks) if W_ks else 0.0) / N_cap)
+            span = max(span, (max(W_ks) if W_ks else 0.0) / max(N_cap - 1, 1))
         raw = float(max(resolution, span))
         port._bs_raw = raw                       # for the bs_explanation narrative
         bs = round_bucket(raw)

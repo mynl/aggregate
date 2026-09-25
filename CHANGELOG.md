@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a348
+
+**[Closed-Support-Window] the bucket grid now strictly contains the window it was sized for.** The two "coarsen `bs` to fit the `log2` cap" fallbacks in `_bucket_window` divided the span by `2**cap` where the rest of the sizer counts inclusively and divides by `2**cap - 1`, so a span that was itself a power of two was not coarsened at all and the realized extent ended exactly on the support top, deleting the last half bucket of mass. Still not fixed, and now tracked as `[Bounded-Residual-Lump]` in `dev/TODO.md`: a `bs` the user pinned is honored verbatim, grid ending on the support top and all.
+
+**Numbers move for a severity bounded on a power-of-two span**, meaning `uniform`, `beta`, `cantor` and anything else on the unit interval: such a build now spends half its buckets over twice the extent, one bit of resolution at an unchanged FFT length. `build('agg C 1 claim sev cantor fixed')` goes from `est_m = 0.4997557` and "fails sev mean, agg mean" to exactly `0.5` and "not unreasonable", `uniform` and `cantor 0.5` likewise become exact, and `beta 2 3` returns exactly `0.4`. A scaled support such as `100000 * beta 2 5`, every unbounded severity, every compound grid and all 197 `library.agg` entries are unchanged.
+
 ## 1.0.0a347
 
 **[Cantor-Severity] `sev cantor` is a DecL severity.** `SeverityCantor` joins the `Severity` registry, so `sev cantor`, `sev cantor 0.5`, `sev 3 * cantor 0.5 + 5` and `sev cantor 10 cv 0.8` all build; the shape is the proportion removed from the middle, defaulting to the classical `1/3`, and the cv route solves it analytically over the attainable `[1/sqrt(3), 1)`. No grammar change was needed. `SeverityCantor.natural_bs(m)` gives the natural bucket size, and two new library entries, `CantorMiddleThirds` and `CantorMiddleHalf`, carry it in their hints. A Cantor severity is the documented exception to the binary-`bs` guidance: its level-`m` cylinders sit on a base-`q` lattice with `q = 2/(1-c)`, and with `bs = scale/q**m` each cylinder's mass lands exactly on one bucket pair. A binary `bs` remains correct, just blurry at the finest scales.

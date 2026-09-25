@@ -869,3 +869,79 @@ def test_bounded_layer_still_selects_bounded_small():
     assert 'bounded_small' in df.loc['used', 'note']
     assert df.loc['bounded_small', 'x_min'] == 0.0
     assert np.isfinite(df.loc['bounded_small', 'x_max'])
+
+
+# ---------------------------------------------------------------------------
+# [Closed-Support-Window]: the realized grid must strictly contain the window
+# it was sized for. Through 1.0.0a347 the two "coarsen bs to fit the cap"
+# fallbacks divided the span by ``2**cap`` rather than ``2**cap - 1``, so a
+# span that was itself a power of two (every severity bounded on its natural
+# scale: uniform, beta, cantor on [0, 1]) got back the same ``bs`` it started
+# with and the grid ended exactly on the support top. The last half bucket of
+# mass was then deleted and ``normalize`` spread the shortfall over the whole
+# support, pulling the mean down. See ``dev/done/plan-closed-support-window.md``.
+# ---------------------------------------------------------------------------
+
+#: ``(program, exact mean)`` for the bounded unit-support severities the
+#: inclusive count repaired. ``cantor`` is the one thick enough at its support
+#: end to fail validation outright: its distribution function is Holder with
+#: exponent ``log 2 / log 3``, not Lipschitz, so the deleted mass is
+#: ``O(bs**0.631)`` rather than the ``O(bs)`` a uniform pays.
+CLOSED_SUPPORT_CASES = [
+    ('agg CSWuniform 1 claim sev uniform fixed', 0.5),
+    ('agg CSWbeta 1 claim sev beta 2 3 fixed', 0.4),
+    ('agg CSWcantor 1 claim sev cantor fixed', 0.5),
+    ('agg CSWcantorhalf 1 claim sev cantor 0.5 fixed', 0.5),
+]
+
+
+@pytest.mark.parametrize('program, mean', CLOSED_SUPPORT_CASES,
+                         ids=[p.split()[1] for p, _ in CLOSED_SUPPORT_CASES])
+def test_grid_strictly_contains_a_closed_support(program, mean):
+    """The realized extent strictly exceeds the severity's support top.
+
+    This is the invariant the fix is named for, and the one that would have
+    caught the bug: a closed support carries mass *at* its top, so a grid
+    ending exactly there covers only to ``top - bs/2``.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build(program)
+    support_hi = float(a.sevs[0].fz.support()[1])
+    assert a.bs * (1 << a.log2) > support_hi
+
+
+@pytest.mark.parametrize('program, mean', CLOSED_SUPPORT_CASES,
+                         ids=[p.split()[1] for p, _ in CLOSED_SUPPORT_CASES])
+def test_closed_support_mean_is_exact_and_validates(program, mean):
+    """The moments the deleted half bucket was corrupting are exact again."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build(program)
+    assert abs(a.est_m - mean) < 1e-13
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_a_scaled_support_is_untouched():
+    """The change bites only on a power-of-two span.
+
+    ``100000 * beta 2 5`` has ``span / 2**cap = 1.5259``, which is not a
+    ``round_bucket`` rung, so it already over-covered and keeps ``bs = 2``.
+    """
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build('agg CSWscaled 1 claim sev 100000 * beta 2 5 fixed')
+    assert a.bs == 2.0
+    assert a.log2 == 16
+
+
+@pytest.mark.parametrize('program, bs', [
+    ('agg CSWpoisson 10 claims sev cantor poisson', 0.0009765625),
+    ('agg CSWlognorm 10 claims 1000 xs 0 sev lognorm 100 cv 2 poisson', 0.25),
+])
+def test_unbounded_and_compound_grids_are_untouched(program, bs):
+    """Compounding widens the window off the rung, so these never coarsened."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build(program)
+    assert a.bs == bs

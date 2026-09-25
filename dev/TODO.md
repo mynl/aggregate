@@ -1238,6 +1238,18 @@
   elsewhere can be trusted, is worth remembering if executable content is ever
   proposed again. The answer then was a documented warning; the answer now is
   that there is nothing to execute.
+- **[Bounded-Residual-Lump]** (logged 2026-09-25, from
+  `dev/done/plan-closed-support-window.md`) — when a severity's support end lies
+  within one bucket of the grid top, add `sf(top edge)` into the last bucket
+  rather than letting `normalize` spread the shortfall proportionally over the
+  whole support. The error becomes `mass * 3*bs/4` instead of `mass * A_hi`,
+  about `7e-9` rather than `4.9e-4` for a Cantor severity, and it costs nothing.
+  `1.0.0a348` made the *grid* honest by widening it; this makes the
+  *discretization* honest whatever grid it is handed, so neither subsumes the
+  other. It is what covers the two cases a348 deliberately left open: a `bs` the
+  user pinned, which is honored verbatim and can still end exactly on the
+  support top, and a bounded severity on any grid the sizer was not free to
+  widen.
 - **[Natural-Lattice-Snap]** (logged 2026-09-25, from `dev/done/plan-cantor.md`)
   — let a severity declare a natural lattice family that the bucket sizer snaps
   to, generalizing `Aggregate._severity_lattice`, which today only finds the gcd

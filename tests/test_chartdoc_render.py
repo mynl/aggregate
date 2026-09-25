@@ -17,6 +17,9 @@ Two of the baselines have moved deliberately, and both are recorded in
   changed what an aggregate draws, from three panels to two with the log
   reading declared rather than drawn. The baseline here is the new picture,
   generated after the author reviewed it.
+* ``structure`` (``[Tower-Renderer]``) had no compositor either: the chart
+  is new at 1.0.0a350 and the tower panel kind is new with it, so the
+  baseline is the approved picture from the start.
 
 Pins confirmed by the author 2026-08-05: ``_PINNED_MPL`` is the version the
 baselines were rendered with (tests skip elsewhere rather than fail on font
@@ -51,6 +54,14 @@ pytestmark = pytest.mark.skipif(
 
 _AGG = 'agg CD.Book 100 claims sev lognorm 50 cv 2 poisson'
 
+#: A two-stage program with both towers and both Lee curves, which is every
+#: part of the tower panel in one picture: a gross slab, a retention, a
+#: placed layer, a co-participation block, boundary ticks in currency and
+#: the faint rules carrying each boundary across to the curve.
+_STRUCTURE = ('agg CD.Program 5 claims 100 xs 0 sev lognorm 10 cv .75 '
+              'occurrence ceded to 15 xs 5 poisson '
+              'aggregate net of 20 xs 0')
+
 
 def _subjects():
     """``name -> ChartDoc``, built fresh so nothing caches across tests."""
@@ -60,6 +71,8 @@ def _subjects():
         'distortion': build_chart_doc(build('distortion CD.PH ph 0.7'),
                                       'distortion'),
         'agg': build_chart_doc(build(_AGG), 'agg'),
+        'structure': build_chart_doc(build(_STRUCTURE), 'structure',
+                                     lee=True),
     }
 
 
@@ -77,7 +90,7 @@ def _compare(actual, baseline_name):
     assert result is None, result
 
 
-@pytest.mark.parametrize('name', ['distortion', 'agg'])
+@pytest.mark.parametrize('name', ['distortion', 'agg', 'structure'])
 def test_chartdoc_matches_baseline(name, tmp_path):
     """The gate: the rendered document is the picture that was approved."""
     target = tmp_path / f'{name}.png'

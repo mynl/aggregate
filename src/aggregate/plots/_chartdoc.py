@@ -11,6 +11,13 @@ no confession to make. That is the capability-declaration pattern every
 later kind follows: prefer a declared realization, degrade honestly and say
 so, or refuse loudly, never approximate silently.
 
+A 'tower' panel is drawn natively: labeled rectangles over a quantity axis,
+a placement axis with no ticks because width is share, and the panel's
+horizontal marks promoted to the quantity ticks, since a tower is read at
+its breaks rather than on a continuous scale. A row holding one gets width
+ratios, a tower being a strip and a curve beside it wanting room, and a
+taller canvas than the house landscape cell.
+
 The four switches on :func:`plot_chartdoc` are the matplotlib side of the
 document's declared readings, and they follow the same surfacing rule as
 the app's control strip: a switch acts on **every** axis or panel that
@@ -29,14 +36,14 @@ import numpy as np
 
 from ..charts.ir import ChartCapabilityError
 from ..constants import LOG_FLOOR
-from ._style import plt, mpl, FIG_H, FIG_W, make_grid
+from ._style import plt, mpl, FIG_H, FIG_W, FONT_SIZE, make_grid
 
 __all__ = ['plot_chartdoc']
 
 # Panel kinds this renderer realizes natively today. 'surface' is the
 # declared degradation (projection); anything else raises until its
 # conversion lands.
-_NATIVE = {'heatmap', 'xy'}
+_NATIVE = {'heatmap', 'xy', 'tower'}
 _DEGRADED = {'surface'}
 
 
@@ -201,6 +208,54 @@ LOLLIPOP_ATOMS = 40
 #: Under it, steps and a line are the same picture and steps cost three
 #: times the vertices.
 STEP_PIXELS = 3.0
+
+# The tower panel's renderer-side decisions. What a block means is in the
+# document (its role); how wide the strip is and how a role is shaded are
+# not, and belong here.
+#: Relative width of a tower panel against a curve panel beside it. A tower
+#: is a strip, not a plot: its abscissa carries one unit of share and no
+#: reading, so width past what the labels need is width taken from the
+#: curve that does have a reading. 1:2 is the prior art's ratio.
+TOWER_WIDTH = 1.0
+CURVE_WIDTH = 2.0
+
+#: Fill per block role: the placed layers in the house primary, everything
+#: the cedent is left holding in grey, and an uncovered band as hatching
+#: over nothing, because a gap is an absence and must not read as a thing
+#: that was bought. Alternating alpha down the tower separates one layer
+#: from the next without a rainbow, which is how a market slide draws it.
+BLOCK_FILL = {
+    'layer': ('C0', (0.80, 0.55)),
+    'co_participation': ('C7', (0.16,)),
+    'retention': ('C7', (0.30,)),
+    'gap': ('none', (1.0,)),
+    'gross': ('C1', (0.40,)),
+}
+
+#: Hatching per block role, for the two that are not solid things.
+BLOCK_HATCH = {'co_participation': '///', 'gap': 'xx'}
+
+#: Height of a tower figure as a multiple of the house panel height. A
+#: tower is read up the page and each block's annotation stack needs rows,
+#: so the default landscape cell is the wrong shape for it.
+TOWER_HEIGHT = 1.8
+
+#: Point size of a block's label text, a fraction of the house font. A
+#: named number rather than matplotlib's 'xx-small', because the fits or
+#: does not fit arithmetic below has to agree with what is drawn, and a
+#: relative keyword leaves the renderer guessing what it asked for.
+LABEL_POINTS = 0.65 * FONT_SIZE
+
+#: Width of one character at the label font, as a fraction of the point
+#: size. A crude average over a proportional face, which is all a fits or
+#: does not fit test needs.
+CHAR_WIDTH = 0.55
+
+#: A label row's height as a multiple of the font size. A block shows as
+#: many rows as fit at this pitch and no more, headline first: a stack
+#: spilling over its own rectangle is worse than a stack cut short, because
+#: the reader cannot tell which block the overflow belongs to.
+ROW_PITCH = 1.5
 
 #: Largest return period drawn when a document declares no window for its
 #: paired reading. The quantile function saturates as its probability
@@ -556,6 +611,164 @@ def _panel_window(window, values):
             else (0.0, 1.0))
 
 
+def _axes_height_px(ax):
+    """Approximate drawing height of ``ax`` in pixels.
+
+    The companion of :func:`_axes_width_px`, read off the figure for the
+    same reason: a label that fits must be decided before anything is
+    drawn, and constrained layout only shifts the answer a little.
+    """
+    fig = ax.figure
+    return ax.get_position().height * fig.get_size_inches()[1] * fig.dpi
+
+
+def _rows_that_fit(ax, height, span):
+    """How many label rows a block of data height ``height`` has room for.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+    height : float
+        The block's extent on the quantity axis.
+    span : float
+        The drawn window's extent on that axis.
+
+    Returns
+    -------
+    int
+        Zero when the block is too thin for even its headline.
+    """
+    if not span > 0:
+        return 0
+    pixels = _axes_height_px(ax) * abs(height) / span
+    row = ROW_PITCH * LABEL_POINTS * ax.figure.dpi / 72.0
+    return int(pixels // row) if row > 0 else 0
+
+
+def _draw_block(ax, block, shade):
+    """Fill one block and draw the edges it is entitled to.
+
+    ``shade`` picks among the role's alphas, counted over the blocks of that
+    role rather than over all of them, so consecutive layers alternate and
+    a retention between two layers does not break the alternation.
+
+    An ``open_top`` block is drawn with its left, bottom and right edges
+    and **no** top: the band continues past the frame, and a closed
+    rectangle would assert a limit the contract has not got. The fill is
+    laid down with no edge of its own so the three sides can be drawn
+    deliberately.
+    """
+    color, alphas = BLOCK_FILL.get(block.role, ('C7', (0.3,)))
+    alpha = alphas[shade % len(alphas)]
+    ax.fill_betweenx([block.y0, block.y1], block.x0, block.x1,
+                     facecolor=color, alpha=alpha, linewidth=0,
+                     hatch=BLOCK_HATCH.get(block.role),
+                     edgecolor='C7' if block.role in BLOCK_HATCH else 'none')
+    edge = dict(color='C7', lw=0.6)
+    ax.plot([block.x0, block.x0], [block.y0, block.y1], **edge)
+    ax.plot([block.x1, block.x1], [block.y0, block.y1], **edge)
+    ax.plot([block.x0, block.x1], [block.y0, block.y0], **edge)
+    if not block.open_top:
+        ax.plot([block.x0, block.x1], [block.y1, block.y1], **edge)
+
+
+def _label_block(ax, doc, block, span, x_span):
+    """Draw as much of a block's label stack as its rectangle has room for.
+
+    The headline comes first and the annotation lines follow in document
+    order, which is the emitter's canonical order, so a block cut short
+    loses its least important line rather than an arbitrary one.
+
+    Both dimensions are tested, and a line that does not fit is **dropped
+    rather than spilled**. Text running out of its own rectangle is worse
+    than text missing: on a tower the rectangle is the reading, so a line
+    lying across a neighbour asserts a term that block does not carry. A
+    narrow layer therefore keeps its name and loses its terms, which the
+    reader can still get from the panel beside it or from the frame.
+    """
+    rows = _rows_that_fit(ax, block.y1 - block.y0, span)
+    if rows < 1:
+        return
+    width = _axes_width_px(ax) * (block.x1 - block.x0) / x_span
+    room = int(width / (CHAR_WIDTH * LABEL_POINTS * ax.figure.dpi / 72.0))
+    headline = _typeset(doc, block.label) if block.label else ''
+    if headline and len(headline) > room:
+        # The headline names the block. An annotation floating in an
+        # unnamed rectangle is worse than a blank one, so if the name will
+        # not fit, nothing does.
+        return
+    lines = ([headline] if headline else []) + [
+        line for line in (_typeset(doc, v) for v in block.label_lines)
+        if len(line) <= room]
+    lines = lines[:rows]
+    if not lines:
+        return
+    ax.text(0.5 * (block.x0 + block.x1), 0.5 * (block.y0 + block.y1),
+            '\n'.join(lines), ha='center', va='center',
+            fontsize=LABEL_POINTS, linespacing=1.3)
+
+
+def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False):
+    """Draw a 'tower' panel: labeled rectangles over a quantity axis.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+    doc : ChartDoc
+    panel : Panel
+        Kind 'tower'. Its x axis is a placement axis in share and its y
+        axis the quantity the blocks band.
+    blocks : list of TowerBlock
+        The panel's own blocks, in document order, which is bottom up.
+    log : bool or {'x', 'y', 'xy'}
+        Read the quantity axis on log where it declares one. The placement
+        axis never does: a share is not a quantity anyone reads on log.
+    full : bool
+        Read the quantity axis at its full extent.
+
+    Notes
+    -----
+    **The placement axis carries no ticks.** Width is share, and the reader
+    takes it by comparison against the full strip beside it, not off a
+    scale: a "0.6" tick on a rectangle whose own label says "60% po" is the
+    same fact twice and invites the axis to be read as a quantity.
+
+    **The quantity axis is ticked at the boundaries.** A tower is read at
+    its breaks, so the panel's horizontal marks become the y ticks,
+    labeled with the amounts the document put on them, in place of a
+    continuous scale. That is the prior art's move and it is what makes the
+    attachments legible without a label per block repeating them.
+    """
+    y_axis = {a.id: a for a in doc.axes}[panel.y_axis]
+    x_axis = {a.id: a for a in doc.axes}[panel.x_axis]
+    _, log_y = _log_directions(log)
+    window = _axis_window(y_axis, full) or (
+        min((b.y0 for b in blocks), default=0.0),
+        max((b.y1 for b in blocks), default=1.0))
+    span = window[1] - window[0]
+    seen = {}
+    for block in blocks:
+        shade = seen.get(block.role, 0)
+        seen[block.role] = shade + 1
+        _draw_block(ax, block, shade)
+    x_window = _axis_window(x_axis, full) or (0.0, 1.0)
+    for block in blocks:
+        _label_block(ax, doc, block, span, x_window[1] - x_window[0])
+    _apply_axis(ax, 'y', y_axis, _axis_scale(y_axis, log_y), window,
+                _decade_floor([b.y0 for b in blocks]
+                              + [b.y1 for b in blocks]))
+    ax.set_xlim(*x_window)
+    ax.set_xticks([])
+    ax.set(xlabel='', ylabel=_typeset(doc, y_axis.label))
+    ticks = sorted({m.at for m in doc.marks if m.panel_id == panel.id})
+    if ticks:
+        labels = {m.at: m.label for m in doc.marks
+                  if m.panel_id == panel.id and m.label}
+        ax.set_yticks(ticks)
+        ax.set_yticklabels([_typeset(doc, labels.get(at, '')) or f'{at:,.0f}'
+                            for at in ticks], fontsize=LABEL_POINTS)
+
+
 def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
                      return_period=False, invert=False, reflect=False):
     """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn.
@@ -883,13 +1096,36 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
         # shared.
         square = any(p.aspect == 'equal' for p in doc.panels)
         shared = len({p.x_axis for p in doc.panels}) == 1 and not square
+        # A tower and the curve beside it are read off one quantity axis,
+        # which runs up the figure rather than across it, so the sharing
+        # that makes them one picture is in y. Every panel must name the
+        # same one: a document with two cession stages carries a per-claim
+        # axis and an annual one, which are different quantities and must
+        # not be dragged onto one window.
+        shared_y = (len({p.y_axis for p in doc.panels}) == 1
+                    and any(r == 'tower' for r in realized) and not square)
+        # A tower is a strip and a curve wants room, so the row is split by
+        # what each panel has to show rather than evenly.
+        ratios = ([TOWER_WIDTH if r == 'tower' else CURVE_WIDTH
+                   for r in realized]
+                  if any(r == 'tower' for r in realized) else None)
         # Equal-aspect panels are squares, and squares in a row need a
         # canvas that is as many squares wide, or constrained layout
         # collapses them to slivers trying to honor the aspect.
         all_square = all(p.aspect == 'equal' for p in doc.panels)
         size = (len(doc.panels) * FIG_H, FIG_H) if all_square else None
-        _, grid = make_grid(1, len(doc.panels), squeeze=False, sharex=shared,
-                            **({} if size is None else {'figsize': size}))
+        if ratios is not None and size is None:
+            # One tower's worth of width per unit of ratio, so a figure
+            # holding five panels is not five full-width plots wide, and a
+            # taller canvas than the house default, because a tower is read
+            # up the page and every row of height is a row of label.
+            size = (0.5 * FIG_W * sum(ratios), TOWER_HEIGHT * FIG_H)
+        _, grid = make_grid(
+            1, len(doc.panels), squeeze=False, sharex=shared,
+            sharey=shared_y,
+            **({} if ratios is None else
+               {'gridspec_kw': {'width_ratios': ratios}}),
+            **({} if size is None else {'figsize': size}))
         axs = list(grid[0])
 
     for panel, realization, panel_ax in zip(doc.panels, realized, axs):
@@ -900,7 +1136,12 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
             # names it; with no name to use, say so rather than invent one.
             panel_title = (panel.inverse_title
                            or f'{panel_title}, inverted')
-        if realization == 'xy':
+        if realization == 'tower':
+            _render_tower_panel(
+                panel_ax, doc, panel,
+                [b for b in doc.blocks if b.panel_id == panel.id],
+                log=log, full=full_range)
+        elif realization == 'xy':
             _render_xy_panel(panel_ax, doc, panel, series, log=log,
                              full=full_range, reflect=reflect,
                              return_period=return_period, invert=invert)

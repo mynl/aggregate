@@ -104,6 +104,8 @@ Rendering
 
 :func:`~aggregate.plots.plot_chartdoc` is the generic matplotlib renderer: it draws any document the schema can express, choosing stems, steps or a line from each series' declared support and the room each atom gets. A renderer asked strictly for a panel kind it cannot realize raises :class:`~aggregate.charts.ir.ChartCapabilityError` rather than approximating silently; matplotlib and a 3-D surface is the live case, where the honest non-strict answer is a labeled 2-D projection, and a panel offering a realization the renderer does draw natively gets that one instead, with nothing to confess.
 
+A ``'tower'`` panel draws natively: filled rectangles per :class:`~aggregate.charts.ir.TowerBlock`, an ``open_top`` block drawn without its top edge, a placement axis with no ticks at all because width is share and a tick would invite it to be read as a quantity, and the panel's horizontal marks promoted to the quantity ticks in currency, since a tower is read at its breaks. A label line that does not fit its own rectangle, in either direction, is dropped rather than spilled: on a tower the rectangle is the reading, so a line lying across a neighbour asserts a term that block does not carry.
+
 Its ``log``, ``full_range``, ``return_period`` and ``kind`` switches select among the readings a document declares. Each acts on every axis or panel that declares the reading and on no other, which is the same surfacing rule the browser applies to its control strip, so a document that declares nothing draws its one reading whatever it is asked for and a caller never has to know which chart it is holding.
 
 .. autosummary::

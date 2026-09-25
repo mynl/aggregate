@@ -1217,12 +1217,14 @@
   published (numerics now stable).
 - **[Pedagogy-Docs-Punchup]** (#40) — punch up `pedagogy` and integrate with docs;
   possible minor renames. Needs `[Pedagogy-Migrations]`.
-- **[Reinsurance-Structure-Diagrams]** (#45) — the `structure` chart: gross
-  slab, occurrence and aggregate towers of layer rectangles, optional Lee
-  curves. Scoped and ruled in `dev/plan-reins-structure.md`. IR half landed at
-  a349 (`'tower'` panel kind, `TowerBlock`, `CHART_IR_VERSION` 3), emitter at
-  a350 (`charts.chart_structure`); matplotlib renderer to follow. SPA half is
-  `aggregate-api`'s `dev/plan-structure-chart.md`, blocked on this one.
+- **[Reinsurance-Structure-Diagrams]** (#45) — **done**, a349 to a351,
+  `dev/done/plan-reins-structure.md`. The `structure` chart: gross slab,
+  occurrence and aggregate towers of layer rectangles, optional Lee curves.
+  IR at a349 (`'tower'` panel kind, `TowerBlock`, `CHART_IR_VERSION` 3),
+  emitter at a350 (`charts.chart_structure`), matplotlib renderer at a351.
+  Portfolio is deliberately out of scope; the registry leaves it open. The
+  SPA half is `aggregate-api`'s `dev/plan-structure-chart.md`, unblocked now
+  and still to land, and until it does the SPA draws no charts at all.
 - **[Cheat-Sheet-Tweaks]** — at the alpha→beta cut, re-run `introspect` per class,
   reconcile any renames/removals, and apply pending wording/layout tweaks (incl.
   whether to densify DecL pages 2–3). Held until first beta.

@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a351
+
+**[Tower-Renderer] `plot_chartdoc` draws the `'tower'` panel kind natively.** Filled rectangles per `TowerBlock`, shaded by role with consecutive layers alternating, an `open_top` block drawn with its left, bottom and right edges and no top, and a hatched gap over nothing so an uncovered band cannot read as cover. The placement axis carries no ticks at all, because width is share; the quantity axis is ticked at the panel's horizontal marks, labeled in currency, since a tower is read at its breaks. A label line that does not fit its rectangle in either direction is dropped rather than spilled, headline first, and a block whose headline will not fit is left blank. A row holding a tower gets width ratios (a tower is a strip, a curve beside it wants room) and a taller canvas; a document whose panels all name one quantity axis shares it. `strict=True` no longer refuses a tower.
+
+Also in this version: an unnamed layer's terms no longer appear twice, once as the fallback headline and once as the `geometry` annotation. A new image baseline, `tests/data/chartdoc_baselines/structure.png`; the two existing baselines are byte-identical, so nothing else moved.
+
 ## 1.0.0a350
 
 **[Structure-Emitter] new chart `'structure'`: a reinsurance program as a tower of layers.** `charts.chart_structure`, registered for `Aggregate` and for a `PnL` wrapping one, and available exactly when either cession slot is populated. A gross slab, then one tower panel per cession stage: each placed layer a rectangle whose band is its attachment to its exhaustion point and whose width is its share, with the retention below and above, the unplaced fraction beside it as a co-participation block, and any uncovered band, whether an implicit hole or an explicit zero-share layer, drawn as a gap. Every layer boundary is also a labeled `Mark` on the loss axis. Available **before** `update()`, since a program's shape is declared and not computed. `annotate` selects the per-layer annotation lines from `ANNOTATE_FIELDS` and renders them in that constant's order whatever order they are passed; the default is `('geometry', 'premium', 'el', 'lr')`. `lee=True` adds the quantile curve of the distribution each tower is read against, sharing its loss axis, and repeats the boundaries on it as `faint` marks; it raises on an un-updated object rather than dropping the panels.

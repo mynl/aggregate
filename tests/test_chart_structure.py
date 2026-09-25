@@ -141,6 +141,22 @@ def test_an_unnamed_layer_falls_back_to_its_terms(net_of):
     assert layers_on(doc, 'occ')[0].label == '15 xs 5'
 
 
+def test_the_fallback_headline_does_not_repeat_as_an_annotation(net_of):
+    """One fact belongs on a block once."""
+    doc = build_chart_doc(net_of, 'structure', annotate=('geometry', 'el'))
+    block = layers_on(doc, 'occ')[0]
+    assert block.label == '15 xs 5'
+    assert '15 xs 5' not in block.label_lines
+    assert len(block.label_lines) == 1 and block.label_lines[0].startswith('el')
+
+
+def test_a_named_layer_keeps_its_terms_as_an_annotation(declared):
+    """The name and the terms are two facts, so both are drawn."""
+    block = layers_on(build_chart_doc(declared, 'structure'), 'occ')[0]
+    assert block.label == 'ClashLayer'
+    assert block.label_lines == ('50.0% po 30 xs 40',)
+
+
 # ----------------------------------------------------------------- geometry
 
 def test_share_is_width_and_the_remainder_is_co_participation(declared):
@@ -482,3 +498,108 @@ def test_money_never_reaches_for_scientific_notation():
 def test_a_unit_scaled_book_keeps_its_digits():
     """A layer of 1.5 xs 0.5 must not read as 2 xs 0."""
     assert _terms(1.0, 1.5, 0.5, 'occ') == '1.5 xs 0.5'
+
+
+# -------------------------------------------------------------- rendering
+
+def test_the_tower_renders_natively(net_of):
+    """No degradation, no confession: matplotlib draws a tower as a tower."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+    from aggregate.plots._chartdoc import _NATIVE
+
+    assert 'tower' in _NATIVE
+    doc = build_chart_doc(net_of, 'structure', lee=True)
+    fig = plot_chartdoc(doc, strict=True)
+    assert len(fig.axes) == len(doc.panels)
+    plt.close(fig)
+
+
+def test_the_placement_axis_carries_no_ticks(net_of):
+    """Width is share, read by comparison, never off a scale."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(net_of, 'structure')
+    fig = plot_chartdoc(doc)
+    tower = fig.axes[[p.id for p in doc.panels].index('occ')]
+    assert list(tower.get_xticks()) == []
+    assert tower.get_xlabel() == ''
+    plt.close(fig)
+
+
+def test_the_quantity_axis_is_ticked_at_the_boundaries(net_of):
+    """A tower is read at its breaks, in currency, not on a scale."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(net_of, 'structure')
+    fig = plot_chartdoc(doc)
+    tower = fig.axes[[p.id for p in doc.panels].index('occ')]
+    assert list(tower.get_yticks()) == [5.0, 20.0]
+    assert [lab.get_text() for lab in tower.get_yticklabels()] == ['5', '20']
+    plt.close(fig)
+
+
+def test_a_tower_figure_is_wider_where_the_curves_are(net_of):
+    """A tower is a strip; a curve beside it gets the room it needs."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(net_of, 'structure', lee=True)
+    fig = plot_chartdoc(doc)
+    ids = [p.id for p in doc.panels]
+    tower = fig.axes[ids.index('occ')].get_position().width
+    curve = fig.axes[ids.index('occ_lee')].get_position().width
+    assert curve > 1.5 * tower
+    plt.close(fig)
+
+
+def test_a_one_stage_document_shares_its_loss_axis():
+    """The tower and the curve beside it are one reading, so one axis."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    one = build('agg CS.OneStage 5 claims 100 xs 0 sev lognorm 10 cv .75 '
+                'occurrence net of 15 xs 5 poisson')
+    doc = build_chart_doc(one, 'structure', lee=True)
+    assert len({p.y_axis for p in doc.panels}) == 1
+    fig = plot_chartdoc(doc)
+    limits = {tuple(ax.get_ylim()) for ax in fig.axes}
+    assert len(limits) == 1
+    plt.close(fig)
+
+
+def test_two_stages_never_share_one_window(net_of):
+    """A per-claim loss and an annual aggregate are different quantities."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(net_of, 'structure', lee=True)
+    fig = plot_chartdoc(doc)
+    ids = [p.id for p in doc.panels]
+    assert fig.axes[ids.index('occ')].get_ylim()         != fig.axes[ids.index('agg')].get_ylim()
+    plt.close(fig)
+
+
+def test_a_renderer_without_the_kind_says_so():
+    """Honest degradation: a tower is refused by name, never drawn as xy."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.charts.ir import ChartCapabilityError
+    from aggregate.plots import _chartdoc
+
+    doc = build_chart_doc(build(_NET_OF, update=False), 'structure')
+    native = _chartdoc._NATIVE
+    try:
+        _chartdoc._NATIVE = {'xy', 'heatmap'}
+        with pytest.raises(ChartCapabilityError, match='not yet realized'):
+            _chartdoc.plot_chartdoc(doc)
+    finally:
+        _chartdoc._NATIVE = native

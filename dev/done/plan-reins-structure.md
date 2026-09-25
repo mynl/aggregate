@@ -304,3 +304,29 @@ Four of the plan's factual premises did not survive review against
 - A gap has two spellings, an implicit hole between consecutive layers and an
   explicit zero-share layer (`_validate_reins_layers` allows both), and the
   emitter draws a `'gap'` block for each.
+
+### Landed
+
+- a349 `[Tower-Block-IR]`: `'tower'` in `PANEL_KINDS`, `TowerBlock`,
+  `BLOCK_ROLES`, `ChartDoc.blocks`, the `_ALWAYS` entry, the `human_strings`
+  and `load_chart_doc` passes, `CHART_IR_VERSION` 3, docs in lockstep.
+- a350 `[Structure-Emitter]`: `charts/_emit_structure.py`, registered for
+  `Aggregate` and `PnL`, with `tests/test_chart_structure.py`.
+- a351 `[Tower-Renderer]`: `plots/_chartdoc.py` draws a tower natively, plus
+  the `structure.png` image baseline. The two existing baselines came back
+  byte-identical, so no other chart moved.
+
+Two further divergences, both found while rendering:
+
+- An unnamed layer's terms were appearing twice, as the fallback headline and
+  again as the `geometry` annotation line. The emitter now drops `geometry`
+  when it equals the headline. Fixed in the a351 commit, since a350 was
+  already out.
+- No corpus lines were added to `decl-testers.agg`. Its `CH.` section states
+  the convention explicitly ("the reinsurance chart tests reuse the RR.*
+  programs above rather than adding near-duplicates here"), and the chart
+  tests carry their own inline programs, as `test_chart_reins.py` does.
+
+Still open, for the author: `aggregate-api`'s `dev/plan-structure-chart.md`
+is unblocked and not yet started. Until it lands the SPA pins
+`CHART_IR_VERSION = 2` and draws **no** charts at all.

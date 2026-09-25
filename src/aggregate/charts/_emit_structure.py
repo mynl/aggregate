@@ -233,7 +233,7 @@ def _by_layer(econ, stage, key, index):
 
 
 def _layer_lines(agg, stats, econ, stage, index, share, limit, attach,
-                 annotate):
+                 annotate, headline=None):
     """The selected annotation lines for one layer, in canonical order.
 
     Parameters
@@ -252,6 +252,10 @@ def _layer_lines(agg, stats, econ, stage, index, share, limit, attach,
         The layer's tuple.
     annotate : tuple of str
         The requested fields, any subset of :data:`ANNOTATE_FIELDS`.
+    headline : str, optional
+        The block's own label. When it is already the terms line, which is
+        what an unnamed layer falls back to, the 'geometry' field is
+        dropped: one fact belongs on the block once.
 
     Returns
     -------
@@ -306,6 +310,8 @@ def _layer_lines(agg, stats, econ, stage, index, share, limit, attach,
     terms = getattr(agg, 'reinstatement_terms', None)
     if terms is not None and stage == 'occ' and index == 0:
         values['reinstatements'] = _reinstatement_line(terms)
+    if headline is not None and values['geometry'] == headline:
+        values['geometry'] = None
     return tuple(values[f] for f in ANNOTATE_FIELDS
                  if f in annotate and values[f] is not None)
 
@@ -371,12 +377,13 @@ def _tower_blocks(agg, stats, econ, stage, panel_id, top, annotate):
         y1 = max(top, attach) if unlimited else attach + limit
         terms = _terms(share, limit, attach, stage)
         if share > 0:
+            label = _layer_label(agg, stage, index, terms)
             blocks.append(TowerBlock(
                 panel_id=panel_id, x0=0.0, x1=min(1.0, share),
-                y0=attach, y1=y1, role='layer',
-                label=_layer_label(agg, stage, index, terms),
+                y0=attach, y1=y1, role='layer', label=label,
                 label_lines=_layer_lines(agg, stats, econ, stage, index,
-                                         share, limit, attach, annotate),
+                                         share, limit, attach, annotate,
+                                         headline=label),
                 open_top=unlimited))
             if share < 1.0:
                 blocks.append(TowerBlock(

@@ -39,8 +39,11 @@ The registry
    chart_pnl
    chart_reins
    chart_severity
+   chart_structure
 
 .. automodule:: aggregate.charts
+
+The ``structure`` chart is the one whose subject is a **contract** rather than a law: a gross slab, then one tower of labeled rectangles per cession stage, each layer's band its attachment to its exhaustion point and its width its share, with the retention below and above, the unplaced fraction beside it and any uncovered band drawn as a gap. It is available *before* ``update()``, because a program's shape is declared and not computed, and it enriches in three tiers under one ``annotate`` tuple: geometry from the declaration, risk statistics off ``reins_stats_df`` once there is a grid, and the economics (ceded premium at 100% terms, rate on line, loss ratio, ceding commission, reinstatements) on a :class:`~aggregate.PnL` only, since a plain ``agg`` has no premium context and strips those clauses. A field whose source is absent is omitted rather than blanked, so one tuple serves every tier. ``lee=True`` adds the quantile curve of the distribution each tower is read against, sharing its loss axis, so every boundary reads off as a return period.
 
 The chart IR
 ------------

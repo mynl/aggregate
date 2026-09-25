@@ -257,7 +257,10 @@ def test_every_emitted_series_declares_its_support():
     for obj in objs:
         for name in available_charts(obj):
             doc = CHARTS[name][0](obj)
-            for s in canonical_dict(doc)['series']:
+            # A tower document carries blocks and, by default, no series at
+            # all, so the key is absent rather than empty. The claim here is
+            # about the series that exist.
+            for s in canonical_dict(doc).get('series', []):
                 assert s.get('support') in ('atomic', 'continuous'), \
                     f'{name}/{s["name"]} reaches a client with no support'
                 seen += 1

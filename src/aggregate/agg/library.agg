@@ -430,6 +430,28 @@ agg MixedSeverityAndProfile
   tags{topic:severity, role:advanced};
 
 # ----------------------------------------------------------------------
+# The Cantor severity: a singular continuous law, and the one place the
+# binary bucket rule is broken on purpose. Both entries carry the natural
+# bucket size in their hints; `aggregate.cantor.cantor_bs` recomputes it.
+# ----------------------------------------------------------------------
+
+agg CantorMiddleThirds
+  1 claim
+  sev cantor
+  fixed
+  note{The classical middle thirds Cantor severity: no atoms, no density, and a devil's staircase distribution function. Its level 10 cylinders all sit on multiples of 1/3**10, so the natural bucket is the ternary 1/59049 hinted here rather than the usual binary fraction, and each cylinder's mass then lands exactly on one pair of buckets. Recompute it with aggregate.cantor.cantor_bs(m, c), or with natural_bs(m) on the severity itself.}
+  tags{topic:severity, topic:numerics, role:advanced}
+  hints{bs=1/59049; log2=16};
+
+agg CantorMiddleHalf
+  1 claim
+  sev cantor 0.5
+  fixed
+  note{The same construction removing the middle half instead of the middle third, so the kept fraction is a quarter and the shape parameter is the proportion removed. The natural lattice is base 4, so the hinted bucket 1/4**6 is a binary fraction after all and the rule break is really about the base, not about binary. Recompute it with aggregate.cantor.cantor_bs(6, 0.5).}
+  tags{topic:severity, topic:numerics, role:advanced}
+  hints{bs=1/4096; log2=13};
+
+# ----------------------------------------------------------------------
 # Severity curve reference
 # The named families first, in alphabetical order for lookup, then the
 # published parameterizations under their citekeys.

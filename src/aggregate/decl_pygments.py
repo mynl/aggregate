@@ -173,7 +173,9 @@ class AggLexer(RegexLexer):
                 suffix=_KW
             ), Name.Function),
 
-            # scipy.stats severity distributions, by shape-parameter count.
+            # Named continuous severity distributions, by shape-parameter
+            # count. Almost all are scipy.stats names; ``cantor`` is the
+            # library's own, and colors with the other one-shape names.
             # Zero parameter.
             (words((
                 'anglit', 'arcsine', 'cauchy', 'cosine', 'expon', 'gilbrat',
@@ -184,7 +186,7 @@ class AggLexer(RegexLexer):
             ), suffix=_KW), Name.Function),
             # One parameter.
             (words((
-                'alpha', 'argus', 'bradford', 'chi', 'chi2', 'dgamma', 'dweibull', 'erlang',
+                'alpha', 'argus', 'bradford', 'cantor', 'chi', 'chi2', 'dgamma', 'dweibull', 'erlang',
                 'exponnorm', 'exponpow', 'fatiguelife', 'fisk', 'foldcauchy', 'foldnorm',
                 'gamma', 'genextreme', 'genhalflogistic', 'genlogistic', 'gennorm', 'genpareto',
                 'gompertz', 'halfgennorm', 'invgamma', 'invgauss', 'invweibull', 'kappa3', 'ksone',

@@ -19,8 +19,11 @@ Class hierarchy
 
 :class:`Severity` is a standalone wrapper around ``scipy.stats`` continuous RVs
 and discrete empirical distributions, with support for layers, limits, and
-spliced forms. :class:`Aggregate` combines a :class:`Frequency` and one or more
-:class:`Severity` objects by FFT convolution.
+spliced forms. One named severity is the library's own rather than scipy's:
+``sev cantor`` is the generalized Cantor law, singular continuous with no
+density, in :mod:`aggregate.cantor`. :class:`Aggregate` combines a
+:class:`Frequency` and one or more :class:`Severity` objects by FFT
+convolution.
 
 Where the code lives
 --------------------

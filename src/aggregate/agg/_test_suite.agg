@@ -106,7 +106,12 @@ agg D.Sev14 1 claim sev 50 * beta    3 2 + 10 fixed;
 # empirical severities, continuous and discrete
 agg D.Sev15 1   claim  sev  dhistogram xps [1 10 40] [.5 .3 .2] fixed  note{old notation};
 agg D.Sev16 dfreq [1] dsev [1 10 40] [.5 .3 .2]                        note{preferred new notation};
-agg D.Sev17 1   claim  sev chistogram xps [1 10 40] [.5 .3 .2] fixed   note{continuous version}
+agg D.Sev17 1   claim  sev chistogram xps [1 10 40] [.5 .3 .2] fixed   note{continuous version};
+# the library's own named continuous severity: singular continuous, no density
+agg D.Sev18 1 claim sev cantor fixed                                   note{middle thirds Cantor severity, the default shape};
+agg D.Sev19 1 claim sev cantor 0.5 fixed                               note{remove the middle half, so the kept fraction is a quarter};
+agg D.Sev20 1 claim sev 3 * cantor 0.5 + 5 fixed                       note{scaled and shifted, the law of 3X + 5};
+agg D.Sev21 1 claim sev cantor 10 cv 0.8 fixed                         note{mean and cv: the shape solves analytically, cv from 0.5774 up to 1}
 
 # Severity transformations: shift, scale, layer, and attachment, unconditional severities
 # =======================================================================================

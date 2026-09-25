@@ -1352,3 +1352,23 @@ agg MXT.Logarithmic 3 claims sev [1 10] * expon wts [0.9 0.1] logarithmic       
 agg MXT.NeymanA 3 claims sev [1 10] * expon wts [0.9 0.1] neymana 2                                                 note{a Poisson cluster count, negatively dependent components};
 agg MXT.Pascal 3 claims sev [1 10] * expon wts [0.9 0.1] pascal 0.5 2                                               note{a Poisson stopped sum of negative binomials};
 agg MXT.MixedExponential dfreq [1] sev [2764 24548 275654 1917469 10000000] * expon wts [0.824796 0.159065 0.014444 0.001624 7.1e-05] hints{log2=18; bs=500}   note{ISO/Verisk style commercial auto mixed exponential, mean 13,990; the case that surfaced the defect};
+
+# ============================================================
+# CAN. Cantor severity regressions (1.0.0a347)
+# ============================================================
+# [Cantor-Severity]: the library's own named continuous severity, singular
+# continuous with no density, so the default survival-differencing
+# discretization is the only route to it. These pin the three declaration
+# routes (bare, explicit shape, mean and cv), the arithmetic form, the two
+# bucket families (a binary bs, correct but blurry, and the natural base-q
+# bs, exact at level m), a compound with a real frequency, and a layered
+# case whose moments go through quadrature on the quantile function. See
+# tests/test_cantor_severity.py and dev/done/plan-cantor.md.
+agg CAN.Binary 1 claim sev cantor fixed hints{bs=1/65536; log2=17}                                                   note{a binary bucket: right, and merely blurry at the finest scales};
+agg CAN.Ternary 1 claim sev cantor fixed hints{bs=1/6561; log2=14}                                                   note{the natural ternary bucket at level 8, exact on the level 8 cylinders};
+agg CAN.Half 1 claim sev cantor 0.5 fixed hints{bs=1/4096; log2=13}                                                  note{remove the middle half: the natural lattice is base 4, so binary after all};
+agg CAN.Shifted 1 claim sev 3 * cantor 0.5 + 5 fixed hints{bs=3/4096; log2=14}                                       note{the law of 3X + 5, mean 6.5 and variance 1.35};
+agg CAN.MeanCv 1 claim sev cantor 10 cv 0.8 fixed hints{bs=20/59049; log2=17}                                        note{mean and cv: the shape solves analytically from cv squared equals (1-a)/(1+a)};
+agg CAN.Poisson 10 claims sev cantor poisson                                                                        note{a real compound: the aggregate smooths the staircase completely};
+agg CAN.Layer 1 claim 0.3 xs 0.2 sev cantor fixed hints{bs=1/59049; log2=15}                                          note{an exposure layer clause sends the severity moments through quadrature on the quantile function};
+agg CAN.Layered 10 claims sev cantor occurrence net of 0.3 xs 0.2 poisson                                            note{occurrence reinsurance over the whole severity, which leaves the gross severity unlayered}

@@ -936,9 +936,9 @@ def _classify_sev(sev_name, sev_xs):
     -------
     str
         One of ``'fixed'``, ``'dhistogram'``, ``'chistogram'``, ``'copy'``,
-        ``'meta'``, ``'scipy'``. Unrecognized string ``sev_name`` values are
-        classified as ``'scipy'`` so the catchall ``SeverityScipy`` can raise
-        a clearer error when scipy itself can't resolve the name.
+        ``'meta'``, ``'cantor'``, ``'scipy'``. Unrecognized string ``sev_name``
+        values are classified as ``'scipy'`` so the catchall ``SeverityScipy``
+        can raise a clearer error when scipy itself can't resolve the name.
     """
     # Local imports to avoid distributions <-> portfolio / _aggregate cycles.
     from .portfolio import Portfolio
@@ -958,6 +958,11 @@ def _classify_sev(sev_name, sev_xs):
         return 'copy'
     if isinstance(sev_name, (Aggregate, Portfolio)):
         return 'meta'
+    if sev_name == 'cantor':
+        # The library's own named continuous severity, not a scipy one, so it
+        # has to be claimed before the catchall below hands it to
+        # ``getattr(scipy.stats, 'cantor')``.
+        return 'cantor'
     return 'scipy'
 
 
@@ -2061,9 +2066,18 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         acv = var ** .5 / mean
         if self.sev_mean > 0 and not np.isclose(self.sev_mean + loc, mean):
             print(f'WARNING target mean {self.sev_mean} and achieved mean {mean} not close')
-        if self.sev_cv > 0 and not np.isclose(
-                self.sev_cv * self.sev_mean / (self.sev_mean + loc), acv):
-            print(f'WARNING target cv {self.sev_cv} and achieved cv {acv} not close')
+        if self.sev_cv > 0:
+            # The target cv is stated about the base mean and has to be
+            # restated about the shifted one, ``cv * m / (m + loc)``. With no
+            # declared mean there is nothing to restate against and the
+            # division is 0/0, so the target is the declared cv as written.
+            # Reachable from ``Severity('cantor', sev_cv=...)``, where a scale
+            # of 1 is a sensible default and no mean is required.
+            denominator = self.sev_mean + loc
+            target_cv = (self.sev_cv * self.sev_mean / denominator
+                         if denominator != 0 else self.sev_cv)
+            if not np.isclose(target_cv, acv):
+                print(f'WARNING target cv {self.sev_cv} and achieved cv {acv} not close')
         logger.debug(
             f'Severity.__init__ | parameters {self.sev_a}, {self.sev_scale}: '
             f'target/actual {self.sev_mean} vs {mean};  {self.sev_cv} vs {acv}')
@@ -2371,6 +2385,131 @@ class SeverityScipy(Severity):
             raise ValueError(
                 f'scipy distribution {sev_name!r} has unexpected shape spec '
                 f'{shapes_spec!r}; expected 0, 1, or 2 shape parameters.')
+
+
+class SeverityCantor(Severity):
+    """Severity backed by the generalized Cantor distribution.
+
+    The one named continuous severity the library supplies itself rather than
+    reading out of ``scipy.stats``. See :mod:`aggregate.cantor` for the
+    distribution; this class is the DecL wiring, reached as ``sev cantor``.
+
+    Notes
+    -----
+    The single shape parameter is ``c``, the proportion removed from the middle
+    of each interval, carried in ``sev_a`` like any other one-shape severity.
+    Three declaration routes resolve it, in this order:
+
+    - ``sev cantor 0.5`` gives ``c`` directly.
+    - ``sev cantor 10 cv 0.8`` solves ``c`` from the coefficient of variation,
+      analytically: ``cv**2 = (1-a)/(1+a)`` inverts to
+      ``a = (1 - cv**2)/(1 + cv**2)`` with ``c = 1 - 2a``. The attainable range
+      is ``[1/sqrt(3), 1)``, the uniform law at one end and a fair coin on the
+      endpoints at the other.
+    - ``sev cantor`` alone takes the classical middle thirds, ``c = 1/3``.
+
+    Scale follows the scipy convention. The base law has mean ``1/2`` on
+    ``[0, 1]``, so a declared ``sev_mean`` sets ``sev_scale = 2 * sev_mean``;
+    otherwise the scale and location arrive from the arithmetic form
+    ``sev 3 * cantor + 5``, which is the law of ``3X + 5``.
+
+    ``sev1`` / ``sev2`` / ``sev3`` are filled from the frozen distribution's
+    exact moments, which sends the unlayered case down :meth:`Severity.moms`'s
+    precomputed fast path instead of through quadrature on a law with no
+    density. They are deliberately **not** filled for a reflected or spliced
+    severity: there the stored moments would describe the base ``X`` and not
+    the law actually built, and the fast path would return them anyway. Those
+    cases route through :func:`_numerical_moms`, which integrates the layered
+    quantile function and is correct by construction.
+    """
+    sev_kind = 'cantor'
+
+    def _build(self):
+        from .cantor import cantor as _cantor
+
+        sev_a = self.sev_a
+        sev_cv = self.sev_cv
+        sev_mean = self.sev_mean
+        sev_loc = self.sev_loc
+        sev_scale = self.sev_scale
+
+        # Reflected severity: build the POSITIVE base at loc 0, exactly as
+        # ``SeverityScipy`` does; ``_apply_reflect`` maps it to ``shift - X``.
+        if self.sev_reflect:
+            sev_loc = 0.0
+
+        if not np.isnan(sev_a):
+            c = float(sev_a)
+            if not (0.0 <= c < 1.0):
+                raise ValueError(
+                    f'cantor shape sev_a={c} out of range; it is the proportion '
+                    f'removed from the middle of each interval and must satisfy '
+                    f'0 <= c < 1. To scale the severity write "sev {c:g} * cantor" '
+                    f'or "sev cantor {c:g} cv <cv>", not "sev cantor {c:g}".')
+        elif sev_cv > 0:
+            cv_lo = 1.0 / np.sqrt(3.0)
+            if not (cv_lo - 1e-12 <= sev_cv < 1.0):
+                raise ValueError(
+                    f'cantor cv={sev_cv} out of range; the attainable cv is '
+                    f'[{cv_lo:.6f}, 1), uniform at the low end and a fair coin '
+                    f'on the endpoints at the high end.')
+            a = (1.0 - sev_cv ** 2) / (1.0 + sev_cv ** 2)
+            c = float(np.clip(1.0 - 2.0 * a, 0.0, 1.0 - 1e-15))
+            logger.info(
+                f'sev_a not set, determined as cantor shape {c} from sev_cv {sev_cv}')
+        else:
+            c = 1.0 / 3.0
+
+        if sev_mean > 0:
+            # Base mean is 1/2, so the scale is twice the target mean.
+            sev_scale = 2.0 * sev_mean
+        elif sev_scale == 0:
+            # Direct ``Severity('cantor')`` construction; the DecL transformer
+            # always supplies 1.0.
+            sev_scale = 1.0
+
+        self.fz = _cantor(c, loc=sev_loc, scale=sev_scale)
+        self.sev_a = c
+        self.sev_scale = sev_scale
+
+        if (not self.sev_reflect and self.sev_lb == 0
+                and self.sev_ub == np.inf):
+            self.sev1 = float(self.fz.moment(1))
+            self.sev2 = float(self.fz.moment(2))
+            self.sev3 = float(self.fz.moment(3))
+
+    def natural_bs(self, m):
+        """Natural bucket size for this severity at level ``m``.
+
+        Parameters
+        ----------
+        m : int
+            Level. Finer levels resolve more of the self-similar structure.
+
+        Returns
+        -------
+        float
+            ``scale / q ** m`` with ``q = 2 / (1 - c)``, in the severity's own
+            units.
+
+        Raises
+        ------
+        ValueError
+            If ``2 / (1 - c)`` is not an integer, so the level-``m`` atoms
+            share no lattice and there is no natural bucket size.
+
+        Notes
+        -----
+        Delegates to :func:`aggregate.cantor.cantor_bs` with this severity's
+        shape and scale already filled in, so the bucket-size recipe is one
+        autocomplete away on the object being held. A Cantor severity is the
+        documented exception to the house rule that ``bs`` should be a binary
+        fraction: the classical ``c = 1/3`` wants a ternary ``bs``. A binary
+        ``bs`` is not wrong, merely blurry at the finest scales, since the law
+        is atomless and its distribution function continuous.
+        """
+        from .cantor import cantor_bs
+        return cantor_bs(m, c=self.sev_a, scale=self.sev_scale)
 
 
 def _broadcast_histogram_xs_ps(sev_name, sev_xs, sev_ps):

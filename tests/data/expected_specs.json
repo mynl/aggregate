@@ -1369,6 +1369,75 @@
       "hints": ""
     }
   },
+  "agg D.Sev18 1 claim sev cantor fixed                                   note{middle thirds Cantor severity, the default shape}": {
+    "kind": "agg",
+    "name": "D.Sev18",
+    "spec": {
+      "name": "D.Sev18",
+      "exp_en": 1.0,
+      "sev_name": "cantor",
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "middle thirds Cantor severity, the default shape",
+      "hints": ""
+    }
+  },
+  "agg D.Sev19 1 claim sev cantor 0.5 fixed                               note{remove the middle half, so the kept fraction is a quarter}": {
+    "kind": "agg",
+    "name": "D.Sev19",
+    "spec": {
+      "name": "D.Sev19",
+      "exp_en": 1.0,
+      "sev_name": "cantor",
+      "sev_a": 0.5,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "remove the middle half, so the kept fraction is a quarter",
+      "hints": ""
+    }
+  },
+  "agg D.Sev20 1 claim sev 3 * cantor 0.5 + 5 fixed                       note{scaled and shifted, the law of 3X + 5}": {
+    "kind": "agg",
+    "name": "D.Sev20",
+    "spec": {
+      "name": "D.Sev20",
+      "exp_en": 1.0,
+      "sev_name": "cantor",
+      "sev_a": 0.5,
+      "sev_scale": 3.0,
+      "sev_loc": 5.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "scaled and shifted, the law of 3X + 5",
+      "hints": ""
+    }
+  },
+  "agg D.Sev21 1 claim sev cantor 10 cv 0.8 fixed                         note{mean and cv: the shape solves analytically, cv from 0.5774 up to 1}": {
+    "kind": "agg",
+    "name": "D.Sev21",
+    "spec": {
+      "name": "D.Sev21",
+      "exp_en": 1.0,
+      "sev_name": "cantor",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "note": "mean and cv: the shape solves analytically, cv from 0.5774 up to 1",
+      "hints": ""
+    }
+  },
   "agg E.TSev00  1 claim sev      lognorm 10 cv .09 fixed": {
     "kind": "agg",
     "name": "E.TSev00",

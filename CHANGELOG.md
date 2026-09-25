@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a347
+
+**[Cantor-Severity] `sev cantor` is a DecL severity.** `SeverityCantor` joins the `Severity` registry, so `sev cantor`, `sev cantor 0.5`, `sev 3 * cantor 0.5 + 5` and `sev cantor 10 cv 0.8` all build; the shape is the proportion removed from the middle, defaulting to the classical `1/3`, and the cv route solves it analytically over the attainable `[1/sqrt(3), 1)`. No grammar change was needed. `SeverityCantor.natural_bs(m)` gives the natural bucket size, and two new library entries, `CantorMiddleThirds` and `CantorMiddleHalf`, carry it in their hints. A Cantor severity is the documented exception to the binary-`bs` guidance: its level-`m` cylinders sit on a base-`q` lattice with `q = 2/(1-c)`, and with `bs = scale/q**m` each cylinder's mass lands exactly on one bucket pair. A binary `bs` remains correct, just blurry at the finest scales.
+
+Also fixed: `Severity._validate_moments` divided by zero when a `sev_cv` was declared with no `sev_mean`, emitting `RuntimeWarning: invalid value encountered in scalar divide`. With no declared mean the target cv is the declared cv, with nothing for the location shift to restate it against. Unreachable from a scipy severity, which raises first; reachable from `Severity('cantor', sev_cv=...)`.
+
+Four corpus lines added to `_test_suite.agg` section D and the spec snapshot regenerated: only the new lines appear. Eight programs added to `decl-testers.agg` under a new `CAN.` section, mirroring `tests/test_cantor_severity.py`. `cantor` added to the one-shape severity word list in `decl_pygments.py`. Docs touched in lockstep and pending a rebuild.
+
 ## 1.0.0a346
 
 **[Cantor-Severity] new module `aggregate.cantor`: the generalized Cantor distribution.** `CantorGen` is a `scipy.stats` continuous distribution with one shape parameter `c`, the proportion removed from the middle of each interval, and `cantor` is its frozen instance. `c = 1/3` is the classical middle-thirds law, `c = 0` is exactly uniform, and `c` toward 1 degenerates to a fair coin on the endpoints. `cdf`, `sf`, `ppf`, `isf` and `rvs` are exact digit algorithms, moments come from a closed recursion (mean `1/2`, variance `(1-a)/(4(1+a))` with `a = (1-c)/2`, skewness `0`), and `pdf` returns `nan` because a singular continuous law has no density. Three helpers come with it: `cantor_pmf(m, q)` gives the exact level-m lattice discretization, `cantor_bs(m, c, scale)` the natural base-`q` bucket size that lattice implies, and `cantor_chf(t, c)` the characteristic function. Submodule access only, like `Tweedie`: `from aggregate.cantor import cantor`.

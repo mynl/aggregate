@@ -1238,6 +1238,18 @@
   elsewhere can be trusted, is worth remembering if executable content is ever
   proposed again. The answer then was a documented warning; the answer now is
   that there is nothing to execute.
+- **[Natural-Lattice-Snap]** (logged 2026-09-25, from `dev/done/plan-cantor.md`)
+  — let a severity declare a natural lattice family that the bucket sizer snaps
+  to, generalizing `Aggregate._severity_lattice`, which today only finds the gcd
+  of *integer* discrete atoms and returns `None` for everything else. Two known
+  customers: the Cantor severity, whose level-`m` cylinders sit on `scale/q**m`
+  with `q = 2/(1-c)` an integer (`aggregate.cantor.cantor_bs`, and
+  `SeverityCantor.natural_bs`), and a `dhistogram` on a non-integer gcd lattice,
+  which currently falls through to the moment method. Deliberately **not** built
+  at `1.0.0a347`: the sizer stays severity-agnostic and the recipe lives in the
+  two helpers and in the `CantorMiddleThirds` / `CantorMiddleHalf` library
+  entries instead. Related: a worked `pedagogy.py` page drawing self-similar
+  aggregates from `cantor_pmf` on a ternary grid, also deferred.
 - **[Multi-Resolution-Portfolio-Combine]** (#20) — compute each unit on its own
   `bs`, decimate onto the shared grid before the Fourier product (the real fix
   for the coarse shared-`bs` deficit). Deficit accepted / surfaced for now.

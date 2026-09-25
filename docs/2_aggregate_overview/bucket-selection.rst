@@ -11,7 +11,7 @@ The problem
 ``aggregate`` computes an aggregate by FFT on a uniform lattice of :math:`N = 2^{\mathrm{log2}}` buckets of width ``bs``, with the first bucket at the origin ``x_min``. Every downstream quantity, the density, quantiles, TVaR, distortion prices, allocations, is read off that lattice, so the grid choice is the single most consequential numerical decision in the library. Three numbers must be fixed before the FFT runs:
 
 ``bs``
-    the bucket width (resolution), constrained by ``round_bucket`` to an exact **binary fraction**, a power of two, possibly negative: ``..., 1/4, 1/2, 1, 2, 4, ...``. Grid arithmetic is then exact. Too coarse and the bulk is under-resolved, so the mean drifts; too fine and the grid cannot reach the tail.
+    the bucket width (resolution), constrained by ``round_bucket`` to an exact **binary fraction**, a power of two, possibly negative: ``..., 1/4, 1/2, 1, 2, 4, ...``. Grid arithmetic is then exact. Too coarse and the bulk is under-resolved, so the mean drifts; too fine and the grid cannot reach the tail. A ``bs`` passed explicitly to ``update`` is honored as written and is never rounded, which is what lets the one severity with a non-binary natural lattice, the Cantor severity of :mod:`aggregate.cantor`, ask for a base-``q`` bucket; see ``cantor_bs``.
 ``log2``
     :math:`\log_2 N`, the bucket count, which fixes the extent given ``bs``. Memory and time grow like :math:`2^{\mathrm{log2}}`, so this is a hard budget. In practice ``log2`` is almost always supplied, by the caller, a hint, or the default of 16, so the sizer's real freedom is ``bs`` and ``x_min`` given a ``log2`` budget, or given an upper bound on it.
 ``x_min``

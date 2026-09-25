@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a346
+
+**[Cantor-Severity] new module `aggregate.cantor`: the generalized Cantor distribution.** `CantorGen` is a `scipy.stats` continuous distribution with one shape parameter `c`, the proportion removed from the middle of each interval, and `cantor` is its frozen instance. `c = 1/3` is the classical middle-thirds law, `c = 0` is exactly uniform, and `c` toward 1 degenerates to a fair coin on the endpoints. `cdf`, `sf`, `ppf`, `isf` and `rvs` are exact digit algorithms, moments come from a closed recursion (mean `1/2`, variance `(1-a)/(4(1+a))` with `a = (1-c)/2`, skewness `0`), and `pdf` returns `nan` because a singular continuous law has no density. Three helpers come with it: `cantor_pmf(m, q)` gives the exact level-m lattice discretization, `cantor_bs(m, c, scale)` the natural base-`q` bucket size that lattice implies, and `cantor_chf(t, c)` the characteristic function. Submodule access only, like `Tweedie`: `from aggregate.cantor import cantor`.
+
+Nothing else changes. The DecL severity `sev cantor ...` that sits on top of this arrives in the next version.
+
 ## 1.0.0a345
 
 **[Dbvsev-Signed-Lattice] fix `dbvsev` with negative outcomes.** A signed lattice (e.g. `dbvsev [-3:3] [0:6]`) was scattered onto the FFT grid at raw negative indices, which the signed lay-in then wrapped a second time: every atom landed `i0` buckets low, the negative atoms fell off the output window, and the joint lost mass (4/7 on the example). The scatter now uses the natural signed convention (offset by the per-axis negative reach), fixing both the in-core and massive discrete paths. Non-negative lattices are unchanged. Regression tests in `tests/test_bv_discrete.py`; `MV.DBVSigned` added to `decl-testers.agg`.

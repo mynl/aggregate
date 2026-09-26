@@ -19,7 +19,15 @@ Two of the baselines have moved deliberately, and both are recorded in
   generated after the author reviewed it.
 * ``structure`` (``[Tower-Renderer]``) had no compositor either: the chart
   is new at 1.0.0a350 and the tower panel kind is new with it, so the
-  baseline is the approved picture from the start.
+  baseline is the approved picture from the start. It moved once, at
+  1.0.0a352, when the loss axis learned to reach the policy limit.
+* ``structure_log`` is the same document on ``log='y'``, added at
+  1.0.0a353. It is the reading a geometrically layered program is meant to
+  be read on, and it gates three things a linear render cannot: a block
+  starting at an exact zero drawn from the panel's decade floor rather than
+  from negative infinity, a boundary mark at zero dropped rather than
+  placed, and one floor per quantity axis, so the gross slab, the tower and
+  the curve beside them line up.
 
 Pins confirmed by the author 2026-08-05: ``_PINNED_MPL`` is the version the
 baselines were rendered with (tests skip elsewhere rather than fail on font
@@ -73,13 +81,20 @@ def _subjects():
         'agg': build_chart_doc(build(_AGG), 'agg'),
         'structure': build_chart_doc(build(_STRUCTURE), 'structure',
                                      lee=True),
+        'structure_log': build_chart_doc(build(_STRUCTURE), 'structure',
+                                         lee=True),
     }
 
 
-def _render(doc, target):
+#: Render options per subject, for a baseline that is a *reading* of a
+#: document rather than a document of its own.
+_OPTIONS = {'structure_log': {'log': 'y'}}
+
+
+def _render(doc, target, **options):
     from aggregate.plots import plot_chartdoc, plt, use
     use()
-    plot_chartdoc(doc).savefig(target, dpi=100)
+    plot_chartdoc(doc, **options).savefig(target, dpi=100)
     plt.close('all')
 
 
@@ -90,11 +105,12 @@ def _compare(actual, baseline_name):
     assert result is None, result
 
 
-@pytest.mark.parametrize('name', ['distortion', 'agg', 'structure'])
+@pytest.mark.parametrize('name', ['distortion', 'agg', 'structure',
+                                  'structure_log'])
 def test_chartdoc_matches_baseline(name, tmp_path):
     """The gate: the rendered document is the picture that was approved."""
     target = tmp_path / f'{name}.png'
-    _render(_subjects()[name], target)
+    _render(_subjects()[name], target, **_OPTIONS.get(name, {}))
     _compare(target, f'{name}.png')
 
 
@@ -102,7 +118,7 @@ def _regen():
     matplotlib.use('Agg')
     _BASELINES.mkdir(parents=True, exist_ok=True)
     for name, doc in _subjects().items():
-        _render(doc, _BASELINES / f'{name}.png')
+        _render(doc, _BASELINES / f'{name}.png', **_OPTIONS.get(name, {}))
     print(f'baselines regenerated under {_BASELINES} '
           f'with matplotlib {matplotlib.__version__}')
 

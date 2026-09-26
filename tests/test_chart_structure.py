@@ -107,6 +107,11 @@ def priced():
     return build(_PRICED)
 
 
+def net_of_module():
+    """The two-stage built program, for a test that is not fixture scoped."""
+    return build(_NET_OF)
+
+
 def blocks_on(doc, panel):
     return [b for b in doc.blocks if b.panel_id == panel]
 
@@ -751,6 +756,101 @@ def test_two_stages_never_share_one_window(net_of):
     ids = [p.id for p in doc.panels]
     assert fig.axes[ids.index('occ')].get_ylim()         != fig.axes[ids.index('agg')].get_ylim()
     plt.close(fig)
+
+
+def test_a_block_starting_at_zero_is_drawn_from_the_floor():
+    """Zero has no position on log, and the retention band starts there."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(build(_NET_OF, update=False), 'structure')
+    fig = plot_chartdoc(doc, log='y')
+    ax = fig.axes[[p.id for p in doc.panels].index('occ')]
+    bottom = ax.get_ylim()[0]
+    assert bottom > 0
+    feet = [collection.get_paths()[0].vertices[:, 1].min()
+            for collection in ax.collections]
+    assert feet and min(feet) == pytest.approx(bottom)
+    assert np.isfinite(feet).all()
+    plt.close(fig)
+
+
+def test_a_boundary_at_zero_is_not_drawn_as_a_tick():
+    """``aggregate net of 20 xs 0`` emits a mark at zero."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(build(_NET_OF, update=False), 'structure')
+    assert any(m.at == 0.0 and m.panel_id == 'agg' for m in doc.marks)
+    index = [p.id for p in doc.panels].index('agg')
+    linear = plot_chartdoc(doc)
+    assert 0.0 in set(linear.axes[index].get_yticks())
+    plt.close(linear)
+    fig = plot_chartdoc(doc, log='y')
+    assert 0.0 not in set(fig.axes[index].get_yticks())
+    plt.close(fig)
+
+
+def test_one_floor_per_quantity_axis_not_per_panel():
+    """The slab, the tower and the curve are one reading, so one bottom."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc, plt
+
+    doc = build_chart_doc(net_of_module(), 'structure', lee=True)
+    fig = plot_chartdoc(doc, log='y')
+    ids = [p.id for p in doc.panels]
+    windows = {}
+    for panel, ax in zip(doc.panels, fig.axes):
+        windows.setdefault(panel.y_axis, set()).add(tuple(ax.get_ylim()))
+    # Each stage's panels agree, and the two stages still do not.
+    assert all(len(v) == 1 for v in windows.values())
+    assert len(windows) == 2
+    assert len({next(iter(v)) for v in windows.values()}) == 2
+    assert 'gross' in ids
+    plt.close(fig)
+
+
+def test_a_label_is_sized_and_centered_in_the_drawn_coordinate():
+    """Measured linearly, a log band is judged by the wrong fraction."""
+    from aggregate.charts.ir import TowerBlock
+    from aggregate.plots._chartdoc import _block_reading
+
+    block = TowerBlock(panel_id='occ', x0=0.0, x1=1.0, y0=5.0, y1=20.0,
+                       role='layer', label='15 xs 5')
+    window = (0.0, 100.0)
+    height, span, mid = _block_reading(block, window, 'linear', 1.0)
+    assert (height, span) == (15.0, 100.0)
+    assert mid == 12.5
+    height, span, mid = _block_reading(block, window, 'log', 1.0)
+    # Two decades of window, and the band covers log10(20 / 5) of them.
+    assert span == pytest.approx(2.0)
+    assert height == pytest.approx(np.log10(4.0))
+    assert mid == pytest.approx(10.0)
+    assert height / span > 0.29
+
+
+def test_a_block_at_the_floor_keeps_its_label_rather_than_misplacing_it():
+    """A band entirely under the floor has no drawn height to measure."""
+    from aggregate.charts.ir import TowerBlock
+    from aggregate.plots._chartdoc import _block_reading
+
+    block = TowerBlock(panel_id='occ', x0=0.0, x1=1.0, y0=0.0, y1=0.5,
+                       role='retention', label='Retained')
+    height, span, mid = _block_reading(block, (0.0, 100.0), 'log', 1.0)
+    assert height == 0.0
+    assert mid == 1.0
+
+
+def test_the_decade_floor_sits_strictly_under_what_is_drawn():
+    """A lone slab from 0 to 100 would otherwise have nothing to draw in."""
+    from aggregate.plots._chartdoc import _decade_floor
+
+    assert _decade_floor([0.0, 100.0]) == 10.0
+    assert _decade_floor([0.0, 5.0, 20.0, 100.0]) == 1.0
+    assert _decade_floor([0.0]) is None
 
 
 def test_a_renderer_without_the_kind_says_so():

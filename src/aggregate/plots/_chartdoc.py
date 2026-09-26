@@ -75,7 +75,7 @@ def _realization(panel, requested):
 
 
 def _decade_floor(values):
-    """The decade at or under the smallest value worth drawing, or ``None``.
+    """The decade strictly under the smallest value worth drawing, or ``None``.
 
     A log view of a window whose declared low end is zero needs a bottom,
     and the honest one is a round decade under the smallest thing actually
@@ -87,12 +87,70 @@ def _decade_floor(values):
     emitters cut a survival curve at. Without it one dust value at 1e-17
     would open six empty decades under a panel whose mass all sits in the
     top three.
+
+    Notes
+    -----
+    **Strictly under, which matters when the smallest value is itself a
+    round decade.** A tower panel holding one gross slab from 0 to 100 has
+    exactly one positive coordinate, and a floor *at* 100 leaves the panel
+    nothing to draw in: the rectangle collapses to the top of the frame.
+    Rounding the exponent up and stepping one decade down gives 10 there
+    and is unchanged wherever the smallest value is not an exact power of
+    ten, which is every continuous series.
     """
     v = np.asarray(values, dtype=float)
     v = v[np.isfinite(v) & (v > LOG_FLOOR)]
     if not v.size:
         return None
-    return float(10.0 ** np.floor(np.log10(v.min())))
+    return float(10.0 ** (np.ceil(np.log10(v.min())) - 1.0))
+
+
+def _tower_floors(doc, realized):
+    """``axis_id -> decade floor`` for every quantity axis carrying a tower.
+
+    Parameters
+    ----------
+    doc : ChartDoc
+    realized : list of str
+        The kind each panel is being drawn as, panel for panel.
+
+    Returns
+    -------
+    dict
+        Empty when the document draws no tower.
+
+    Notes
+    -----
+    **The floor is a property of the axis, not of the panel.** A structure
+    document puts the gross slab, the tower carving it up and the quantile
+    curve beside it on one loss axis, and they are one reading: a boundary
+    is meant to carry across. Computed per panel the three disagree, since
+    each sees only its own content, and the panels are then drawn with
+    different bottoms and different clamps, so a slab floats above the
+    frame its neighbour fills. Pooling per axis is what makes them line up,
+    and it is also what makes the clamp agree with the window matplotlib
+    ends up with under ``sharey``, which takes the last panel's limits for
+    all of them.
+
+    **Pooled over the blocks, not over everything drawn against the axis.**
+    A Lee curve on a loss axis runs down to the first positive grid point,
+    three or four decades under the program, and a floor taken from that
+    would open those decades under every tower and squeeze the bands back
+    into slivers, which is the pathology the log reading exists to cure.
+    The tower's breaks are the scale the picture is read at; the curve
+    beside it simply runs off the bottom of the frame, as a curve on a log
+    loss axis always does.
+    """
+    towers = {p.y_axis for p, r in zip(doc.panels, realized) if r == 'tower'}
+    if not towers:
+        return {}
+    panels = {p.id: p for p in doc.panels}
+    values = {}
+    for block in doc.blocks:
+        panel = panels.get(block.panel_id)
+        if panel is not None and panel.y_axis in towers:
+            values.setdefault(panel.y_axis, []).extend((block.y0, block.y1))
+    return {axis_id: _decade_floor(vs) for axis_id, vs in values.items()}
 
 
 def _axis_scale(axis, log):
@@ -622,6 +680,53 @@ def _axes_height_px(ax):
     return ax.get_position().height * fig.get_size_inches()[1] * fig.dpi
 
 
+def _block_reading(block, window, scale, floor):
+    """``(height, span, mid)`` for one block in the coordinate it is drawn in.
+
+    Parameters
+    ----------
+    block : TowerBlock
+    window : tuple of float
+        The drawn window on the quantity axis, before the floor is applied.
+    scale : str
+        'linear' or 'log', the reading the panel is drawn on.
+    floor : float or None
+        The decade floor from :func:`_decade_floor`, which is what a log
+        axis puts in place of a window whose low end is an exact zero.
+
+    Returns
+    -------
+    tuple of float
+        The block's extent, the window's extent, and the block's center,
+        all in the drawn coordinate. On log the first two are measured in
+        decades and the third is the geometric center.
+
+    Notes
+    -----
+    **A label is placed and sized in the coordinate the reader sees, not in
+    loss units.** On a 1 to 100 log ordinate a ``15 xs 5`` band fills about
+    43% of the drawn height while spanning 15% of the range, so measuring
+    it linearly would drop labels it has room for and, on the retention
+    above it, spill text across a neighbour. That matters most here because
+    the log reading exists for exactly the program whose bands are slivers
+    read linearly.
+
+    A block sitting at or below the floor has no drawn height, so it
+    answers zero and keeps its label rather than taking it somewhere the
+    rectangle is not.
+    """
+    lo, hi = window
+    linear = (block.y1 - block.y0, hi - lo, 0.5 * (block.y0 + block.y1))
+    if scale != 'log' or floor is None:
+        return linear
+    base = max(lo, floor)
+    y0, y1 = max(block.y0, base), max(block.y1, base)
+    if not (y1 > y0 and hi > base):
+        return 0.0, 1.0, y1
+    log0, log1 = np.log10(y0), np.log10(y1)
+    return log1 - log0, np.log10(hi) - np.log10(base), 10.0 ** (0.5 * (log0 + log1))
+
+
 def _rows_that_fit(ax, height, span):
     """How many label rows a block of data height ``height`` has room for.
 
@@ -645,7 +750,7 @@ def _rows_that_fit(ax, height, span):
     return int(pixels // row) if row > 0 else 0
 
 
-def _draw_block(ax, block, shade):
+def _draw_block(ax, block, shade, bottom=None):
     """Fill one block and draw the edges it is entitled to.
 
     ``shade`` picks among the role's alphas, counted over the blocks of that
@@ -657,22 +762,33 @@ def _draw_block(ax, block, shade):
     rectangle would assert a limit the contract has not got. The fill is
     laid down with no edge of its own so the three sides can be drawn
     deliberately.
+
+    ``bottom`` is the lowest drawable coordinate, which a log reading needs
+    and a linear one does not. A tower's two commonest bands start at an
+    exact zero, the retention below the first attachment and the gross slab
+    itself, and zero has no position on a log axis: sent there unclamped
+    the rectangle's foot goes to negative infinity and the fill vanishes.
+    Clamping to the panel's decade floor draws the band from the bottom of
+    the frame, which is what the floor is for.
     """
+    y0, y1 = block.y0, block.y1
+    if bottom is not None:
+        y0, y1 = max(y0, bottom), max(y1, bottom)
     color, alphas = BLOCK_FILL.get(block.role, ('C7', (0.3,)))
     alpha = alphas[shade % len(alphas)]
-    ax.fill_betweenx([block.y0, block.y1], block.x0, block.x1,
+    ax.fill_betweenx([y0, y1], block.x0, block.x1,
                      facecolor=color, alpha=alpha, linewidth=0,
                      hatch=BLOCK_HATCH.get(block.role),
                      edgecolor='C7' if block.role in BLOCK_HATCH else 'none')
     edge = dict(color='C7', lw=0.6)
-    ax.plot([block.x0, block.x0], [block.y0, block.y1], **edge)
-    ax.plot([block.x1, block.x1], [block.y0, block.y1], **edge)
-    ax.plot([block.x0, block.x1], [block.y0, block.y0], **edge)
+    ax.plot([block.x0, block.x0], [y0, y1], **edge)
+    ax.plot([block.x1, block.x1], [y0, y1], **edge)
+    ax.plot([block.x0, block.x1], [y0, y0], **edge)
     if not block.open_top:
-        ax.plot([block.x0, block.x1], [block.y1, block.y1], **edge)
+        ax.plot([block.x0, block.x1], [y1, y1], **edge)
 
 
-def _label_block(ax, doc, block, span, x_span):
+def _label_block(ax, doc, block, reading, x_span):
     """Draw as much of a block's label stack as its rectangle has room for.
 
     The headline comes first and the annotation lines follow in document
@@ -685,8 +801,13 @@ def _label_block(ax, doc, block, span, x_span):
     lying across a neighbour asserts a term that block does not carry. A
     narrow layer therefore keeps its name and loses its terms, which the
     reader can still get from the panel beside it or from the frame.
+
+    ``reading`` is the block's ``(height, span, mid)`` in the drawn
+    coordinate, from :func:`_block_reading`, so the fit is judged and the
+    text is centered where the rectangle actually is under either scale.
     """
-    rows = _rows_that_fit(ax, block.y1 - block.y0, span)
+    height, span, mid = reading
+    rows = _rows_that_fit(ax, height, span)
     if rows < 1:
         return
     width = _axes_width_px(ax) * (block.x1 - block.x0) / x_span
@@ -703,12 +824,13 @@ def _label_block(ax, doc, block, span, x_span):
     lines = lines[:rows]
     if not lines:
         return
-    ax.text(0.5 * (block.x0 + block.x1), 0.5 * (block.y0 + block.y1),
+    ax.text(0.5 * (block.x0 + block.x1), mid,
             '\n'.join(lines), ha='center', va='center',
             fontsize=LABEL_POINTS, linespacing=1.3)
 
 
-def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False):
+def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False,
+                        floor=None):
     """Draw a 'tower' panel: labeled rectangles over a quantity axis.
 
     Parameters
@@ -725,6 +847,11 @@ def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False):
         axis never does: a share is not a quantity anyone reads on log.
     full : bool
         Read the quantity axis at its full extent.
+    floor : float or None
+        The quantity axis' decade floor, from :func:`_tower_floors`,
+        pooled over every panel that shares the axis. ``None`` falls back
+        to this panel's own blocks, which is right only when it is the
+        axis' only panel.
 
     Notes
     -----
@@ -738,6 +865,16 @@ def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False):
     labeled with the amounts the document put on them, in place of a
     continuous scale. That is the prior art's move and it is what makes the
     attachments legible without a label per block repeating them.
+
+    **The log reading needs a bottom, and three things follow from it.** A
+    balanced program is layered in a roughly geometric progression, whose
+    bands are close to equal height on log and slivers on linear, so the
+    reading earns its place. But the quantity axis routinely starts at an
+    exact zero, which has no position on log: the panel's decade floor
+    stands in for it, blocks are clamped to that floor so a rectangle
+    starting at zero still has a foot, a boundary mark at zero is dropped
+    rather than placed, and labels are sized and centered in decades so a
+    band that is 43% of the drawn height is not judged as 15% of the range.
     """
     y_axis = {a.id: a for a in doc.axes}[panel.y_axis]
     x_axis = {a.id: a for a in doc.axes}[panel.x_axis]
@@ -745,22 +882,29 @@ def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False):
     window = _axis_window(y_axis, full) or (
         min((b.y0 for b in blocks), default=0.0),
         max((b.y1 for b in blocks), default=1.0))
-    span = window[1] - window[0]
+    scale = _axis_scale(y_axis, log_y)
+    if floor is None:
+        floor = _decade_floor([b.y0 for b in blocks] + [b.y1 for b in blocks])
+    bottom = floor if scale == 'log' else None
     seen = {}
     for block in blocks:
         shade = seen.get(block.role, 0)
         seen[block.role] = shade + 1
-        _draw_block(ax, block, shade)
+        _draw_block(ax, block, shade, bottom)
     x_window = _axis_window(x_axis, full) or (0.0, 1.0)
     for block in blocks:
-        _label_block(ax, doc, block, span, x_window[1] - x_window[0])
-    _apply_axis(ax, 'y', y_axis, _axis_scale(y_axis, log_y), window,
-                _decade_floor([b.y0 for b in blocks]
-                              + [b.y1 for b in blocks]))
+        _label_block(ax, doc, block, _block_reading(block, window, scale, floor),
+                     x_window[1] - x_window[0])
+    _apply_axis(ax, 'y', y_axis, scale, window, floor)
     ax.set_xlim(*x_window)
     ax.set_xticks([])
     ax.set(xlabel='', ylabel=_typeset(doc, y_axis.label))
     ticks = sorted({m.at for m in doc.marks if m.panel_id == panel.id})
+    if scale == 'log':
+        # A boundary at zero has no position on a log axis, and an
+        # aggregate cover written ``20 xs 0`` emits one. Drop it rather
+        # than hand matplotlib a tick it cannot place.
+        ticks = [at for at in ticks if at > 0]
     if ticks:
         labels = {m.at: m.label for m in doc.marks
                   if m.panel_id == panel.id and m.label}
@@ -770,7 +914,8 @@ def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False):
 
 
 def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
-                     return_period=False, invert=False, reflect=False):
+                     return_period=False, invert=False, reflect=False,
+                     y_floor=None):
     """Render one 'xy' panel: role-styled curves, gaps broken, marks drawn.
 
     ``return_period`` swaps a drawn probability axis for the paired reading
@@ -941,7 +1086,12 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     if panel.aspect == 'equal' and x_scale == y_scale:
         x_only = y_window = _square_window(x_only, y_window, all_x, all_y)
     _apply_axis(ax, 'x', x_axis, x_scale, x_only, _decade_floor(all_x))
-    _apply_axis(ax, 'y', y_axis, y_scale, y_window, _decade_floor(all_y))
+    # A curve sharing a tower's quantity axis takes the tower's floor, so
+    # the two panels are one reading; it keeps its own wherever the axis
+    # was remapped to a paired reading, whose values are not that axis'.
+    _apply_axis(ax, 'y', y_axis, y_scale, y_window,
+                _decade_floor(all_y) if (y_floor is None or y_period)
+                else y_floor)
     # The document labels its axes and the renderer draws what it is given,
     # as the grid panels already do.
     ax.set(xlabel=_typeset(doc, x_axis.label),
@@ -1128,6 +1278,9 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
             **({} if size is None else {'figsize': size}))
         axs = list(grid[0])
 
+    # One floor per quantity axis, computed before anything is drawn,
+    # because panels sharing an axis must share its bottom.
+    floors = _tower_floors(doc, realized)
     for panel, realization, panel_ax in zip(doc.panels, realized, axs):
         series = [s for s in doc.series if s.panel_id == panel.id]
         panel_title = panel.title or title
@@ -1140,11 +1293,12 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
             _render_tower_panel(
                 panel_ax, doc, panel,
                 [b for b in doc.blocks if b.panel_id == panel.id],
-                log=log, full=full_range)
+                log=log, full=full_range, floor=floors.get(panel.y_axis))
         elif realization == 'xy':
             _render_xy_panel(panel_ax, doc, panel, series, log=log,
                              full=full_range, reflect=reflect,
-                             return_period=return_period, invert=invert)
+                             return_period=return_period, invert=invert,
+                             y_floor=floors.get(panel.y_axis))
         else:
             _render_grid_panel(panel_ax, doc, panel, series, log=log)
             if realization in _DEGRADED:

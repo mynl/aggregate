@@ -65,8 +65,8 @@ from .._grid_distribution import GridDistribution
 from .._pnl import PnL
 from . import register_chart, _emitter_base
 from ._payload import lattice_payload
-from ._two_panel import (RETURN_PERIOD_TOP, SURVIVAL_FLOOR, loss_window,
-                          pad_window, quantile_curve)
+from ._two_panel import (RETURN_PERIOD_TOP, SURVIVAL_FLOOR, WINDOW_PAD,
+                          loss_window, quantile_curve)
 from .ir import (ChartAxis, ChartDoc, ChartSeries, Mark, Panel, TowerBlock,
                  complete_tex)
 
@@ -424,8 +424,59 @@ def _tower_extent(agg, stage):
     return float(top), unlimited
 
 
-def _stage_window(top, unlimited, reference):
-    """The loss window for one stage: the tower, and the law beside it.
+def _support(agg, stage):
+    """``(lo, hi)`` structural support of the quantity one stage's tower bands.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        Need not be updated: the report this reads is built from the spec.
+    stage : str
+        'occ' or 'agg'.
+
+    Returns
+    -------
+    tuple of float
+        The bounds, with ``inf`` at an unbounded top. ``(0.0, inf)`` when
+        the report or the row it wants is absent, which is the answer that
+        leaves the window where it was before this rule existed.
+
+    Notes
+    -----
+    Read off :attr:`~aggregate.Aggregate.tail_behavior_df`, which composes
+    both of the two ways a severity can be bounded and is valid before
+    :meth:`~aggregate.Aggregate.update`. The occurrence tower is read
+    against the **gross** severity, so its bound is the union over the
+    ``comp*`` rows: not the ``severity`` row, which is absent when there is
+    a single component, and not ``severity (net occ)``, which is the net
+    rather than the gross. Both spellings of a bounded severity land there,
+    an explicit ``xs`` clause and a distribution bounded in itself such as
+    ``40 * uniform``.
+
+    The aggregate tower is the ``aggregate`` row, and it is ``inf`` under
+    any unbounded frequency. That is the rule rather than a special case:
+    an aggregate acquires a ceiling only when the frequency is bounded too,
+    so ``dfreq [1 2 3] sev 40 * uniform`` is bounded at ``120`` and the
+    same severity under Poisson is not.
+    """
+    try:
+        df = agg.tail_behavior_df
+    except (AttributeError, KeyError, ValueError):  # pragma: no cover
+        # The chart draws whatever object it is handed, and a stage window
+        # is not the place to fail over a report that will not build.
+        return 0.0, np.inf
+    if stage == 'occ':
+        rows = [i for i in df.index if str(i).startswith('comp')]
+    else:
+        rows = [i for i in df.index if i == 'aggregate']
+    if not rows or 'min' not in df or 'max' not in df:  # pragma: no cover
+        return 0.0, np.inf
+    frame = df.loc[rows]
+    return float(frame['min'].min()), float(frame['max'].max())
+
+
+def _stage_window(top, unlimited, reference, support):
+    """The loss window for one stage: the contract, or the law beside it.
 
     Parameters
     ----------
@@ -437,31 +488,53 @@ def _stage_window(top, unlimited, reference):
     reference : GridDistribution or None
         The distribution the tower is read against, when the object is
         built.
+    support : tuple of float
+        The stage quantity's structural bounds, from :func:`_support`.
 
     Returns
     -------
     tuple of float
-        ``(lo, hi)``, padded.
+        ``(lo, hi)``, **unpadded**: the extent the blocks are drawn to and
+        the extent the axis declares. The caller pads the top only, for the
+        axis alone, so a block never asserts cover above the contract.
 
     Notes
     -----
-    The window is the **union** of the tower and the law's own interesting
-    slice, never one or the other. Taking the law alone crops a high layer
-    that rarely attaches out of its own picture; taking the tower alone
-    puts a modest program against a book whose tail runs far past it. An
-    unlimited top layer has no exhaustion point to bound anything, so it
-    gets fixed headroom above the highest thing that does.
+    **Where the support is bounded the contract answers and there is
+    nothing to trade off.** The gross column is the policy, and a program
+    review draws it whole: a ``100 xs 0`` policy cropped at a quantile of
+    its own severity asserts less cover than was bought. A band this leaves
+    as a sliver is what the axis' log reading is for.
+
+    Where the support is unbounded the window is the **union** of the tower
+    and the law's own interesting slice, never one or the other. Taking the
+    law alone crops a high layer that rarely attaches out of its own
+    picture; taking the tower alone puts a modest program against a book
+    whose tail runs far past it. An unlimited top layer then has no
+    exhaustion point to bound anything, so it gets fixed headroom above the
+    highest thing that does.
+
+    **The floor is the quantity's own lower bound and is never padded past
+    it.** A loss cannot be negative, so an axis labeled ``-2,000`` says
+    something false about the quantity; the tower itself starts at zero, so
+    a positive lower bound (``dsev [10 20 30]``) must not crop the
+    retention band below it either. Hence ``min(0, support_lo)``, which is
+    ``0`` for every loss and honors a genuinely signed severity.
     """
+    lo = min(0.0, support[0])
+    if np.isfinite(support[1]):
+        # max, not the support alone: a tower may be written above its own
+        # severity's ceiling, and a window that cropped it would draw a
+        # program the object does not have.
+        return lo, max(support[1], top, lo + 1.0)
     hi = top
-    lo = 0.0
     if reference is not None:
         window = loss_window(reference.q, 0.0)
         if window is not None:
-            lo = min(lo, window[0])
             hi = max(hi, window[1])
     if unlimited:
         hi = hi * (1.0 + HEADROOM) if hi > 0 else 1.0
-    return pad_window(lo, hi) or (lo, max(hi, lo + 1.0))
+    return lo, max(hi, lo + 1.0)
 
 
 def _reference(agg, stage):
@@ -480,7 +553,7 @@ def _reference(agg, stage):
                             bs=agg.bs, name=column)
 
 
-def _gross_block(agg, stats, stage, panel_id, top):
+def _gross_block(agg, stats, stage, panel_id, top, support_hi=np.inf):
     """The gross slab: what the first tower is carving up.
 
     On an occurrence program that is the policy layer each claim is written
@@ -488,6 +561,29 @@ def _gross_block(agg, stats, stage, panel_id, top):
     program it is the subject aggregate over the drawn window, annotated
     with its own. One slab either way, because the point of the panel is
     the comparison of heights.
+
+    Parameters
+    ----------
+    agg : Aggregate
+    stats : pandas.DataFrame or None
+        ``reins_stats_df`` on a built object, for the moment lines.
+    stage : str
+        'occ' or 'agg', which decides what the slab is.
+    panel_id : str
+    top : float
+        The drawn window's top, unpadded.
+    support_hi : float
+        The subject quantity's own ceiling, from :func:`_support`.
+
+    Notes
+    -----
+    **Two things can close the slab and either one is enough.** A written
+    limit closes it because that is the cover bought; the severity's own
+    support closes it because no claim can exceed it. ``sev 40 * uniform``
+    with no ``xs`` clause is the second case on its own, and reading
+    ``exp_limit`` alone would draw it open topped at 40 while asserting
+    cover above a loss that cannot happen. The slab is open only when
+    nothing bounds it, or when what bounds it sits above the drawn window.
     """
     if stage == 'occ':
         limit = agg.spec.get('exp_limit', np.inf)
@@ -500,14 +596,17 @@ def _gross_block(agg, stats, stage, panel_id, top):
         limit, attach = np.inf, 0.0
         component = 'agg'
         headline = 'Subject'
-    # The window is sized for the tower, not for the subject, so a policy
-    # limit far above the program crops the slab. Cropping is right, saying
-    # nothing about it is not: the block declares an open top, exactly as an
-    # unlimited layer does, rather than asserting a ceiling the book has not
-    # got.
-    cropped = np.isfinite(limit) and attach + limit > top
-    unlimited = not np.isfinite(limit) or cropped
-    y1 = top if unlimited else attach + limit
+    # Either bound closes it, so the ceiling is the lower of the two. A
+    # ceiling inside the window is drawn and the slab closes on it; one
+    # above the window (an unbounded subject whose window is a quantile
+    # slice) is cropped, and cropping is right there. Saying nothing about
+    # the crop is not: the block declares an open top exactly as an
+    # unlimited layer does rather than asserting a ceiling the book has
+    # not got.
+    ceiling = min(attach + limit, support_hi)
+    cropped = np.isfinite(ceiling) and ceiling > top
+    unlimited = not np.isfinite(ceiling) or cropped
+    y1 = top if unlimited else ceiling
     lines = [headline]
     if stats is not None:
         try:
@@ -605,11 +704,20 @@ def _structure(obj, annotate=DEFAULT_ANNOTATE, lee=False):
     for stage in stages:
         top, unlimited = _tower_extent(agg, stage)
         reference = _reference(agg, stage) if built else None
-        window = _stage_window(top, unlimited, reference)
+        support = _support(agg, stage)
+        lo, drawn = _stage_window(top, unlimited, reference, support)
         loss_id = f'{stage}_loss'
+        # The axis takes the padded top so a band is not drawn hard against
+        # the frame; the blocks below take ``drawn``, the bare number, since
+        # a retention ending two percent above the policy limit asserts
+        # cover that does not exist. A consumer clamps the suggestion back
+        # to the declared extent, which lands the drawn axis on the limit
+        # itself rather than on a number near it.
         axes.append(ChartAxis(
             id=loss_id, label=STAGE_LOSS[stage], unit='currency',
-            suggested_range=window, full_range=window))
+            scales=('linear', 'log'),
+            suggested_range=(lo, drawn + WINDOW_PAD * (drawn - lo)),
+            full_range=(lo, drawn) if np.isfinite(support[1]) else None))
         # The placement axis is a share, so it is a 'ratio' and it is read
         # as a width rather than interrogated. One per stage, because two
         # panels sharing an axis id share the axis itself and the towers
@@ -626,13 +734,13 @@ def _structure(obj, annotate=DEFAULT_ANNOTATE, lee=False):
             panels.append(Panel(id='gross', kind='tower', x_axis=gross_place,
                                 y_axis=loss_id, read_axis='y',
                                 title='Gross'))
-            blocks.append(_gross_block(agg, stats, stage, 'gross',
-                                       window[1]))
+            blocks.append(_gross_block(agg, stats, stage, 'gross', drawn,
+                                       support[1]))
         panels.append(Panel(id=stage, kind='tower', x_axis=place_id,
                             y_axis=loss_id, read_axis='y',
                             title=STAGE_TITLE[stage]))
         stage_blocks = _tower_blocks(agg, stats, econ, stage, stage,
-                                     window[1], annotate)
+                                     drawn, annotate)
         blocks.extend(stage_blocks)
         boundaries = sorted({b.y0 for b in stage_blocks if b.role == 'layer'}
                             | {b.y1 for b in stage_blocks

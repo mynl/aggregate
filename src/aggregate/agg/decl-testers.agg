@@ -1372,3 +1372,19 @@ agg CAN.MeanCv 1 claim sev cantor 10 cv 0.8 fixed hints{bs=20/59049; log2=17}   
 agg CAN.Poisson 10 claims sev cantor poisson                                                                        note{a real compound: the aggregate smooths the staircase completely};
 agg CAN.Layer 1 claim 0.3 xs 0.2 sev cantor fixed hints{bs=1/59049; log2=15}                                          note{an exposure layer clause sends the severity moments through quadrature on the quantile function};
 agg CAN.Layered 10 claims sev cantor occurrence net of 0.3 xs 0.2 poisson                                            note{occurrence reinsurance over the whole severity, which leaves the gross severity unlayered}
+
+# ============================================================
+# TW. Tower loss window fixtures (1.0.0a352)
+# ============================================================
+# [Tower-Loss-Window]: the structure chart draws its loss axis against the
+# quantity's own structural support, so these pin the three ways a stage can
+# be bounded or not. A severity bounded in itself with no `xs` clause to read
+# a limit off; a bounded frequency over a bounded severity, which is the only
+# way an aggregate acquires a ceiling; a discrete severity whose support
+# starts above zero, which must not crop the retention below it; and nothing
+# bounded at all, which keeps the union of tower and law. See
+# tests/test_chart_structure.py and dev/done/plan-tower-window.md.
+agg CS.BoundedSev 5 claims sev 40 * uniform occurrence net of 15 xs 5 poisson                                      note{bounded in itself: the window reaches 40 with no limit clause to read};
+agg CS.BoundedAgg dfreq [1 2 3] sev 40 * uniform aggregate net of 30 xs 30                                         note{bounded both ways, so the aggregate is bounded at 3 * 40};
+agg CS.Atomic 5 claims dsev [10 20 30] occurrence net of 3 xs 6 poisson                                            note{support starts at 10, and the retention below it is still drawn from 0};
+agg CS.Unbounded 5 claims sev lognorm 10 cv .75 occurrence net of 15 xs 5 poisson aggregate net of 20 xs 0         note{nothing bounds either stage, so both keep the union of tower and law}

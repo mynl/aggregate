@@ -1205,6 +1205,19 @@
   different tests in two different bivariate modules now points at the shared
   cause rather than at either test, which strengthens the worker-load
   hypothesis and widens the symptom past the RuntimeWarning flag.
+- **[Zero-Share-Layer-Moments]** — found a352 while parametrizing the structure
+  chart tests over every tier. A `0% po` layer in an occurrence program
+  (`occurrence net of 20 xs 20 and 0% po 20 xs 40 and inf xs 60`) cedes nothing,
+  so its ceded second moment lands as float noise just below zero;
+  `moments.mcvsk` takes the square root of that, emits `invalid value
+  encountered in sqrt`, and `reins_stats_df` reports the layer's `cv` and `skew`
+  as `NaN` beside a mean of `-1.8e-11`. A NaN reaching a reported frame wants a
+  fix, not an `np.errstate` guard: clamp a variance that is noise below zero to
+  zero in the reinsurance moment path, and decide whether a zero-share layer
+  should report zeros or blanks across the column. Until then the gapped program
+  is exercised on the declared tier only, so the numerics gate stays green; see
+  the `_EVERY_TIER` comment in `tests/test_chart_structure.py`.
+
 - **[Colorizer-Style-Choice]** — `decl_writer._colorize` hard-codes
   `style='friendly'` for html, ansi and latex alike. A `style=` axis on
   `format_program`, and a dark-background default for the terminal path, is a
@@ -1225,6 +1238,11 @@
   Portfolio is deliberately out of scope; the registry leaves it open. The
   SPA half is `aggregate-api`'s `dev/plan-structure-chart.md`, unblocked now
   and still to land, and until it does the SPA draws no charts at all.
+  Extended at a352 to a353 by `dev/done/plan-tower-window.md`
+  (`[Tower-Loss-Window]`, `[Tower-Log-Reading]`): the loss axis is drawn
+  against the quantity's own structural support, so it starts at zero and
+  reaches a known limit, it declares both ranges rather than the same pair
+  twice, and it offers a log reading for a geometrically layered program.
 - **[Cheat-Sheet-Tweaks]** — at the alpha→beta cut, re-run `introspect` per class,
   reconcile any renames/removals, and apply pending wording/layout tweaks (incl.
   whether to densify DecL pages 2–3). Held until first beta.

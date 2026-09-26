@@ -25,6 +25,7 @@ from aggregate.charts import (
 from aggregate.charts._emit_structure import (
     ANNOTATE_FIELDS, DEFAULT_ANNOTATE, _money, _pct, _terms,
 )
+from aggregate.charts._two_panel import WINDOW_PAD
 
 # Geometry only: two stages, a partial placement, named layers.
 _DECLARED = ('agg CS.Declared 10 claims 100 xs 0 sev lognorm 20 cv 1.5 '
@@ -54,6 +55,41 @@ _PRICED = ('xpnl CS.Priced 33333.33 premium as GWP less agg CS.Priced_e '
 _UNPRICED_PNL = ('pnl CS.Unpriced 5000 prem less agg CS.Unpriced_e 100 claims '
                  'sev lognorm 50 cv 1.5 poisson aggregate net of 2000 xs 3000')
 _NO_REINS = 'agg CS.Gross 10 claims 100 xs 0 sev lognorm 20 cv 1.5 poisson'
+# A severity bounded in itself, with no ``xs`` clause to read a limit off.
+# This is the case an ``exp_limit`` read alone would miss.
+_BOUNDED_SEV = ('agg CS.BoundedSev 5 claims sev 40 * uniform '
+                'occurrence net of 15 xs 5 poisson')
+# A bounded frequency over a bounded severity, so the aggregate is bounded
+# too, at 3 * 40, and its tower is drawn against that rather than against a
+# quantile of itself.
+_BOUNDED_AGG = ('agg CS.BoundedAgg dfreq [1 2 3] sev 40 * uniform '
+                'aggregate net of 30 xs 30')
+# Nothing bounds either stage, so both keep the union of tower and law.
+_UNBOUNDED = ('agg CS.Unbounded 5 claims sev lognorm 10 cv .75 '
+              'occurrence net of 15 xs 5 poisson aggregate net of 20 xs 0')
+
+#: Every program in this module that carries a cession, for the invariants
+#: that hold over the whole set rather than case by case.
+_EVERY_PROGRAM = (_DECLARED, _NET_OF, _CEDED_TO, _QUOTA, _GAPPED, _PRICED,
+                  _UNPRICED_PNL, _BOUNDED_SEV, _BOUNDED_AGG, _UNBOUNDED)
+
+#: Every (program, tier) pair the whole-set invariants are checked over.
+#:
+#: ``CS.Gapped`` is checked on the declared tier only, and the omission is
+#: deliberate. Building it walks ``reins_stats_df`` into its ``0% po``
+#: layer, whose ceded variance comes out as float noise below zero, so
+#: ``moments.mcvsk`` takes the square root of a negative number and the
+#: layer reports ``cv`` and ``skew`` as NaN. That is a real defect and it
+#: has nothing to do with the loss window, so it is tracked separately
+#: (``[Zero-Share-Layer-Moments]`` in ``dev/TODO.md``) rather than either
+#: fixed here or allowed to trip the ``-W error::RuntimeWarning`` gate. The
+#: window rule itself is tier independent on this program, since its
+#: support is bounded at 100 either way, so nothing about the window goes
+#: unchecked.
+_EVERY_TIER = [(program, update)
+               for program in _EVERY_PROGRAM
+               for update in (False, True)
+               if not (program is _GAPPED and update)]
 
 
 @pytest.fixture(scope='module')
@@ -231,6 +267,135 @@ def test_the_gross_slab_declares_an_open_top_when_the_window_crops_it():
     doc = build_chart_doc(build(_QUOTA, update=False), 'structure')
     slab, = blocks_on(doc, 'gross')
     assert slab.open_top
+
+
+# ------------------------------------------------------------- the loss window
+
+@pytest.mark.parametrize('program,update', _EVERY_TIER)
+def test_no_loss_axis_starts_below_zero(program, update):
+    """Reinsurance applies to losses, and a loss cannot be negative.
+
+    The old window padded below its own lower bound, so an axis whose
+    quantity starts at zero arrived at ``-2.57`` and a consumer rounding
+    that outward labeled it ``-2,000``.
+    """
+    doc = build_chart_doc(build(program, update=update), 'structure')
+    for axis in doc.axes:
+        if axis.id.endswith('_loss'):
+            assert axis.suggested_range[0] == 0.0
+
+
+@pytest.mark.parametrize('update', [False, True])
+def test_a_written_limit_closes_the_gross_slab(update):
+    """A ``100 xs 0`` policy is cover that was bought, so it draws whole."""
+    doc = build_chart_doc(build(_NET_OF, update=update), 'structure')
+    loss = {a.id: a for a in doc.axes}['occ_loss']
+    assert loss.full_range == (0.0, 100.0)
+    slab, = blocks_on(doc, 'gross')
+    assert slab.y1 == 100.0
+    assert not slab.open_top
+
+
+@pytest.mark.parametrize('update', [False, True])
+def test_a_severity_bounded_in_itself_closes_it_too(update):
+    """``40 * uniform`` has no ``xs`` clause and still cannot exceed 40."""
+    doc = build_chart_doc(build(_BOUNDED_SEV, update=update), 'structure')
+    loss = {a.id: a for a in doc.axes}['occ_loss']
+    assert loss.full_range == (0.0, 40.0)
+    slab, = blocks_on(doc, 'gross')
+    assert slab.y1 == 40.0
+    assert not slab.open_top
+
+
+@pytest.mark.parametrize('update', [False, True])
+def test_a_bounded_frequency_bounds_the_aggregate(update):
+    """At most three claims of at most 40 is an aggregate of at most 120."""
+    doc = build_chart_doc(build(_BOUNDED_AGG, update=update), 'structure')
+    loss = {a.id: a for a in doc.axes}['agg_loss']
+    assert loss.full_range == (0.0, 120.0)
+
+
+def test_an_unbounded_stage_declares_no_extent():
+    """There is no honest number to put there, so the field is omitted."""
+    doc = build_chart_doc(build(_UNBOUNDED), 'structure')
+    axes = {a.id: a for a in doc.axes}
+    for stage in ('occ', 'agg'):
+        assert axes[f'{stage}_loss'].full_range is None
+
+
+def test_an_unbounded_stage_keeps_the_union_of_tower_and_law():
+    """The law is still allowed to widen a window nothing else bounds."""
+    doc = build_chart_doc(build(_UNBOUNDED), 'structure')
+    loss = {a.id: a for a in doc.axes}['occ_loss']
+    tower_top = max(b.y1 for b in blocks_on(doc, 'occ'))
+    # A 15 xs 5 program against an unlimited lognormal: the law runs well
+    # past the tower, and cropping to the tower would draw the program
+    # against nothing.
+    assert tower_top >= 20.0
+    assert loss.suggested_range[1] > tower_top
+
+
+def test_the_law_is_not_consulted_where_the_contract_answers():
+    """Directly on the rule, with a law whose tail runs far past the cover."""
+    from aggregate.charts._emit_structure import _stage_window
+
+    class _Law:
+        """A quantile function holding everything at 500."""
+
+        q = staticmethod(lambda p: 500.0 if p > 0.5 else 0.0)
+
+    assert _stage_window(60.0, False, _Law(), (0.0, 100.0)) == (0.0, 100.0)
+    # An unlimited top layer, and still no headroom: the support is the
+    # ceiling, so there is nothing for headroom to stand in for.
+    assert _stage_window(60.0, True, _Law(), (0.0, 100.0)) == (0.0, 100.0)
+    # Nothing bounds it, so the law widens the window past the tower.
+    assert _stage_window(60.0, False, _Law(), (0.0, np.inf)) == (0.0, 510.0)
+
+
+def test_a_tower_written_above_its_own_ceiling_is_not_cropped():
+    """The window contains both, because it must contain the program."""
+    from aggregate.charts._emit_structure import _stage_window
+
+    assert _stage_window(200.0, False, None, (0.0, 100.0)) == (0.0, 200.0)
+
+
+def test_a_positive_lower_bound_does_not_crop_the_retention():
+    """``dsev [10 20 30]`` cannot pay under 10; the cedent retains from 0."""
+    doc = build_chart_doc(
+        build('agg CS.Atomic 5 claims dsev [10 20 30] '
+              'occurrence net of 3 xs 6 poisson', update=False), 'structure')
+    loss = {a.id: a for a in doc.axes}['occ_loss']
+    assert loss.suggested_range[0] == 0.0
+    assert loss.full_range == (0.0, 30.0)
+    first = blocks_on(doc, 'occ')[0]
+    assert (first.role, first.y0) == ('retention', 0.0)
+
+
+@pytest.mark.parametrize('update', [False, True])
+def test_the_padding_sits_above_the_declared_extent(update):
+    """Two ranges, so a consumer can clamp the suggestion to the limit.
+
+    Declaring the same pair twice disarmed the consumer's own guard, which
+    is why the padded number and the extent have to differ.
+    """
+    doc = build_chart_doc(build(_NET_OF, update=update), 'structure')
+    loss = {a.id: a for a in doc.axes}['occ_loss']
+    assert loss.suggested_range[1] > loss.full_range[1]
+    assert loss.suggested_range[1] == pytest.approx(100.0 * (1 + WINDOW_PAD))
+
+
+@pytest.mark.parametrize('program,update', _EVERY_TIER)
+def test_every_loss_axis_offers_a_log_reading(program, update):
+    """A balanced program is layered geometrically, so log is a real reading.
+
+    Without it a ``500 xs 500`` band against a ``10000 xs 0`` gross block is
+    five percent of the panel, and a real program is a dozen such layers.
+    """
+    doc = build_chart_doc(build(program, update=update), 'structure')
+    for axis in doc.axes:
+        if axis.id.endswith('_loss'):
+            assert axis.scales == ('linear', 'log')
+            assert axis.scale == 'linear'
 
 
 # ---------------------------------------------------------------- the built tier

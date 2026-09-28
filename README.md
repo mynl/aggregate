@@ -1,6 +1,6 @@
  [![Latest Version](https://img.shields.io/github/commit-activity/m/mynl/aggregate)](https://github.com/mynl/aggregate) [![Documentation Status](https://readthedocs.org/projects/aggregate/badge/?version=latest)](https://aggregate.readthedocs.io/en/latest/) [![Latest version](https://img.shields.io/pypi/v/aggregate.svg?label=pypi)](https://pypi.org/project/aggregate)
  ![Supported Python versions](https://img.shields.io/pypi/pyversions/aggregate.svg) [![Downloads](https://img.shields.io/pypi/dm/aggregate.svg)](https://pepy.tech/project/aggregate) [![Github stars](https://img.shields.io/github/stars/mynl/aggregate.svg)](https://github.com/mynl/aggregate/stargazers) [![Github forks](https://img.shields.io/github/forks/mynl/aggregate.svg)](https://github.com/mynl/aggregate/network/members)
- [![License](https://img.shields.io/pypi/l/aggregate.svg)](https://github.com/mynl/aggregate/blob/master/LICENSE) [![Binary packages](https://repology.org/badge/tiny-repos/python:aggregate.svg)](https://repology.org/metapackage/python:aggregate/versions) [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10557199.svg)](https://zenodo.org/records/10557199)
+ [![License](https://img.shields.io/pypi/l/aggregate.svg)](https://github.com/mynl/aggregate/blob/master/LICENSE) [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10557199.svg)](https://zenodo.org/records/10557199)
 
 ------------------------------------------------------------------------
 

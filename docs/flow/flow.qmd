@@ -13,8 +13,8 @@ format:
       light: cosmo
       dark: darkly
     fig-align: center
-bibliography: C:/s/TELOS/Biblio/uber-library.bib
-csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+bibliography: D:/Projects/Biblio/uber-library.bib
+csl: D:/Projects/Biblio/journal-of-risk-and-uncertainty.csl
 ---
 
 {{< include _style-block.md >}}

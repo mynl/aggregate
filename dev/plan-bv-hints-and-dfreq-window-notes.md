@@ -39,4 +39,33 @@ were made; anything not listed here landed exactly as the plan specifies.
 
 ## Workstream [Bv-Dfreq-Outer-Window] (1.0.0a355)
 
-(To be filled as the workstream executes.)
+* **Divergence, the dfreq [2] variant's expected mean.** The plan's test
+  bullet says the standalone measurement marginal has mean 10.0; the correct
+  number is 5.0 (2 outer events, each 5 claims of cantor mean 1/2). Verified
+  by experiment and against `_marginal_moments`, which returns (5.0, 1.118,
+  0.0) for that axis; the test asserts 5.0 and the agreement with the
+  analytic mean.
+* **Divergence, the library entry carries an explicit `copula independent`.**
+  The plan's entry has no copula clause. Without one, the grammar binds the
+  trailing `note{}` to unit B rather than to the bivariate (the bv body has
+  no closing clause in the dfreq form), and the canonical-layout lint
+  (`test_library_is_written_in_the_canonical_layout`) renders the clause
+  explicitly. The entry also spells `bivariate`, matching every neighbor in
+  the section, where the plan wrote the `bv` alias.
+* **Confirmed at implementation, as the plan directed.** `_marginal_moments`
+  returns mean 2.5 for the CantorArt reproducing axis, so it is a valid guard
+  target; the shipped `CantorArt` entry builds by name lookup with full mass,
+  marginal mean 2.0, and no warning.
+
+## Finding left for the author (pre-existing, not part of this plan)
+
+Under the numerics gate (`-W error::RuntimeWarning`) one case fails:
+`test_library_entries.py::test_every_library_entry_builds[agg:RenewalDeterministicWait]`
+hits `RuntimeWarning: invalid value encountered in sqrt` at
+`src/aggregate/moments.py:500` (`sd = np.sqrt(v)` on a negative central
+variance). The entry landed at 1.0.0a327 and `moments.py` has not moved since
+the a220 census, and nothing in this plan touches that path, so the warning
+predates this work and was simply exposed by running the gate here. The case
+passes without the flag. Per the census policy this is a real finding: either
+the negative variance wants an `np.errstate` guard with a Notes paragraph, or
+a NaN is reaching an answer and wants a fix.

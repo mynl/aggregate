@@ -996,3 +996,75 @@ def test_stats_df_netceded_total_matches_gross_theory():
     assert float(sd.loc[('agg', 'mean'), 'Net']) \
         + float(sd.loc[('agg', 'mean'), 'Ceded']) == pytest.approx(
             float(sd.loc[('agg', 'mean'), 'total']), rel=1e-9)
+
+
+# ----------------------------------------------------------------------
+# [Bv-Dfreq-Outer-Window] empirical (dfreq) outer frequency, 1.0.0a355
+# ----------------------------------------------------------------------
+import warnings  # noqa: E402
+
+from aggregate.constants import (  # noqa: E402
+    DefectiveDistributionWarning, warn_once_isolated)
+
+CANTOR_ART = ('bv CantorArtTest dfreq [1] '
+              'agg A dfreq [5] sev cantor agg B dfreq [5] sev cantor')
+
+
+def test_bv_dfreq_outer_full_mass_and_mean():
+    """A dfreq outer sizes both axes off the true marginal: full joint mass,
+    marginal mean 2.5 (5 cantor draws), and no defective warning. Before
+    1.0.0a355 this program held 8.6% of its mass with marginal mean 0.12."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', DefectiveDistributionWarning)
+        mv = build(CANTOR_ART)
+    assert float(mv.density.sum()) >= 0.999
+    assert mv.marginal(0).mean() == pytest.approx(2.5, rel=0.01)
+    assert mv.marginal(1).mean() == pytest.approx(2.5, rel=0.01)
+
+
+def test_bv_dfreq_outer_standalone_marginal_scales():
+    """A dfreq [2] outer folds the unit's per-event count into the outcome
+    vector: the measurement marginal has mean 5.0 (2 events of 5 claims of
+    cantor mean 1/2), agreeing with the analytic marginal moments."""
+    mv = build('bv CantorArtTwo dfreq [2] '
+               'agg A dfreq [5] sev cantor agg B dfreq [5] sev cantor',
+               update=False)
+    sm = mv._standalone_marginal(0)
+    sm.update(log2=10)
+    ser = sm.density_df.p_total
+    measured = float((ser.index.values * ser.values).sum())
+    assert measured == pytest.approx(5.0, rel=1e-6)
+    assert measured == pytest.approx(mv._marginal_moments(0)[0], rel=1e-6)
+
+
+def test_bv_poisson_outer_control_unchanged():
+    """The Poisson-outer control still measures the true marginal (thinning
+    identity): mean 2.5, window covering the deep tail, full mass."""
+    mv = build('bv CantorPoissonCtl 1 claim '
+               'agg A dfreq [5] sev cantor agg B dfreq [5] sev cantor poisson')
+    assert float(mv.density.sum()) >= 0.999
+    assert mv.marginal(0).mean() == pytest.approx(2.5, rel=0.01)
+    assert float(mv.axis_xs[0][-1]) >= 10
+
+
+def test_bv_marginal_mean_guard_fires(monkeypatch):
+    """A measurement marginal that disagrees with the analytic mean warns
+    loudly from _measure_marginal_window instead of shipping a clipped grid."""
+    mv = build('bv CantorGuard dfreq [1] '
+               'agg A dfreq [5] sev cantor agg B dfreq [5] sev cantor',
+               update=False)
+    monkeypatch.setattr(mv, '_marginal_moments', lambda i: (100.0, 1.0, 0.0))
+    with warn_once_isolated():
+        with pytest.warns(DefectiveDistributionWarning,
+                          match='disagrees with theory'):
+            mv._measure_marginal_window(0, 1e-9, 10)
+
+
+def test_bv_cantor_art_library_entry():
+    """The shipped CantorArt library entry builds clean under the fix: full
+    mass, marginal mean 2 (4 cantor draws), no defective warning."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', DefectiveDistributionWarning)
+        mv = build('CantorArt')
+    assert float(mv.density.sum()) >= 0.999
+    assert mv.marginal(0).mean() == pytest.approx(2.0, rel=0.01)

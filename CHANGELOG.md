@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a355
+
+**[Bv-Dfreq-Outer-Window] a `bv` with an empirical (`dfreq`) outer frequency sizes its axes off the true marginal.** A correctness fix that changes numbers: the axis-sizing measurement marginal relied on the thinning identity (`exp_en = en * n_i`), which the empirical family ignores, so `bv ... dfreq [1] agg A dfreq [5] sev cantor ...` measured one per-event draw instead of the unit aggregate, windowed both axes at a fifth of their support, and shipped a joint holding 8.6% of its mass. The measurement now folds the unit's per-event count into the outcome vector (`freq_a -> ceil(freq_a * n_i)`), exact for a degenerate unit count and mean-exact otherwise. A new analytic mean guard in `_measure_marginal_window` warns (`DefectiveDistributionWarning`) whenever the measured marginal disagrees with `_marginal_moments` beyond `max(0.01 |mean|, 0.01 sd)`, catching any future family the construction mishandles. New library entry `CantorArt` (two Cantor-severity units under a shared `dfreq [2]` outer); new tests in `tests/test_bivariate.py`.
+
 ## 1.0.0a354
 
 **[Hints-Tuple-Values] `hints{}` accepts per-axis `(x, y)` pairs for `log2` and `bs`.** `hints{log2=(9,12); bs=(3,1);}` on a `bv` statement now behaves exactly like `build(..., log2=(9, 12), bs=(3, 1))`: a `0` entry leaves that axis auto, and elements may be `a/b` fractions. A value that is not exactly two numeric elements degrades to the raw string under the hints warn-and-degrade contract instead of crashing in `float()`. A pair reaching a plain `agg` or `port`, or the inner aggregate of the `netceded` DecL route, raises a one-sentence `ValueError` naming the object. The DecL highlighting lexer now accepts the comma inside `hints{}`. New corpus line `HINT.PairBv` in `decl-testers.agg`; the parser spec snapshot is unchanged.

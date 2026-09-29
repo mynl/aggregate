@@ -1557,12 +1557,10 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """Build the standalone **loss** marginal aggregate for axis ``i``.
 
         The component-``i`` marginal is the shared outer frequency compounded
-        with that component's per-event severity, i.e. an ordinary 1-D
-        :class:`Aggregate` with the **shared** frequency and an expected count
-        ``en * (per-event trigger mean)``. This is the validation target the
-        joint marginal must reproduce (exact for Poisson / mixed-Poisson /
-        negative-binomial outer frequencies, where thinning preserves the
-        family). It is built but **not updated** here -- the caller sizes it.
+        with that component's per-event severity, an ordinary 1-D
+        :class:`Aggregate` with the shared frequency and the unit's per-event
+        count folded in. This is the validation target the joint marginal must
+        reproduce. It is built but **not updated** here; the caller sizes it.
 
         Any ``pnl`` affine is *not* applied: the loss marginal is what the 2-D
         FFT runs on, and the per-axis affine relabels it afterwards
@@ -1573,13 +1571,38 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         Aggregate
             The unupdated standalone loss marginal.
+
+        Notes
+        -----
+        How the unit's per-event count ``n_i`` folds in depends on the outer
+        frequency family. For Poisson, mixed-Poisson and negative-binomial
+        outers the thinning identity applies: scaling ``exp_en`` to
+        ``en * n_i`` gives the exact marginal, because thinning preserves the
+        family. An **empirical** (``dfreq``) outer ignores ``exp_en``
+        entirely, its count law being pinned by the outcome vector, so there
+        the outcomes themselves are scaled instead:
+        ``freq_a -> ceil(freq_a * n_i)`` element-wise, weights unchanged.
+        ``ceil`` keeps the outcomes integral and biases the measured window
+        wide, the safe direction for axis sizing, and a 0 outcome stays 0.
+        The scaled construction is exact when the unit's per-event count is
+        degenerate (``dfreq [n]``); otherwise it is mean-exact and
+        variance-understated, which the analytic mean guard in
+        :meth:`_measure_marginal_window` watches.
         """
         from .distributions import Aggregate
 
         spec = {k: v for k, v in self._unit_specs[i].items()
                 if k.startswith('sev_') or k in ('name', 'note')}
         spec['exp_en'] = float(self.en) * float(self.units[i].n)
-        spec.update(self._freq_kwargs)
+        freq_kwargs = dict(self._freq_kwargs)
+        if freq_kwargs.get('freq_name') == 'empirical':
+            # the empirical family pins the count at its outcome vector and
+            # silently ignores exp_en, so fold the unit's per-event count into
+            # the outcomes instead (see Notes)
+            freq_kwargs['freq_a'] = np.ceil(
+                np.asarray(freq_kwargs['freq_a'], dtype=float)
+                * float(self.units[i].n))
+        spec.update(freq_kwargs)
         return Aggregate(**spec)
 
     def _measure_marginal_window(self, i, prob, log2):
@@ -1601,6 +1624,17 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         (lo, hi, bs) : tuple of float
             The measured window edges and the marginal's bucket size (the latter
             a resolution floor for the width).
+
+        Notes
+        -----
+        The measured pmf's mean is checked against the analytic marginal mean
+        from :meth:`_marginal_moments` (valid for every frequency family). A
+        mismatch beyond ``max(0.01 |mean|, 0.01 sd)`` means the axis window
+        was measured off a marginal that disagrees with theory, so the grid
+        may clip; it fires a :class:`DefectiveDistributionWarning` naming the
+        axis and both means. This catches any frequency family the standalone
+        marginal construction (:meth:`_standalone_marginal`) mishandles, not
+        just the empirical case fixed at 1.0.0a355.
         """
         a = self._standalone_marginal(i)
         a.update(log2=log2)
@@ -1614,6 +1648,16 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             bs0 = float(round_bucket((hi_box - lo_box) / (1 << log2)))
             a.update(log2=log2, bs=bs0, x_min=float(np.floor(lo_box / bs0) * bs0))
             ser = a.density_df.query('p_total > 0').p_total
+        measured = float((ser.index.values * ser.values).sum())
+        mean_t, sd_t, _ = self._marginal_moments(i)
+        if abs(measured - mean_t) > max(0.01 * abs(mean_t), 0.01 * sd_t):
+            warn_once(
+                f'{self.name}: axis {i} ({self.units[i].name}) sizing marginal '
+                f'has mean {measured:.6g} against the analytic marginal mean '
+                f'{mean_t:.6g}; the axis window was measured off a marginal '
+                f'that disagrees with theory, so the grid may clip.',
+                DefectiveDistributionWarning,
+                key='bv-marginal-mean-mismatch', stacklevel=3)
         lo, hi = balanced_window(ser, prob)
         return lo, hi, float(a.bs)
 

@@ -1205,6 +1205,18 @@ bivariate BivariateIndependent
   note{A bivariate aggregate whose two independent units each have positive and negative support.}
   tags{topic:bivariate, role:intermediate};
 
+bivariate CantorArt
+  dfreq [2]
+  agg A
+    dfreq [2]
+    sev cantor
+  agg B
+    dfreq [2]
+    sev cantor
+  copula independent
+  note{Copula art: two independent units of Cantor severity draws under a shared empirical outer frequency. Each marginal is four Cantor draws, mean 2, support [0, 4].}
+  tags{topic:bivariate, role:advanced};
+
 bivariate BivariateNormal
   25 claims
   agg A

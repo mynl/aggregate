@@ -479,6 +479,38 @@ def test_single_layer_serves_the_total_only():
         'ceded share', 'most the program could cede']
 
 
+def test_the_palm_axes_offer_the_zoom_out(palm_doc):
+    """[Kappa-Full-Range]: the declaration is data, not a box.
+
+    Both value axes carry ``full_range`` beside the windowed
+    ``suggested_range`` (presence is what offers the zoom out), and the
+    series really reach the declared extent, which runs past the view
+    window into the tail a high-attaching program acts in.
+    """
+    outcome = next(a for a in palm_doc.axes if a.id == 'outcome')
+    cession = next(a for a in palm_doc.axes if a.id == 'cession')
+    assert outcome.full_range is not None
+    assert cession.full_range is not None
+    assert outcome.full_range[1] > outcome.suggested_range[1]
+    assert cession.full_range[1] == outcome.full_range[1]
+    g = np.asarray(named(palm_doc, 'cession', 'gross').x_values, dtype=float)
+    assert g[0] == pytest.approx(outcome.full_range[0])
+    assert g[-1] == pytest.approx(outcome.full_range[1])
+    assert outcome.suggested_range[0] >= outcome.full_range[0]
+
+
+def test_the_band_routes_keep_the_single_reading(joint):
+    """An axis carrying only ``suggested_range`` has no other honest reading.
+
+    On the band routes each drawn cell is a fold over the joint, so the
+    window is still the cost control and no wider extent is shipped.
+    """
+    for doc in (build_chart_doc(joint, 'kappa'),
+                build_chart_doc(build(FALLBACK), 'kappa')):
+        outcome = next(a for a in doc.axes if a.id == 'outcome')
+        assert outcome.full_range is None
+
+
 def test_palm_doc_round_trips_hash_for_hash(palm_doc):
     back = load_chart_doc(json.loads(json.dumps(canonical_dict(palm_doc))))
     assert doc_hash(back) == palm_doc.hash

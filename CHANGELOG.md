@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a370
+
+**[Kappa-Full-Range] the Palm kappa chart ships its full extent and offers the zoom out.** The Palm route's curves now run from the first finite cell out to the new `KAPPA_FULL_FLOOR` survival of the gross compound (one in a million), and the outcome and cession axes declare that extent as `full_range` beside the unchanged `cdf_range` view in `suggested_range`, the same axis vocabulary the reins chart uses, so the app's zoom out appears by presence. The initial view is identical to a369; Palm document hashes move (series carry more cells) and documents grow to roughly 2 MB on a log2 16 tower. The band routes (a `BivariateAggregate` input and the 2-D fallback) keep the plain window and declare no `full_range`, since there each drawn cell is a fold over the joint.
+
 ## 1.0.0a369
 
 **[PnL-Kappa-Chart] the kappa chart lights for a reinsured P&L, through its engine.** The `kappa` chart registers for `PnL` by delegating to the wrapped aggregate (the a367 `chart_reins` pattern), titled by the engine's label; availability looks through `obj.engine`, so a P&L over a `Portfolio` and a stitched ledger with no engine stay dark. The engine takes the a368 route switch unchanged: a peel serves one Palm curve per occurrence layer, an exotic frequency serves the 2-D fallback band chart, and `bands=True` passes through. Conditioning is gross, matching the aggregate chart and the natural allocation.

@@ -491,6 +491,18 @@ KAPPA_CDF_RANGE = (1e-3, 0.999)
 #: and never "confidence interval".
 KAPPA_LEVELS = (0.01, 0.99)
 
+#: How deep the Palm route ships its curves, as survival of the gross
+#: compound ([Kappa-Full-Range]). The Palm pass computes the whole curve in
+#: one FFT, so the view window of :data:`KAPPA_CDF_RANGE` is a display
+#: choice, not a cost control, and cropping the *data* to it hid exactly
+#: the tail a high-attaching program acts in. Three decades past the view
+#: window, so the zoom out has something real to show; short of
+#: ``_two_panel.SURVIVAL_FLOOR`` (1e-9), because every shipped cell is an
+#: explicit float on each curve and past one in a million the picture is
+#: parallel to the identity to the eye. The band routes keep the plain
+#: window: there each cell is a fold over the joint.
+KAPPA_FULL_FLOOR = 1e-6
+
 chart_kappa = _emitter_base('kappa')
 
 
@@ -730,8 +742,11 @@ def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
     levels : (float, float), default :data:`KAPPA_LEVELS`
         The band's lower and upper probability; read only under ``bands``.
     cdf_range : (float, float), default :data:`KAPPA_CDF_RANGE`
-        The probability window on the gross compound the curves are drawn
-        over, mirroring the band chart's window on the gross marginal.
+        The probability window on the gross compound the document *opens*
+        on (the outcome axis's ``suggested_range``), mirroring the band
+        chart's window on the gross marginal. The curves themselves are
+        shipped out to the :data:`KAPPA_FULL_FLOOR` survival, declared as
+        the axes' ``full_range``, so a renderer can offer the zoom out.
     ceiling : bool, default True
         Draw the deterministic ceiling on the share panel where the program
         is a single layer (:func:`_kappa_ceiling`).
@@ -767,12 +782,18 @@ def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
     :class:`~aggregate.bivariate.BivariateAggregate` input keeps the full
     band chart.
 
-    **The window.** The gross axis is windowed to ``cdf_range`` on the
-    conditioning density the kernel returns (the gross compound), and cells
-    where that density is negligible (the kernel's ``NaN`` guard) are
-    dropped: on a continuous compound the window is a contiguous lattice
-    slice and ships as three numbers, on a gappy one the grid goes out
-    explicit, both exact.
+    **The window and the full range** ([Kappa-Full-Range]). The view is
+    windowed to ``cdf_range`` on the conditioning density the kernel
+    returns (the gross compound), but the data is not: the Palm pass
+    computes the whole curve in one FFT, so the series run from the first
+    finite cell out to the :data:`KAPPA_FULL_FLOOR` survival, and the two
+    value axes declare that extent as ``full_range`` beside the windowed
+    ``suggested_range``, which is what offers the zoom out. Cells where
+    the density is negligible (the kernel's ``NaN`` guard) are dropped: on
+    a continuous compound the extent is a contiguous lattice slice and
+    ships as three numbers, on a gappy one the grid goes out explicit,
+    both exact. The band routes keep the plain window and declare no
+    ``full_range``, honestly: there each cell is a fold over the joint.
 
     **Per-layer share curves are deliberately absent**: the share panel's
     reading is one number against the ceiling, and layering it would
@@ -792,15 +813,24 @@ def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
 
     lo_p, hi_p = (float(v) for v in cdf_range)
     cdf = np.cumsum(np.asarray(f_n, dtype=float))
-    i0 = int(np.searchsorted(cdf, lo_p))
-    i1 = min(int(np.searchsorted(cdf, hi_p)) + 1, cdf.size)
-    idx = np.arange(i0, i1)
-    idx = idx[np.isfinite(total[idx])]
     xs = np.asarray(agg.xs, dtype=float)
+    # The drawn extent runs from the first finite cell out to the
+    # full-range floor ([Kappa-Full-Range]): the Palm pass computed the
+    # whole curve already, so the zoom out costs bytes, never a second
+    # computation. The view the document opens on stays the cdf_range
+    # window, carried by suggested_range below.
+    i_top = min(int(np.searchsorted(cdf, 1.0 - KAPPA_FULL_FLOOR)) + 1,
+                cdf.size)
+    i0 = int(np.searchsorted(cdf, lo_p))
+    i1 = min(int(np.searchsorted(cdf, hi_p)) + 1, i_top)
+    idx = np.arange(i_top)
+    idx = idx[np.isfinite(total[idx])]
     # Strictly above zero, as on the band route: the share is undefined at
     # g = 0 and NaN cannot ride in the document.
     idx = idx[xs[idx] > 0]
     g = xs[idx]
+    in_view = (idx >= i0) & (idx < i1)
+    g_view = g[in_view] if in_view.any() else g
 
     step = float(agg.bs)
     x = lattice_payload(g, step)
@@ -871,16 +901,21 @@ def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
             panel_id='share', support='continuous',
             y=tuple(float(v) for v in top_share), **x))
 
-    window = (float(g[0]), float(g[-1]))
     return complete_tex(ChartDoc(
         name='kappa',
         title=f'Conditional cession: {agg.label}',
         axes=(
+            # suggested_range is the cdf_range view the document opens on;
+            # full_range is the drawn extent, and its presence is what
+            # offers the zoom out ([Kappa-Full-Range]).
             ChartAxis(id='outcome', label='Gross outcome', unit='currency',
-                      scales=('linear', 'log'), suggested_range=window),
+                      scales=('linear', 'log'),
+                      suggested_range=(float(g_view[0]), float(g_view[-1])),
+                      full_range=(float(g[0]), float(g[-1]))),
             ChartAxis(id='cession', label='Conditional cession',
                       unit='currency', scales=('linear', 'log'),
-                      suggested_range=(0.0, float(g[-1]))),
+                      suggested_range=(0.0, float(g_view[-1])),
+                      full_range=(0.0, float(g[-1]))),
             ChartAxis(id='share', label='Share ceded',
                       unit='ratio', suggested_range=(0.0, 1.0)),
         ),

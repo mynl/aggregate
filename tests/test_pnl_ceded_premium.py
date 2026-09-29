@@ -7,8 +7,10 @@
 own expenses. The per-step split is the ``xpnl`` **walk** (gross -> each
 cover -> Total), whose cession groups book contra (``-premium / +recovery /
 +commission``). The premium resolves to currency (``deposit`` an amount,
-``rol`` = share x rol x limit, ``rate`` = rate x gross premium); the
-commission is ``cede x ceded_premium`` per layer. The resolved economics ride
+``rol`` = share x rol x limit, ``rate`` = rate x the side's subject premium:
+the stated gross on the occurrence side, gross - pc_occ on the aggregate side
+[Agg-Rate-Nets-Inuring-Occ]); the commission is ``cede x ceded_premium`` per
+layer. The resolved economics ride
 on :attr:`PnL.economics` (keys ``pc_occ`` / ``pc_agg`` = occ / agg ceded
 premium, ``c_occ`` / ``c_agg`` = commissions, ``gross`` / ``ceded`` =
 totals).
@@ -185,6 +187,33 @@ def test_walk_means_add_down_the_sheet():
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     assert p.est_m == pytest.approx(
         s.loc[('All', 'Margin', 'Net'), 'EX'], rel=5e-3)
+
+
+def test_agg_rate_nets_inuring_occ_premium():
+    # [Agg-Rate-Nets-Inuring-Occ]: the aggregate-side ``rate`` base is the
+    # subject premium net of the inuring occurrence cession, not the stated
+    # gross; the occurrence commission does not add back
+    p = build(_BASE + 'occurrence net of 100 xs 200 rol 10% cede 20% poisson '
+              'aggregate net of 50% po 2000 xs 3000 rate 30% cede 25%')
+    e = p.economics
+    assert e['pc_occ'] == pytest.approx(0.10 * 100)                     # 10
+    assert e['pc_agg'] == pytest.approx(0.5 * 0.30 * (5000 - 10))       # 748.5
+    assert e['c_agg'] == pytest.approx(0.25 * 0.5 * 0.30 * (5000 - 10))
+    # the occurrence side rates off the stated gross (occ is first in the
+    # tower), regardless of its own cession
+    occ = build(_BASE + 'occurrence net of 50% po 100 xs 200 rate 2% poisson')
+    assert occ.economics['pc_occ'] == pytest.approx(0.5 * 0.02 * 5000)
+
+
+def test_agg_deposit_and_rol_ignore_inuring_occ_premium():
+    # companion to [Agg-Rate-Nets-Inuring-Occ]: ``deposit`` and ``rol``
+    # aggregate clauses are absolute quotes, unchanged by an occ program
+    dep = build(_BASE + 'occurrence net of 100 xs 200 rol 10% poisson '
+                'aggregate net of 2000 xs 3000 deposit 1500')
+    assert dep.economics['pc_agg'] == pytest.approx(1500.0)
+    rol = build(_BASE + 'occurrence net of 100 xs 200 rol 10% poisson '
+                'aggregate net of 2000 xs 3000 rol 8%')
+    assert rol.economics['pc_agg'] == pytest.approx(0.08 * 2000)
 
 
 def test_cede_without_premium_errors():

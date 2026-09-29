@@ -373,7 +373,9 @@ reins_list: reins_list AND reins_clause   -> reins_list_cons
 // 3, appendix S3), and an optional reinstatement schedule (the property-cat
 // stochastic-ceded feature). The premium forms are mutually exclusive:
 // ``deposit`` is a currency amount, ``rol`` a rate-on-line (x share x limit),
-// ``rate`` a fraction of gross premium. ``cede`` is the commission fraction,
+// ``rate`` a fraction of the side's subject premium: the stated gross on the
+// occurrence side, gross net of the occurrence ceded premium on the aggregate
+// side (the occurrence program inures). ``cede`` is the commission fraction,
 // valid only with a premium. Entered gross of commission. The loss layer feeds
 // the reinsurance engine exactly as before; the premium / cede / reinstatements
 // ride alongside for the P&L.

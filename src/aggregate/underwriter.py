@@ -1367,11 +1367,22 @@ class Underwriter(HelpMixin):
         layer's premium to currency **at the layer's placement share** -- all
         forms are quoted at 100% placement and scaled down by the fraction
         placed (``share``): ``deposit`` is ``share x amount``, ``rol`` is
-        ``share x rol x limit``, ``rate`` is ``share x rate x gross_premium``.
-        The ceding commission is ``cede x ceded_premium`` per layer -- a fraction
-        of the *placed* premium, so it scales automatically. Returns
-        ``{'gross', 'ceded', 'pc_occ', 'pc_agg', 'c_occ', 'c_agg'}`` for the GCN
-        view, or ``None`` when no ceded-premium clause is present.
+        ``share x rol x limit``, ``rate`` is ``share x rate x`` the side's
+        **subject premium**. The occurrence side is first in the tower, so its
+        subject premium is the stated gross; the aggregate side inures behind
+        the occurrence program, so its subject premium is the net position,
+        ``gross - pc_occ`` ([Agg-Rate-Nets-Inuring-Occ]). The occurrence
+        commission does NOT add back (commission is an expense reimbursement,
+        not premium). Under occurrence reinstatements the occurrence ceded
+        premium is stochastic (``D + h(R)``); the netting amount is the
+        constant deposit resolved here. No intra-tier netting: several
+        aggregate layers with ``rate`` clauses all use the same net-of-occ
+        base; an aggregate layer does not net the premium of an aggregate
+        layer below it. The ceding commission is ``cede x ceded_premium`` per
+        layer -- a fraction of the *placed* premium, so it scales
+        automatically. Returns ``{'gross', 'ceded', 'pc_occ', 'pc_agg',
+        'c_occ', 'c_agg'}`` for the GCN view, or ``None`` when no
+        ceded-premium clause is present.
 
         The per-side totals are accompanied by the per-layer figures that
         produced them, ``pc_occ_by_layer`` / ``c_occ_by_layer`` and the
@@ -1385,7 +1396,8 @@ class Underwriter(HelpMixin):
         spec : dict
             The pnl spec (mutated: the four reins-economics keys are popped).
         gross_premium : float
-            The pnl's stated premium (the gross premium; the ``rate`` base).
+            The pnl's stated premium (the gross premium; the occurrence-side
+            ``rate`` base -- the aggregate side rates off ``gross - pc_occ``).
         """
         keys = ('occ_reins_premium', 'occ_reins_cede',
                 'agg_reins_premium', 'agg_reins_cede')
@@ -1393,7 +1405,7 @@ class Underwriter(HelpMixin):
             return None
         pg = float(gross_premium)
 
-        def side(which):
+        def side(which, rate_base):
             layers = spec.get(f'{which}_reins') or []
             prem = spec.pop(f'{which}_reins_premium', None)
             cede = spec.pop(f'{which}_reins_cede', None)
@@ -1416,7 +1428,7 @@ class Underwriter(HelpMixin):
                 elif basis == 'rol':
                     layer_pc = share * val * limit
                 elif basis == 'rate':
-                    layer_pc = share * val * pg
+                    layer_pc = share * val * rate_base
                 else:                                   # pragma: no cover
                     raise ValueError(f'unknown ceded-premium basis {basis!r}')
                 pc += layer_pc
@@ -1426,8 +1438,10 @@ class Underwriter(HelpMixin):
                     comm_layers[i] = cede[i] * layer_pc
             return pc, comm, pc_layers, comm_layers
 
-        pc_occ, c_occ, pc_occ_layers, c_occ_layers = side('occ')
-        pc_agg, c_agg, pc_agg_layers, c_agg_layers = side('agg')
+        pc_occ, c_occ, pc_occ_layers, c_occ_layers = side('occ', pg)
+        # the aggregate side inures behind the occurrence program: its rate
+        # base is the subject premium net of the occurrence cession
+        pc_agg, c_agg, pc_agg_layers, c_agg_layers = side('agg', pg - pc_occ)
         return {'gross': pg, 'ceded': pc_occ + pc_agg,
                 'pc_occ': pc_occ, 'pc_agg': pc_agg, 'c_occ': c_occ, 'c_agg': c_agg,
                 'pc_occ_by_layer': pc_occ_layers, 'c_occ_by_layer': c_occ_layers,

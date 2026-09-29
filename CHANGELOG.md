@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a359
+
+**[Agg-Rate-Nets-Inuring-Occ] the aggregate-side `rate` clause prices off the subject premium, net of the inuring occurrence cession.** `rate` on an aggregate layer now resolves to `share x rate x (gross - pc_occ)` rather than `share x rate x gross`; the occurrence side still rates off the stated gross (it is first in the tower), the occurrence commission does not add back, and under occurrence reinstatements the netting amount is the constant deposit. `deposit` and `rol` clauses are unchanged. A program combining an occurrence program with an aggregate `rate` clause reports lower `pc_agg` (and proportionally lower `c_agg`) than before; the resolved figures ride on `PnL.economics` as always. Grammar comment and language reference restated to match.
+
 ## 1.0.0a358
 
 **[PnL-Waterfall-Labels] the waterfall columns rename onto `M01`, and the kappa chart's share panel says what it shows.** Nothing computational moves: every number the waterfall serves is the number it served before. `M01` reads as "the margin at the 1st percentile", the convention the format sheet already uses for `P01` and `P99`, and it replaces headings that spelled the return period out at a width no table wanted to carry. The two exhibit captions are rewritten to introduce the word, the walk's caption saying what `M01` measures and the ratio caption leaning on it. `PnL.walk_df` and `PnL.evaluation_df` carry the new headings, and their `Returns` docstrings follow. On the chart side the `kappa` document's second panel is titled `Cession as share of gross` rather than `The same reading as a share`, and its y-axis shortens to `Share ceded`, the long form having become a restatement of the title directly above it. Panel titles and exhibit captions are provisional surface under the policy above.

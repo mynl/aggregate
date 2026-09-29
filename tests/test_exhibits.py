@@ -767,19 +767,58 @@ def test_reins_unavailable_without_cession(dice):
 def test_economic_raw(objects):
     pn = objects['PnL']
     blocks = exhibit_frames(pn, 'economic')
-    assert [name for name, _, _ in blocks] == ['economic_df']
+    # a scenario-laddered ledger serves both sheets ([Ledger-Both-Ladders])
+    assert [name for name, _, _ in blocks] == ['economic_df',
+                                               'economic_marginal_df']
     _, df, kw = blocks[0]
     assert set(kw) == {'caption'}
     assert list(df.index.names) in (['Side', 'Label'],
                                     ['Step', 'Side', 'Label'])
-    # RAW stays the untouched passthrough; INSURER translates the same frame
+    # RAW serves the untouched frames; INSURER translates the first frame
     # rather than reshaping it ([Exhibits-Economic-Insurer]), and since
     # [Ledger-Insurer-Abbreviated] it also narrows it. Same rows, same values,
-    # a subset of the columns.
-    _, ins_df, ins_kw = exhibit_frames(pn, 'economic', 'insurer')[0]
+    # a subset of the columns, and still one block.
+    ins_blocks = exhibit_frames(pn, 'economic', 'insurer')
+    assert len(ins_blocks) == 1
+    _, ins_df, ins_kw = ins_blocks[0]
     pd.testing.assert_frame_equal(df[ins_df.columns], ins_df)
     assert len(ins_df.columns) < len(df.columns)
     assert set(ins_kw) == {'caption', 'row_flags'}
+
+
+def test_economic_serves_both_ladders_when_they_differ(objects, tower, peel,
+                                                       peel_marginal):
+    """[Ledger-Both-Ladders]: ledger-sa and ledger-div, side by side.
+
+    Tower (per-atom kappa) and Peel (Palm kappa) serve the scenario sheet
+    and the marginal sheet; PeelMarginal's ``economic_df`` is itself
+    marginal, so serving it twice would say nothing, and the second block
+    is suppressed.
+    """
+    for obj in (tower, peel):
+        names = [n for n, _, _ in exhibit_frames(obj, 'economic')]
+        assert names == ['economic_df', 'economic_marginal_df']
+    names = [n for n, _, _ in exhibit_frames(peel_marginal, 'economic')]
+    assert names == ['economic_df']
+
+
+def test_economic_marginal_grand_result_equals_scenario(tower, peel):
+    """The one row the two sheets share: the grand result.
+
+    Its scenario cells are its own marginal quantiles (``E[result |
+    result = x] = x``), so the grand-result row of the marginal sheet must
+    equal the same row of the scenario sheet, ladder cell for ladder cell.
+    """
+    import numpy as np
+    for obj in (tower, peel):
+        scen = obj.economic_df
+        marg = obj.economic_marginal_df
+        assert list(scen.index) == list(marg.index)
+        grand = obj._plan.index(next(
+            r for r in obj._plan if r[1] == 'grand_result'))
+        s = scen.iloc[grand].to_numpy(dtype=float)
+        m = marg.iloc[grand].to_numpy(dtype=float)
+        np.testing.assert_allclose(s, m, rtol=1e-9, atol=1e-9)
 
 
 def test_economic_ratios_raw(objects):

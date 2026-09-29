@@ -215,12 +215,10 @@ register_simple_exhibit(
     caption='Return period ladder read off the realized grid: VaR (the '
             'quoted number), TVaR (the priced number), excess VaR over the '
             'mean (the capital), and VaR to mean leverage.')
-register_simple_exhibit(
-    'economic', 'Economics', 'economic_df', [PnL],
-    caption='The full ledger by side and label in currency units, then the '
-            'kappa columns: what each line comes to when the book as a whole '
-            'lands at that percentile. Read down for the ledger, across for '
-            'a scenario.')
+# ``economic`` RAW is no longer a one-line passthrough: since
+# [Ledger-Both-Ladders] it serves the scenario sheet and the marginal sheet
+# side by side, so its frames function lives with the other PnL treatments
+# in ``exhibits._pnl`` (``_economic_frames``).
 
 # Diagnostics, the app's "More" material. Both need the realized grid.
 #

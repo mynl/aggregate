@@ -53,9 +53,46 @@ def _stats_insurer_pnl(obj, blocks):
     return _stats_insurer_moment_store(obj, blocks)
 
 
-# ``economic`` itself is a plain passthrough over ``economic_df``, declared in
-# the manifest; its insurer translation lives here. ``economic_ratios`` carries
-# two blocks, so it needs a builder either way.
+# ``economic`` RAW serves the two ladders side by side since
+# [Ledger-Both-Ladders]; its insurer translation (below) keeps reading the
+# first block only, so INSURER stays the abbreviated single sheet.
+# ``economic_ratios`` carries two blocks, so it needs a builder either way.
+
+@economic.register(PnL)
+def _economic_frames(obj):
+    """The ledger, on both ladders when they differ ([Ledger-Both-Ladders]).
+
+    Two readings of one sheet. :attr:`PnL.economic_df` carries the scenario
+    (``κ``) ladder, "the state the book is in": each cell a conditional
+    mean, footing down the sheet. :attr:`PnL.economic_marginal_df` carries
+    each row's own quantiles under plain ``P`` headers, "each row on its
+    own": always available, never footing. When ``economic_df`` is itself
+    marginal (an ineligible build: no shared atoms and no Palm ladder) the
+    two sheets coincide and only the first is served, with a caption that
+    says which regime is in force.
+    """
+    df = obj.economic_df
+    scenario = any(str(c).startswith('κ') for c in df.columns)
+    if not scenario:
+        return [('economic_df', df, {'caption': (
+            'The full ledger by side and label in currency units. This '
+            'ledger shares no atoms across its rows and has no scenario '
+            'ladder, so the P columns are each row\'s own marginal '
+            'quantiles: the state the book is in is not computable here, '
+            'and the ladder does not foot.')})]
+    return [
+        ('economic_df', df, {'caption': (
+            'The full ledger by side and label in currency units, then the '
+            'kappa columns: what each line comes to when the book as a '
+            'whole lands at that percentile, the state the book is in. '
+            'Conditional means add, so every column foots down the sheet.')}),
+        ('economic_marginal_df', obj.economic_marginal_df, {'caption': (
+            'The same ledger with each row on its own: the P columns are '
+            'per row marginal quantiles, read off each row\'s own '
+            'distribution. Quantiles never add, so this ladder does not '
+            'foot; the one row the two sheets share is the grand result, '
+            'whose scenario cells are its own quantiles.')}),
+    ]
 
 def _ledger_row_flags(obj, df):
     """Positional row flags for a ledger sheet, from the ledger plan.

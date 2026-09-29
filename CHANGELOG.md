@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a364
+
+**[Ledger-Both-Ladders] new `PnL.economic_marginal_df`, and the `economic` exhibit serves both ladders.** The new property is the ledger sheet with the marginal (`P`) ladder: same rows and MultiIndex as `economic_df`, columns `EX / SD / CV / Skew` then `P01` through `P99` as each row's own quantiles, always available on every route and never footing (the grand-result row equals `economic_df`'s, that row's scenario cells being its own quantiles). The `economic` exhibit's RAW view serves `economic_df` and `economic_marginal_df` as two blocks with captions distinguishing "the state the book is in" from "each row on its own", suppressing the second when `economic_df` is itself marginal; captions now state the regime in force on marginal ledgers too. The INSURER view is unchanged (one abbreviated sheet). Sync of `tests/data/exhibit_snapshots.json` required.
+
 ## 1.0.0a363
 
 **[Palm-Ledger] eligible stitched peels serve the full scenario (`κ`) ladder, and their waterfall diversified column populates.** A guaranteed-cost multi-layer occurrence peel whose frequency implements `freq_pgf_prime` now computes every `economic_df` ladder cell at build time by the Palm identity (per-claim rows by 1-D FFT against the occurrence-retained compound, aggregate-tier rows by a level-set transport, constants and sums by linearity), so the sheet's headers switch from `P` to `κ`, every column foots, and `walk_df`'s `M01 diversified` fills and foots with no waterfall change. Ineligible builds (a frequency without a pgf derivative, or loss-sensitive features) keep the marginal `P` ladder and the blank diversified column exactly as before; per-atom and 2-D routes are byte-identical. Test fixtures: the `Peel` exhibit fixture now carries `κ` headers, and a new `PeelMarginal` fixture (the same peel under `logarithmic`) pins the ineligible case; ruled 2026-09-29 in place of the plan's swing fixture, since a swing walk is per-atom and keeps its populated `κ` ladder (now pinned too). Sync of `tests/data/exhibit_snapshots.json` required.

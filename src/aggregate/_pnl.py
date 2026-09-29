@@ -1922,6 +1922,39 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             cols = _stat_names(scenario=True)
         return pd.DataFrame(data, index=self._side_index(), columns=cols)
 
+    @property
+    def economic_marginal_df(self):
+        """The ledger sheet with the **marginal** (``P``) ladder, always.
+
+        The companion to :attr:`economic_df` ([Ledger-Both-Ladders]): the
+        same rows in the same order under the same MultiIndex, the same
+        ``EX / SD / CV / Skew``, and then the full
+        :data:`PERCENTILE_LADDER` as each row's **own** quantiles, read off
+        its :class:`GridDistribution`, under plain ``P`` headers. Where
+        :attr:`economic_df` answers "what does each line come to in the
+        state the book is in", this sheet answers "what does each line look
+        like on its own".
+
+        Always available, on every route (per-atom, stitched, massive).
+        The ladder does **not** foot, by nature: quantiles never add. The
+        one row where the two sheets must agree is the grand result, whose
+        scenario cells are its own marginal quantiles.
+
+        Returns
+        -------
+        pandas.DataFrame
+            MultiIndexed rows in ledger order; columns
+            ``EX / SD / CV / Skew`` then ``P01 ... P99``.
+
+        See Also
+        --------
+        economic_df : the scenario (``κ``) ladder sheet, which foots.
+        """
+        data = [[_snap_noise(v) for v in row.stat_vector()]
+                for row in self._rows.values()]
+        return pd.DataFrame(data, index=self._side_index(),
+                            columns=_stat_names())
+
     # ------------------------------------------------------------------
     # raw materials for ratio exhibits ([PnL-Ratio-Frame])
     # ------------------------------------------------------------------

@@ -248,24 +248,26 @@ _HINT_KEYS = {
     'sev_calc', 'discretization_calc', 'force_severity', 'x_min', 'x_max',
 }
 
+# A parenthesized per-axis pair ``(a, b)`` in a hint value: exactly two
+# comma-separated tokens, each coerced by the scalar ladder below. Used by
+# bivariate ``log2`` / ``bs`` axis sizing.
+_HINT_PAIR_RE = re.compile(r'\(\s*([^,()]+?)\s*,\s*([^,()]+?)\s*\)')
 
-def _coerce_hint_value(v):
-    """Infer a Python type for a ``hints{...}`` value string.
 
-    Tries, in order: ``int``, ``float``, an ``a/b`` fraction (so ``bs=1/64``
-    works), the literals ``True`` / ``False``, else the raw stripped string.
+def _coerce_hint_scalar(v):
+    """Coerce one numeric hint token: ``int``, ``float``, or ``a/b`` fraction.
 
     Parameters
     ----------
     v : str
-        The right-hand side of a ``key=value`` hint.
+        A stripped candidate numeric token.
 
     Returns
     -------
-    int, float, bool, or str
-        The coerced value.
+    int, float, or None
+        The coerced number, or ``None`` when the token is not numeric under
+        any of the three forms (the caller then degrades to the raw string).
     """
-    v = v.strip()
     try:
         return int(v)
     except ValueError:
@@ -280,6 +282,41 @@ def _coerce_hint_value(v):
             return float(m.group(1)) / float(m.group(2))
         except (ValueError, ZeroDivisionError):
             pass
+    return None
+
+
+def _coerce_hint_value(v):
+    """Infer a Python type for a ``hints{...}`` value string.
+
+    Tries, in order: a parenthesized per-axis pair ``(a, b)`` (each element
+    ``int`` / ``float`` / ``a/b`` fraction; the spelling for bivariate
+    ``log2`` / ``bs`` axis sizing, where a ``0`` element leaves that axis
+    auto), then ``int``, ``float``, an ``a/b`` fraction (so ``bs=1/64``
+    works), the literals ``True`` / ``False``, else the raw stripped string.
+    Anything that looks like a pair but is not exactly two numeric elements
+    degrades to the raw string, preserving the :func:`_parse_hints`
+    warn-and-degrade contract.
+
+    Parameters
+    ----------
+    v : str
+        The right-hand side of a ``key=value`` hint.
+
+    Returns
+    -------
+    int, float, bool, tuple, or str
+        The coerced value; a valid pair comes back as a 2-tuple.
+    """
+    v = v.strip()
+    m = _HINT_PAIR_RE.fullmatch(v)
+    if m:
+        pair = tuple(_coerce_hint_scalar(p) for p in m.groups())
+        if all(p is not None for p in pair):
+            return pair
+        return v
+    num = _coerce_hint_scalar(v)
+    if num is not None:
+        return num
     if v == 'True':
         return True
     if v == 'False':
@@ -291,7 +328,10 @@ def _parse_hints(txt):
     """Parse a ``hints{...}`` body (``key=value; key=value``) into a typed dict.
 
     Value typing is by :func:`_coerce_hint_value` (int / float / ``a/b``
-    fraction / bool / str). Unknown keys (not in :data:`_HINT_KEYS`) are warned
+    fraction / bool / a per-axis ``(a, b)`` pair / str); the pair form spells
+    bivariate axis sizing, ``hints{log2=(9,12); bs=(3,1);}``, and a tuple does
+    not contain ``;`` so the clause split is unaffected. Unknown keys (not in
+    :data:`_HINT_KEYS`) are warned
     about and dropped; a duplicate key warns and the last value wins; a clause
     that is not exactly one ``key=value`` warns and is skipped. This function
     never raises -- a malformed hint degrades to a warning, not a crash.
@@ -380,7 +420,10 @@ def _resolve_hints(spec, log2, bs, bucket_sizing_p, kwargs):
     # keyword). Take the hint value only when the caller left the sentinel
     # default, then drop the key from the pass-through either way.
     if log2 == 0 and 'log2' in hints:
-        log2 = int(hints['log2'])
+        # a per-axis (x, y) pair (bivariate sizing) passes through untouched;
+        # only a scalar is coerced to int
+        h = hints['log2']
+        log2 = h if isinstance(h, tuple) else int(h)
     if bs == 0 and 'bs' in hints:
         bs = hints['bs']
     if bucket_sizing_p == BUCKET_SIZING_P and 'bucket_sizing_p' in hints:
@@ -2679,6 +2722,10 @@ class Underwriter(HelpMixin):
                 d = answer.spec
                 log2, bs, bucket_sizing_p, kw = _resolve_hints(
                     d, log2_in, bs_in, bsp_in, dict(kwargs))
+                if isinstance(log2, tuple) or isinstance(bs, tuple):
+                    raise ValueError(
+                        f'per-axis (x, y) log2/bs sizing applies to bivariate '
+                        f'objects only; {answer.name} is a {answer.kind}')
                 # ``log2`` is a CAP; bucket + window selection is delegated to
                 # Aggregate.update / _bs_window (the single source of truth:
                 # exact-discrete, bounded, moment, and signed/P&L windows).
@@ -2699,6 +2746,10 @@ class Underwriter(HelpMixin):
                 d = answer.spec
                 log2, bs, bucket_sizing_p, kw = _resolve_hints(
                     d, log2_in, bs_in, bsp_in, dict(kwargs))
+                if isinstance(log2, tuple) or isinstance(bs, tuple):
+                    raise ValueError(
+                        f'per-axis (x, y) log2/bs sizing applies to bivariate '
+                        f'objects only; {answer.name} is a {answer.kind}')
                 if log2 == -1:
                     log2_ = 13
                 elif log2 == 0:

@@ -1777,7 +1777,9 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             A **scalar** is applied to both axes; a **2-tuple ``(bs_x, bs_y)``**
             pins the per-axis bucket size. ``0`` (default) measures each axis's
             ``bs`` from its standalone marginal. (Both ``log2`` and ``bs`` tuple
-            forms pass straight through ``build(..., log2=(a, b), bs=(x, y))``.)
+            forms pass straight through ``build(..., log2=(a, b), bs=(x, y))``,
+            and the DecL trailer spells the same pairs as
+            ``hints{log2=(9,12); bs=(3,1);}``.)
         padding : int, optional
             FFT zero-padding factor per axis (mirrors the 1D aggregate; ``1``
             doubles each axis length for the transform). Default ``1``
@@ -1952,6 +1954,12 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``log2`` and ``bs`` size the inner aggregate or the joint according to
         which route built this object; see :meth:`_netceded_sizing_kwargs`.
         """
+        if self._nc_built_here and (isinstance(log2, (tuple, list))
+                                    or isinstance(bs, (tuple, list))):
+            raise ValueError(
+                'per-axis (x, y) log2/bs sizing applies to the joint grid '
+                'only; on the netceded DecL route log2/bs size the inner 1-D '
+                'aggregate, so pass scalars.')
         a = self._nc_agg
         if self._nc_built_here and a.sev_density_gross is None:
             kw = {}

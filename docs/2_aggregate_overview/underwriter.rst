@@ -198,7 +198,9 @@ A DecL statement can carry three **trailer** clauses. They are order-free and at
 
     note{...}       one line. What this is.
     tags{...}       comma or space separated slugs. Grouping and selection.
-    hints{...}      key=value; build settings, e.g. hints{log2=18; bs=1/64}
+    hints{...}      key=value; build settings, e.g. hints{log2=18; bs=1/64}.
+                    On a bivariate, a (x, y) pair sizes each axis, e.g.
+                    hints{log2=(9,12); bs=(3,1)}; a 0 entry leaves that axis auto.
 
 Each states a fact about the entry, and a ``note`` is the norm: it is all :meth:`discover` and an object picker need. There is no second tier to fill in, so ``build.recipes`` is a directory of the library rather than a backlog.
 

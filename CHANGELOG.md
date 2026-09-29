@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a354
+
+**[Hints-Tuple-Values] `hints{}` accepts per-axis `(x, y)` pairs for `log2` and `bs`.** `hints{log2=(9,12); bs=(3,1);}` on a `bv` statement now behaves exactly like `build(..., log2=(9, 12), bs=(3, 1))`: a `0` entry leaves that axis auto, and elements may be `a/b` fractions. A value that is not exactly two numeric elements degrades to the raw string under the hints warn-and-degrade contract instead of crashing in `float()`. A pair reaching a plain `agg` or `port`, or the inner aggregate of the `netceded` DecL route, raises a one-sentence `ValueError` naming the object. The DecL highlighting lexer now accepts the comma inside `hints{}`. New corpus line `HINT.PairBv` in `decl-testers.agg`; the parser spec snapshot is unchanged.
+
 ## 1.0.0a353
 
 **[Tower-Log-Reading] `plot_chartdoc` draws a tower panel on `log='y'`.** The reading the loss axis started declaring at a352, and the answer to a geometrically layered program whose bands are slivers read linearly. Three things a log reading of a tower needs, none of which a linear one does. A block whose band starts at an exact zero, which is both the retention below the first attachment and the gross slab itself, is clamped to the panel's decade floor instead of being sent to negative infinity, where its fill vanishes. A boundary mark at zero, which `aggregate net of 20 xs 0` emits, is dropped rather than handed to matplotlib as a tick it cannot place. Label fit and placement are measured in the coordinate the reader sees, so a band filling 43% of the drawn height is not judged as 15% of the range and dropped, or centered where the rectangle is not.

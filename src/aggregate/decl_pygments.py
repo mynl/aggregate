@@ -125,11 +125,12 @@ class AggLexer(RegexLexer):
             (r'\}', Comment.Preproc, '#pop'),
         ],
 
-        # `key=value;` build settings, e.g. hints{bs=1/64; log2=10}.
+        # `key=value;` build settings, e.g. hints{bs=1/64; log2=10}. A value
+        # may be a per-axis pair, e.g. hints{log2=(9,12)}, hence the comma.
         'hints': [
             (r'\}', Comment.Preproc, '#pop'),
             (_ID + r'(?=\s*=)', Name.Attribute),
-            (r'[=;]', Punctuation),
+            (r'[=;,]', Punctuation),
             (r'(?:True|False|None)' + _KW, Keyword.Constant),
             include('numbers'),
             (r'[-+*/()]', Operator),

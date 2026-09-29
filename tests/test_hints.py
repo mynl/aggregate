@@ -136,6 +136,46 @@ def test_unknown_hint_key_still_builds(caplog):
     assert "unknown key" in caplog.text
 
 
+def test_coerce_hint_pair():
+    """Per-axis ``(x, y)`` pairs coerce to 2-tuples; anything else degrades to
+    the raw string (warn-and-degrade, never a crash)."""
+    assert _coerce_hint_value("(9, 12)") == (9, 12)
+    assert _coerce_hint_value("(3,1)") == (3, 1)
+    assert _coerce_hint_value("(1/8, 1/2)") == pytest.approx((0.125, 0.5))
+    assert _coerce_hint_value("(0, 12)") == (0, 12)
+    assert _coerce_hint_value("(1, 2, 3)") == "(1, 2, 3)"
+    assert _coerce_hint_value("(a, b)") == "(a, b)"
+
+
+def test_parse_hints_pair_dict():
+    d = _parse_hints("log2=(9,12); bs=(3,1)")
+    assert d == {"log2": (9, 12), "bs": (3, 1)}
+
+
+# Mirrored in decl-testers.agg (HINT.PairBv).
+BV_PAIR = ("bv HintPairBv 25 claims "
+           "agg A dfreq [1] sev gamma 10 cv 0.3 "
+           "agg B dfreq [1] sev gamma 40 cv 0.3 "
+           "poisson hints{log2=(9,12); bs=(3,1);}")
+
+
+def test_bv_pair_hint_sizes_axes():
+    """A pair hint behaves exactly like build(..., log2=(9, 12), bs=(3, 1)):
+    per-axis (bs, nout) == ((3.0, 512), (1.0, 4096)), full joint mass."""
+    b = build(BV_PAIR)
+    assert b.bs == [3.0, 1.0]
+    assert [len(x) for x in b.axis_xs] == [512, 4096]
+    assert float(b.density.sum()) == pytest.approx(1.0, abs=1e-3)
+
+
+def test_pair_hint_on_agg_raises():
+    """A per-axis pair on a non-bivariate object fails with one clear
+    sentence, not a downstream float() traceback."""
+    with pytest.raises(ValueError, match="bivariate objects only"):
+        build("agg HintPairAgg 5 claims sev lognorm 10 cv 2 poisson "
+              "hints{log2=(9,12)}")
+
+
 def test_settings_in_note_warns_deprecation(caplog):
     """A note that still looks like it carries settings triggers the
     deprecation warning (but the note is treated as pure text, not acted on)."""

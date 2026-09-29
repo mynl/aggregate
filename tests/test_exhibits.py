@@ -74,7 +74,7 @@ PROGRAMS = {
                      'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
                      'deposit 40 logarithmic peel top-down'),
 }
-_WALK_EXHIBITS = ['summary', 'stats', 'validation', 'economic',
+_WALK_EXHIBITS = ['summary', 'tail', 'stats', 'validation', 'economic',
                   'economic_ratios', 'economic_waterfall']
 AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
@@ -87,7 +87,8 @@ EXPECTED_EXHIBITS = {
     'Portfolio': ['summary', 'tail', 'stats', 'validation', *_DIAG],
     'BivariateAggregate': ['summary', 'stats', 'validation', 'dependency',
                            'bs_window'],
-    'PnL': ['summary', 'stats', 'validation', 'economic', 'economic_ratios'],
+    'PnL': ['summary', 'tail', 'stats', 'validation', 'economic',
+            'economic_ratios'],
     'Distortion': ['summary', 'stats', 'validation'],
     'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins',
                        *_DIAG],
@@ -257,6 +258,7 @@ AXIS_BLOCKS = {
 #: dispersion); and a handful of one-off diagnostics (``Gate``, ``tau``,
 #: ``cov``, ``corr``, the bivariate support bounds).
 PENDING_VOCABULARY = frozenset({
+    'Ceded CV', 'Ceded EX', 'Ceded Sk',
     'Change CV', 'Change EX', 'D_g_inv', 'Est', 'Gross CV',
     'Gross EX', 'Gross Sk',
     'Net CV', 'Net EX', 'Net Sk', 'Ref', 'Subject CV',
@@ -562,6 +564,33 @@ def test_pnl_stats_is_the_engine_moment_store(objects):
     # the ledger is a different exhibit and a different document
     assert build_exhibit(pn, 'stats').hash \
         != build_exhibit(pn, 'economic').hash
+
+
+def test_pnl_validation_serves_the_engine_frame(objects):
+    """[PnL-Overview-Punchups]: the Validation tab shows the book's QA.
+
+    The first block is the engine's ``validation_df`` through the new
+    ``engine_validation_df`` delegation (mirroring the ``stats_df``
+    pattern); the ledger's own rebucketing audit is empty on every DecL
+    build, so no second block is served.
+    """
+    pn = objects['PnL']
+    blocks = exhibit_frames(pn, 'validation')
+    assert [n for n, _, _ in blocks] == ['engine_validation_df']
+    pd.testing.assert_frame_equal(blocks[0][1], pn.engine.validation_df)
+    assert not blocks[0][1].empty
+    # the per-leg audit keeps its name, meaning and emptiness
+    assert pn.validation_df.empty
+
+
+def test_pnl_tail_serves_the_margin_ladder(objects):
+    """The tail exhibit lights for a P&L, over the closing margin."""
+    pn = objects['PnL']
+    blocks = exhibit_frames(pn, 'tail')
+    assert [n for n, _, _ in blocks] == ['tail_df']
+    pd.testing.assert_frame_equal(blocks[0][1], pn.tail_df)
+    # payoff orientation: the caption says the adverse tail is the low one
+    assert 'adverse tail is the low one' in blocks[0][2]['caption']
 
 
 def test_validation_insurer_pass_frames_no_emphasis(objects):

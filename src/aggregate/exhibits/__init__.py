@@ -195,10 +195,10 @@ register_simple_exhibit(
             'estimate, with noise aware relative errors, for the frequency, '
             'severity and aggregate of each unit. Errors of this size are '
             'discretization, not model error.')
-register_simple_exhibit(
-    'validation', 'Validation', 'validation_df', [PnL],
-    caption='Ledger QA: each declared amount against the realized estimate, '
-            'with absolute and relative error.')
+# PnL ``validation`` serves the engine's moment QA first, with the per-leg
+# ledger audit as a second block only when non-empty
+# ([PnL-Overview-Punchups]); its frames function lives with the other PnL
+# treatments in ``exhibits._pnl`` (``_validation_frames``).
 register_simple_exhibit(
     'validation', 'Validation', 'validation_df', [Distortion],
     caption='Identity checks: the realized value against its reference, the '
@@ -215,6 +215,12 @@ register_simple_exhibit(
     caption='Return period ladder read off the realized grid: VaR (the '
             'quoted number), TVaR (the priced number), excess VaR over the '
             'mean (the capital), and VaR to mean leverage.')
+register_simple_exhibit(
+    'tail', 'Return periods', 'tail_df', [PnL],
+    caption='Return period ladder over the closing margin, in payoff '
+            'orientation: the adverse tail is the low one, so the ladder '
+            'walks into the losses. VaR is the quoted number, TVaR the '
+            'priced one, excess VaR over the mean the capital.')
 # ``economic`` RAW is no longer a one-line passthrough: since
 # [Ledger-Both-Ladders] it serves the scenario sheet and the marginal sheet
 # side by side, so its frames function lives with the other PnL treatments

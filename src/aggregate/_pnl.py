@@ -1829,6 +1829,29 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return engine.stats_df
 
     @property
+    def engine_validation_df(self):
+        """The wrapped engine's validation frame, or an empty frame.
+
+        Delegates exactly as :attr:`stats_df` does ([PnL-Overview-Punchups]):
+        the book's moment QA (reference against realized FFT estimate, with
+        noise-aware relative errors) is the engine's story, and a P&L is a
+        ledger over a book. The P&L's own :attr:`validation_df` is a
+        different frame, the per-leg rebucketing audit, and keeps its name
+        and meaning.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``self.engine.validation_df`` when a stochastic engine is
+            attached; an **empty** frame on a hand-built kernel P&L, which
+            carries no engine.
+        """
+        engine = self.engine
+        if engine is None:
+            return pd.DataFrame()
+        return engine.validation_df
+
+    @property
     def economic_df(self):
         """The full ledger x metrics sheet, in currency units -- the
         alignment/footing exhibit.

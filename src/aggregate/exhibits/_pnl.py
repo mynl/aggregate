@@ -14,7 +14,7 @@ from .._pnl import (
     PERCENTILE_LADDER, PnL, WATERFALL_RETURN_PERIOD, _kappa_label, _pct_label,
 )
 from ._core import (
-    economic, economic_ratios, economic_waterfall, stats,
+    economic, economic_ratios, economic_waterfall, stats, validation,
     _stats_insurer_moment_store,
 )
 
@@ -51,6 +51,33 @@ def _stats_insurer_pnl(obj, blocks):
                    'the economic exhibit.')
         return [(block_name, df, dict(kw, caption=caption))]
     return _stats_insurer_moment_store(obj, blocks)
+
+
+@validation.register(PnL)
+def _validation_frames(obj):
+    """The engine's moment QA first, the ledger audit only when it has rows.
+
+    [PnL-Overview-Punchups]: every DecL-built P&L wraps a live engine whose
+    ``validation_df`` is the moment QA a Validation tab wants, while the
+    P&L's own ``validation_df`` is a per-leg **rebucketing audit** that is
+    empty on every DecL build (no builder passes ``bs=`` to a ``Leg``).
+    Serving the empty audit alone made the tab blank; serving the engine's
+    frame first fixes that, and the audit stays as a second block exactly
+    when it has something to say.
+    """
+    out = [('engine_validation_df', obj.engine_validation_df, {'caption': (
+        'Moment QA for the wrapped book: the reference moment against the '
+        'realized FFT estimate, with noise aware relative errors, for the '
+        'frequency, severity and aggregate. Errors of this size are '
+        'discretization, not model error. Empty on a hand-built kernel '
+        'P&L, which carries no engine.')})]
+    audit = obj.validation_df
+    if not audit.empty:
+        out.append(('validation_df', audit, {'caption': (
+            'Ledger QA: each declared amount against the realized estimate, '
+            'with absolute and relative error. Served only for legs carrying '
+            'their own rebucketing grid.')}))
+    return out
 
 
 # ``economic`` RAW serves the two ladders side by side since

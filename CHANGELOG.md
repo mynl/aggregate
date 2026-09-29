@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a366
+
+**[PnL-Overview-Punchups] the P&L Validation tab shows the engine's moment QA, and the Tail tab lights.** New `PnL.engine_validation_df` delegates to `self.engine.validation_df` exactly as `stats_df` does (empty frame with no engine); the PnL `validation` exhibit serves it as the first block, with the ledger's own per-leg rebucketing audit (`PnL.validation_df`, unchanged in name and meaning) as a second block only when non-empty. The `tail` exhibit registers for `PnL` over the existing `tail_df` with a caption noting the payoff orientation (the adverse tail is the low one). Every P&L fixture now serves `tail` between `summary` and `stats`. Sync of `tests/data/exhibit_snapshots.json` required.
+
 ## 1.0.0a365
 
 **[Writer-Standalone-CoC] the writer-side standalone on ceded steps, and the evaluation frame renames onto `MSD`, `SA CoC` and `Div CoC`.** `walk_df`'s `M01 standalone` is two-sided by role: a risk-bearing step reads its own left tail as before; a ceded step (and any tier subtotal containing a cover) now reads its own **right** tail, the writer's 1-in-100, a positive number superseding the a361 blank. `evaluation_df`'s columns are now `Premium spent / Margin spent / CR / MSD / SA CoC / Div CoC`: `MSD` is the former `M / SD` unchanged; `SA CoC` and `Div CoC` are the single quotient `M / -M01` per basis on every row (the sign convention carries the reading: a return on risk rows, a cost of relief on ceded rows), reverting the a361 role routing and removing `Cost of relief`. Both waterfall captions rewrite as the reading rubric; formats: `MSD` reads `.3f`, both CoC columns `ratio`.

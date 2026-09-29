@@ -126,6 +126,85 @@ def freq_sev_convolution(sev_density, freq_pgf, n, *, N, bs, i0=0, x_min=0.0,
     return agg, ftagg
 
 
+def palm_conditional_mean(n_image_density, target_image_measure, freq_pgf,
+                          freq_pgf_prime, n, *, padding=1):
+    """Conditional mean of one compound given another sharing its event process.
+
+    For i.i.d. claims ``X_j`` independent of the count ``N`` and per-claim
+    functions ``c`` (the target) and ``n_fn`` (the conditioning subject), the
+    compounds ``S_c = sum c(X_j)`` and ``S_n = sum n_fn(X_j)`` are dependent
+    (same count, same draws). Their conditional mean satisfies the Palm
+    identity: with ``w = iFFT(P_N'(phi_n))`` for ``phi_n`` the transform of
+    the ``n_fn``-image severity density,
+
+    .. math::
+
+        \\mathsf{P}[S_c \\mid S_n = s]\\; f_{S_n}(s)
+            = (\\nu * w)(s),
+
+    where ``nu`` is the image measure obtained by scattering ``c(x_a) p_a``
+    into the bucket at ``n_fn(x_a)``. One shared inverse FFT for ``w`` plus
+    one FFT per target; no 2-D joint ever forms.
+
+    Parameters
+    ----------
+    n_image_density : ndarray
+        The conditioning image severity density: gross severity mass
+        scattered to the buckets at ``n_fn(x)``. Zero-based grid.
+    target_image_measure : ndarray
+        The target image measure ``nu``: ``c(x) * p(x)`` scattered to the
+        buckets at ``n_fn(x)``, on the same grid.
+    freq_pgf : callable
+        ``freq_pgf(n, z)``, elementwise in ``z`` (e.g.
+        ``Frequency.freq_pgf``).
+    freq_pgf_prime : callable
+        The pgf derivative, same contract
+        (``Frequency.freq_pgf_prime``).
+    n : float
+        The base mean passed to both callables
+        (``Aggregate.base_mean``, never the realized count under zero
+        modification).
+    padding : int, optional
+        FFT padding factor passed to :func:`~aggregate.utilities.ft` /
+        :func:`~aggregate.utilities.ift`. Default 1.
+
+    Returns
+    -------
+    kappa : ndarray
+        ``E[S_c | S_n = s]`` on the grid; ``NaN`` where the conditioning
+        density is negligible (below machine epsilon relative to its peak),
+        since the conditional is then 0/0.
+    conditioning_density : ndarray
+        ``f_{S_n}``, the compound density of the conditioning subject, on
+        the same grid (the denominator; callers also use it to locate
+        quantiles of ``S_n``).
+
+    Notes
+    -----
+    The identity is the general-frequency form of the Poisson size-bias
+    (Mecke / Palm) equation: expanding ``P[S_c g(S_n)]`` over ``N = k`` and
+    using exchangeability gives the size-biased count factor
+    ``sum_k k p_k phi_n(t)^(k-1) = P_N'(phi_n(t))``. With
+    ``c = n_fn = id`` it reduces to the integral form of the Panjer
+    recursion, so ``kappa(s) = s``. Only the pgf derivative is ever needed,
+    never the frequency mgf. Assumes the default zero-based, non-negative
+    grid (no ``i0`` / ``x_min`` window); the derivation and scope are in
+    ``dev/plan-a362-pnl-punchups.md``.
+    """
+    n_image_density = np.asarray(n_image_density, dtype=float)
+    nu = np.asarray(target_image_measure, dtype=float)
+    z = ft(n_image_density, padding)
+    conditioning_density = np.real(ift(freq_pgf(n, z), padding))
+    numerator = np.real(ift(freq_pgf_prime(n, z) * ft(nu, padding), padding))
+    # 0/0 guard: below machine-epsilon relative mass the conditional is
+    # undefined; serve NaN rather than noise.
+    floor = np.finfo(float).eps * max(float(conditioning_density.max()), 0.0)
+    kappa = np.full_like(conditioning_density, np.nan)
+    ok = conditioning_density > floor
+    np.divide(numerator, conditioning_density, out=kappa, where=ok)
+    return kappa, conditioning_density
+
+
 def evaluate_pgf_polynomial(atoms, weights, z):
     """Evaluate the empirical pgf ``P(z) = sum_i w_i z^(a_i)`` elementwise in ``z``.
 

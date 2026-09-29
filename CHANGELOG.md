@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a362
+
+**[Palm-Kernel] `Frequency.freq_pgf_prime` and the 1-D Palm conditional-mean kernel.** New `Frequency.freq_pgf_prime(n, z)`, the pgf derivative (same contract as `freq_pgf`): the `(a, b, 0)` Panjer identity serves poisson, binomial, negbin and geometric; closed forms serve fixed, bernoulli, empirical (renewal through it) and the gamma, delaporte and ig mixed Poissons; every other family raises `NotImplementedError` (logarithmic included, being `(a, b, 1)`), and zero modification layers `c * G'` on top. New kernel `palm_conditional_mean` in `_aggregate_compute` and convenience `Aggregate.palm_kappa(target, conditioning)` compute `E[sum c(X_j) | sum n(X_j) = s]` for per-claim functions sharing one event process by 1-D FFT alone (no 2-D joint), agreeing with the `occ_bivariate` route to 1.4% on the Tower fixture (the joint's budget grid). No exhibit or ladder behavior changes in this bump; tests in `tests/test_palm.py`.
+
 ## 1.0.0a361
 
 **[Waterfall-Ceded-Steps] the margin walk stops asking a hedge for standalone capital, and prices the capital it releases instead.** `PnL.walk_df` now blanks `M01 standalone` on a ceded step: a cover's own 1-in-100 is the state in which it paid nothing, so the quantile reported its premium rather than any capital. `M / M01 standalone` blanks with it. Risk-bearing rows are untouched, and the `M01 diversified` walk column is untouched and still foots.

@@ -64,7 +64,8 @@ from ._validation import (VALIDATION_NOISE, DEFICIT_MATERIALITY,
                           ALIASING_EPS, explain_validation)
 from . import _validation
 from . import _reinsurance
-from ._aggregate_compute import discretize_severities, freq_sev_convolution
+from ._aggregate_compute import (discretize_severities, freq_sev_convolution,
+                                 palm_conditional_mean)
 from . import _pricing
 from .results import EvaluationResult, RuinResult
 
@@ -2243,6 +2244,81 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if key not in self._occ_joints:
             self._occ_joints[key] = self.occ_bivariate(views=views, **sizing)
         return self._occ_joints[key]
+
+    def palm_kappa(self, target, conditioning=None):
+        """Conditional mean of one per-claim compound given another, all 1-D.
+
+        The Palm conditional-mean ladder
+        ``kappa(s) = E[sum target(X_j) | sum conditioning(X_j) = s]`` on the
+        model grid, for deterministic per-claim functions of the **gross**
+        severity sharing this object's event process (e.g. a layer's cession
+        against the occurrence-retained claim). Assembles the pieces for
+        :func:`aggregate._aggregate_compute.palm_conditional_mean`: the
+        conditioning image density and the target image measure via
+        :meth:`_rebucket_to_grid`, the pgf pair off :attr:`frequency`, and
+        :attr:`base_mean`.
+
+        Parameters
+        ----------
+        target : callable
+            Per-claim target function ``c(x)``, vectorized over the grid
+            (e.g. a ceder from
+            :func:`~aggregate._reinsurance.make_ceder_netter`).
+        conditioning : callable, optional
+            Per-claim conditioning function ``n_fn(x)``; ``None`` (default)
+            conditions on the gross aggregate itself (the identity), under
+            which ``kappa`` of the identity target is ``s`` exactly (the
+            Panjer self-check).
+
+        Returns
+        -------
+        kappa : ndarray
+            ``E[S_target | S_conditioning = s]`` at ``s = self.xs``; ``NaN``
+            where the conditioning density is negligible.
+        conditioning_density : ndarray
+            The compound density of the conditioning subject on ``self.xs``
+            (use it to locate quantiles of the conditioning aggregate).
+
+        Raises
+        ------
+        NotImplementedError
+            On a signed or windowed grid (``i0`` or ``x_min`` active), or
+            for a frequency family without :meth:`Frequency.freq_pgf_prime`
+            (callers catch and degrade to a marginal ladder).
+        ValueError
+            If the object has not been updated (no severity density).
+
+        Notes
+        -----
+        The shared-event analogue of ``Portfolio``'s independence trick:
+        linearity of the conditional mean decomposes claim by claim, the
+        rest of the book enters only through its conditioning sum, and the
+        Fourier-side count factor is ``P_N'`` in place of the leave-one-out
+        transform. One shared inverse FFT plus one FFT for the target;
+        the 2-D ``occ_bivariate`` joint is never formed. Derivation and
+        scope: ``dev/plan-a362-pnl-punchups.md``.
+        """
+        if self.i0 or (self.bs and int(round(self.x_min / self.bs))):
+            raise NotImplementedError(
+                'palm_kappa requires the default zero-based, non-negative '
+                'grid (no signed severity, no output window)')
+        sev = self.sev_density_gross if self.sev_density_gross is not None \
+            else self.sev_density
+        if sev is None:
+            raise ValueError(
+                f'{self.name}: update() before palm_kappa -- no severity '
+                'density is present')
+        xs = self.xs
+        sev = np.asarray(sev, dtype=float)
+        c_vals = np.asarray(target(xs), dtype=float)
+        n_vals = xs if conditioning is None \
+            else np.asarray(conditioning(xs), dtype=float)
+        n_image = self._rebucket_to_grid(n_vals, sev)
+        nu = self._rebucket_to_grid(n_vals, c_vals * sev)
+        return palm_conditional_mean(
+            n_image, nu, self.frequency.freq_pgf,
+            self.frequency.freq_pgf_prime, self.base_mean,
+            padding=self.padding)
 
     # ----- reinsurance stats: exact (EX) vs rebucketed (Est) -------------
 

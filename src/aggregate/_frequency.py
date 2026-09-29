@@ -194,10 +194,17 @@ class Frequency(HelpMixin):
     #     other family is a family until an exposure clause fixes its mean.
     #     ``Aggregate`` refuses to spread such a frequency over an exposure
     #     profile, which would need a mean it cannot be asked for.
+    #   _panjer_ab0: True iff the family is (a, b, 0) -- the Panjer recursion
+    #     ``k p_k = (a k + b) p_(k-1)`` holds from ``k = 1`` -- so the base
+    #     ``freq_pgf_prime`` can compute the pgf derivative algebraically from
+    #     ``freq_pgf`` and ``panjer_ab``. Note the logarithmic family stores
+    #     ``panjer_ab`` but is (a, b, 1) (the recursion starts at ``k = 2``),
+    #     so it must NOT set this flag.
     freq_name = ''
     supports_zm = False
     carries_own_count = False
     _prob_eq_0 = None
+    _panjer_ab0 = False
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)
@@ -403,6 +410,79 @@ class Frequency(HelpMixin):
         out.en = out.modify_mean()
         return out
 
+    def freq_pgf_prime(self, n, z):
+        """Derivative of the pgf, :math:`P_N'(z)`, elementwise in ``z``, when ``E[N] = n``.
+
+        Same contract as :meth:`freq_pgf`: ``n`` is the un-modified (base)
+        mean and the evaluation is elementwise in the transformed argument
+        ``z``. The derivative is the Fourier-side ingredient of the Palm
+        conditional-mean identity
+        (:func:`aggregate._aggregate_compute.palm_conditional_mean`): for two
+        compounds sharing one event process, the kernel of
+        :math:`\\mathsf{P}[S_c \\mid S_n = s]` is
+        :math:`\\mathrm{iFFT}(P_N'(\\varphi_n))` with :math:`\\varphi_n` the
+        transform of the conditioning image severity.
+
+        Parameters
+        ----------
+        n : float
+            The un-modified (base) expected claim count, exactly as for
+            :meth:`freq_pgf` (pass :attr:`Aggregate.base_mean`, never the
+            realized ``n``, under zero modification).
+        z : scalar or ndarray, real or complex
+            Evaluation points (e.g. an rfft vector).
+
+        Returns
+        -------
+        ndarray
+            :math:`P_N'(z)`, elementwise.
+
+        Raises
+        ------
+        NotImplementedError
+            For families outside the supported set (``sig``, ``beta``,
+            ``sichel`` and variants, ``neymana``, ``pascal``,
+            ``logarithmic``). Callers catch this and degrade (the P&L ladder
+            stays marginal).
+
+        Notes
+        -----
+        Two routes. **(a, b, 0) families** (Poisson, binomial, negbin,
+        geometric, flagged ``_panjer_ab0``) use the Panjer recursion
+        ``k p_k = (a k + b) p_(k-1)``: multiplying by ``z^(k-1)`` and summing
+        gives ``P'(z) = a z P'(z) + (a + b) P(z)``, so
+
+        .. math::
+
+            P_N'(z) = \\frac{(a + b)\\, P_N(z)}{1 - a z}.
+
+        For Poisson (``a = 0, b = n``) this is the size-bias fact
+        ``P' = n P``. The identity holds for the **base** pgf, so the base
+        implementation reads the class-level ``freq_pgf``, never an
+        instance-level zero-modified wrapper; ``_install_zm_wrappers`` layers
+        ``c G'`` on top. **Closed-form overrides** cover fixed, bernoulli,
+        empirical (and renewal through it), and the common mixed Poissons
+        (gamma, delaporte, ig) via :math:`P_N'(z) = n M_G'(n(z-1))` for
+        mixing mgf :math:`M_G`.
+
+        A universal fallback, deliberately not built (author's ruling,
+        2026-09-29): ``P_N'(z) = sum_k k p_k z^(k-1)`` off the ``freq_pmf``
+        FFT inversion, evaluated with ``evaluate_pgf_polynomial``, would
+        cover every family at the cost of materializing the count pmf.
+        """
+        if not self._panjer_ab0:
+            raise NotImplementedError(
+                f'freq_pgf_prime is not implemented for {self.freq_name!r}; '
+                'supported: the (a, b, 0) families (poisson, binomial, '
+                'negbin, geometric), fixed, bernoulli, empirical/renewal, '
+                'and the gamma, delaporte and ig mixed Poissons')
+        # Refresh panjer_ab at this mean (set as a side effect of freq_moms)
+        # and read the BASE pgf off the class: the (a, b, 0) identity holds
+        # for the base pgf, not the zero-modified instance wrapper.
+        type(self).freq_moms(self, n)
+        a, b = self.panjer_ab
+        return (a + b) * type(self).freq_pgf(self, n, z) / (1 - a * z)
+
     def _install_zm_wrappers(self):
         """
         Replace ``freq_moms`` / ``freq_pgf`` with their zero-modified forms.
@@ -419,9 +499,16 @@ class Frequency(HelpMixin):
         zero contributes nothing to :math:`E[N^j]` for :math:`j \\ge 1`. Closed
         form throughout -- the solver that used to invert this map now lives in
         :meth:`solve_base_mean` and fires only under the DecL ``!`` marker.
+
+        ``freq_pgf_prime`` is wrapped too: :math:`(G^M)'(z) = c\\,G'(z)`,
+        layered ON TOP of whichever route (the (a, b, 0) identity or a
+        closed form) computes the base derivative. The base routes read the
+        class-level ``freq_pgf``, so the layering order is route first,
+        wrapper second, never the wrapper applied twice.
         """
         orig_moms = self.freq_moms
         orig_pgf = self.freq_pgf
+        orig_pgf_prime = self.freq_pgf_prime
 
         @wraps(orig_moms)
         def wrapped_moms(n):
@@ -433,8 +520,14 @@ class Frequency(HelpMixin):
             c = self._zm_weight(n)
             return (1 - c) + c * orig_pgf(n, z)
 
+        @wraps(orig_pgf_prime)
+        def wrapped_pgf_prime(n, z):
+            c = self._zm_weight(n)
+            return c * orig_pgf_prime(n, z)
+
         self.freq_moms = wrapped_moms
         self.freq_pgf = wrapped_pgf
+        self.freq_pgf_prime = wrapped_pgf_prime
 
     def __init__(self, freq_name, freq_a, freq_b, freq_zm, freq_p0):
         """
@@ -758,6 +851,7 @@ class FrequencyPoisson(Frequency):
 
     freq_name = 'poisson'
     supports_zm = True
+    _panjer_ab0 = True
 
     def _build(self):
         # No precomputation; freq_a is unused for pure Poisson.
@@ -794,6 +888,10 @@ class FrequencyFixed(Frequency):
     def freq_pgf(self, n, z):
         return z ** n
 
+    def freq_pgf_prime(self, n, z):
+        """Pgf derivative :math:`n z^{n-1}` (closed form)."""
+        return n * z ** (n - 1)
+
 
 class FrequencyBernoulli(Frequency):
     """
@@ -812,6 +910,10 @@ class FrequencyBernoulli(Frequency):
     def freq_pgf(self, n, z):
         return z * n + np.ones_like(z) * (1 - n)
 
+    def freq_pgf_prime(self, n, z):
+        """Pgf derivative: the constant ``n`` (closed form)."""
+        return n * np.ones_like(z)
+
 
 class FrequencyBinomial(Frequency):
     """
@@ -822,6 +924,7 @@ class FrequencyBinomial(Frequency):
 
     freq_name = 'binomial'
     supports_zm = True
+    _panjer_ab0 = True
 
     def _build(self):
         # ``freq_a`` carries the per-trial probability ``p``; trial count
@@ -858,6 +961,7 @@ class FrequencyNegbin(Frequency):
 
     freq_name = 'negbin'
     supports_zm = True
+    _panjer_ab0 = True
 
     def _build(self):
         self._beta = self.freq_a - 1
@@ -895,6 +999,7 @@ class FrequencyGeometric(Frequency):
 
     freq_name = 'geometric'
     supports_zm = True
+    _panjer_ab0 = True
 
     def _build(self):
         return None
@@ -1031,6 +1136,18 @@ class FrequencyEmpirical(Frequency):
         # outcomes fall back to the legacy matrix expression. See
         # ``evaluate_pgf_polynomial`` ([Empirical-PGF-Horner-Dispatch]).
         return evaluate_pgf_polynomial(self.freq_a, self.freq_b, z)
+
+    def freq_pgf_prime(self, n, z):
+        """Pgf derivative :math:`\\sum_k k\\,p_k z^{k-1}` (termwise).
+
+        Zero atoms are masked out: they contribute nothing to the derivative
+        and would otherwise put a ``z**-1`` term in front of
+        ``evaluate_pgf_polynomial`` (undefined at ``z = 0``).
+        """
+        a = np.asarray(self.freq_a, dtype=float)
+        w = np.asarray(self.freq_b, dtype=float)
+        pos = a > 0
+        return evaluate_pgf_polynomial(a[pos] - 1, w[pos] * a[pos], z)
 
     @cached_property
     def freq_df(self):
@@ -1199,6 +1316,17 @@ class FrequencyGammaMixed(_FrequencyMixedPoisson):
     def freq_pgf(self, n, z):
         return (1 - self._theta * n * (z - 1)) ** -self._a
 
+    def freq_pgf_prime(self, n, z):
+        """Pgf derivative :math:`a\\theta n (1 - \\theta n(z-1))^{-a-1}`.
+
+        Chain rule on the gamma-mixed pgf; equals
+        :math:`n M_G'(n(z-1))` for the gamma mixing mgf, and (since
+        :math:`a\\theta = 1` under the mean-1 calibration) reduces to
+        :math:`n (1 - \\theta n(z-1))^{-a-1}`.
+        """
+        return (self._a * self._theta * n
+                * (1 - self._theta * n * (z - 1)) ** (-self._a - 1))
+
 
 class FrequencyDelaporteMixed(_FrequencyMixedPoisson):
     """
@@ -1226,6 +1354,20 @@ class FrequencyDelaporteMixed(_FrequencyMixedPoisson):
         a = self._a
         return np.exp(f * n * (z - 1)) * (1 - theta * n * (z - 1)) ** -a
 
+    def freq_pgf_prime(self, n, z):
+        """Pgf derivative by the product rule on the shifted-gamma pgf.
+
+        :math:`P'(z) = P(z)\\,[f n + a\\theta n / (1 - \\theta n(z-1))]`:
+        the certain-claims exponential contributes ``f n`` and the gamma
+        factor its own logarithmic derivative.
+        """
+        f = self._f
+        theta = self._theta
+        a = self._a
+        base = 1 - theta * n * (z - 1)
+        return (np.exp(f * n * (z - 1)) * base ** -a
+                * (f * n + a * theta * n / base))
+
 
 class FrequencyIGMixed(_FrequencyMixedPoisson):
     """
@@ -1250,6 +1392,18 @@ class FrequencyIGMixed(_FrequencyMixedPoisson):
         mu = self._mu
         lam = self._lam
         return np.exp(1 / mu * (1 - np.sqrt(1 - 2 * mu ** 2 * lam * n * (z - 1))))
+
+    def freq_pgf_prime(self, n, z):
+        """Pgf derivative by the chain rule on the IG-mixed pgf.
+
+        With ``root = sqrt(1 - 2 mu^2 lam n (z-1))`` the exponent's
+        derivative is :math:`\\mu\\lambda n / \\text{root}`, so
+        :math:`P'(z) = P(z)\\,\\mu\\lambda n / \\text{root}`.
+        """
+        mu = self._mu
+        lam = self._lam
+        root = np.sqrt(1 - 2 * mu ** 2 * lam * n * (z - 1))
+        return np.exp((1 - root) / mu) * mu * lam * n / root
 
 
 class FrequencySIGMixed(_FrequencyMixedPoisson):

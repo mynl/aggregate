@@ -495,6 +495,54 @@ def test_palm_doc_renders(palm_doc):
     assert len(fig.axes) >= 2
 
 
+# --- the P&L surface ([PnL-Kappa-Chart], 1.0.0a369) -------------------------
+
+TOWER_PNL = ('xpnl CK.PT 1000 prem less agg CK.PTE 1000 prem at 70% lr '
+             'sev lognorm 100 cv 2 '
+             'occurrence ceded to 500 xs 500 deposit 100 poisson')
+PEEL_PNL = ('xpnl CK.PP 1000 premium less agg CK.PPE 1000 premium at 70% lr '
+            'sev lognorm 100 cv 2 '
+            'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+            'deposit 40 poisson peel top-down')
+PLAIN_PNL = ('pnl CK.PB 1000 premium less agg CK.PBL 100 claims '
+             'sev lognorm 5 cv 2 poisson')
+
+
+def test_a_reinsured_pnl_lights_kappa():
+    """The engine look-through: a cession lights the tab, no cession stays dark."""
+    assert 'kappa' in available_charts(build(TOWER_PNL))
+    assert 'kappa' in available_charts(build(PEEL_PNL))
+    assert 'kappa' not in available_charts(build(PLAIN_PNL))
+
+
+def test_the_pnl_doc_is_the_engines_own():
+    """A thin delegate, the a367 ``chart_reins`` pattern: nothing to drift."""
+    pn = build(TOWER_PNL)
+    assert (build_chart_doc(pn, 'kappa').hash
+            == build_chart_doc(pn.engine, 'kappa').hash)
+
+
+def test_the_peel_serves_one_curve_per_layer():
+    """The multi-layer picture the 2-D route cannot produce, on a P&L."""
+    doc = build_chart_doc(build(PEEL_PNL), 'kappa')
+    assert doc.meta['route'] == 'palm'
+    layers = [s.name for s in doc.series
+              if s.panel_id == 'cession' and s.role == 'ceded'
+              and s.name != 'E[ceded | gross]']
+    assert layers == ['occ 100 xs 100', 'occ 300 xs 200']
+
+
+def test_the_pnl_doc_round_trips_and_renders():
+    doc = build_chart_doc(build(TOWER_PNL), 'kappa')
+    back = load_chart_doc(json.loads(json.dumps(canonical_dict(doc))))
+    assert doc_hash(back) == doc.hash
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc
+
+    assert len(plot_chartdoc(doc).axes) >= 2
+
+
 def test_supports_pgf_prime_truth_table():
     """The capability the route switch keys on, family by family."""
     from aggregate.distributions import Frequency

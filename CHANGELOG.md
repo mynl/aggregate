@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a369
+
+**[PnL-Kappa-Chart] the kappa chart lights for a reinsured P&L, through its engine.** The `kappa` chart registers for `PnL` by delegating to the wrapped aggregate (the a367 `chart_reins` pattern), titled by the engine's label; availability looks through `obj.engine`, so a P&L over a `Portfolio` and a stitched ledger with no engine stay dark. The engine takes the a368 route switch unchanged: a peel serves one Palm curve per occurrence layer, an exotic frequency serves the 2-D fallback band chart, and `bands=True` passes through. Conditioning is gross, matching the aggregate chart and the natural allocation.
+
 ## 1.0.0a368
 
 **[Palm-Kappa-Chart] the aggregate kappa chart defaults to the Palm route, per layer, with the band behind `bands=`.** An `Aggregate` with an occurrence program now serves the kappa chart off the 1-D Palm conditional-mean identity on the fine model grid, no joint: one mean curve per occurrence layer (labeled by the declared `as` label or the DecL descriptor; a single-layer program serves the total only), the exact total, the mirrored net and the identity, `meta` recording `route: 'palm'`. New keyword `bands=True` opts the joint-derived percentile band back in through the `occ_joint` memo; a `BivariateAggregate` input keeps the full band chart; a frequency without the new read-only property `Frequency.supports_pgf_prime` (or a signed or windowed grid) serves the 2-D band chart unchanged, `meta` `route: '2d-fallback'`. Both routes now start the drawn window strictly above zero, so a budget grid with visible mass in the zero bucket no longer puts a NaN share in the document. The label helpers `_reins_layer_label` / `_layer_descriptor` hoisted from `_pnl_builders` to `_reinsurance`.

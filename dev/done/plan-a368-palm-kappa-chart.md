@@ -314,3 +314,26 @@ breaking:
 
 Gate: tier 3 (`uv run pytest -m 'slow or not slow'`) green, 5,435 passed,
 142 s. FEATURES audit OK with the new `supports_pgf_prime` row.
+
+### [PnL-Kappa-Chart], 1.0.0a369 (2026-09-29)
+
+As planned, no surprises. Decisions the plan deferred to execution:
+
+- **[title]** The P&L doc accepts the engine's label, exactly what
+  `chart_reins` does at a367, so the two tabs title consistently; the
+  tower P&L doc is hash-identical to the engine's own.
+- **[availability]** The engine look-through in `_kappa_available` is the
+  final (aggregate) branch only: a P&L reaches `occ_reins` plus
+  `agg_density` on whatever it wraps, so a P&L over a `Portfolio` (no
+  occurrence program on the wrapped object) and a stitched ledger with no
+  engine both answer False, and the book and joint branches are never
+  reached through a look-through.
+- **[peel-fixture]** The peel P&L test build appends `peel top-down` to a
+  two-layer occurrence tower (the `tests/test_pnl_peel.py` idiom); its
+  engine carries the program, so the per-layer curves come through the
+  route switch with no peel-specific code.
+
+Gate: tier 3 green, 5,439 passed, 142 s. Plan retired to `dev/done/` with
+this bump. No `dev/TODO.md` entry existed to tick (same-day plan). The
+[API-Kappa-Residue] phase follows in `V:\dev\aggregate-api` as a separate
+commit under that repo's rules.

@@ -49,9 +49,11 @@ import numpy as np
 
 from .._aggregate import Aggregate
 from .._grid_distribution import GridDistribution
+from .._pnl import PnL
 from .._reinsurance import _reins_layer_label, make_ceder_netter
 from ..bivariate import BivariateAggregate
 from . import register_chart, _emitter_base
+from ._emit_structure import _engine
 from ._payload import lattice_payload
 from .ir import (ChartAxis, ChartDoc, ChartSeries, Panel, SurfaceData,
                  complete_tex, encode_z_block)
@@ -917,6 +919,21 @@ def _kappa_from_aggregate(agg, bands=False, **options):
     return _kappa_palm(agg, bands=bands, **options)
 
 
+@chart_kappa.register(PnL)
+def _kappa_from_pnl(pn, **options):
+    """Emit the kappa chart for a P&L, through its engine ([PnL-Kappa-Chart]).
+
+    The a367 ``chart_reins`` pattern: an ``xpnl`` wraps a single aggregate,
+    so the chart is the engine's own, titled by the engine's label, and the
+    route switch applies unchanged. A peel's engine carries the multi-layer
+    program, so this serves the per-layer Palm curves the 2-D route cannot
+    produce. Conditioning stays **gross** (the author's 2026-09-29 ruling):
+    Pricing, Plot remains the premium-splitting picture, and the
+    net-conditioned story lives in the waterfall.
+    """
+    return _kappa_from_aggregate(_engine(pn), **options)
+
+
 def _kappa_available(obj):
     """Availability for the three sources the ``kappa`` name serves.
 
@@ -935,6 +952,13 @@ def _kappa_available(obj):
         return ('gross' in getattr(obj, '_views', ())
                 and (obj.density is not None
                      or getattr(obj, '_massive', None) is not None))
+    # A P&L answers for its engine ([PnL-Kappa-Chart]): the look-through
+    # lands on the aggregate test below, so a P&L over a Portfolio (no
+    # occurrence program on the object it wraps) and a stitched ledger with
+    # no engine both stay dark.
+    engine = getattr(obj, 'engine', None)
+    if engine is not None:
+        obj = engine
     return (getattr(obj, 'occ_reins', None) is not None
             and getattr(obj, 'agg_density', None) is not None)
 

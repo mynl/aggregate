@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a358
+
+**[PnL-Waterfall-Labels] the waterfall columns rename onto `M01`, and the kappa chart's share panel says what it shows.** Nothing computational moves: every number the waterfall serves is the number it served before. `M01` reads as "the margin at the 1st percentile", the convention the format sheet already uses for `P01` and `P99`, and it replaces headings that spelled the return period out at a width no table wanted to carry. The two exhibit captions are rewritten to introduce the word, the walk's caption saying what `M01` measures and the ratio caption leaning on it. `PnL.walk_df` and `PnL.evaluation_df` carry the new headings, and their `Returns` docstrings follow. On the chart side the `kappa` document's second panel is titled `Cession as share of gross` rather than `The same reading as a share`, and its y-axis shortens to `Share ceded`, the long form having become a restatement of the title directly above it. Panel titles and exhibit captions are provisional surface under the policy above.
+
+**Breaking, on a stable-tier class.** `walk_df` renames `M` to `Margin`, `M @ 1-in-100 standalone` to `M01 standalone`, and `M @ 1-in-100 diversified` to `M01 diversified`; `evaluation_df` renames `M / capital standalone` and `M / capital diversified` to `M / M01 standalone` and `M / M01 diversified`. A caller indexing either frame by column name has to follow. Permissible only because the alpha series is where the 1.0 promise has not yet taken effect.
+
+Four format-sheet entries retire the matching four exemptions from the exhibits vocabulary gate, so the renamed columns are declared rather than excused. That changes rendering: the two `M01` columns now read as money and the two ratio columns as `ratio` (`.1%`), which is what `ROE` and `coc` already take and what a return on capital is.
+
 ## 1.0.0a357
 
 **[Degenerate-Variance-Floor] a degenerate law reports cv 0, not nan, on both the empirical and the renewal-theory side.** A correctness fix that changes numbers, found by the numerics gate on the `RenewalDeterministicWait` library entry. `MomentWrangler.stats` / `.mcvsk` floor a negative central variance at exactly 0 (a realized point mass cancels `ex2 - ex1**2` slightly negative), so `est_cv` is 0 and `est_skew` is `nan` where both were `nan` via a `RuntimeWarning` sqrt. On the theory side, `renewal_count_pmf` zeroes the count pmf beyond the exact support bound `floor(T / w_min)` set by the smallest positive-mass wait: tilt-amplified FFT roundoff had left `P(N=11) ~ 2e-9` on an impossible count, inflating a degenerate count's theoretical cv to 1.1e-4 (which the floored estimate then newly tripped as `AGG_CV`). Renewal frequencies whose wait law has mass in the first bucket are untouched. Regression tests in `tests/test_moments.py` and `tests/test_renewal.py`.

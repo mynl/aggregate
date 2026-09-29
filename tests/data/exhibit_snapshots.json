@@ -25914,7 +25914,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -25937,7 +25937,7 @@
      },
      "key": "c1",
      "name": [
-      "M"
+      "Margin"
      ],
      "raw": true
     },
@@ -25951,7 +25951,7 @@
      },
      "key": "c2",
      "name": [
-      "M @ 1-in-100 standalone"
+      "M01 standalone"
      ],
      "raw": true
     },
@@ -25965,7 +25965,7 @@
      },
      "key": "c3",
      "name": [
-      "M @ 1-in-100 diversified"
+      "M01 diversified"
      ],
      "raw": true
     }
@@ -25976,13 +25976,13 @@
       "text": "Step"
      },
      {
-      "text": "M"
+      "text": "Margin"
      },
      {
-      "text": "M @ 1-in-100 standalone"
+      "text": "M01 standalone"
      },
      {
-      "text": "M @ 1-in-100 diversified"
+      "text": "M01 diversified"
      }
     ]
    ],
@@ -26013,7 +26013,7 @@
       },
       {
        "raw": 0.16483175378107306,
-       "text": "0.165"
+       "text": "16.5%"
       },
       {
        "raw": null,
@@ -26046,7 +26046,7 @@
       },
       {
        "raw": 2.097316297622789,
-       "text": "2.097"
+       "text": "209.7%"
       },
       {
        "raw": null,
@@ -26079,7 +26079,7 @@
       },
       {
        "raw": 1.0626718404224398,
-       "text": "1.063"
+       "text": "106.3%"
       },
       {
        "raw": null,
@@ -26112,7 +26112,7 @@
       },
       {
        "raw": 1.4765296233038314,
-       "text": "1.477"
+       "text": "147.7%"
       },
       {
        "raw": null,
@@ -26142,7 +26142,7 @@
       },
       {
        "raw": 0.3940552413058428,
-       "text": "0.394"
+       "text": "39.4%"
       },
       {
        "raw": null,
@@ -26154,7 +26154,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The last two columns are the return on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state; they are blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
    "columns": [
     {
      "align": "l",
@@ -26227,29 +26227,29 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c5",
      "name": [
-      "M / capital standalone"
+      "M / M01 standalone"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c6",
      "name": [
-      "M / capital diversified"
+      "M / M01 diversified"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -26270,10 +26270,10 @@
       "text": "M / SD"
      },
      {
-      "text": "M / capital standalone"
+      "text": "M / M01 standalone"
      },
      {
-      "text": "M / capital diversified"
+      "text": "M / M01 diversified"
      }
     ]
    ],
@@ -26360,7 +26360,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit.",
    "columns": [
     {
      "align": "l",
@@ -26383,7 +26383,7 @@
      },
      "key": "c1",
      "name": [
-      "M"
+      "Margin"
      ],
      "raw": true
     },
@@ -26397,7 +26397,7 @@
      },
      "key": "c2",
      "name": [
-      "M @ 1-in-100 standalone"
+      "M01 standalone"
      ],
      "raw": true
     },
@@ -26411,7 +26411,7 @@
      },
      "key": "c3",
      "name": [
-      "M @ 1-in-100 diversified"
+      "M01 diversified"
      ],
      "raw": true
     }
@@ -26422,13 +26422,13 @@
       "text": "Step"
      },
      {
-      "text": "M"
+      "text": "Margin"
      },
      {
-      "text": "M @ 1-in-100 standalone"
+      "text": "M01 standalone"
      },
      {
-      "text": "M @ 1-in-100 diversified"
+      "text": "M01 diversified"
      }
     ]
    ],
@@ -26459,11 +26459,11 @@
       },
       {
        "raw": 0.1630401386192802,
-       "text": "0.16304"
+       "text": "16.3%"
       },
       {
        "raw": 0.16638720555887582,
-       "text": "0.16639"
+       "text": "16.6%"
       }
      ]
     },
@@ -26501,7 +26501,7 @@
         "neg"
        ],
        "raw": -0.48886903493082123,
-       "text": "-0.48887"
+       "text": "-48.9%"
       },
       {
        "raw": null,
@@ -26531,11 +26531,11 @@
       },
       {
        "raw": 0.18196155910608228,
-       "text": "0.18196"
+       "text": "18.2%"
       },
       {
        "raw": 0.18196155910608228,
-       "text": "0.18196"
+       "text": "18.2%"
       }
      ],
      "flags": [
@@ -26543,7 +26543,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The last two columns are the return on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state; they are blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
    "columns": [
     {
      "align": "l",
@@ -26616,29 +26616,29 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c5",
      "name": [
-      "M / capital standalone"
+      "M / M01 standalone"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c6",
      "name": [
-      "M / capital diversified"
+      "M / M01 diversified"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -26659,10 +26659,10 @@
       "text": "M / SD"
      },
      {
-      "text": "M / capital standalone"
+      "text": "M / M01 standalone"
      },
      {
-      "text": "M / capital diversified"
+      "text": "M / M01 diversified"
      }
     ]
    ],
@@ -26686,7 +26686,7 @@
         "neg"
        ],
        "raw": -1820.0,
-       "text": "-1,820.00"
+       "text": "-1,820"
       },
       {
        "raw": null,
@@ -26707,7 +26707,7 @@
         "neg"
        ],
        "raw": -40.0,
-       "text": "-40.00"
+       "text": "-40"
       },
       {
        "raw": null,
@@ -26728,7 +26728,7 @@
         "neg"
        ],
        "raw": -60.0,
-       "text": "-60.00"
+       "text": "-60"
       },
       {
        "raw": null,
@@ -26749,7 +26749,7 @@
         "neg"
        ],
        "raw": -100.0,
-       "text": "-100.00"
+       "text": "-100"
       },
       {
        "raw": null,
@@ -26770,7 +26770,7 @@
         "neg"
        ],
        "raw": -1136.0,
-       "text": "-1,136.00"
+       "text": "-1,136"
       },
       {
        "raw": null,
@@ -26782,7 +26782,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -26805,7 +26805,7 @@
      },
      "key": "c1",
      "name": [
-      "M"
+      "Margin"
      ],
      "raw": true
     },
@@ -26813,13 +26813,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
+      "digits": 7,
       "group": true,
-      "kind": "dec"
+      "kind": "gen"
      },
      "key": "c2",
      "name": [
-      "M @ 1-in-100 standalone"
+      "M01 standalone"
      ],
      "raw": true
     },
@@ -26827,13 +26827,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
+      "digits": 7,
       "group": true,
-      "kind": "dec"
+      "kind": "gen"
      },
      "key": "c3",
      "name": [
-      "M @ 1-in-100 diversified"
+      "M01 diversified"
      ],
      "raw": true
     }
@@ -26844,13 +26844,13 @@
       "text": "Step"
      },
      {
-      "text": "M"
+      "text": "Margin"
      },
      {
-      "text": "M @ 1-in-100 standalone"
+      "text": "M01 standalone"
      },
      {
-      "text": "M @ 1-in-100 diversified"
+      "text": "M01 diversified"
      }
     ]
    ],
@@ -26881,7 +26881,7 @@
       },
       {
        "raw": 0.16483175378107306,
-       "text": "0.165"
+       "text": "16.5%"
       },
       {
        "raw": null,
@@ -26914,7 +26914,7 @@
       },
       {
        "raw": 2.097316297622789,
-       "text": "2.097"
+       "text": "209.7%"
       },
       {
        "raw": null,
@@ -26947,7 +26947,7 @@
       },
       {
        "raw": 1.0626718404224398,
-       "text": "1.063"
+       "text": "106.3%"
       },
       {
        "raw": null,
@@ -26980,7 +26980,7 @@
       },
       {
        "raw": 1.4765296233038314,
-       "text": "1.477"
+       "text": "147.7%"
       },
       {
        "raw": null,
@@ -27010,7 +27010,7 @@
       },
       {
        "raw": 0.3940552413058428,
-       "text": "0.394"
+       "text": "39.4%"
       },
       {
        "raw": null,
@@ -27022,7 +27022,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The last two columns are the return on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state; they are blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
    "columns": [
     {
      "align": "l",
@@ -27095,29 +27095,29 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c5",
      "name": [
-      "M / capital standalone"
+      "M / M01 standalone"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c6",
      "name": [
-      "M / capital diversified"
+      "M / M01 diversified"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -27138,10 +27138,10 @@
       "text": "M / SD"
      },
      {
-      "text": "M / capital standalone"
+      "text": "M / M01 standalone"
      },
      {
-      "text": "M / capital diversified"
+      "text": "M / M01 diversified"
      }
     ]
    ],
@@ -27165,14 +27165,14 @@
         "neg"
        ],
        "raw": -1840.0,
-       "text": "-1,840.00"
+       "text": "-1,840"
       },
       {
        "flags": [
         "neg"
        ],
        "raw": -1802.9863176788754,
-       "text": "-1,802.99"
+       "text": "-1,802.986"
       }
      ]
     },
@@ -27192,11 +27192,11 @@
         "neg"
        ],
        "raw": -100.0,
-       "text": "-100.00"
+       "text": "-100"
       },
       {
        "raw": 422.98631767887554,
-       "text": "422.99"
+       "text": "422.9863"
       }
      ]
     },
@@ -27213,14 +27213,14 @@
         "neg"
        ],
        "raw": -1380.0,
-       "text": "-1,380.00"
+       "text": "-1,380"
       },
       {
        "flags": [
         "neg"
        ],
        "raw": -1380.0,
-       "text": "-1,380.00"
+       "text": "-1,380"
       }
      ],
      "flags": [
@@ -27228,7 +27228,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net, each shown at its expected value and in its 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit.",
    "columns": [
     {
      "align": "l",
@@ -27251,7 +27251,7 @@
      },
      "key": "c1",
      "name": [
-      "M"
+      "Margin"
      ],
      "raw": true
     },
@@ -27259,13 +27259,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
+      "digits": 7,
       "group": true,
-      "kind": "dec"
+      "kind": "gen"
      },
      "key": "c2",
      "name": [
-      "M @ 1-in-100 standalone"
+      "M01 standalone"
      ],
      "raw": true
     },
@@ -27273,13 +27273,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 2,
+      "digits": 7,
       "group": true,
-      "kind": "dec"
+      "kind": "gen"
      },
      "key": "c3",
      "name": [
-      "M @ 1-in-100 diversified"
+      "M01 diversified"
      ],
      "raw": true
     }
@@ -27290,13 +27290,13 @@
       "text": "Step"
      },
      {
-      "text": "M"
+      "text": "Margin"
      },
      {
-      "text": "M @ 1-in-100 standalone"
+      "text": "M01 standalone"
      },
      {
-      "text": "M @ 1-in-100 diversified"
+      "text": "M01 diversified"
      }
     ]
    ],
@@ -27327,11 +27327,11 @@
       },
       {
        "raw": 0.1630401386192802,
-       "text": "0.16304"
+       "text": "16.3%"
       },
       {
        "raw": 0.16638720555887582,
-       "text": "0.16639"
+       "text": "16.6%"
       }
      ]
     },
@@ -27369,7 +27369,7 @@
         "neg"
        ],
        "raw": -0.48886903493082123,
-       "text": "-0.48887"
+       "text": "-48.9%"
       },
       {
        "raw": null,
@@ -27399,11 +27399,11 @@
       },
       {
        "raw": 0.18196155910608228,
-       "text": "0.18196"
+       "text": "18.2%"
       },
       {
        "raw": 0.18196155910608228,
-       "text": "0.18196"
+       "text": "18.2%"
       }
      ],
      "flags": [
@@ -27411,7 +27411,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. Capital is the injection a 1-in-100 outcome would call for, so M / capital is a return on it; it is blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
+   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The last two columns are the return on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state; they are blank where the step calls for no capital, which is what a purchased layer does in the adverse state, and there the diversified column is the more meaningful of the two.",
    "columns": [
     {
      "align": "l",
@@ -27484,29 +27484,29 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c5",
      "name": [
-      "M / capital standalone"
+      "M / M01 standalone"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c6",
      "name": [
-      "M / capital diversified"
+      "M / M01 diversified"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -27527,10 +27527,10 @@
       "text": "M / SD"
      },
      {
-      "text": "M / capital standalone"
+      "text": "M / M01 standalone"
      },
      {
-      "text": "M / capital diversified"
+      "text": "M / M01 diversified"
      }
     ]
    ],

@@ -69,6 +69,11 @@ columns:
   # --- the pentagon octet (L, P, M, a, Q, lr, pq, coc) and its neighbours
   L: money
   M: money
+  Margin: money        # the walk's first column (walk_df) spells the margin
+                       # out, since it stands beside M01 rather than beside
+                       # L, P and Q
+  'M01 standalone': money      # the walk's 1-in-100 margin, on its own and
+  'M01 diversified': money     # conditional on the whole book's 1-in-100
   P: money
   Q: money
   a: money
@@ -126,6 +131,8 @@ columns:
   M_share: ratio
   'Premium spent': ratio
   'Margin spent': ratio
+  'M / M01 standalone': ratio   # a return on the capital the 1-in-100 state
+  'M / M01 diversified': ratio  # calls for, so it reads as ROE and coc do
 
   # --- missing from round 1
   Mean: money

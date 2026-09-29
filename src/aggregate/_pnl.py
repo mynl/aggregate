@@ -2133,14 +2133,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         idx = pd.Index(index, name='Step')
         t = WATERFALL_RETURN_PERIOD
+        # derived from the constant rather than written in, so the heading and
+        # the state it names cannot drift apart. 'M01' at t=100, reading as
+        # "M at the 1st percentile", the way the format sheet's P01 does
+        m = f'M{100 // t:02d}'
         walk_df = pd.DataFrame(
             walk, index=idx,
-            columns=['M', f'M @ 1-in-{t} standalone',
-                     f'M @ 1-in-{t} diversified'])
+            columns=['Margin', f'{m} standalone', f'{m} diversified'])
         evaluation_df = pd.DataFrame(
             evaluation, index=idx,
             columns=['Premium spent', 'Margin spent', 'CR', 'M / SD',
-                     'M / capital standalone', 'M / capital diversified'])
+                     f'M / {m} standalone', f'M / {m} diversified'])
         return walk_df, evaluation_df
 
     @property
@@ -2157,19 +2160,20 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         pandas.DataFrame
             Indexed by ``'Step'``, with columns
 
-            ``M``
+            ``Margin``
                 The step's own signed result, its expected value.
-            ``M @ 1-in-<t> standalone``
+            ``M01 standalone``
                 The step's result in **its own** 1-in-``t`` state, read off
                 that step's :class:`GridDistribution`. Tail measures do not
                 add, so this column does **not** foot down the walk.
-            ``M @ 1-in-<t> diversified``
+            ``M01 diversified``
                 The step's result conditional on the **whole book** landing at
                 its own 1-in-``t``, read off the ledger's kappa column, so this
                 one foots exactly. Blank on a ledger whose rows share no atoms,
                 where no conditioning is possible.
 
-            ``t`` is :data:`WATERFALL_RETURN_PERIOD`.
+            ``t`` is :data:`WATERFALL_RETURN_PERIOD`, and ``M01`` is the margin
+            at the 1st percentile, which is the state ``t = 100`` names.
 
         Notes
         -----
@@ -2213,7 +2217,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 The step's combined ratio, ``(L + E) / P``.
             ``M / SD``
                 Margin over its own standard deviation.
-            ``M / capital standalone``, ``M / capital diversified``
+            ``M / M01 standalone``, ``M / M01 diversified``
                 Margin over the capital a 1-in-``t`` outcome would call for,
                 on each of :attr:`walk_df`'s two readings of that state. Blank
                 where the step calls for no capital, which is what a purchased

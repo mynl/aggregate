@@ -245,14 +245,12 @@ AXIS_BLOCKS = {
 #: again in lower case on the bivariate and tail behavior frames); the
 #: composed validation headers (``Est EX``, ``Gross Sk``, ``Change CV``,
 #: ``Subject EX``, which are a basis and a measure joined into one label);
-#: the waterfall's composed readings (``M / SD``, ``M @ 1-in-100
-#: diversified``); and a handful of one-off diagnostics (``Gate``, ``tau``,
+#: the waterfall's one composed reading (``M / SD``, a margin over a
+#: dispersion); and a handful of one-off diagnostics (``Gate``, ``tau``,
 #: ``cov``, ``corr``, the bivariate support bounds).
 PENDING_VOCABULARY = frozenset({
     'Change CV', 'Change EX', 'D_g_inv', 'Est', 'Gross CV',
-    'Gross EX', 'Gross Sk', 'M / SD', 'M / capital diversified',
-    'M / capital standalone', 'M @ 1-in-100 diversified',
-    'M @ 1-in-100 standalone',
+    'Gross EX', 'Gross Sk', 'M / SD',
     'Net CV', 'Net EX', 'Net Sk', 'Ref', 'Subject CV',
     'Subject EX', 'Subject Sk', 'closed_form', 'corr', 'cov',
     'cv', 'max', 'mean', 'min', 'sd', 'skew', 'support_max',
@@ -958,14 +956,14 @@ def test_waterfall_diversified_foots_and_standalone_does_not(tower):
     and quantiles do not add. Showing both side by side is the point.
     """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    div = walk['M @ 1-in-100 diversified']
-    sa = walk['M @ 1-in-100 standalone']
+    div = walk['M01 diversified']
+    sa = walk['M01 standalone']
     # the steps before the closing row sum to the closing row, exactly
     assert div.iloc[:-1].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
     assert sa.iloc[:-1].sum() != pytest.approx(sa.iloc[-1], rel=1e-6)
     # the expected margin foots too, by linearity
-    assert walk['M'].iloc[:-1].sum() == pytest.approx(walk['M'].iloc[-1],
-                                                      rel=1e-9)
+    assert walk['Margin'].iloc[:-1].sum() == pytest.approx(
+        walk['Margin'].iloc[-1], rel=1e-9)
 
 
 def test_waterfall_capital_ratio_definition(tower):
@@ -973,12 +971,13 @@ def test_waterfall_capital_ratio_definition(tower):
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
     _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
     for basis in ('standalone', 'diversified'):
-        m100 = walk[f'M @ 1-in-100 {basis}']
-        got = ev[f'M / capital {basis}']
+        m100 = walk[f'M01 {basis}']
+        got = ev[f'M / M01 {basis}']
         for step in walk.index:
             capital = -m100[step]
             if capital > 0:
-                assert got[step] == pytest.approx(walk['M'][step] / capital)
+                assert got[step] == pytest.approx(
+                    walk['Margin'][step] / capital)
             else:
                 # a purchased layer releases capital in the adverse state, so
                 # there is no capital to return on and the cell is blank
@@ -988,8 +987,8 @@ def test_waterfall_capital_ratio_definition(tower):
 def test_waterfall_blanks_diversified_without_shared_atoms(peel):
     """No shared atoms means no conditioning happened; say so, do not guess."""
     _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
-    assert walk['M @ 1-in-100 diversified'].isna().all()
-    assert walk['M @ 1-in-100 standalone'].notna().any()
+    assert walk['M01 diversified'].isna().all()
+    assert walk['M01 standalone'].notna().any()
     assert 'blank here' in kw['caption']
 
 

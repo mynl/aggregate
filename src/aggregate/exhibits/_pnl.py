@@ -235,28 +235,32 @@ def _economic_waterfall_frames(obj):
     walk_df, evaluation_df = obj.walk_df, obj.evaluation_df
     idx = walk_df.index
     t = WATERFALL_RETURN_PERIOD
-    diversified_available = not walk_df[f'M @ 1-in-{t} diversified'].isna().all()
+    # the walk's own heading for the 1-in-t state, derived the same way the
+    # frame derives it, so the caption and the columns cannot drift apart
+    m = f'M{100 // t:02d}'
+    diversified_available = not walk_df[f'{m} diversified'].isna().all()
 
     total_row = {len(idx) - 1: ('total',)} if len(idx) > 1 else {}
     walk_caption = (
         f'The margin walk in currency: gross, what each layer cedes, and the '
-        f'closing net, each shown at its expected value and in its 1-in-{t} '
-        f'state. The diversified column conditions on the whole book landing '
-        f'at its own 1-in-{t}, so it foots down the walk exactly. The '
-        f'standalone column is each step\'s own 1-in-{t}; tail measures do '
-        f'not add, so it does not foot, and the gap between the two columns '
-        f'is the diversification benefit.')
+        f'closing net. Margin is the expected result and {m} is the result in '
+        f'the 1-in-{t} state, which measures the capital that state calls for. '
+        f'The diversified column conditions on the whole book landing at its '
+        f'own 1-in-{t}, so it foots down the walk exactly. The standalone '
+        f'column is each step\'s own 1-in-{t}, the capital it would call for '
+        f'alone; tail measures do not add, so it does not foot, and the gap '
+        f'between the two columns is the diversification benefit.')
     if not diversified_available:
         walk_caption += (
             ' The diversified column is blank here: this ledger shares no '
             'atoms across its rows, so no conditioning was possible.')
     evaluation_caption = (
         f'The same walk read as ratios. Premium and margin spent are against '
-        f'the gross block. Capital is the injection a 1-in-{t} outcome would '
-        f'call for, so M / capital is a return on it; it is blank where the '
-        f'step calls for no capital, which is what a purchased layer does in '
-        f'the adverse state, and there the diversified column is the more '
-        f'meaningful of the two.')
+        f'the gross block. The last two columns are the return on the capital '
+        f'a 1-in-{t} outcome calls for, on each of the walk\'s two readings of '
+        f'that state; they are blank where the step calls for no capital, '
+        f'which is what a purchased layer does in the adverse state, and there '
+        f'the diversified column is the more meaningful of the two.')
 
     return [
         ('walk_df', walk_df, dict(caption=walk_caption, row_flags=total_row)),

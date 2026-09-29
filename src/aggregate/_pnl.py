@@ -2204,26 +2204,29 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             row = ledger.iloc[pos]
             margin, sd = float(row['EX']), float(row['SD'])
             gd = densities.get(label)
-            # A ceded step hedges rather than bears risk, so its own 1-in-100
-            # is the state in which it paid nothing and the quantile reports
-            # its premium. Blank, rather than serve an exact number that is
-            # not capital.
-            standalone = np.nan if ceded or gd is None else float(gd.q(p))
+            # The standalone state is two-sided by role ([Writer-Standalone]):
+            # a risk-bearing step reads its own left tail (the state that
+            # calls for capital); a ceded step reads its own RIGHT tail, the
+            # writer's 1-in-t, the state in which the cover pays most --
+            # positive almost always, the capital the writer of that cover
+            # would hold. The sign flip is the marker of which reading a row
+            # takes.
+            if gd is None:
+                standalone = np.nan
+            else:
+                standalone = float(gd.q(1 - p)) if ceded else float(gd.q(p))
             divers = float(row[kappa]) if diversified_available else np.nan
             r = ratios.loc[step]
             index.append(step)
             walk.append([margin, standalone, divers])
-            # one evaluation of the diversified quotient, routed to one of two
-            # columns by the row's role, so every column has one meaning: a
-            # high ratio is capital earning well on a risk row and relief
-            # bought expensively on a ceded one
-            divers_ratio = _capital_ratio(margin, divers)
+            # one quotient per capital basis, on every row; the sign carries
+            # the reading (risk rows: margin > 0, M01 < 0, a return on
+            # capital; ceded rows: margin < 0, M01 > 0, a cost of relief)
             evaluation.append([
                 float(r['P_share']), float(r['M_share']), float(r['CR']),
                 margin / sd if sd > 0 else np.nan,
                 _capital_ratio(margin, standalone),
-                np.nan if ceded else divers_ratio,
-                divers_ratio if ceded else np.nan,
+                _capital_ratio(margin, divers),
             ])
 
         idx = pd.Index(index, name='Step')
@@ -2237,9 +2240,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             columns=['Margin', f'{m} standalone', f'{m} diversified'])
         evaluation_df = pd.DataFrame(
             evaluation, index=idx,
-            columns=['Premium spent', 'Margin spent', 'CR', 'M / SD',
-                     f'M / {m} standalone', f'M / {m} diversified',
-                     'Cost of relief'])
+            columns=['Premium spent', 'Margin spent', 'CR', 'MSD',
+                     'SA CoC', 'Div CoC'])
         return walk_df, evaluation_df
 
     @property
@@ -2259,17 +2261,21 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ``Margin``
                 The step's own signed result, its expected value.
             ``M01 standalone``
-                The step's result in **its own** 1-in-``t`` state, read off
-                that step's :class:`GridDistribution`. Tail measures do not
-                add, so this column does **not** foot down the walk. Blank on
-                a ceded step: a hedge's own 1-in-``t`` is the state in which
-                the cover paid nothing, so the quantile would report its
-                premium rather than any capital.
+                The step's result in its own 1-in-``t`` state, read off that
+                step's :class:`GridDistribution`, **two-sided by role**
+                ([Writer-Standalone]): a risk-bearing step reads its own left
+                tail, the state that calls for capital; a ceded step reads
+                its own **right** tail, the writer's 1-in-``t``, the state in
+                which the cover pays most, positive almost always: the
+                capital the writer of that cover would hold. The sign flip
+                is the marker of which reading a row takes. Tail measures do
+                not add, so this column does **not** foot down the walk. A
+                tier subtotal containing any cover takes the ceded reading.
             ``M01 diversified``
                 The step's result conditional on the **whole book** landing at
                 its own 1-in-``t``, read off the ledger's kappa column, so this
-                one foots exactly. Blank on a ledger whose rows share no atoms,
-                where no conditioning is possible.
+                one foots exactly. Blank on a ledger whose rows share no atoms
+                and have no Palm ladder, where no conditioning is possible.
 
             ``t`` is :data:`WATERFALL_RETURN_PERIOD`, and ``M01`` is the margin
             at the 1st percentile, which is the state ``t = 100`` names.
@@ -2314,25 +2320,31 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 which is the first block in every builder.
             ``CR``
                 The step's combined ratio, ``(L + E) / P``.
-            ``M / SD``
-                Margin over its own standard deviation.
-            ``M / M01 standalone``, ``M / M01 diversified``
-                Margin over the capital a 1-in-``t`` outcome calls for, on
-                each of :attr:`walk_df`'s two readings of that state. Served
-                only on the steps that bear risk; blank on ceded steps.
-            ``Cost of relief``
-                The ceded-step reading of the diversified quotient: the margin
-                given up per unit of capital the cover hands back. Blank on
-                risk-bearing steps.
+            ``MSD``
+                Margin over its own standard deviation (margin to standard
+                deviation, a multiple).
+            ``SA CoC``
+                ``M / -M01 standalone`` on every row: the cost of capital on
+                the standalone basis. On a risk row both inputs carry their
+                natural signs (margin > 0, ``M01 < 0``) and the ratio is the
+                return earned on the capital the step calls for alone; on a
+                ceded row both flip (margin < 0, ``M01 > 0``, the writer's
+                right-tail standalone), so the quotient is again positive:
+                the cost of the layer per unit of the writer's standalone
+                capital.
+            ``Div CoC``
+                ``M / -M01 diversified`` on every row, the same quotient on
+                the diversified basis: a return on capital on risk rows, a
+                cost of relief on ceded rows (the margin given up per unit
+                of capital the cover hands back).
 
         Notes
         -----
-        ``M / M01 diversified`` and ``Cost of relief`` are one quotient routed
-        to one of two columns by the row's role, because the polarity of
-        "good" flips between them. On a risk row a high ratio is capital
-        earning well; on a ceded row a high ratio is relief bought
-        expensively, and the test is whether it comes in under the return the
-        risk-bearing rows earn.
+        The sign convention carries the reading: gross and net rows have
+        margin > 0 and ``M01 < 0``; ceded rows the reverse, so both CoC
+        columns stay positive with one arithmetic and no routing. The
+        reinsurance test is whether a ceded row's CoC comes in under the
+        return the risk-bearing rows earn.
 
         See Also
         --------

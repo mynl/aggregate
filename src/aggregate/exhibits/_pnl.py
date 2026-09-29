@@ -281,29 +281,32 @@ def _economic_waterfall_frames(obj):
     walk_caption = (
         f'The margin walk in currency: gross, what each layer cedes, and the '
         f'closing net. Margin is the expected result and {m} is the result in '
-        f'the 1-in-{t} state, which measures the capital that state calls for. '
-        f'The diversified column conditions on the whole book landing at its '
-        f'own 1-in-{t}, so it foots down the walk exactly. The standalone '
-        f'column is each step\'s own 1-in-{t}, the capital it would call for '
-        f'alone; tail measures do not add, so it does not foot, and the gap '
-        f'between the two columns is the diversification benefit. It is blank '
-        f'on a ceded step, whose own 1-in-{t} is the state in which the cover '
-        f'paid nothing, so the quantile would report its premium rather than '
-        f'any capital.')
+        f'the 1-in-{t} state. The diversified column conditions on the whole '
+        f'book landing at its own 1-in-{t}, so it foots down the walk '
+        f'exactly. The standalone column is two-sided by role: a risk '
+        f'bearing step reads its own left tail, the state that calls for '
+        f'capital, while a ceded step reads its own right tail, the '
+        f'writer\'s 1-in-{t}, the state in which the cover pays most and '
+        f'the capital the writer of that cover would hold, so the cell is '
+        f'positive there and the sign flip marks which reading a row takes. '
+        f'Tail measures do not add, so standalone does not foot, and the '
+        f'gap between the two columns is the diversification benefit.')
     if not diversified_available:
         walk_caption += (
             ' The diversified column is blank here: this ledger shares no '
             'atoms across its rows, so no conditioning was possible.')
     evaluation_caption = (
-        f'The same walk read as ratios. Premium and margin spent are against '
-        f'the gross block. The two M / {m} columns are the return earned on '
-        f'the capital a 1-in-{t} outcome calls for, on each of the walk\'s '
-        f'two readings of that state, and they are served only on the steps '
-        f'that bear risk. A cover does not call for capital, it releases it, '
-        f'so a ceded step reads instead under cost of relief: the margin '
-        f'given up per unit of capital the cover hands back, where a low '
-        f'number is the good one, and the test is whether it comes in under '
-        f'the return the risk-bearing rows earn.')
+        f'The same walk read as ratios: the rubric for the program. MSD is '
+        f'margin over its own standard deviation, a multiple. SA CoC and '
+        f'Div CoC are one quotient, M over the negated {m}, on the '
+        f'standalone and diversified capital bases. The sign convention '
+        f'carries the reading: gross and net rows have margin above zero '
+        f'and {m} below, so the ratio is the return earned on the capital '
+        f'that state calls for; a ceded row has both reversed (margin '
+        f'below zero, the writer\'s right-tail {m} above), so the same '
+        f'arithmetic reads as a cost, the margin given up per unit of '
+        f'capital. The reinsurance test is whether a ceded row\'s CoC '
+        f'comes in under the return the risk-bearing rows earn.')
 
     return [
         ('walk_df', walk_df, dict(caption=walk_caption, row_flags=total_row)),

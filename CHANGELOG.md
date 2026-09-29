@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a365
+
+**[Writer-Standalone-CoC] the writer-side standalone on ceded steps, and the evaluation frame renames onto `MSD`, `SA CoC` and `Div CoC`.** `walk_df`'s `M01 standalone` is two-sided by role: a risk-bearing step reads its own left tail as before; a ceded step (and any tier subtotal containing a cover) now reads its own **right** tail, the writer's 1-in-100, a positive number superseding the a361 blank. `evaluation_df`'s columns are now `Premium spent / Margin spent / CR / MSD / SA CoC / Div CoC`: `MSD` is the former `M / SD` unchanged; `SA CoC` and `Div CoC` are the single quotient `M / -M01` per basis on every row (the sign convention carries the reading: a return on risk rows, a cost of relief on ceded rows), reverting the a361 role routing and removing `Cost of relief`. Both waterfall captions rewrite as the reading rubric; formats: `MSD` reads `.3f`, both CoC columns `ratio`.
+
+**Breaking, on a stable-tier class.** `evaluation_df` renames `M / SD` to `MSD`, collapses `M / M01 standalone` / `M / M01 diversified` / `Cost of relief` onto `SA CoC` and `Div CoC`, and `walk_df`'s ceded `M01 standalone` cells change from blank to positive right-tail numbers; a caller indexing either frame by column has to follow. Sync of `tests/data/exhibit_snapshots.json` required.
+
 ## 1.0.0a364
 
 **[Ledger-Both-Ladders] new `PnL.economic_marginal_df`, and the `economic` exhibit serves both ladders.** The new property is the ledger sheet with the marginal (`P`) ladder: same rows and MultiIndex as `economic_df`, columns `EX / SD / CV / Skew` then `P01` through `P99` as each row's own quantiles, always available on every route and never footing (the grand-result row equals `economic_df`'s, that row's scenario cells being its own quantiles). The `economic` exhibit's RAW view serves `economic_df` and `economic_marginal_df` as two blocks with captions distinguishing "the state the book is in" from "each row on its own", suppressing the second when `economic_df` is itself marginal; captions now state the regime in force on marginal ledgers too. The INSURER view is unchanged (one abbreviated sheet). Sync of `tests/data/exhibit_snapshots.json` required.

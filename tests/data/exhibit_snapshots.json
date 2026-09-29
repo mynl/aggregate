@@ -32936,8 +32936,8 @@
        "text": "83.89"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 620.0,
+       "text": "620.00"
       },
       {
        "raw": 426.0027994395041,
@@ -32954,8 +32954,8 @@
        "text": "63.76"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 360.0,
+       "text": "360.00"
       },
       {
        "raw": 192.48474623329446,
@@ -32972,8 +32972,8 @@
        "text": "147.65"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 940.0,
+       "text": "940.00"
       },
       {
        "raw": 618.4875456727981,
@@ -33009,7 +33009,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. It is blank on a ceded step, whose own 1-in-100 is the state in which the cover paid nothing, so the quantile would report its premium rather than any capital.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and the gap between the two columns is the diversification benefit.",
    "columns": [
     {
      "align": "l",
@@ -33104,7 +33104,7 @@
       },
       {
        "raw": 0.5070774083024571,
-       "text": "0.50708"
+       "text": "0.507"
       },
       {
        "raw": 0.16483175378107306,
@@ -33113,10 +33113,6 @@
       {
        "raw": 0.17098656107388605,
        "text": "17.1%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ]
     },
@@ -33141,15 +33137,14 @@
       },
       {
        "raw": 0.4969830060840827,
-       "text": "0.49698"
+       "text": "0.497"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1353107288788896,
+       "text": "-13.5%"
       },
       {
        "flags": [
@@ -33181,15 +33176,14 @@
       },
       {
        "raw": 0.614924629808769,
-       "text": "0.61492"
+       "text": "0.615"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.17711197340373996,
+       "text": "-17.7%"
       },
       {
        "flags": [
@@ -33221,15 +33215,14 @@
       },
       {
        "raw": 0.5835379976351804,
-       "text": "0.58354"
+       "text": "0.584"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.15707761950040758,
+       "text": "-15.7%"
       },
       {
        "flags": [
@@ -33258,7 +33251,7 @@
       },
       {
        "raw": 1.0886772129543212,
-       "text": "1.08868"
+       "text": "1.089"
       },
       {
        "raw": 0.3940552413058428,
@@ -33267,10 +33260,6 @@
       {
        "raw": 0.3940552413058456,
        "text": "39.4%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ],
      "flags": [
@@ -33278,7 +33267,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The two M / M01 columns are the return earned on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state, and they are served only on the steps that bear risk. A cover does not call for capital, it releases it, so a ceded step reads instead under cost of relief: the margin given up per unit of capital the cover hands back, where a low number is the good one, and the test is whether it comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. SA CoC and Div CoC are one quotient, M over the negated M01, on the standalone and diversified capital bases. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -33337,13 +33326,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "M / SD"
+      "MSD"
      ],
      "raw": true
     },
@@ -33356,7 +33344,7 @@
      },
      "key": "c5",
      "name": [
-      "M / M01 standalone"
+      "SA CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -33370,21 +33358,7 @@
      },
      "key": "c6",
      "name": [
-      "M / M01 diversified"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Cost of relief"
+      "Div CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -33405,16 +33379,13 @@
       "text": "CR"
      },
      {
-      "text": "M / SD"
+      "text": "MSD"
      },
      {
-      "text": "M / M01 standalone"
+      "text": "SA CoC"
      },
      {
-      "text": "M / M01 diversified"
-     },
-     {
-      "text": "Cost of relief"
+      "text": "Div CoC"
      }
     ]
    ],
@@ -33455,8 +33426,8 @@
        "text": "83.89"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 1115.0,
+       "text": "1,115.00"
       },
       {
        "raw": null,
@@ -33473,8 +33444,8 @@
        "text": "63.76"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 940.0,
+       "text": "940.00"
       },
       {
        "raw": null,
@@ -33491,8 +33462,8 @@
        "text": "147.65"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 2000.0,
+       "text": "2,000.00"
       },
       {
        "raw": null,
@@ -33525,7 +33496,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. It is blank on a ceded step, whose own 1-in-100 is the state in which the cover paid nothing, so the quantile would report its premium rather than any capital. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -33620,15 +33591,11 @@
       },
       {
        "raw": 0.25400925574735117,
-       "text": "0.25401"
+       "text": "0.254"
       },
       {
        "raw": 0.06309015367610536,
        "text": "6.3%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       },
       {
        "raw": null,
@@ -33657,15 +33624,14 @@
       },
       {
        "raw": 0.3390438910634031,
-       "text": "0.33904"
+       "text": "0.339"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07523844530254795,
+       "text": "-7.5%"
       },
       {
        "raw": null,
@@ -33694,15 +33660,14 @@
       },
       {
        "raw": 0.3060050983292784,
-       "text": "0.30601"
+       "text": "0.306"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.06782512545974877,
+       "text": "-6.8%"
       },
       {
        "raw": null,
@@ -33731,15 +33696,14 @@
       },
       {
        "raw": 0.33452919345393833,
-       "text": "0.33453"
+       "text": "0.335"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07382324222221201,
+       "text": "-7.4%"
       },
       {
        "raw": null,
@@ -33765,15 +33729,11 @@
       },
       {
        "raw": 0.5753160949722593,
-       "text": "0.57532"
+       "text": "0.575"
       },
       {
        "raw": 0.1546252729257952,
        "text": "15.5%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       },
       {
        "raw": null,
@@ -33785,7 +33745,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The two M / M01 columns are the return earned on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state, and they are served only on the steps that bear risk. A cover does not call for capital, it releases it, so a ceded step reads instead under cost of relief: the margin given up per unit of capital the cover hands back, where a low number is the good one, and the test is whether it comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. SA CoC and Div CoC are one quotient, M over the negated M01, on the standalone and diversified capital bases. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -33844,13 +33804,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "M / SD"
+      "MSD"
      ],
      "raw": true
     },
@@ -33863,7 +33822,7 @@
      },
      "key": "c5",
      "name": [
-      "M / M01 standalone"
+      "SA CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -33877,21 +33836,7 @@
      },
      "key": "c6",
      "name": [
-      "M / M01 diversified"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Cost of relief"
+      "Div CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -33912,16 +33857,13 @@
       "text": "CR"
      },
      {
-      "text": "M / SD"
+      "text": "MSD"
      },
      {
-      "text": "M / M01 standalone"
+      "text": "SA CoC"
      },
      {
-      "text": "M / M01 diversified"
-     },
-     {
-      "text": "Cost of relief"
+      "text": "Div CoC"
      }
     ]
    ],
@@ -33968,8 +33910,8 @@
        "text": "-48.89"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 420.0,
+       "text": "420.00"
       },
       {
        "raw": 422.98631767887554,
@@ -34005,7 +33947,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. It is blank on a ceded step, whose own 1-in-100 is the state in which the cover paid nothing, so the quantile would report its premium rather than any capital.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and the gap between the two columns is the diversification benefit.",
    "columns": [
     {
      "align": "l",
@@ -34100,7 +34042,7 @@
       },
       {
        "raw": 0.5057099917516722,
-       "text": "0.50571"
+       "text": "0.506"
       },
       {
        "raw": 0.1630401386192802,
@@ -34109,10 +34051,6 @@
       {
        "raw": 0.16638720555887582,
        "text": "16.6%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ]
     },
@@ -34143,15 +34081,11 @@
         "neg"
        ],
        "raw": -0.347143971720678,
-       "text": "-0.34714"
+       "text": "-0.347"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 0.11639738926924315,
+       "text": "11.6%"
       },
       {
        "raw": 0.1155756142689142,
@@ -34177,7 +34111,7 @@
       },
       {
        "raw": 0.5042702204366026,
-       "text": "0.50427"
+       "text": "0.504"
       },
       {
        "raw": 0.18196155910608228,
@@ -34186,10 +34120,6 @@
       {
        "raw": 0.18196155910608228,
        "text": "18.2%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ],
      "flags": [
@@ -34197,7 +34127,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The two M / M01 columns are the return earned on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state, and they are served only on the steps that bear risk. A cover does not call for capital, it releases it, so a ceded step reads instead under cost of relief: the margin given up per unit of capital the cover hands back, where a low number is the good one, and the test is whether it comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. SA CoC and Div CoC are one quotient, M over the negated M01, on the standalone and diversified capital bases. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -34256,13 +34186,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "M / SD"
+      "MSD"
      ],
      "raw": true
     },
@@ -34275,7 +34204,7 @@
      },
      "key": "c5",
      "name": [
-      "M / M01 standalone"
+      "SA CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -34289,21 +34218,7 @@
      },
      "key": "c6",
      "name": [
-      "M / M01 diversified"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Cost of relief"
+      "Div CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -34324,16 +34239,13 @@
       "text": "CR"
      },
      {
-      "text": "M / SD"
+      "text": "MSD"
      },
      {
-      "text": "M / M01 standalone"
+      "text": "SA CoC"
      },
      {
-      "text": "M / M01 diversified"
-     },
-     {
-      "text": "Cost of relief"
+      "text": "Div CoC"
      }
     ]
    ],
@@ -34377,8 +34289,8 @@
        "text": "83.89265"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 620.0,
+       "text": "620"
       },
       {
        "raw": 426.0027994395041,
@@ -34395,8 +34307,8 @@
        "text": "63.76031"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 360.0,
+       "text": "360"
       },
       {
        "raw": 192.48474623329446,
@@ -34413,8 +34325,8 @@
        "text": "147.653"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 940.0,
+       "text": "940"
       },
       {
        "raw": 618.4875456727981,
@@ -34450,7 +34362,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. It is blank on a ceded step, whose own 1-in-100 is the state in which the cover paid nothing, so the quantile would report its premium rather than any capital.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and the gap between the two columns is the diversification benefit.",
    "columns": [
     {
      "align": "l",
@@ -34545,7 +34457,7 @@
       },
       {
        "raw": 0.5070774083024571,
-       "text": "0.50708"
+       "text": "0.507"
       },
       {
        "raw": 0.16483175378107306,
@@ -34554,10 +34466,6 @@
       {
        "raw": 0.17098656107388605,
        "text": "17.1%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ]
     },
@@ -34582,15 +34490,14 @@
       },
       {
        "raw": 0.4969830060840827,
-       "text": "0.49698"
+       "text": "0.497"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1353107288788896,
+       "text": "-13.5%"
       },
       {
        "flags": [
@@ -34622,15 +34529,14 @@
       },
       {
        "raw": 0.614924629808769,
-       "text": "0.61492"
+       "text": "0.615"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.17711197340373996,
+       "text": "-17.7%"
       },
       {
        "flags": [
@@ -34662,15 +34568,14 @@
       },
       {
        "raw": 0.5835379976351804,
-       "text": "0.58354"
+       "text": "0.584"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.15707761950040758,
+       "text": "-15.7%"
       },
       {
        "flags": [
@@ -34699,7 +34604,7 @@
       },
       {
        "raw": 1.0886772129543212,
-       "text": "1.08868"
+       "text": "1.089"
       },
       {
        "raw": 0.3940552413058428,
@@ -34708,10 +34613,6 @@
       {
        "raw": 0.3940552413058456,
        "text": "39.4%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ],
      "flags": [
@@ -34719,7 +34620,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The two M / M01 columns are the return earned on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state, and they are served only on the steps that bear risk. A cover does not call for capital, it releases it, so a ceded step reads instead under cost of relief: the margin given up per unit of capital the cover hands back, where a low number is the good one, and the test is whether it comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. SA CoC and Div CoC are one quotient, M over the negated M01, on the standalone and diversified capital bases. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -34778,13 +34679,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "M / SD"
+      "MSD"
      ],
      "raw": true
     },
@@ -34797,7 +34697,7 @@
      },
      "key": "c5",
      "name": [
-      "M / M01 standalone"
+      "SA CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -34811,21 +34711,7 @@
      },
      "key": "c6",
      "name": [
-      "M / M01 diversified"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Cost of relief"
+      "Div CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -34846,16 +34732,13 @@
       "text": "CR"
      },
      {
-      "text": "M / SD"
+      "text": "MSD"
      },
      {
-      "text": "M / M01 standalone"
+      "text": "SA CoC"
      },
      {
-      "text": "M / M01 diversified"
-     },
-     {
-      "text": "Cost of relief"
+      "text": "Div CoC"
      }
     ]
    ],
@@ -34896,8 +34779,8 @@
        "text": "83.89087"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 1115.0,
+       "text": "1,115"
       },
       {
        "raw": null,
@@ -34914,8 +34797,8 @@
        "text": "63.75562"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 940.0,
+       "text": "940"
       },
       {
        "raw": null,
@@ -34932,8 +34815,8 @@
        "text": "147.6465"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 2000.0,
+       "text": "2,000"
       },
       {
        "raw": null,
@@ -34966,7 +34849,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. It is blank on a ceded step, whose own 1-in-100 is the state in which the cover paid nothing, so the quantile would report its premium rather than any capital. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and the gap between the two columns is the diversification benefit. The diversified column is blank here: this ledger shares no atoms across its rows, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -35061,15 +34944,11 @@
       },
       {
        "raw": 0.25400925574735117,
-       "text": "0.25401"
+       "text": "0.254"
       },
       {
        "raw": 0.06309015367610536,
        "text": "6.3%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       },
       {
        "raw": null,
@@ -35098,15 +34977,14 @@
       },
       {
        "raw": 0.3390438910634031,
-       "text": "0.33904"
+       "text": "0.339"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07523844530254795,
+       "text": "-7.5%"
       },
       {
        "raw": null,
@@ -35135,15 +35013,14 @@
       },
       {
        "raw": 0.3060050983292784,
-       "text": "0.30601"
+       "text": "0.306"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.06782512545974877,
+       "text": "-6.8%"
       },
       {
        "raw": null,
@@ -35172,15 +35049,14 @@
       },
       {
        "raw": 0.33452919345393833,
-       "text": "0.33453"
+       "text": "0.335"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07382324222221201,
+       "text": "-7.4%"
       },
       {
        "raw": null,
@@ -35206,15 +35082,11 @@
       },
       {
        "raw": 0.5753160949722593,
-       "text": "0.57532"
+       "text": "0.575"
       },
       {
        "raw": 0.1546252729257952,
        "text": "15.5%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       },
       {
        "raw": null,
@@ -35226,7 +35098,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The two M / M01 columns are the return earned on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state, and they are served only on the steps that bear risk. A cover does not call for capital, it releases it, so a ceded step reads instead under cost of relief: the margin given up per unit of capital the cover hands back, where a low number is the good one, and the test is whether it comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. SA CoC and Div CoC are one quotient, M over the negated M01, on the standalone and diversified capital bases. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -35285,13 +35157,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "M / SD"
+      "MSD"
      ],
      "raw": true
     },
@@ -35304,7 +35175,7 @@
      },
      "key": "c5",
      "name": [
-      "M / M01 standalone"
+      "SA CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -35318,21 +35189,7 @@
      },
      "key": "c6",
      "name": [
-      "M / M01 diversified"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Cost of relief"
+      "Div CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -35353,16 +35210,13 @@
       "text": "CR"
      },
      {
-      "text": "M / SD"
+      "text": "MSD"
      },
      {
-      "text": "M / M01 standalone"
+      "text": "SA CoC"
      },
      {
-      "text": "M / M01 diversified"
-     },
-     {
-      "text": "Cost of relief"
+      "text": "Div CoC"
      }
     ]
    ],
@@ -35409,8 +35263,8 @@
        "text": "-48.8869"
       },
       {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 420.0,
+       "text": "420"
       },
       {
        "raw": 422.98631767887554,
@@ -35446,7 +35300,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state, which measures the capital that state calls for. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is each step's own 1-in-100, the capital it would call for alone; tail measures do not add, so it does not foot, and the gap between the two columns is the diversification benefit. It is blank on a ceded step, whose own 1-in-100 is the state in which the cover paid nothing, so the quantile would report its premium rather than any capital.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The diversified column conditions on the whole book landing at its own 1-in-100, so it foots down the walk exactly. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and the gap between the two columns is the diversification benefit.",
    "columns": [
     {
      "align": "l",
@@ -35541,7 +35395,7 @@
       },
       {
        "raw": 0.5057099917516722,
-       "text": "0.50571"
+       "text": "0.506"
       },
       {
        "raw": 0.1630401386192802,
@@ -35550,10 +35404,6 @@
       {
        "raw": 0.16638720555887582,
        "text": "16.6%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ]
     },
@@ -35584,15 +35434,11 @@
         "neg"
        ],
        "raw": -0.347143971720678,
-       "text": "-0.34714"
+       "text": "-0.347"
       },
       {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
+       "raw": 0.11639738926924315,
+       "text": "11.6%"
       },
       {
        "raw": 0.1155756142689142,
@@ -35618,7 +35464,7 @@
       },
       {
        "raw": 0.5042702204366026,
-       "text": "0.50427"
+       "text": "0.504"
       },
       {
        "raw": 0.18196155910608228,
@@ -35627,10 +35473,6 @@
       {
        "raw": 0.18196155910608228,
        "text": "18.2%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ],
      "flags": [
@@ -35638,7 +35480,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios. Premium and margin spent are against the gross block. The two M / M01 columns are the return earned on the capital a 1-in-100 outcome calls for, on each of the walk's two readings of that state, and they are served only on the steps that bear risk. A cover does not call for capital, it releases it, so a ceded step reads instead under cost of relief: the margin given up per unit of capital the cover hands back, where a low number is the good one, and the test is whether it comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. SA CoC and Div CoC are one quotient, M over the negated M01, on the standalone and diversified capital bases. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -35697,13 +35539,12 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 5,
-      "group": true,
+      "digits": 3,
       "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "M / SD"
+      "MSD"
      ],
      "raw": true
     },
@@ -35716,7 +35557,7 @@
      },
      "key": "c5",
      "name": [
-      "M / M01 standalone"
+      "SA CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -35730,21 +35571,7 @@
      },
      "key": "c6",
      "name": [
-      "M / M01 diversified"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Cost of relief"
+      "Div CoC"
      ],
      "raw": true,
      "tag": "ratio"
@@ -35765,16 +35592,13 @@
       "text": "CR"
      },
      {
-      "text": "M / SD"
+      "text": "MSD"
      },
      {
-      "text": "M / M01 standalone"
+      "text": "SA CoC"
      },
      {
-      "text": "M / M01 diversified"
-     },
-     {
-      "text": "Cost of relief"
+      "text": "Div CoC"
      }
     ]
    ],

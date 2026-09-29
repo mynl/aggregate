@@ -258,7 +258,7 @@ AXIS_BLOCKS = {
 #: ``cov``, ``corr``, the bivariate support bounds).
 PENDING_VOCABULARY = frozenset({
     'Change CV', 'Change EX', 'D_g_inv', 'Est', 'Gross CV',
-    'Gross EX', 'Gross Sk', 'M / SD',
+    'Gross EX', 'Gross Sk',
     'Net CV', 'Net EX', 'Net Sk', 'Ref', 'Subject CV',
     'Subject EX', 'Subject Sk', 'closed_form', 'corr', 'cov',
     'cv', 'max', 'mean', 'min', 'sd', 'skew', 'support_max',
@@ -1019,45 +1019,40 @@ def test_waterfall_diversified_foots_and_standalone_does_not(tower):
     sa = walk['M01 standalone']
     # the steps before the closing row sum to the closing row, exactly
     assert div.iloc[:-1].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
-    # standalone is a quantile and does not foot. The tower's one risk step
-    # before the close is Gross, since a361 blanks the ceded step, so the
-    # assertion is stated on that row explicitly rather than through a
-    # NaN-skipping sum whose meaning would drift with the fixture.
-    assert sa['Gross'] != pytest.approx(sa.iloc[-1], rel=1e-6)
+    # standalone is a quantile (two-sided by role since a365) and does not
+    # foot: the pre-close cells do not sum to the closing cell
+    assert sa.iloc[:-1].sum() != pytest.approx(sa.iloc[-1], rel=1e-6)
     # the expected margin foots too, by linearity
     assert walk['Margin'].iloc[:-1].sum() == pytest.approx(
         walk['Margin'].iloc[-1], rel=1e-9)
 
 
 def test_waterfall_capital_ratio_definition(tower):
-    """``M / -M_100``: the quotient, routed by role since a361.
+    """``M / -M01``: one quotient per basis, on every row, since a365.
 
-    The standalone basis is asserted on risk rows only, since the ceded cells
-    are blank by design. The diversified quotient is one piece of arithmetic
-    landing in ``M / M01 diversified`` on a risk row and in ``Cost of
-    relief`` on a ceded row, with the other column blank.
+    The a361 role routing (``Cost of relief`` beside ``M / M01
+    diversified``) reverted: the sign convention carries the reading, so
+    each basis is a single column and the identity holds on risk and ceded
+    rows alike.
     """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
     _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
-    ceded = walk['M01 standalone'].isna()
     for step in walk.index:
         margin = walk['Margin'][step]
-        if not ceded[step]:
-            assert ev['M / M01 standalone'][step] == pytest.approx(
-                margin / -walk['M01 standalone'][step])
-        m100 = walk['M01 diversified'][step]
-        got = ev['Cost of relief' if ceded[step]
-                 else 'M / M01 diversified'][step]
-        assert got == pytest.approx(margin / -m100)
+        assert ev['SA CoC'][step] == pytest.approx(
+            margin / -walk['M01 standalone'][step])
+        assert ev['Div CoC'][step] == pytest.approx(
+            margin / -walk['M01 diversified'][step])
 
 
-def test_waterfall_ceded_step_blanks_standalone_and_reads_relief(tower):
-    """[Waterfall-Ceded-Steps]: a hedge answers cost of relief, nothing else.
+def test_waterfall_sign_convention_by_role(tower):
+    """[Writer-Standalone]: the sign flip is the marker of a row's role.
 
-    A ceded step has no standalone capital (its own 1-in-100 is the state in
-    which it paid nothing) and it releases diversified capital rather than
-    calling for it, so its one ratio is the cost of that relief. A risk step
-    is the mirror image.
+    A ceded row has margin < 0 and both M01 cells > 0 (the standalone is the
+    writer's right-tail 1-in-100, the diversified is the capital the cover
+    releases), so both CoC quotients are finite and positive: costs of
+    relief. A risk-bearing row is the mirror image (margin > 0, both M01
+    < 0, both CoC the return on capital). This supersedes the a361 blanks.
     """
     import numpy as np
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
@@ -1067,15 +1062,48 @@ def test_waterfall_ceded_step_blanks_standalone_and_reads_relief(tower):
     risk_steps = [s for s in walk.index if s not in ceded_steps]
     assert ceded_steps and len(risk_steps) >= 2
     for step in ceded_steps:
-        assert pd.isna(walk['M01 standalone'][step])
-        assert pd.isna(ev['M / M01 standalone'][step])
-        assert pd.isna(ev['M / M01 diversified'][step])
-        assert np.isfinite(ev['Cost of relief'][step])
+        assert walk['Margin'][step] < 0
+        assert walk['M01 standalone'][step] > 0
+        assert walk['M01 diversified'][step] > 0
+        assert np.isfinite(ev['SA CoC'][step]) and ev['SA CoC'][step] > 0
+        assert np.isfinite(ev['Div CoC'][step]) and ev['Div CoC'][step] > 0
     for step in risk_steps:
-        assert np.isfinite(walk['M01 standalone'][step])
-        assert np.isfinite(ev['M / M01 standalone'][step])
-        assert np.isfinite(ev['M / M01 diversified'][step])
-        assert pd.isna(ev['Cost of relief'][step])
+        assert walk['M01 standalone'][step] < 0
+        assert walk['M01 diversified'][step] < 0
+        assert np.isfinite(ev['SA CoC'][step])
+        assert np.isfinite(ev['Div CoC'][step])
+
+
+def test_waterfall_capstone_acceptance():
+    """The a365 acceptance table on the author's capstone program.
+
+    Div CoC carries the a361 acceptance numbers in one column (the role
+    routing reverted); the SA CoC ceded cells are the new writer-side
+    right-tail numbers, first computed 2026-09-29 (XOL 1800 / 4800, QS
+    776.25 / 5036.25; the QS cells agree across bases because a quota share
+    of the whole book is comonotone with it).
+    """
+    p = build(
+        'xpnl Acc.Capstone derive premium less '
+        'agg Acc.FullProgram '
+        '[2000 5000 10000 3000 1000] premium as GWP '
+        'at [0.95 0.95 0.9 0.85 0.75] lr '
+        '[500 1000 5000 10000 5000] xs [0 0 0 0 1000] '
+        'sev 151.63266492815836 * lognorm 1 '
+        'picks [500 1000 2000 5000 10000] [14900 2250 1250 500 50] '
+        'occurrence net of 90% po 4500 xs 500 deposit 6000 as "XOL layer" '
+        'mixed gamma 0.125 '
+        'aggregate net of 75% po inf xs 0 rate 1 cede 0.275 as QS '
+        'less 0.25 premium expenses as "G&A" peel bottom-up')
+    ev = p.evaluation_df
+    got = [round(v, 4) for v in ev['Div CoC']]
+    assert got == [0.2332, 1.3955, 0.1541, -0.2136]
+    assert round(ev['MSD']['Gross'], 3) == 0.451
+    got_sa = [round(v, 4) for v in ev['SA CoC']]
+    assert got_sa == [0.199, 0.375, 0.1541, -0.2136]
+    walk = p.walk_df
+    assert walk['M01 standalone']['XOL layer'] == pytest.approx(4800.0)
+    assert walk['M01 standalone']['QS'] == pytest.approx(5036.25)
 
 
 def test_waterfall_closing_row_standalone_equals_diversified(tower):

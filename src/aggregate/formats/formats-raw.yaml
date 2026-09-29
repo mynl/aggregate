@@ -131,10 +131,12 @@ columns:
   M_share: ratio
   'Premium spent': ratio
   'Margin spent': ratio
-  'M / M01 standalone': ratio   # a return on the capital the 1-in-100 state
-  'M / M01 diversified': ratio  # calls for, so it reads as ROE and coc do
-  'Cost of relief': ratio       # price per unit of capital released, read as
-                                # a percentage like the two returns beside it
+  MSD: '.3f'           # margin to standard deviation, a multiple, read to
+                       # the same places as PQ and VaR/Mean
+  'SA CoC': ratio      # cost of capital on the standalone basis: a return
+                       # on risk rows, a cost of relief on ceded rows, so it
+                       # reads as ROE and coc do
+  'Div CoC': ratio     # the same quotient on the diversified basis
 
   # --- missing from round 1
   Mean: money

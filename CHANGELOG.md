@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a368
+
+**[Palm-Kappa-Chart] the aggregate kappa chart defaults to the Palm route, per layer, with the band behind `bands=`.** An `Aggregate` with an occurrence program now serves the kappa chart off the 1-D Palm conditional-mean identity on the fine model grid, no joint: one mean curve per occurrence layer (labeled by the declared `as` label or the DecL descriptor; a single-layer program serves the total only), the exact total, the mirrored net and the identity, `meta` recording `route: 'palm'`. New keyword `bands=True` opts the joint-derived percentile band back in through the `occ_joint` memo; a `BivariateAggregate` input keeps the full band chart; a frequency without the new read-only property `Frequency.supports_pgf_prime` (or a signed or windowed grid) serves the 2-D band chart unchanged, `meta` `route: '2d-fallback'`. Both routes now start the drawn window strictly above zero, so a budget grid with visible mass in the zero bucket no longer puts a NaN share in the document. The label helpers `_reins_layer_label` / `_layer_descriptor` hoisted from `_pnl_builders` to `_reinsurance`.
+
+**Breaking, provisional tier (`aggregate.charts`):** a consumer reading the band series off the aggregate route must now pass `bands=True`; the default document carries mean curves only.
+
 ## 1.0.0a367
 
 **[PnL-Reins-Passthrough] the reins exhibit and chart serve for a ceded P&L, through its engine.** New delegating properties `PnL.reins_stats_df` and `PnL.reins_summary_df` (empty frame with no engine) let the shared `_reins_frames` builder and the Aggregate insurer translation (contract, consequence, summary) work unchanged for `PnL`; availability (`_has_reinsurance`) looks through `obj.engine`. The `reins` chart registers for `PnL` by delegating to the wrapped engine, with availability gated on an occurrence program; the module's "Aggregate only, at 1.0" note records the 2026-09-29 supersession for the P&L case (an `xpnl` wraps a single aggregate, so the portfolio objection does not apply). A P&L without a cession serves neither. Sync of `tests/data/exhibit_snapshots.json` required.

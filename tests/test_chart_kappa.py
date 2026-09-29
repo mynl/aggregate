@@ -347,19 +347,170 @@ def test_the_book_keeps_its_own_primary_picture(port):
     assert primary_chart(port) == 'port'
 
 
-def test_the_aggregate_delegate_draws_the_band(joint):
-    """An occurrence program answers off the joint it implies."""
-    agg = build(LAYER)
-    direct = build_chart_doc(joint, 'kappa')
-    delegated = build_chart_doc(agg, 'kappa')
-    assert [s.name for s in delegated.series] == [s.name for s in direct.series]
-    assert delegated.hash == direct.hash
-
-
 def test_the_delegate_reads_the_held_joint(joint):
-    """Decision 6 end to end: drawing after an allocation costs a lookup."""
+    """Decision 6 end to end: drawing after an allocation costs a lookup.
+
+    Under the Palm default no joint is built at all, so the memo reading is
+    exercised where the joint is actually wanted: the ``bands`` overlay.
+    """
     agg = build(LAYER)
-    build_chart_doc(agg, 'kappa')
+    build_chart_doc(agg, 'kappa', bands=True)
     first = agg.occ_joint(views=('gross', 'ceded'))
-    build_chart_doc(agg, 'kappa')
+    build_chart_doc(agg, 'kappa', bands=True)
     assert agg.occ_joint(views=('gross', 'ceded')) is first
+
+
+# --- the Palm route ([Palm-Kappa-Chart], 1.0.0a368) -------------------------
+
+# A frequency outside the pgf-derivative set: the fallback's load-bearing case.
+FALLBACK = ('agg CK.F 10 claims 500 xs 0 sev lognorm 50 cv 1.5 '
+            'occurrence net of 50 xs 50 logarithmic')
+
+
+@pytest.fixture(scope='module')
+def palm_doc():
+    return build_chart_doc(build(TOWER), 'kappa')
+
+
+def test_palm_is_the_default_route(palm_doc):
+    """Mean curves off the 1-D identity: no band, and the meta says why."""
+    assert palm_doc.meta['route'] == 'palm'
+    assert palm_doc.meta['band'] == 'none'
+    assert not [s for s in palm_doc.series if s.y2 is not None]
+    assert [p.id for p in palm_doc.panels] == ['cession', 'share']
+    assert {p.x_axis for p in palm_doc.panels} == {'outcome'}
+    assert palm_doc.panels[0].aspect == 'equal'
+
+
+def test_palm_serves_one_curve_per_layer(palm_doc):
+    """The picture the 2-D route cannot draw: each layer's own cession."""
+    layers = [s for s in series_of(palm_doc, 'cession')
+              if s.role == 'ceded' and s.name != 'E[ceded | gross]']
+    assert [s.name for s in layers] == ['occ 50 xs 50', 'occ 100 xs 100']
+
+
+def test_palm_layers_foot_to_the_total_and_the_identity(palm_doc):
+    """Linearity of the conditional mean, cell by cell.
+
+    Per-layer ceders sum identically to the program ceder (the validator
+    rejects overlapping cessions), so the layer curves sum to the total; and
+    ``total + net = g`` is the same identity footing as the band chart.
+    """
+    g = np.asarray(named(palm_doc, 'cession', 'gross').y_values, dtype=float)
+    total = np.asarray(
+        named(palm_doc, 'cession', 'E[ceded | gross]').y_values, dtype=float)
+    net = np.asarray(
+        named(palm_doc, 'cession', 'E[net | gross]').y_values, dtype=float)
+    layers = sum(np.asarray(s.y_values, dtype=float)
+                 for s in series_of(palm_doc, 'cession')
+                 if s.role == 'ceded' and s.name != 'E[ceded | gross]')
+    assert layers == pytest.approx(total, abs=1e-9)
+    assert (total + net) == pytest.approx(g, abs=1e-9)
+
+
+def test_palm_total_agrees_with_the_2d_route():
+    """The two computations of one conditional mean meet in the middle.
+
+    The Palm curve lives on the fine model grid, the 2-D ``exeqa`` curve on
+    the joint's budget grid; interpolating the fine curve at the coarse
+    grid's points, the gap is the joint's budget-grid coarseness. Observed
+    at implementation (2026-09-29): max 0.20% relative, median 0.017%, over
+    the 353 coarse cells clearing the 5% floor; the 5% tolerance absorbs
+    the interpolation, not the identity.
+    """
+    agg = build(TOWER)
+    palm = build_chart_doc(agg, 'kappa')
+    band = build_chart_doc(agg.occ_joint(views=('gross', 'ceded')), 'kappa')
+    fine = named(palm, 'cession', 'E[ceded | gross]')
+    coarse = named(band, 'cession', 'E[ceded | gross]')
+    g_fine = np.asarray(fine.x_values, dtype=float)
+    y_fine = np.asarray(fine.y_values, dtype=float)
+    g_coarse = np.asarray(coarse.x_values, dtype=float)
+    y_coarse = np.asarray(coarse.y_values, dtype=float)
+    inside = (g_coarse >= g_fine[0]) & (g_coarse <= g_fine[-1])
+    at = np.interp(g_coarse[inside], g_fine, y_fine)
+    ok = y_coarse[inside] > 0.05 * np.nanmax(y_coarse)
+    rel = np.abs(at[ok] - y_coarse[inside][ok]) / y_coarse[inside][ok]
+    assert np.nanmax(rel) < 0.05
+
+
+def test_bands_opt_back_in():
+    """``bands=True``: the joint's band series ride on the Palm chart."""
+    agg = build(TOWER)
+    doc = build_chart_doc(agg, 'kappa', bands=True)
+    assert doc.meta['route'] == 'palm'
+    assert doc.meta['band'] == 'percentile'
+    pure = build_chart_doc(agg.occ_joint(views=('gross', 'ceded')), 'kappa')
+    for role in ('ceded', 'net'):
+        mine = next(s for s in series_of(doc, 'cession')
+                    if s.y2 is not None and s.role == role)
+        theirs = next(s for s in series_of(pure, 'cession')
+                      if s.y2 is not None and s.role == role)
+        assert mine.name == theirs.name
+        assert mine.y_values == theirs.y_values
+        assert mine.y2 == theirs.y2
+        assert mine.x_lattice == theirs.x_lattice
+
+
+def test_fallback_for_a_frequency_without_a_pgf_derivative():
+    """Chart availability moves for no object: logarithmic still serves.
+
+    The served document is the band chart off the implied joint, unchanged
+    apart from the ``route`` meta key that says which way it came.
+    """
+    agg = build(FALLBACK)
+    assert 'kappa' in available_charts(agg)
+    doc = build_chart_doc(agg, 'kappa')
+    assert doc.meta['route'] == '2d-fallback'
+    assert doc.meta['band'] == 'percentile'
+    direct = build_chart_doc(agg.occ_joint(views=('gross', 'ceded')), 'kappa')
+    assert doc.series == direct.series
+    assert doc.axes == direct.axes
+    assert doc.panels == direct.panels
+
+
+def test_single_layer_serves_the_total_only():
+    """One layer's curve is the total: serve one line, not two identical."""
+    doc = build_chart_doc(build(LAYER), 'kappa')
+    assert doc.meta['route'] == 'palm'
+    cession = [s.name for s in series_of(doc, 'cession')]
+    assert cession == ['E[ceded | gross]', 'E[net | gross]', 'gross']
+    assert [s.name for s in series_of(doc, 'share')] == [
+        'ceded share', 'most the program could cede']
+
+
+def test_palm_doc_round_trips_hash_for_hash(palm_doc):
+    back = load_chart_doc(json.loads(json.dumps(canonical_dict(palm_doc))))
+    assert doc_hash(back) == palm_doc.hash
+    assert back == palm_doc
+
+
+def test_palm_doc_renders(palm_doc):
+    """The generic renderer draws it: no per-chart matplotlib code exists."""
+    import matplotlib
+    matplotlib.use('Agg')
+    from aggregate.plots import plot_chartdoc
+
+    fig = plot_chartdoc(palm_doc)
+    assert len(fig.axes) >= 2
+
+
+def test_supports_pgf_prime_truth_table():
+    """The capability the route switch keys on, family by family."""
+    from aggregate.distributions import Frequency
+
+    supported = {
+        'poisson': (0, 0), 'binomial': (0.4, 0), 'negbin': (2.25, 0),
+        'geometric': (0, 0), 'fixed': (0, 0), 'bernoulli': (0, 0),
+        'empirical': (np.array([0, 1, 3]), np.array([0.4, 0.4, 0.2])),
+        'gamma': (0.5, 0), 'delaporte': (0.5, 0.3), 'ig': (0.6, 0),
+    }
+    unsupported = {
+        'logarithmic': (0, 0), 'sig': (0.5, 0.5), 'beta': (2.0, 3.0),
+        'sichel': (0.5, 0.5), 'neymana': (2.0, 0), 'pascal': (1.5, 2.0),
+    }
+    for name, (a, b) in supported.items():
+        assert Frequency(name, a, b, False, np.nan).supports_pgf_prime, name
+    for name, (a, b) in unsupported.items():
+        assert not Frequency(name, a, b, False, np.nan).supports_pgf_prime, \
+            name

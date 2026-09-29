@@ -54,6 +54,11 @@ from __future__ import annotations
 import numpy as np
 
 from ._pnl import Leg, Group, PnL
+# Hoisted to ``_reinsurance`` ([Palm-Kappa-Chart]): the kappa chart names its
+# per-layer curves with the same helper, and charts must not import this
+# module.
+from ._reinsurance import (_SITE_PREFIX, _layer_descriptor,
+                           _reins_layer_label)
 
 __all__ = ['build_plain_pnl', 'build_consolidated_pnl', 'build_xpnl_walk',
            'build_xpnl_peel', 'build_variable_pnl', 'build_reinstatement_pnl',
@@ -363,37 +368,6 @@ def _first_reins_label(agg, site):
     d = getattr(agg, 'label_map', None) or {}
     d = d.get(site) or {}
     return d[min(d)] if d else None
-
-
-#: Cession-basis prefix used in a default step label, keyed by ``label_map`` site.
-_SITE_PREFIX = {'occ_reins': 'occ', 'agg_reins': 'agg'}
-
-
-def _layer_descriptor(site, clause):
-    """One layer as its DecL descriptor, e.g. ``'occ 300 xs 200'``.
-
-    Reuses the writer's cession renderer, so the descriptor is exactly the DecL
-    the layer round-trips to (a full-line share renders ``limit xs attach``, a
-    partial share ``share% po limit xs attach``).
-    """
-    from .decl_writer import _render_reins_clause
-    return f'{_SITE_PREFIX[site]} {_render_reins_clause(clause)}'
-
-
-def _reins_layer_label(agg, site, index, clause):
-    """The step label for one reinsurance layer ([Walk-Step-Default-Labels]).
-
-    The layer's declared ``as`` label wins, read from the sparse
-    ``{layer_index: label}`` dict pooled into the engine's ``label_map``
-    (``agg.labels.occ_reins`` / ``.agg_reins``); an undeclared layer falls back
-    to its DecL descriptor, which is distinct per layer because the validator
-    rejects overlapping cessions. ``site`` is ``'occ_reins'`` or
-    ``'agg_reins'``.
-    """
-    d = (getattr(agg, 'label_map', None) or {}).get(site) or {}
-    if index in d and d[index]:
-        return str(d[index])
-    return _layer_descriptor(site, clause)
 
 
 def _tier_label(agg, site, generic):

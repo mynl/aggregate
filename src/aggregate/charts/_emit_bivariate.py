@@ -31,13 +31,25 @@ program, which is not "what do I cede on average when the year comes in at
 and how much am I actually ceding". The gross outcome does not determine the
 cession, and the band is where that story is.
 
+The band is a property of the conditional *distribution*, which only a 2-D
+joint knows, so it is served exactly where a joint is the input: a
+:class:`~aggregate.bivariate.BivariateAggregate` keeps the full band chart.
+An :class:`~aggregate.Aggregate` defaults to the Palm conditional-mean route
+([Palm-Kappa-Chart]): mean curves only, one per occurrence layer, computed
+by 1-D FFT on the fine model grid with no joint; ``bands=True`` opts the
+percentile band back in, and a frequency without the pgf derivative falls
+back to the joint band chart, so availability moves for no object.
+
 Pure numpy; no matplotlib (the plots boundary), no ECharts vocabulary.
 """
+
+import dataclasses
 
 import numpy as np
 
 from .._aggregate import Aggregate
 from .._grid_distribution import GridDistribution
+from .._reinsurance import _reins_layer_label, make_ceder_netter
 from ..bivariate import BivariateAggregate
 from . import register_chart, _emitter_base
 from ._payload import lattice_payload
@@ -601,6 +613,12 @@ def _kappa_band(bv, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
             f'the kappa band has two edges, a lower and an upper level; got '
             f'{levels!r}.')
     df, axis = _kappa_frame(bv, levels, cdf_range)
+    # The drawn window starts strictly above zero: the share panel is a
+    # ratio, undefined at g = 0, and the cession reading there is
+    # identically zero. A budget grid whose zero bucket holds more than the
+    # window floor would otherwise put a NaN share in the document, which
+    # canonical JSON refuses ([Palm-Kappa-Chart]).
+    df = df[df.index > 0]
     other_name = bv.unit_names[1 - axis]
     other_view = bv._views[1 - axis]
 
@@ -697,17 +715,206 @@ def _kappa_band(bv, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
     ))
 
 
-@chart_kappa.register(Aggregate)
-def _kappa_from_aggregate(agg, **options):
-    """The band chart for an occurrence program, off the joint it implies.
+def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
+                ceiling=True, bands=False):
+    """Emit the per-layer kappa chart for an occurrence program, all 1-D.
 
-    A thin delegate. The curves are a property of the cession rather than of a
-    calibration, so this is a chart on the built object and not a fourth
-    pricing call; what it needs is the joint, and
-    :meth:`~aggregate.distributions.Aggregate.occ_joint` holds one, so drawing
-    after an allocation costs a lookup rather than a second 2-D FFT.
+    Parameters
+    ----------
+    agg : Aggregate
+        An updated aggregate carrying an occurrence program, whose frequency
+        supports the pgf derivative
+        (:attr:`~aggregate._frequency.Frequency.supports_pgf_prime`).
+    levels : (float, float), default :data:`KAPPA_LEVELS`
+        The band's lower and upper probability; read only under ``bands``.
+    cdf_range : (float, float), default :data:`KAPPA_CDF_RANGE`
+        The probability window on the gross compound the curves are drawn
+        over, mirroring the band chart's window on the gross marginal.
+    ceiling : bool, default True
+        Draw the deterministic ceiling on the share panel where the program
+        is a single layer (:func:`_kappa_ceiling`).
+    bands : bool, default False
+        Build (or reuse, via the :meth:`occ_joint` memo) the budget-grid
+        joint and overlay the total ceded and net percentile band series.
+
+    Returns
+    -------
+    ChartDoc
+        The same two panels as :func:`_kappa_band`: **cession** carries one
+        mean curve per occurrence layer (a single-layer program serves the
+        total only, rather than two identical lines), the total
+        ``E[ceded | gross]``, the mirrored net curve and the identity;
+        **share** carries the total ceded share and the ceiling. ``meta``
+        records ``route: 'palm'``.
+
+    Notes
+    -----
+    **One Palm call per layer, no joint.** Each layer's curve is
+    :meth:`~aggregate.distributions.Aggregate.palm_kappa` of that layer's
+    ceder (``make_ceder_netter([clause])[0]``) conditioned on the gross
+    aggregate, a pair of 1-D FFTs on the fine model grid. The validator
+    rejects overlapping cessions, so the per-layer ceders sum identically to
+    the program ceder and the layer curves sum to the total **by linearity
+    of the conditional mean**: the total is the sum, exactly, never a second
+    computation. Net is ``g - total``, the same identity footing as the band
+    chart.
+
+    **Mean curves only.** The percentile band is a property of the
+    conditional *distribution*, which only a 2-D joint knows; ``bands``
+    opts back into it (two ``y2`` series on the joint's budget grid), and a
+    :class:`~aggregate.bivariate.BivariateAggregate` input keeps the full
+    band chart.
+
+    **The window.** The gross axis is windowed to ``cdf_range`` on the
+    conditioning density the kernel returns (the gross compound), and cells
+    where that density is negligible (the kernel's ``NaN`` guard) are
+    dropped: on a continuous compound the window is a contiguous lattice
+    slice and ships as three numbers, on a gappy one the grid goes out
+    explicit, both exact.
+
+    **Per-layer share curves are deliberately absent**: the share panel's
+    reading is one number against the ceiling, and layering it would
+    clutter the panel without adding a reading the cession panel does not
+    already carry.
     """
-    return _kappa_band(agg.occ_joint(views=('gross', 'ceded')), **options)
+    program = agg.occ_reins
+    layer_curves = []
+    f_n = None
+    for clause in program:
+        ceder = make_ceder_netter([clause])[0]
+        kappa, f_n = agg.palm_kappa(ceder)
+        layer_curves.append(np.asarray(kappa, dtype=float))
+    # Every layer shares one conditioning subject, so the NaN guard cells
+    # align and the exact total keeps them.
+    total = np.sum(layer_curves, axis=0)
+
+    lo_p, hi_p = (float(v) for v in cdf_range)
+    cdf = np.cumsum(np.asarray(f_n, dtype=float))
+    i0 = int(np.searchsorted(cdf, lo_p))
+    i1 = min(int(np.searchsorted(cdf, hi_p)) + 1, cdf.size)
+    idx = np.arange(i0, i1)
+    idx = idx[np.isfinite(total[idx])]
+    xs = np.asarray(agg.xs, dtype=float)
+    # Strictly above zero, as on the band route: the share is undefined at
+    # g = 0 and NaN cannot ride in the document.
+    idx = idx[xs[idx] > 0]
+    g = xs[idx]
+
+    step = float(agg.bs)
+    x = lattice_payload(g, step)
+    series = []
+    if len(program) > 1:
+        for index, (clause, curve) in enumerate(zip(program, layer_curves)):
+            series.append(ChartSeries(
+                name=_reins_layer_label(agg, 'occ_reins', index, clause),
+                role='ceded', panel_id='cession', support='continuous',
+                y=tuple(float(v) for v in curve[idx]), **x))
+    total_w = total[idx]
+    net = g - total_w
+    series += [
+        ChartSeries(name='E[ceded | gross]', role='ceded',
+                    panel_id='cession', support='continuous',
+                    y=tuple(float(v) for v in total_w), **x),
+        ChartSeries(name='E[net | gross]', role='net',
+                    panel_id='cession', support='continuous',
+                    y=tuple(float(v) for v in net), **x),
+        ChartSeries(name='gross', role='identity', panel_id='cession',
+                    support='continuous',
+                    y=tuple(float(v) for v in g), **x),
+    ]
+
+    meta = {'route': 'palm', 'cdf_range': [lo_p, hi_p], 'band': 'none'}
+    if bands:
+        levels = tuple(sorted(float(v) for v in levels))
+        if len(levels) != 2:
+            raise ValueError(
+                f'the kappa band has two edges, a lower and an upper level; '
+                f'got {levels!r}.')
+        bv = agg.occ_joint(views=('gross', 'ceded'))
+        df, axis = _kappa_frame(bv, levels, cdf_range)
+        other_name = bv.unit_names[1 - axis]
+        gj = df.index.to_numpy(dtype=float)
+        b_lo = df[bv._quantile_column(levels[0], other_name)] \
+            .to_numpy(dtype=float)
+        b_hi = df[bv._quantile_column(levels[1], other_name)] \
+            .to_numpy(dtype=float)
+        xb = lattice_payload(gj, float(bv.bs[axis]))
+        band_label = (f'{levels[0]:.0%} to {levels[1]:.0%} percentile band'
+                      .replace('%%', '%'))
+        series += [
+            ChartSeries(name=f'ceded {band_label}', role='ceded',
+                        panel_id='cession', support='continuous',
+                        y=tuple(float(v) for v in b_lo),
+                        y2=tuple(float(v) for v in b_hi), **xb),
+            ChartSeries(name=f'net {band_label}', role='net',
+                        panel_id='cession', support='continuous',
+                        y=tuple(float(v) for v in gj - b_hi),
+                        y2=tuple(float(v) for v in gj - b_lo), **xb),
+        ]
+        meta['band'] = 'percentile'
+        meta['levels'] = [float(v) for v in levels]
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        share = np.where(g > 0, total_w / g, np.nan)
+    series.append(ChartSeries(
+        name='ceded share', role='ceded', panel_id='share',
+        support='continuous',
+        y=tuple(float(v) for v in share), **x))
+    top = _kappa_ceiling(agg, g) if ceiling else None
+    if top is not None:
+        with np.errstate(divide='ignore', invalid='ignore'):
+            top_share = np.where(g > 0, top / g, np.nan)
+        series.append(ChartSeries(
+            name='most the program could cede', role='ceiling',
+            panel_id='share', support='continuous',
+            y=tuple(float(v) for v in top_share), **x))
+
+    window = (float(g[0]), float(g[-1]))
+    return complete_tex(ChartDoc(
+        name='kappa',
+        title=f'Conditional cession: {agg.label}',
+        axes=(
+            ChartAxis(id='outcome', label='Gross outcome', unit='currency',
+                      scales=('linear', 'log'), suggested_range=window),
+            ChartAxis(id='cession', label='Conditional cession',
+                      unit='currency', scales=('linear', 'log'),
+                      suggested_range=(0.0, float(g[-1]))),
+            ChartAxis(id='share', label='Share ceded',
+                      unit='ratio', suggested_range=(0.0, 1.0)),
+        ),
+        panels=(
+            Panel(id='cession', kind='xy', x_axis='outcome',
+                  y_axis='cession', aspect='equal',
+                  title='Cession given the gross outcome'),
+            Panel(id='share', kind='xy', x_axis='outcome', y_axis='share',
+                  title='Cession as share of gross'),
+        ),
+        series=tuple(series),
+        meta=meta,
+    ))
+
+
+@chart_kappa.register(Aggregate)
+def _kappa_from_aggregate(agg, bands=False, **options):
+    """The route switch for an occurrence program ([Palm-Kappa-Chart]).
+
+    The default route is the Palm conditional-mean identity
+    (:func:`_kappa_palm`): mean curves only, one per occurrence layer, on
+    the fine model grid with no joint. ``bands=True`` overlays the
+    joint-derived percentile band on that chart. A frequency without
+    :attr:`~aggregate._frequency.Frequency.supports_pgf_prime`, or a signed
+    or windowed grid (the kernel's own refusals), serves exactly the 2-D
+    band chart off :meth:`occ_joint` instead, so chart availability moves
+    for no object; the fallback's ``meta`` records ``route: '2d-fallback'``.
+    """
+    palm_ready = (agg.frequency.supports_pgf_prime
+                  and not agg.i0
+                  and not (agg.bs and int(round(agg.x_min / agg.bs))))
+    if not palm_ready:
+        doc = _kappa_band(agg.occ_joint(views=('gross', 'ceded')), **options)
+        return dataclasses.replace(
+            doc, meta={**doc.meta, 'route': '2d-fallback'})
+    return _kappa_palm(agg, bands=bands, **options)
 
 
 def _kappa_available(obj):

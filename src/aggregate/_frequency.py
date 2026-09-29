@@ -483,6 +483,36 @@ class Frequency(HelpMixin):
         a, b = self.panjer_ab
         return (a + b) * type(self).freq_pgf(self, n, z) / (1 - a * z)
 
+    @property
+    def supports_pgf_prime(self):
+        """True when the family can evaluate the pgf derivative.
+
+        The capability the kappa chart and the Palm scenario ladder key on:
+        callers that would otherwise catch ``NotImplementedError`` from
+        :meth:`freq_pgf_prime` read this instead, so chart availability and
+        the emitter's route switch agree without a try/except at predicate
+        time.
+
+        Returns
+        -------
+        bool
+            ``True`` for the (a, b, 0) families (the ``_panjer_ab0`` flag)
+            and for any subclass carrying a closed-form
+            :meth:`freq_pgf_prime` override (fixed, bernoulli,
+            empirical/renewal, and the gamma, delaporte and ig mixed
+            Poissons); ``False`` for the rest (logarithmic, sig, beta,
+            sichel and variants, neymana, pascal).
+
+        Notes
+        -----
+        Reads the override off the **class**, never the instance:
+        ``_install_zm_wrappers`` layers a ``c G'`` wrapper onto the
+        instance, and a zero-modified member of an unsupported family must
+        still answer ``False`` (the wrapper wraps a route that raises).
+        """
+        return (self._panjer_ab0
+                or type(self).freq_pgf_prime is not Frequency.freq_pgf_prime)
+
     def _install_zm_wrappers(self):
         """
         Replace ``freq_moms`` / ``freq_pgf`` with their zero-modified forms.

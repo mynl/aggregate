@@ -28,6 +28,38 @@ REINS_DESCRIBE_COLS = ['EX', 'Est EX', 'Change EX',
                        'CV', 'Est CV', 'Change CV',
                        'Sk', 'Est Sk']
 
+#: Prefix for a layer's DecL descriptor by cession site.
+_SITE_PREFIX = {'occ_reins': 'occ', 'agg_reins': 'agg'}
+
+
+def _layer_descriptor(site, clause):
+    """One layer as its DecL descriptor, e.g. ``'occ 300 xs 200'``.
+
+    Reuses the writer's cession renderer, so the descriptor is exactly the DecL
+    the layer round-trips to (a full-line share renders ``limit xs attach``, a
+    partial share ``share% po limit xs attach``).
+    """
+    from .decl_writer import _render_reins_clause
+    return f'{_SITE_PREFIX[site]} {_render_reins_clause(clause)}'
+
+
+def _reins_layer_label(agg, site, index, clause):
+    """The display label for one reinsurance layer ([Walk-Step-Default-Labels]).
+
+    The layer's declared ``as`` label wins, read from the sparse
+    ``{layer_index: label}`` dict pooled into the engine's ``label_map``
+    (``agg.labels.occ_reins`` / ``.agg_reins``); an undeclared layer falls back
+    to its DecL descriptor, which is distinct per layer because the validator
+    rejects overlapping cessions. ``site`` is ``'occ_reins'`` or
+    ``'agg_reins'``. Hoisted here from the P&L builders ([Palm-Kappa-Chart]):
+    the kappa chart names its per-layer curves with it, and charts must not
+    import ``_pnl_builders``.
+    """
+    d = (getattr(agg, 'label_map', None) or {}).get(site) or {}
+    if index in d and d[index]:
+        return str(d[index])
+    return _layer_descriptor(site, clause)
+
 
 def _validate_reins_layers(reins_list, tol=1e-9):
     """

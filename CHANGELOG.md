@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a356
+
+**[All-Extra] new `aggregate[all]` extra installs every user-facing extra.** `pip install "aggregate[all]"` (or `uv add "aggregate[all]"`) pulls `notebook`, `numba`, `massive`, and `viz` in one shot; it deliberately excludes `dev`, the documentation and test tooling. The extra is self-referencing (`aggregate[notebook,numba,massive,viz]`) so the lists cannot drift. The README installation section now lists all six extras.
+
 ## 1.0.0a355
 
 **[Bv-Dfreq-Outer-Window] a `bv` with an empirical (`dfreq`) outer frequency sizes its axes off the true marginal.** A correctness fix that changes numbers: the axis-sizing measurement marginal relied on the thinning identity (`exp_en = en * n_i`), which the empirical family ignores, so `bv ... dfreq [1] agg A dfreq [5] sev cantor ...` measured one per-event draw instead of the unit aggregate, windowed both axes at a fifth of their support, and shipped a joint holding 8.6% of its mass. The measurement now folds the unit's per-event count into the outcome vector (`freq_a -> ceil(freq_a * n_i)`), exact for a degenerate unit count and mean-exact otherwise. A new analytic mean guard in `_measure_marginal_window` warns (`DefectiveDistributionWarning`) whenever the measured marginal disagrees with `_marginal_moments` beyond `max(0.01 |mean|, 0.01 sd)`, catching any future family the construction mishandles. New library entry `CantorArt` (two Cantor-severity units under a shared `dfreq [2]` outer); new tests in `tests/test_bivariate.py`.
@@ -890,7 +894,7 @@ No behavior changes: `slice` on a massive joint answers exactly as it did.
 
 ## 1.0.0a277
 
-**[Sizing-And-Passthrough] the netceded joint sizes itself honestly, and says what it chose.** Three defects reported together in `dev/notes-net-natural-allocation.md` §7, fixed together because they are one story: a caller could not reach the grid they wanted, and the grid they got instead answered anyway. The measured case is `a.occ_bivariate(views=('gross', 'ceded'), bs=0.5)` on an unbounded lognormal, which returned a 512 x 2,048 joint carrying a **deficit of 0.535** and a correlation of **-0.2225** for a comonotone pair, after a single warning.
+**[Sizing-And-Passthrough] the netceded joint sizes itself honestly, and says what it chose.** Three defects reported together in `dev/done/notes-net-natural-allocation.md` §7, fixed together because they are one story: a caller could not reach the grid they wanted, and the grid they got instead answered anyway. The measured case is `a.occ_bivariate(views=('gross', 'ceded'), bs=0.5)` on an unbounded lognormal, which returned a 512 x 2,048 joint carrying a **deficit of 0.535** and a correlation of **-0.2225** for a comonotone pair, after a single warning.
 
 **A pin that cannot be honored raises.** When a pinned `bs` or `log2_x` / `log2_y` needs more than `2**total_log2` cells, the sizing used to clip the wider axis and report a "tail deficit". It is not a tail loss: with both axes pinned equal the rule cut axis 0 to the 16 bucket floor, and a 16 bucket gross axis is a different distribution rather than a truncated one. The caller has stated numbers that cannot all be honored, so `ValueError` now names what was pinned, how many cells the windows actually need, and the two escapes (`total_log2=`, with `store_dir=` at that size, or relax the pin). Nothing pinned still coarsens `bs` until the pair fits, so the default build never raises.
 

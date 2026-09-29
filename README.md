@@ -1,4 +1,4 @@
- [![Latest Version](https://img.shields.io/github/commit-activity/m/mynl/aggregate)](https://github.com/mynl/aggregate) [![Documentation Status](https://readthedocs.org/projects/aggregate/badge/?version=latest)](https://aggregate.readthedocs.io/en/latest/) [![Latest version](https://img.shields.io/pypi/v/aggregate.svg?label=pypi)](https://pypi.org/project/aggregate)
+ [![Commit activity](https://img.shields.io/github/commit-activity/m/mynl/aggregate)](https://github.com/mynl/aggregate) [![Documentation Status](https://readthedocs.org/projects/aggregate/badge/?version=latest)](https://aggregate.readthedocs.io/en/latest/) [![Latest version](https://img.shields.io/pypi/v/aggregate.svg?label=pypi)](https://pypi.org/project/aggregate)
  ![Supported Python versions](https://img.shields.io/pypi/pyversions/aggregate.svg) [![Downloads](https://img.shields.io/pypi/dm/aggregate.svg)](https://pepy.tech/project/aggregate) [![Github stars](https://img.shields.io/github/stars/mynl/aggregate.svg)](https://github.com/mynl/aggregate/stargazers) [![Github forks](https://img.shields.io/github/forks/mynl/aggregate.svg)](https://github.com/mynl/aggregate/network/members)
  [![License](https://img.shields.io/pypi/l/aggregate.svg)](https://github.com/mynl/aggregate/blob/master/LICENSE) [![Zenodo DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.10557199.svg)](https://zenodo.org/records/10557199)
 
@@ -7,13 +7,21 @@
 # aggregate: working with actuarial compound distributions
 
 ## Purpose
-
 `aggregate` builds approximations to compound (aggregate) probability distributions quickly and accurately.
 It can be used to solve insurance, risk management, and actuarial problems using realistic models that reflect
 underlying frequency and severity. It delivers the speed and accuracy of parametric distributions to situations
 that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution
 as the lognormal. `aggregate` includes an expressive language called DecL to describe aggregate distributions
 and is implemented in Python under an open source BSD-license.
+
+## Version 1.0
+Version 1.0 represents a substantial extension over the prior 0.30.1 release. It was written in collaboration with Claude Code. Version 1.0 adds:
+
+* The ability to model positive and negative amounts, opening the way for a specific PnL profit-and-loss class.
+* Automated generation of incremental gross–ceded–net views across multi-layer occurrence and aggregate programs.
+* The FFT calculations are now managed in a window that need not include the origin, providing more efficient discretization.
+* Bivariate distributions, including bivariate severity, clash, ceded–net, gross-cede, and gross–net models.
+* All standard reinsurance variable features: swings, slides, profit commissions, reinstatements, and loss corridors, as well as loss-sensitive retro rating used in large accounts.
 
 ## Aggregate White Paper
 
@@ -22,7 +30,7 @@ The paper describes the purpose, implementation, and use `Aggregate`, showing ho
 
 ## Changelog
 
-See [CHANGELOG.md](CHANGELOG.md) for the full version history.
+See [CHANGELOG.md](https://github.com/mynl/aggregate/blob/master/CHANGELOG.md) for the full version history.
 
 ## API stability
 
@@ -58,11 +66,15 @@ uv add aggregate       # resolves, locks, and installs into .venv
 
 `uv add` records the dependency in your `pyproject.toml` and syncs the project
 environment; from then on `uv sync` recreates that exact, locked environment on
-any machine. To also pull the optional documentation and test tooling, request
-the `dev` extra:
+any machine. Optional extras add capabilities:
 
 ```bash
-uv add "aggregate[dev]"
+uv add "aggregate[numba]"     # numba-compiled TVaR paths
+uv add "aggregate[viz]"       # interactive bivariate exploration: holoviews, datashader, bokeh
+uv add "aggregate[massive]"   # disk-backed bivariate grids via zarr
+uv add "aggregate[notebook]"  # JupyterLab, widgets
+uv add "aggregate[dev]"       # documentation build and test tooling
+uv add "aggregate[all]"       # all of the above except dev
 ```
 
 Run anything inside the managed environment with `uv run`, for example
@@ -84,25 +96,28 @@ pip install aggregate
 
 ## Getting started
 
-To get started, import `build`. It provides easy access to all functionality.
+To get started, import `build`. It provides easy access to all functionality. The function `qd` is a quick display helper, printing germane information.
 
-Here is a model of the sum of three dice rolls. The DataFrame `describe` compares exact mean, CV and skewness with the `aggregate` computation for the frequency, severity, and aggregate components. Common statistical functions like the cdf and quantile function are built-in. The whole probability distribution is available in `a.density_df`.
+Here is a model of the sum of three dice rolls. Running `qd(a)` prints the mean, SD, CV, skewness, and 1st, 50th and 99th percentiles for the frequency, severity, and aggregate components. Common statistical functions like the cdf and quantile function are built-in. The whole probability distribution is available in `a.density_df`.
 
     from aggregate import build, qd
     a = build('agg Dice dfreq [3] dsev [1:6]')
     qd(a)
 
-\>\>\>        EX Est EX     Err EX      CV  Est CV Sk Est Sk
-\>\>\> X
-\>\>\> Freq    3                         0
-\>\>\> Sev   3.5    3.5          0 0.48795 0.48795  0      0
-\>\>\> Agg  10.5   10.5 2.2204e-16 0.28172 0.28172  0      0
-\>\>\> log2 = 5, bandwidth = 1, validation: not unreasonable.
+    >>> Aggregate object: Dice. Frequency distribution empirical. Severity
+        dhistogram, [1, 6], bounded; atoms [1 2 3 4 5 6]. Updated with bucket
+        size 1 and log2 = 5. Validation: not unreasonable.
+
+    >>>       Mean     SD      CV Skew P01 Median P99
+    >>> X
+    >>> Freq     3      0       0
+    >>> Sev    3.5 1.7078 0.48795    0   1      3   6
+    >>> Agg   10.5  2.958 0.28172    0   4     10  17
 
     print(f'\nProbability sum < 12 = {a.cdf(12):.3f}\nMedian = {a.q(0.5):.0f}')
 
-\>\>\> Probability sum \< 12 = 0.741
-\>\>\> Median = 10
+    >>> Probability sum < 12 = 0.741
+    >>> Median = 10
 
 `aggregate` can use any `scipy.stats` continuous random variable as a severity, and
 supports all common frequency distributions. Here is a compound-Poisson with lognormal
@@ -111,18 +126,15 @@ severity, mean 50 and cv 2.
     a = build('agg Example 10 claims sev lognorm 50 cv 2 poisson')
     qd(a)
 
-\>\>\>       EX Est EX     Err EX      CV  Est CV      Sk Est Sk
-\>\>\> X
-\>\>\> Freq  10                   0.31623         0.31623
-\>\>\> Sev   50     50 8.8689e-06       2       2      14 13.981
-\>\>\> Agg  500    500 8.8689e-06 0.70711 0.70711  3.5355 3.5312
-\>\>\> log2 = 16, bandwidth = 2, validation: not unreasonable.
+    >>> Aggregate object: Example. Frequency distribution poisson. Severity lognorm,
+        [0, inf), subexponential right tail. Updated with bucket size 2 and log2 =
+        16. Validation: not unreasonable.
 
-    # cdf and quantiles
-
-
-\>\>\> Pr(X\<=500)=0.612
-\>\>\> 0.99 quantile=1736.0
+    >>>       Mean     SD      CV    Skew P01 Median  P99
+    >>> X
+    >>> Freq    10 3.1623 0.31623 0.31623
+    >>> Sev     50    100       2  13.981   2     22  428
+    >>> Agg    500 353.56 0.70711  3.5312  68    422 1736
 
 See the documentation for more examples.
 
@@ -139,100 +151,31 @@ and write the program as the cell:
 
 which is exactly `a = build('agg Dice dfreq [3] dsev [1:6]')` followed by `qd(a)`, with two conveniences: the program is not in quotes, so your editor still highlights it as DecL, and the object is bound to its declared name as well as to `a`, giving both `a` and `Dice`.
 
-A cell can declare as many objects as it likes, separated by a blank line or a semicolon, in which case each name is bound on its own and the magic's own name is bound to a dictionary of them all. Add `-q` to skip the display, `-s` to print nothing, `-p` to also plot a single object, and `--log2` / `--bs` to set the grid.
-
-Full description in [Getting Started](https://aggregate.readthedocs.io/en/latest/1_Getting_Started.html#the-agg-cell-magic).
+Full descriptions are in the [documentation](https://aggregate.readthedocs.io/en/latest/).
 
 ## Dependencies
 
-See requirements.txt.
+See pyproject.toml.
 
-## Install from source
-
-    git clone --no-single-branch --depth 50 https://github.com/mynl/aggregate.git .
-
-    python -mvirtualenv ./venv
-    # activate the virtual environment (Windows, YRMV)
-    venv\Scripts\activate.bat
-
-    # install the package
-    pip install aggregate[dev]
 
 ## Running the tests
 
-All commands assume `UV_LINK_MODE=copy` is set (the Claude harness
-sets it automatically via `.claude/settings.local.json`; in a regular
-shell run `$env:UV_LINK_MODE = "copy"` on PowerShell or
-`export UV_LINK_MODE=copy` on POSIX).
+The pytest suite lives in `tests/`:
 
-The pytest suite lives in `tests/`. Each line of
-`src/aggregate/agg/test_suite.agg` (categories A–O) becomes two
-parametrized cases: `test_line_parses` and
-`test_spec_matches_snapshot` (against
-`tests/data/expected_specs.json`). Splice cases come from
-`test_suite2.agg`.
-
-Whole suite:
-
-    uv run pytest                          # full suite
-    uv run pytest -v                       # verbose
-    uv run pytest -x                       # stop at first failure
-    uv run pytest --lf                     # re-run last failed
-    uv run pytest --ff                     # last failed first, then rest
-
-Single file or single test:
-
-    uv run pytest tests/test_decl_parser.py
-    uv run pytest tests/test_decl_parser.py::test_line_parses
-    uv run pytest "tests/test_decl_parser.py::test_line_parses[A.01]"
-
-Filter by name pattern:
-
-    uv run pytest -k "splice"
-    uv run pytest -k "parses and not snapshot"
-
-Output / debugging:
-
-    uv run pytest -s                       # don't capture stdout
-    uv run pytest --tb=short               # shorter tracebacks
-    uv run pytest -l                       # show local vars on failure
-    uv run pytest --pdb                    # drop into pdb on first failure
-
-The individual test modules:
-
-    uv run pytest tests/test_decl_parser.py             # DecL parser, parametrized
-    uv run pytest tests/test_distortion_calibrate.py    # Distortion calibration
-    uv run pytest tests/test_portfolio_peg_regression.py # Portfolio vs peg_baseline.json
-    uv run pytest tests/test_severity_layer_golden.py   # Severity layer golden
-    uv run pytest tests/test_splice_suite.py            # Spliced severity
-    uv run pytest tests/test_underwriter.py             # Underwriter build/persist
-
-Regenerating golden / baseline files (scripts, not pytest cases —
-only when intentionally updating snapshots):
-
-    uv run python tests/capture_spec_snapshot.py       # expected_specs.json
-    uv run python tests/capture_peg_baseline.py        # peg_baseline.json
-    uv run python tests/capture_severity_golden.py     # severity_layer_golden.json
-
-Visual / non-pytest check (HTML report with plots, builds every
-`test_suite.agg` line):
-
-    uv run python -m aggregate.extensions.test_suite
-
-Tight inner loop: `uv run pytest -x --tb=short` — stop fast, readable
-failure. Single area being changed: `uv run pytest tests/test_<file>.py -v`.
-Pre-commit: plain `uv run pytest`.
+    uv run pytest                             # fast suite (multi-minute cases deselected)
+    uv run pytest -m "slow or not slow"       # everything, including the slow bivariate cases
+    uv run pytest tests/test_decl_parser.py   # one file; add -k "pattern" to filter by name
 
 ## License
 
-BSD 3 licence.
+BSD 3 license.
 
-## Help and contributions
-
-Limited help available. Email me at <help@aggregate.capital>.
+## Contributions
 
 All contributions, bug reports, bug fixes, documentation improvements,
 enhancements and ideas are welcome. Create a pull request on github and/or
 email me.
 
 Social media: <https://www.reddit.com/r/AggregateDistribution/>.
+
+Blog: <https://blog.mynl.com>

@@ -322,3 +322,18 @@ def test_wait_grid_hard_atom_incommensurable():
     assert not bs_df.attrs['snapped']
     assert not bs_df.loc['hard_atom_snap', 'feasible']
     assert bs_df.selected.sum() == 1
+
+
+def test_kernel_impossible_counts_are_exact_zero():
+    """FFT dust beyond the support bound floor(T / w_min) is zeroed exactly.
+
+    With the automatic kmax, a deterministic wait 1 over T = 3 once read
+    P(N=11) ~ 2e-9 of tilt-amplified roundoff, which turned the exactly
+    degenerate count's variance materially positive downstream (nan CV via
+    sqrt of a negative empirical variance in the paired aggregate)."""
+    pm = np.zeros(16)
+    pm[1] = 1.0
+    k, pN = renewal_count_pmf(pm, 1.0, 3.0, lattice=True)
+    assert pN[3] == pytest.approx(1.0, abs=1e-9)
+    assert float(np.abs(pN[4:]).max(initial=0.0)) == 0.0
+    assert float(pN[:3].max(initial=0.0)) < 1e-12

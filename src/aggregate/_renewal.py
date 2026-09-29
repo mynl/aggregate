@@ -151,6 +151,12 @@ def renewal_count_pmf(pm, bs, T, *, lattice=False, z=10.0, tilt_total=20.0,
     transform ``phat^k`` is accumulated -- and ``b`` is the tilted indicator
     of ``[0, T]``, so each ``F^{*k}(T)`` costs one vector multiply and one
     dot product. See ``sparre`` theory.md sections 1-5.
+
+    The returned pmf is zeroed beyond the exact support bound
+    ``floor(T / w_min)`` set by the smallest positive-mass wait ``w_min``
+    (when the wait pmf has no mass at index 0): the Plancherel sums carry
+    tilt-amplified roundoff, and that dust otherwise lands on counts that
+    cannot occur.
     """
     pm = np.asarray(pm, dtype=float)
     m = len(pm)
@@ -192,6 +198,18 @@ def renewal_count_pmf(pm, bs, T, *, lattice=False, z=10.0, tilt_total=20.0,
         F[k] = np.real(v @ c)
 
     pN = np.clip(-np.diff(F), 0.0, None)   # P(N=k) = F_k - F_{k+1}
+    # Exact support bound. The smallest positive-mass wait, w_min = imin * bs,
+    # caps the count: k arrivals need S_k >= k * w_min, impossible beyond
+    # k = floor(T / w_min) (bucket-integer arithmetic against the same n1 the
+    # readout uses, so the lattice atom-at-T convention is honored). The
+    # Plancherel sums carry roundoff amplified by the tilt, and without the
+    # bound that dust lands on impossible counts: a deterministic wait 1 over
+    # T = 3 read P(N=11) ~ 2e-9, turning an exactly degenerate count into a
+    # materially wrong variance. Mass at index 0 (zero waits) leaves the
+    # count unbounded, so the bound applies only when imin >= 1.
+    nz = np.nonzero(pm)[0]
+    if len(nz) and nz[0] >= 1:
+        pN[n1 // int(nz[0]) + 1:] = 0.0
     return np.arange(kmax + 1), pN
 
 

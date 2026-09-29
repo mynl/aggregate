@@ -57,7 +57,28 @@ were made; anything not listed here landed exactly as the plan specifies.
   target; the shipped `CantorArt` entry builds by name lookup with full mass,
   marginal mean 2.0, and no warning.
 
-## Finding left for the author (pre-existing, not part of this plan)
+## Finding: RenewalDeterministicWait sqrt (pre-existing, fixed at 1.0.0a357)
+
+Fixed on the author's instruction 2026-09-29, in the commit that retires this
+plan. Two halves, one cause each side of the comparison:
+
+* `MomentWrangler.stats` / `.mcvsk` floor a negative central variance at
+  exactly 0 (shared `_msdcvsk` helper), so a realized point mass reports
+  `sd = 0`, `cv = 0`, `skew = nan` instead of `RuntimeWarning` and `nan`
+  reaching `est_cv` / `est_skew`. The sign alone is decisive for empirical
+  moments, so there is no materiality floor; the rationale sits in the
+  `_msdcvsk` Notes beside the analytic-path contrast.
+* Fixing the estimate exposed the theory side: with `est_cv` now finite,
+  validation newly flagged `AGG_CV` because the renewal count pmf carried a
+  tilt-amplified FFT dust atom `P(N=11) ~ 2e-9` (impossible: eleven unit
+  waits cannot fit in a horizon of 3), inflating the theoretical cv to
+  1.1e-4. `renewal_count_pmf` now zeroes the pmf beyond the exact support
+  bound `floor(T / w_min)` set by the smallest positive-mass wait. After
+  both halves the theoretical and estimated cv are exactly 0 and the entry
+  validates `NOT_UNREASONABLE`.
+
+Regression tests in `tests/test_moments.py` and `tests/test_renewal.py`.
+The original finding, as recorded at a355:
 
 Under the numerics gate (`-W error::RuntimeWarning`) one case fails:
 `test_library_entries.py::test_every_library_entry_builds[agg:RenewalDeterministicWait]`

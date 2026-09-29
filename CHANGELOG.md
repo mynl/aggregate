@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a357
+
+**[Degenerate-Variance-Floor] a degenerate law reports cv 0, not nan, on both the empirical and the renewal-theory side.** A correctness fix that changes numbers, found by the numerics gate on the `RenewalDeterministicWait` library entry. `MomentWrangler.stats` / `.mcvsk` floor a negative central variance at exactly 0 (a realized point mass cancels `ex2 - ex1**2` slightly negative), so `est_cv` is 0 and `est_skew` is `nan` where both were `nan` via a `RuntimeWarning` sqrt. On the theory side, `renewal_count_pmf` zeroes the count pmf beyond the exact support bound `floor(T / w_min)` set by the smallest positive-mass wait: tilt-amplified FFT roundoff had left `P(N=11) ~ 2e-9` on an impossible count, inflating a degenerate count's theoretical cv to 1.1e-4 (which the floored estimate then newly tripped as `AGG_CV`). Renewal frequencies whose wait law has mass in the first bucket are untouched. Regression tests in `tests/test_moments.py` and `tests/test_renewal.py`.
+
 ## 1.0.0a356
 
 **[All-Extra] new `aggregate[all]` extra installs every user-facing extra.** `pip install "aggregate[all]"` (or `uv add "aggregate[all]"`) pulls `notebook`, `numba`, `massive`, and `viz` in one shot; it deliberately excludes `dev`, the documentation and test tooling. The extra is self-referencing (`aggregate[notebook,numba,massive,viz]`) so the lists cannot drift. The README installation section now lists all six extras.

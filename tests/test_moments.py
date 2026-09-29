@@ -19,6 +19,7 @@ from aggregate import build
 from aggregate.config import get_settings
 from aggregate.moments import (
     MomentAggregator,
+    MomentWrangler,
     xsden_to_mwrangler,
     xsden_to_meancv,
     xsden_to_meancvskew,
@@ -203,3 +204,30 @@ def test_degenerate_severity_builds_without_a_nan_cv():
         a = build("agg MZ.Point 1 claim sev dhistogram xps [6961.6903826] [1] fixed")
     assert a.sev_m == pytest.approx(6961.6903826)
     assert a.sev_cv == pytest.approx(0.0, abs=1e-12)
+
+
+def test_mwrangler_negative_variance_floored():
+    """A negative central variance (cancellation on a degenerate law) floors
+    to exactly 0: sd 0, cv 0 for a nonzero mean, skew nan, and no
+    RuntimeWarning from sqrt."""
+    mw = MomentWrangler()
+    mw.noncentral = (3.0, 9.0 - 1e-5, 27.0)   # var = -1e-5
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        s = mw.stats
+        m, cv, skew = mw.mcvsk
+    assert s['var'] == 0.0 and s['sd'] == 0.0 and s['cv'] == 0.0
+    assert np.isnan(s['skew'])
+    assert (m, cv) == (3.0, 0.0) and np.isnan(skew)
+
+
+def test_deterministic_wait_realized_cv_is_zero():
+    """The RenewalDeterministicWait shape: a realized point mass at 3 whose
+    empirical var cancels slightly negative. est_cv is 0, not nan, and the
+    build emits no RuntimeWarning (the numerics gate case that found it)."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', RuntimeWarning)
+        a = build('agg MW.RenewalPoint 3 years dsev [1] dwait [1]')
+    assert a.est_m == pytest.approx(3.0, rel=1e-6)
+    assert a.est_cv == 0.0
+    assert np.isnan(a.est_skew)

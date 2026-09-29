@@ -478,9 +478,35 @@ class MomentWrangler:
         self._noncentral = (ex1, ex2 + ex1, ex3 + 3 * ex2 + ex1)
         self._make_central()
 
-    @property
-    def stats(self):
+    def _msdcvsk(self):
+        """Central moments to ``(m, v, sd, cv, skew)``, variance floored at 0.
+
+        Returns
+        -------
+        tuple of float
+            ``(m, v, sd, cv, skew)``; ``cv`` is ``nan`` for a zero mean and
+            ``skew`` is ``nan`` for a zero (or floored) variance.
+
+        Notes
+        -----
+        The central variance arrives as ``ex2 - ex1 ** 2``, a subtraction of
+        equal magnitudes when the distribution is degenerate. Fed from a
+        realized density (:func:`xsden_to_mwrangler`), the raw moments carry
+        discretization error well above machine epsilon, so the cancellation
+        can land materially negative: a deterministic-wait aggregate whose
+        law is a point mass at 3 realized ``var = -7.5e-06``, and the bare
+        ``sqrt`` returned ``nan`` (with a ``RuntimeWarning``) into ``est_cv``
+        and ``est_skew``. A distribution's variance cannot be negative, so a
+        negative value is error around a true 0 and is floored to exactly 0:
+        ``sd = 0``, ``cv = 0`` for a nonzero mean, ``skew = nan``. Compare
+        :meth:`MomentAggregator.static_moments_to_mcvsk`, whose analytic
+        inputs justify the far tighter ``VALIDATION_NOISE`` cancellation
+        floor and an error report beyond it; empirical moments cannot
+        distinguish those scales, and the sign alone is decisive.
+        """
         m, v, c3 = self._central
+        if v < 0:
+            v = 0.0
         sd = np.sqrt(v)
         if m == 0:
             cv = np.nan
@@ -490,22 +516,25 @@ class MomentWrangler:
             skew = np.nan
         else:
             skew = c3 / sd ** 3
-        #         return pd.Series((m, v, sd, cv, skew), index=('EX', 'Var(X)', 'SD(X)', 'CV(X)', 'Skew(X)'))
-        # shorter names are better
+        return m, v, sd, cv, skew
+
+    @property
+    def stats(self):
+        """Central statistics as a Series ``('ex', 'var', 'sd', 'cv', 'skew')``.
+
+        See :meth:`_msdcvsk` for the zero floor on a negative variance.
+        """
+        m, v, sd, cv, skew = self._msdcvsk()
+        # shorter names are better than EX, Var(X), SD(X), CV(X), Skew(X)
         return pd.Series((m, v, sd, cv, skew), index=('ex', 'var', 'sd', 'cv', 'skew'))
 
     @property
     def mcvsk(self):
-        m, v, c3 = self._central
-        sd = np.sqrt(v)
-        if m == 0:
-            cv = np.nan
-        else:
-            cv = sd / m
-        if sd == 0:
-            skew = np.nan
-        else:
-            skew = c3 / sd ** 3
+        """The ``(mean, cv, skew)`` triple.
+
+        See :meth:`_msdcvsk` for the zero floor on a negative variance.
+        """
+        m, _, _, cv, skew = self._msdcvsk()
         return m, cv, skew
 
     def _make_central(self):

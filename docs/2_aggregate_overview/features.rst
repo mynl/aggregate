@@ -26,7 +26,7 @@ The maintenance contract: every major point in ``CHANGELOG.md`` is accounted for
 by a row. "Under the hood" plus an em-dash means an internal change named in the
 appendix but not exampled.
 
-.. csv-table:: Coverage ledger, a1 to a325
+.. csv-table:: Coverage ledger, a1 to a353
    :header-rows: 1
    :widths: 46 8 26 20
 
@@ -341,6 +341,34 @@ appendix but not exampled.
    "the INSURER contract block serves ``loss`` in place of ``pr_loss``", "a323", "Served documents", "``reins``"
    "``picks`` gets its own line in the spread layout", "a324", "Programs as text", "—"
    "**breaking:** ``zt`` and ``zm`` deliver the count you asked for; ``!`` opts out", "a325", "New DecL elements", "``zt``"
+   "``ErrorReport.hint``, and the expense-group-closed-by-label rule", "a326", "Better parse errors", "—"
+   "43 worked examples join ``library.agg``, the capstone chain among them", "a327", "The recipe library", "``recipes``"
+   "``marginal`` / ``conditional`` / ``total`` on a bivariate", "a328", "Bivariate aggregates", "``mv_copula``"
+   "**breaking:** bivariate ``summary_df`` is the headline, ``validation_df`` the audit", "a329", "Bivariate aggregates", "``mv_copula``"
+   "**breaking:** bivariate ``stats_df`` is the Portfolio-parallel moment store", "a330", "Bivariate aggregates", "``mv_copula``"
+   "``approximate`` reaches all five families; every fit renders as DecL", "a331", "New DecL elements", "``simple``"
+   "``approximation_df`` / ``approximation_density_df``, exhibit and chart", "a332", "Reporting quartet / Served documents", "``simple``"
+   "family columns read on the centered (``round``) convention", "a333", "Reporting quartet", "``simple``"
+   "``approximation_df`` goes all-numeric and gains a ``rel err`` block", "a334", "Reporting quartet", "``simple``"
+   "``geometric !``, the number-of-trials geometric", "a335", "New DecL elements", "``trials``"
+   "**breaking:** ``geometric !`` withdrawn; the spelling is ``geometric zt``", "a336", "New DecL elements", "``trials``"
+   "the ``approximation`` chart drops its tail panel", "a337", "Served documents", "—"
+   "pricing difference rows clamp float dust; snapshot float tolerance", "a338", "Under the hood", "—"
+   "the ruin simulation core moves to ``Aggregate._ruin_paths``", "a339", "Under the hood", "—"
+   "``eventual_ruin`` and ``RuinResult``; the ``ruin`` exhibit", "a340", "Renewal frequency & ruin", "``renewal``"
+   "the ``ruin`` chart: sample paths and the exact ``psi(u)``", "a341", "Served documents", "``renewal``"
+   "``plot_chartdoc(log=...)`` takes a direction", "a342", "Served documents", "—"
+   "the approximation frames are cached and invalidated with ``density_df``", "a343", "Reporting quartet", "``simple``"
+   "new chart ``approximation_tails``", "a344", "Served documents", "``simple``"
+   "fix ``dbvsev`` with negative outcomes", "a345", "Bivariate aggregates", "—"
+   "new module ``aggregate.cantor``: the generalized Cantor law", "a346", "New DecL elements", "``cant``"
+   "``sev cantor`` is a DecL severity", "a347", "New DecL elements", "``cant``"
+   "**numbers move:** the grid strictly contains the window it was sized for", "a348", "Grids, buckets & windows", "``cant``"
+   "the ``tower`` panel kind and ``TowerBlock``; ``CHART_IR_VERSION`` 2 to 3", "a349", "Served documents", "``reins``"
+   "new chart ``structure``: a reinsurance program as a tower of layers", "a350", "Served documents", "``reins``"
+   "``plot_chartdoc`` draws a tower natively", "a351", "Served documents", "``reins``"
+   "the ``structure`` loss axis is drawn against the quantity's own support", "a352", "Served documents", "``reins``"
+   "a tower on ``log='y'``; one decade floor per quantity axis", "a353", "Served documents", "``reins``"
 
 The cast of examples
 --------------------
@@ -473,6 +501,11 @@ here.)
     #      not on a Poisson clock. `1 year` + `wait <dist>` replaces the freq clause.
     renewal = build('agg Renewal 1 year sev gamma 2 wait 0.25 * uniform')
 
+    # 11. Singular continuous (a346, a347) ───────────────────────────────────────
+    # 11.a cant — a Cantor severity: continuous cdf, no atoms, and no density
+    #      anywhere. Exact mean 1/2, which since a348 the grid reproduces exactly.
+    cant = build('agg Cant 1 claim sev cantor fixed')
+
 .. list-table:: The cast and what each member drives
    :header-rows: 1
    :widths: 30 70
@@ -505,6 +538,8 @@ here.)
      - stochastic ceded premium: reinstatements and variable rating
    * - ``renewal``
      - Sparre-Andersen renewal frequency via the ``wait`` clause
+   * - ``cant``
+     - the Cantor severity, and the closed-support grid (a347, a348)
 
 New DecL elements
 -----------------
@@ -1026,6 +1061,97 @@ ceded premium into, so the clause is now dropped with an
 (``netceded``, ``grossceded``, ``grossnet``) was affected and all three are
 fixed.
 
+``approximate`` reaches all five families (a331)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The ``approximate`` keyword (a47) now takes ``norm``, ``gamma`` and ``lognorm``
+beside the shifted pair ``sgamma`` / ``slognorm``. The unshifted three match the
+mean and cv only and ``norm`` targets zero skew, so the choice states how much of
+the shape the fit is asked to carry:
+
+.. ipython:: python
+
+    fits = {k: build(f'agg Fit{k} 1e6 claims dsev [1 3] poisson approximate {k}')
+            for k in ['norm', 'gamma', 'lognorm', 'sgamma', 'slognorm']}
+    qd(pd.DataFrame({k: (a.est_m, a.est_sd, a.est_skew) for k, a in fits.items()},
+                    index=['mean', 'sd', 'skew']))
+
+Every fit also renders as DecL, so it can be read, edited and rebuilt rather than
+only used. ``output='agg_decl'`` gives the program and ``output='agg'`` the object
+it builds, which carries that program and lands in the knowledge base:
+
+.. ipython:: python
+
+    simple.approximate('norm', output='agg_decl')
+    simple.approximate('gamma', output='agg_decl')
+    simple.approximate('sgamma', output='agg').program
+
+A left-skew fit renders through the ordinary reflection syntax
+``loc - scale * name shape``, so only ``output='scipy'`` still refuses one.
+**Results move.** The emitted severity keyword mirrors the source's signedness on
+every path, the DecL keyword included, so a plain ``sev`` input whose fit reaches
+below zero, a normal or a reflected fit, clamps to an atom at 0 and the matched
+moments drift by the clamp mass, which ``validation_df`` reports. An ``ssev``
+input stays exact.
+
+Zero truncation is the geometric's trials convention (a335, a336)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``geometric`` counts failures, on 0, 1, 2, .... The other textbook convention
+counts trials, on 1, 2, ..., and by memorylessness that is exactly the
+zero-truncated geometric, so it is spelled ``geometric zt`` and the clause mean
+calibrates as ``zt`` does:
+
+.. ipython:: python
+
+    trials = build('agg Trials 5 claims dsev [1] geometric zt')
+    trials.est_m
+
+a335 shipped ``geometric !`` as sugar for this and a336 withdrew it by ruling
+before any consumer used it: the marker gave ``!`` a second meaning for one
+family and inherited every ``zt`` edge case anyway, a realized mean of 1 being
+the degenerate boundary either way. ``geometric !`` is a parse error.
+
+``sev cantor``: continuous with no density (a346, a347)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``aggregate.cantor`` adds the generalized Cantor law, a singular continuous
+distribution: continuous cdf, no atoms, and no density anywhere. The shape ``c``
+is the proportion removed from the middle of each interval, so ``c = 1/3`` is the
+classical middle-thirds law, ``c = 0`` is exactly uniform, and ``c`` toward 1
+degenerates to a fair coin on the endpoints. ``cdf``, ``sf``, ``ppf``, ``isf`` and
+``rvs`` are exact digit algorithms, the moments come from a closed recursion (mean
+:math:`1/2`, variance :math:`(1-a)/(4(1+a))` with :math:`a = (1-c)/2`, skewness
+0), and ``pdf`` returns ``nan``, because a singular continuous law has no density
+to return. Submodule access only, like ``Tweedie``:
+
+.. ipython:: python
+
+    from aggregate.cantor import cantor, cantor_bs
+    cantor.cdf(0.5, 1 / 3), cantor.stats(1 / 3, moments='mvs')
+
+``SeverityCantor`` puts it in the severity registry, where it behaves like any
+other one-shape severity: no grammar change was needed. The cv route solves the
+shape analytically over the attainable :math:`[1/\sqrt 3, 1)`:
+
+.. ipython:: python
+
+    qd(cant.summary_df)
+    qd(build('agg Cant2 1 claim sev 3 * cantor 0.5 + 5 fixed').summary_df)
+    qd(build('agg Cant3 1 claim sev cantor 10 cv 0.8 fixed').summary_df)
+
+A Cantor severity is the documented exception to the binary ``bs`` guidance. Its
+level-:math:`m` cylinders sit on a base-:math:`q` lattice with
+:math:`q = 2/(1-c)`, so with ``bs = scale / q**m`` each cylinder's mass lands
+exactly on one bucket pair. ``cantor_bs`` returns that natural bucket size, and
+the two new library entries ``CantorMiddleThirds`` and ``CantorMiddleHalf`` carry
+it in their hints. A binary ``bs`` remains correct, just blurry at the finest
+scales.
+
+.. ipython:: python
+
+    cantor_bs(4, 1 / 3, 1.0)
+
 Better parse errors (a16)
 -------------------------
 
@@ -1045,6 +1171,33 @@ full rendered block is ``e.report.render()`` (also auto-printed by ``build``):
 Keyword terminals also require word boundaries, so a typo like ``aggx Re …``
 reports ``Unexpected 'aggx'. Did you mean: agg?`` at column 1 instead of a
 misleading downstream error.
+
+A report can carry a hint (a326)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+An accurate report can still be silent on the cause.
+``500 fixed expenses as Fees and 0.15 premium expenses as Commission`` reported a
+bare ``Unexpected 'and'``, which is true and unhelpful. ``ErrorReport.hint`` is a
+sentence naming the shape of the mistake, rendered as a trailing ``Hint:`` line
+and appended to ``summary``, so ``str(e)`` carries it too:
+
+.. ipython:: python
+    :okwarning:
+
+    try:
+        build('pnl Bad 1000 premium less agg BadE 10 claims sev lognorm 50 cv 1 '
+              'poisson less 500 fixed expenses as Fees and 0.15 premium expenses '
+              'as Commission')
+    except ValueError as e:
+        print(e.report.render())
+
+Rules live in ``parser_errors._HINT_RULES``, each matching the source text
+immediately before the error position. The first one says that ``as`` closes an
+expense group, so either the ``and`` goes, leaving separate groups with one leg
+each, or the label moves after the last ``and``-joined term, combining them into
+one leg. ``hint`` is ``str | None``, defaults to ``None``, and adds a key to
+``to_dict()``, so a consumer that builds its own display from the dict rather than
+from ``render()`` or ``summary`` needs to read the new key to show it.
 
 Programs as text: ``decl_writer`` (a53)
 ---------------------------------------
@@ -1536,6 +1689,36 @@ occurrence has no largest loss, and it raises rather than returning ``nan``. And
 Poisson frequency is required, with zero-modified Poisson refused: the thinning
 argument is what makes :math:`1 - e^{-\lambda S}` hold.
 
+The approximation frames (a332 to a334, a343)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``approximation_df`` reads all five method-of-moments fits against the exact law,
+the total on a :class:`Portfolio`. Rows are a ``meta`` block of fitted parameters,
+``stats`` (the achieved moments of each emitted law, the mirror clamp included,
+plus the Kolmogorov distance ``ks``), ``quantiles`` on the ``tail_df`` ladder, and
+``rel err``, each family quantile as a relative error against ``exact``:
+
+.. ipython:: python
+
+    qd(simple.approximation_df.loc['stats'])
+    qd(simple.approximation_df.loc['rel err'].iloc[-6:])
+
+``approximation_density_df`` is the plotting feed, ``pdf * bs`` per family beside
+the realized density. Both are on-demand properties with no options, cached and
+invalidated at exactly the sites that invalidate ``density_df``, so treat what
+comes back as read-only. A family the subject cannot admit, an unshifted ``gamma``
+or ``lognorm`` on a negative-mean book, reports ``NaN`` and is not drawn.
+
+Two things about the numbers. The family columns are discretized under the
+library's own centered (``round``) convention, read at the bucket's upper
+half-edge :math:`G(x_k + bs/2)`, which removes a systematic :math:`bs/2` mean
+shift against ``exact`` that was glaring on coarse grids: a mean-8 book at
+``bs = 1`` reported its normal fit as 8.5 and now reports 8.0. Quantile rows are
+analytic and were never biased. And the frame is all-numeric, so it formats as one
+block: a family with no parameter reports 0 rather than ``NaN``, and the DecL
+fragment of each fit lives on ``_approximation_laws`` instead of in a fragment
+row.
+
 Grids, buckets and windows
 --------------------------
 
@@ -1777,6 +1960,31 @@ layers above it forces a negative adjustment weight, which makes the adjusted
 survival function increase across the layer and returns a severity carrying
 negative probabilities. That used to happen with no signal at all and now warns,
 naming the offending layers at the moment they are read.
+
+The grid strictly contains the window it was sized for (a348)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The two "coarsen ``bs`` to fit the ``log2`` cap" fallbacks in ``_bucket_window``
+divided the span by ``2**cap`` where the rest of the sizer counts inclusively and
+divides by ``2**cap - 1``. A span that was itself a power of two was therefore not
+coarsened at all, the realized extent ended exactly on the support top, and the
+last half bucket of mass was deleted.
+
+**Numbers move for any severity bounded on a power-of-two span**, which means
+``uniform``, ``beta``, ``cantor`` and anything else on the unit interval. Such a
+build now spends half its buckets over twice the extent, one bit of resolution at
+an unchanged FFT length, and the mean comes back exact:
+
+.. ipython:: python
+
+    cant.est_m, cant.bs, cant.log2
+    build('agg U 1 claim sev uniform fixed').est_m
+    build('agg B 1 claim sev beta 2 3 fixed').est_m
+
+A scaled support such as ``100000 * beta 2 5``, every unbounded severity and every
+compound grid are unchanged. A ``bs`` the user pinned is still honored verbatim,
+grid ending on the support top and all, tracked as ``[Bounded-Residual-Lump]`` in
+``dev/TODO.md``.
 
 Tail-thickness classification (a29)
 -----------------------------------
@@ -2915,6 +3123,74 @@ joint sizes itself against the risk rather than against a default, and it says
 what it chose. The measured case returned a 512 by 2,048 joint carrying a mass
 deficit of 0.535 and a correlation of -0.2225, all three of them silent.
 
+The probability accessors: ``marginal``, ``conditional``, ``total`` (a328)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Three accessors turn the joint into laws that can be asked questions, each
+returning a ``GridDistribution``, the shared discrete-grid value type. All three
+live on ``JointBandsMixin``, so the in-core and the massive containers expose one
+identical probability surface.
+
+``marginal(axis)`` takes an index, ``'x'`` / ``'y'``, or a component name, case
+insensitive; a ``pnl`` axis comes back payoff oriented. ``total`` is a cached
+property holding the realized law of :math:`X + Y`, an exact anti-diagonal fold on
+a shared ``bs`` and a mean-preserving scatter otherwise. ``conditional(kind,
+value, report=None)`` returns the full conditional law for ``kind`` in
+``x | y | x+y | x-y``, where the diagonal kinds condition on the total-grid bucket
+containing ``value`` and ``report=`` picks which axis's law comes back:
+
+.. ipython:: python
+
+    mv_copula.marginal('flood').mean(), mv_copula.total.mean()
+    mv_copula.conditional('x+y', 2000).mean()
+    mv_copula.conditional('x', 700, report='y').mean()
+
+The bivariate frames take their first-class names (a329, a330)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Breaking for readers of the old frames.** A bivariate's frames now mean what
+they mean everywhere else in the library. ``summary_df`` is the at-a-glance
+headline, ``Mean | SD | CV | Skew | P01 | Median | P99`` over the two marginals by
+resolved label and the realized dependent ``total``, matching :class:`Aggregate`
+and :class:`Portfolio`, and it is what ``qd(bv)`` prints:
+
+.. ipython:: python
+
+    qd(mv_copula.summary_df)
+
+``validation_df`` carries the moment audit ``summary_df`` used to hold, the Freq /
+Sev / Agg blocks against theory:
+
+.. ipython:: python
+
+    qd(mv_copula.validation_df)
+
+``stats_df`` is the Portfolio-parallel moment store: rows on Portfolio's
+``(component, measure)`` index, then one column per marginal carrying theoretical
+moments, ``independent``, the moments :math:`X + Y` would have were the axes
+independent, which is the dependence benchmark, and ``total``, the realized
+dependent total off the joint mixed moments:
+
+.. ipython:: python
+
+    qd(mv_copula.stats_df.loc['agg'])
+
+Portfolio's ``empirical`` and ``error`` columns are omitted, since they would
+duplicate ``validation_df``, and the old check table
+(``Est | Ref | Err | Gate | Pass``) is private, still feeding ``info`` and the
+validation narrative unchanged. Code indexing ``summary_df`` by
+``(component, part)`` tuples reads ``validation_df`` instead.
+
+Signed lattices on ``dbvsev`` (a345)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+A signed discrete joint such as ``dbvsev [-3:3] [0:6]`` was scattered onto the FFT
+grid at raw negative indices, which the signed lay-in then wrapped a second time:
+every atom landed ``i0`` buckets low, the negative atoms fell off the output
+window, and the joint lost mass, 4/7 of it on that example. The scatter now uses
+the natural signed convention, offset by the per-axis negative reach, on both the
+in-core and the massive discrete paths. Non-negative lattices are unchanged.
+
 Reinsurance economics: stochastic ceded premium
 -----------------------------------------------
 
@@ -2996,6 +3272,27 @@ by a cepstral Wiener-Hopf factorization, at loading ``rho``:
 The classical Pollaczek-Khinchine solver is still there and now carries a strict
 Poisson guard, so it refuses rather than silently returning the wrong answer for
 a renewal process. Defective waiting laws are refused outright.
+
+``eventual_ruin`` and the ``ruin`` exhibit (a339, a340)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``wiener_hopf`` answers the question. ``eventual_ruin`` states it the way a
+pricing conversation does: a margin, ``rho`` or ``lr`` and exactly one, and a
+capital level, ``p`` or ``u`` and exactly one. It computes the exact probability of
+eventual ruin through the frequency-dispatched solver, validates it with a capped
+simulation, and returns a ``RuinResult`` carrying the one-column ``ruin_df``
+strip:
+
+.. ipython:: python
+
+    rr = renewal.eventual_ruin(rho=0.2, p=0.05)
+    qd(rr.ruin_df)
+
+The simulation seed is fixed by default so that a served ruin document is hash
+stable; ``seed=None`` draws one and reports it. The Poisson path adds the Lundberg
+exponent and bound when the adjustment equation brackets a root on the grid. The
+``ruin`` exhibit registers on the result rather than on the aggregate, the
+keyed-on-result pattern, so ``build_exhibit(rr, 'ruin')`` serves the strip.
 
 Served documents: exhibits and charts
 -------------------------------------
@@ -3155,6 +3452,166 @@ portfolio's density and log density became one panel read two ways, which freed
 the second panel for the **kappa** reading, and the envelope's five calibrated
 distortions moved onto one band instead of being split three and two by the order
 they were added.
+
+The approximation documents (a332, a337, a344)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The approximation frames come with an ``approximation`` exhibit and two charts.
+``approximation`` is one density panel: the realized mass with the five family
+curves in grid-mass terms, mean marked. ``approximation_tails`` is the exceedance
+reading as its own document: the exact tail, one survival curve per admissible
+family, and the sub-exponential implied tail :math:`\mathsf{P}N\,S_X(x)` as a
+``ceiling`` series. It registers on :class:`Aggregate` only, because the implied
+tail needs a single severity.
+
+.. ipython:: python
+
+    from aggregate import charts
+    charts.available_charts(simple)
+    tails = charts.build_chart_doc(simple, 'approximation_tails')
+    [(p.id, p.kind) for p in tails.panels]
+    [(a.id, a.scales) for a in tails.axes]
+
+They were one chart and became two. The exceedance panel shipped inside
+``approximation`` at a332 and came off at a337 by ruling, because it dominated the
+document's byte count, measured 11.1 MB to 8.1 MB on a ``log2 = 16`` book, and the
+tail reading already lives in the frame's ``quantiles`` and ``rel err`` blocks.
+Each law now ships one curve and the declared axis readings do the rest: the cdf
+is the complement axis, the return period the reciprocal axis, and the exchanged
+panel is the upper Lee plot, so nothing travels twice. A consumer keying on the
+old ``tail`` panel of ``approximation`` must re-sync.
+
+``log`` takes a direction (a342)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``plot_chartdoc``'s ``log`` switch accepts ``True`` for both directions as before,
+and now ``'x'``, ``'y'`` or ``'xy'``, which is the reading the app's per-panel
+controls already offered. The declaration rule is unchanged: a direction's flag
+acts only on an axis that declares a log reading and nowhere else, and under
+``invert`` the flags follow the drawn direction. On a grid panel the z (color)
+axis rides ``'y'``. An unknown direction raises ``ValueError``.
+
+The ``ruin`` chart (a341)
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Predicate: updated, with a poisson or a renewal frequency. Panel ``paths`` carries
+about fifty decimated sample paths, each interval's running minimum preserved so a
+dip below zero survives the thinning and a ruined path ending on its exact ruin
+point, plus the two-point expected trend, the law-of-the-iterated-logarithm funnel
+band and a rug of simulated ruin times. Panel ``psi`` carries the exact
+:math:`\psi(u)` on about 256 log-spaced grid points and a one-point marker series
+at the resolved :math:`(u, \psi(u))`:
+
+.. ipython:: python
+
+    ruin_doc = charts.build_chart_doc(renewal, 'ruin')
+    [(p.id, p.kind) for p in ruin_doc.panels]
+    [(a.id, a.scales) for a in ruin_doc.axes]
+
+Options are ``rho`` or ``lr``, ``p`` or ``u``, ``log2``, ``seed`` (fixed by
+default so documents are hash stable), ``n_plot`` and ``detail``, the per-path
+point budget. A bare call draws the teaching default, and the simulation size is
+pinned at 1000 by ruling. Default documents measure about 155 kB canonical JSON
+against the 200 kB acceptance.
+
+A program as a tower: the ``structure`` chart (a349 to a353)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The IR carried curves. A reinsurance program is rectangles, so it learned a panel
+kind for them: a ``tower`` panel holds ``TowerBlock`` rectangles on
+``ChartDoc.blocks`` rather than series, each with ``x0`` / ``x1`` on a placement
+axis where width is share, ``y0`` / ``y1`` on a quantity axis, a ``role`` from the
+``BLOCK_ROLES`` vocabulary (``layer``, ``retention``, ``co_participation``,
+``gap``, ``gross``), a label, a pre-formatted ``label_lines`` stack, and
+``open_top`` for an unlimited layer. Every coordinate is in the always-serialized
+set, because a zero is a real reading on both axes. ``CHART_IR_VERSION`` moved 2
+to 3, so **every chart document's hash moved**: a consumer that pins and checks
+the version refuses every document from a349 on until it is updated, which is the
+pin-and-check contract of :doc:`../3_reference/3_x_API_Stability` working as
+documented.
+
+``structure`` is the chart that emits one. A gross slab, then one tower panel per
+cession stage: each placed layer a rectangle whose band is its attachment to its
+exhaustion point and whose width is its share, with the retention below and above,
+the unplaced fraction beside it as a co-participation block, and any uncovered
+band, whether an implicit hole or an explicit zero-share layer, drawn as a gap.
+Every layer boundary is also a labeled mark on the loss axis. It is available
+**before** ``update()``, because a program's shape is declared, not computed:
+
+.. ipython:: python
+
+    struct = charts.build_chart_doc(reins, 'structure')
+    [(p.id, p.kind) for p in struct.panels]
+    for blk in struct.blocks:
+        print(f'{blk.panel_id:6s} {blk.role:16s} '
+              f'x {blk.x0:.2f} to {blk.x1:.2f}   '
+              f'y {blk.y0:,.0f} to {blk.y1:,.0f}   {blk.label}')
+
+Three annotation tiers, selected by ``annotate`` from ``ANNOTATE_FIELDS`` and
+rendered in that constant's order whatever order they are passed, with a field
+that has no source omitted rather than blanked: geometry from the declaration,
+risk statistics off ``reins_stats_df`` once there is a grid, and the economics
+(``premium``, ``lr``, ``rol``, ``cede``, ``reinstatements``) on a :class:`PnL`
+only, read from ``PnL.economics``. A plain ``agg`` has no premium context and
+strips those clauses with a warning, so those five fields cannot appear on one.
+Premium, expected loss and its standard deviation are quoted at 100% terms, the
+stored figures divided by the placement share once; they are annual figures on
+both towers, while the geometry on the occurrence tower is per occurrence.
+``lee=True`` adds the quantile curve of the distribution each tower is read
+against, sharing its loss axis and repeating the boundaries on it as faint marks.
+There is no ``distortion`` argument: the chart reports declared pricing, not
+derived pricing.
+
+``plot_chartdoc`` draws a tower natively: filled rectangles shaded by role with
+consecutive layers alternating, an ``open_top`` block drawn with its left, bottom
+and right edges and no top, and a hatched gap over nothing, so an uncovered band
+cannot read as cover. The placement axis carries no ticks at all, because width is
+share; the quantity axis is ticked at the panel's marks and labeled in currency,
+because a tower is read at its breaks. A label line that does not fit its
+rectangle in either direction is dropped rather than spilled, headline first, and
+a block whose headline will not fit is left blank.
+
+.. ipython:: python
+
+    from aggregate.plots import plot_chartdoc
+
+    @savefig features_structure.png scale=20
+    plot_chartdoc(struct);
+
+Two readings of the loss axis finish it. The axis is drawn against the quantity's
+own support, read off ``tail_behavior_df``, which is valid before ``update()``:
+the occurrence stage takes the union of the gross severity rows, the aggregate
+stage the aggregate row, which is bounded only when the frequency is bounded too.
+So the axis starts at the quantity's own lower bound and is never padded past it,
+and where the support is finite the window reaches it, so a ``100 xs 0`` policy
+draws whole and its gross slab closes instead of being cropped at the 99.9th
+percentile with an open top. ``suggested_range`` and ``full_range`` are now the
+padded top and the bare extent, two different numbers where they used to be the
+same pair twice, which disarmed a consumer's own clamp, and ``full_range`` is
+omitted rather than faked when the support has no finite top:
+
+.. ipython:: python
+
+    [(a.id, a.scales, a.suggested_range, a.full_range) for a in struct.axes]
+
+Both loss axes declare ``('linear', 'log')``, so a geometrically layered program
+whose bands are slivers read linearly can be taken on log. A log reading of a
+tower needs three things a linear one does not. A band starting at an exact zero,
+which is both the retention below the first attachment and the gross slab itself,
+is clamped to the panel's decade floor rather than sent to negative infinity where
+its fill vanishes. A boundary mark at zero, which ``aggregate net of 20 xs 0``
+emits, is dropped rather than handed to matplotlib as a tick it cannot place. And
+label fit and placement are measured in the coordinate the reader sees, so a band
+filling 43% of the drawn height is not judged as 15% of the range and dropped, or
+centered where the rectangle is not. The decade floor is one number per quantity
+axis, pooled over the blocks that line up on it and sitting strictly under the
+smallest value drawn, so the slab, the tower carving it up and the Lee curve
+beside it agree about their shared bottom:
+
+.. ipython:: python
+
+    @savefig features_structure_log.png scale=20
+    plot_chartdoc(struct, log='y');
 
 The recipe library
 ------------------
@@ -3327,6 +3784,31 @@ the empty strings the trailer seeds. An outer clause still wins wherever it is
 written. The visible casualty had been ``agg.MED.WithPicks``, which needs its
 stored ``hints{bs=...}`` to place its picks on the grid and died with a raw
 ``KeyError`` without it.
+
+Forty-three more worked examples, and a capstone chain (a327)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``library.agg`` grew by 43 entries to 197. The headline addition is an
+eleven-entry capstone section under a new ``topic:capstone`` tag, a complete
+reinsurance pricing workflow in which each link pulls the previous one in by
+reference: a gross book entered from a limit and attachment profile, exposure
+rating, layer loss picks, an XOL program, quota share variants with a sliding
+scale commission, and the P&L and grossnet views.
+
+.. ipython:: python
+
+    recipes = build.recipes
+    caps = recipes[recipes['tags'].apply(lambda t: 'topic:capstone' in t)]
+    qd(caps[['seq']])
+
+The rest fill in the newer subsystems: renewal frequency (``years`` with ``wait``
+and ``dwait``, exponential through defective), reinsurance economics
+(reinstatements in treaty language and in number words, swing, retro, slide,
+profit commission and corridor over a shared feature base), the bivariate group
+(``clash``, dense and sparse ``dbvsev``, and the three view prefixes rebuilt over
+one base), the P&L expense trio, and a set of small single-idea forms. The tag
+vocabulary migration rides along, with ``topic:spectral`` and ``topic:economics``
+added and the ``check:`` namespace retired.
 
 Under the hood
 --------------
@@ -3511,3 +3993,17 @@ refer to ``CHANGELOG.md`` sections.
   ``MomentAggregator.thin_moments(wt, m1, m2, m3)`` returns the moments of
   ``Binomial(N, wt)`` given the parent's, and each exposure row's frequency is
   resolved once and thinned per component.
+- **a338** the pricing difference rows clamp float dust to exact 0, and the
+  exhibit snapshot comparison tolerates last-ulp raw drift. A ``basis less view``
+  row whose amounts agree to relative 1e-12 now reads exactly 0 instead of
+  machine-dependent dust rendering ``-0.00`` with a negative flag, and
+  ``test_canonical_snapshot`` compares floats to relative 1e-9 (structure, text
+  and flags stay exact), because a value downstream of an iterative calibration
+  reproduces only to the last ulp across CPUs, non-associative summation under
+  different SIMD dispatch.
+- **a339** the ruin simulation core moved into ``Aggregate._ruin_paths``, which
+  returns the exact eventual-ruin function via the frequency-dispatched solver,
+  the simulated reasonableness check, the drawable sample paths, and the trend and
+  funnel arrays. ``pedagogy.ruin_example`` became a thin matplotlib consumer of
+  it, its signature, defaults and figure unchanged. The ``ruin`` exhibit and chart
+  are built on the same helper.

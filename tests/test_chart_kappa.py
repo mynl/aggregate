@@ -1,6 +1,6 @@
 """[Chart-Kappa-Band] the conditional cession, as a curve with a band.
 
-1.0.0a280, phase four of ``dev/notes-net-natural-allocation.md``. A mean is
+1.0.0a280, phase four of ``dev/done/notes-net-natural-allocation.md``. A mean is
 the wrong summary for the question a cedent asks about an occurrence program:
 the gross outcome does not determine the cession, so "having come in at 500,
 how much am I actually ceding" has a spread that the kappa curve averages

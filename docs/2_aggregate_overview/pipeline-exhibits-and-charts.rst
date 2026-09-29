@@ -76,7 +76,7 @@ The governing rule is that **INSURER equals RAW unless an override is registered
 What is published
 ~~~~~~~~~~~~~~~~~
 
-.. Provenance of the table below. Transcribed from ``dev/summary-exhibits-and-charts.md`` section 1, and verified against the live registries at 1.0.0a248 by introspection, not from memory. Three code sites are the source of truth: the passthrough manifest at the foot of ``src/aggregate/exhibits/__init__.py`` (name, title, source frame, classes, caption), the ``EXHIBITS`` registry and its availability predicates in ``exhibits/_core.py``, and the per-class ``insurer`` overrides in ``exhibits/_aggregate.py``, ``_portfolio.py``, ``_pnl.py``, ``_bivariate.py`` and ``_distortion.py``. Check any row in one line with ``[n for n, _ in exhibits.available_exhibits(obj)]``. To update: edit the summary in ``dev/`` first, since it is the reference snapshot the app team reads, then re-transcribe here. It is a ``list-table`` and not a grid or simple table precisely so it can be edited in place: a grid table has to be redrawn to change one cell, which is why the ones in this documentation go stale.
+.. Provenance of the table below. THIS PAGE IS CANONICAL for the catalogue: it superseded the old ``dev/summary-exhibits-and-charts.md`` snapshot, which was retired at 1.0.0a357 because two copies drifted (the snapshot sat at a274, this page at a248, and neither carried the a274 pricing leaves or the a332 / a340 additions). Verified against the live registries at 1.0.0a357 by introspection, not from memory. Three code sites are the source of truth: the passthrough manifest at the foot of ``src/aggregate/exhibits/__init__.py`` (name, title, source frame, classes, caption), the ``EXHIBITS`` registry and its availability predicates in ``exhibits/_core.py``, and the per-class ``insurer`` overrides in ``exhibits/_aggregate.py``, ``_portfolio.py``, ``_pnl.py``, ``_bivariate.py``, ``_distortion.py`` and ``_pricing.py``. Check any row in one line with ``[n for n, _ in exhibits.available_exhibits(obj)]``, and the whole registry with ``sorted(aggregate.exhibits._core.EXHIBITS)`` plus the manifest names. It is a ``list-table`` and not a grid or simple table precisely so it can be edited in place: a grid table has to be redrawn to change one cell, which is why the ones in this documentation go stale.
 
 .. list-table:: The exhibit registry
    :header-rows: 1
@@ -160,11 +160,49 @@ What is published
      - 1: ``tail_behavior_df``
      - updated
      - none
+   * - ``approximation``
+     - Approximation
+     - Aggregate, Portfolio
+     - 1: ``approximation_df``
+     - updated
+     - none
+   * - ``pricing.calibrate``
+     - Calibrated distortions
+     - CalibrationResult
+     - 1: ``distortion_df``
+     - always
+     - none, deliberately: what the fit produced, with no adjustment
+   * - ``pricing.stand_alone``
+     - Stand-alone pricing
+     - CalibrationResult
+     - varies with what was calibrated
+     - always
+     - the fullest use of restructuring in the package; on a reinsured Aggregate RAW carries **more** rows than INSURER, since RAW prices every view and INSURER drops the ``ceded`` rows as the seller's reading
+   * - ``pricing.allocate``
+     - Allocated pricing
+     - CalibrationResult
+     - one block per calibrated family
+     - the calibration has parts to split across
+     - none
+   * - ``pricing.evaluate``
+     - Breakeven acceptability
+     - EvaluationResult
+     - 1: ``evaluation_df``
+     - always
+     - caption only, the business reading of ``gini_p`` and of ``status``
+   * - ``ruin``
+     - Eventual ruin
+     - RuinResult
+     - 1: ``ruin_df``
+     - always
+     - none
+
+The last five rows are **keyed on a result object** rather than on a built object, the ``[Pricing-Keyed-On-Result]`` pattern. A calibration, an acceptability test and a ruin reading are calculations, not stored state, so there is no partially available condition to gate on: a successful call is what produces the subject, and dispatching on it makes the answer an ordinary exhibit. ``build_exhibit(agg.eventual_ruin(rho=0.2, p=0.05), 'ruin')`` is the shape of every one of them.
 
 Read by class, which is the question a landing page actually asks:
 
 Aggregate
-    ``summary``, ``tail``, ``stats``, ``validation``, ``bs_window``, ``tail_behavior``, plus ``reins`` when it cedes and ``sharpen`` once the grid probe has run. Six to eight.
+    ``summary``, ``tail``, ``stats``, ``validation``, ``bs_window``, ``tail_behavior``, ``approximation``, plus ``reins`` when it cedes and ``sharpen`` once the grid probe has run. Seven to nine.
 Portfolio
     The same, per unit plus the total.
 PnL
@@ -175,6 +213,8 @@ Distortion
     ``summary``, ``stats``, ``validation``.
 Severity
     None. It publishes a chart but no exhibit, which is a gap rather than a decision.
+Result objects
+    ``CalibrationResult`` serves ``pricing.calibrate`` and ``pricing.stand_alone``, plus ``pricing.allocate`` where there are parts to split across; ``EvaluationResult`` serves ``pricing.evaluate``; ``RuinResult`` serves ``ruin``.
 
 Adding a new Exhibit
 ~~~~~~~~~~~~~~~~~~~~~
@@ -229,13 +269,23 @@ Chart-level facts, one line each. Options are semantic arguments to the emitter,
     On Distortion, primary. Always. Option ``dual``. Entry point :meth:`Distortion.plot` (``dual``, ``reflect``, ``ax``).
 ``envelope``
     On Bounds, primary. Always. Options ``n_resamples`` (bracketing curves inside the band, each carrying its weight as ``ChartSeries.value``) and ``n`` (curve points, default 1001). Entry point ``Bounds.plot_envelope(n_resamples, reflect)``.
+``approximation``
+    On Aggregate, and on Portfolio through the same emitter. Updated. Option ``xmax``. One density panel reading the five method-of-moments fits against the realized mass, the companion picture to the ``approximation`` exhibit. It carried an exceedance panel when it shipped at 1.0.0a332 and lost it at a337, by ruling: the panel dominated the document's byte count, 11.1 MB against 8.1 MB measured on a ``log2 = 16`` book, and the tail reading is better served by its own document. A consumer keying on a panel named ``tail`` here must re-sync.
+``approximation_tails``
+    On Aggregate only, since the implied tail needs a single severity. Updated. Option ``xmax``. The exceedance reading a337 removed, returned at a344 as its own document: one ``tails`` panel carrying the exact tail, one survival curve per admissible family, and the sub-exponential implied tail :math:`\mathsf{P}N\,S_X(x)` in role ``ceiling``. Each law ships **one** curve and the declared readings do the rest, so nothing travels twice.
+``kappa``
+    On Portfolio, BivariateAggregate and Aggregate, by dispatch, and primary for none of them. Three readings of one idea, the conditional loss given the total. On a Portfolio it needs ``density_df`` and is the ``port`` chart's second panel served alone. On a ``netceded`` BivariateAggregate, in core or on disk, it is the kappa **band**: options ``levels`` (default ``(0.01, 0.99)``), ``cdf_range`` (default ``(1e-3, 0.999)``) and ``ceiling``, which adds the deterministic comb of the largest cession a gross total could produce. On a reinsured Aggregate it is that band computed off the joint the occurrence program implies.
+``ruin``
+    On Aggregate. Available when updated with a poisson or renewal frequency. Options ``rho`` or ``lr``, ``p`` or ``u``, ``log2``, ``seed``, ``n_plot`` (default 50) and ``detail`` (default 192, the per-path point budget). Two panels: ``paths`` carries the decimated sample paths with the expected trend, the law-of-the-iterated-logarithm funnel and a rug of simulated ruin times, and ``psi`` the exact eventual-ruin curve with a one-point marker at the resolved capital. The seed has a fixed default so a served document is hash stable; ``seed=None`` draws one and reports it in ``meta``. The simulation size is pinned at 1000 by ruling.
+``structure``
+    On Aggregate, and on a PnL wrapping one, primary for neither. Available exactly when either cession slot is populated, and **before** ``update()``, because a program's shape is declared rather than computed. Options ``annotate``, a selection from ``ANNOTATE_FIELDS`` rendered in that constant's order whatever order it is passed (default ``('geometry', 'premium', 'el', 'lr')``), and ``lee``, which adds the quantile curve of the distribution each tower is read against and so does require the realized grid. The economics fields are available on a PnL only, read from ``PnL.economics``; a plain Aggregate has no premium context. No ``distortion`` argument: the chart reports declared pricing, not derived pricing.
 ``joint_surface``
     On BivariateAggregate, primary. Needs the in-memory joint density. Options ``window`` (default 4: **draw** ``q(1e-4)`` to ``q(1 - 1e-4)`` of each marginal, measured on the fine lattice before the reduction). The window selects the block factor and says which part of the grid is the subject; it does not crop what is served, since a consumer forming a conditional off a cropped grid would normalize it by the visible mass, which is a different object whose mean moves whenever the window does. ``detail`` (default 128 cells **across the window**, a ceiling reached by a power-of-two block sum, mass preservingly) therefore bounds the drawn cells rather than the emitted axis, which runs the whole lattice at that step. ``encoding`` (default ``f32b64``; ``json`` for the plain arrays alone). The surface block carries both lattices as origin, step and count, the fine bucket size and block factor each was reduced from, the exact marginals, the fine-lattice means and the realized window as a sub-rectangle of the lattice. **No class method yet**: reach it through ``charts.build_chart_doc`` and :func:`~aggregate.plots.plot_chartdoc`.
 
 Panel by panel
 ~~~~~~~~~~~~~~
 
-.. Provenance of the table below. Transcribed from ``dev/summary-exhibits-and-charts.md`` section 2, and verified against the emitters at 1.0.0a248 by introspection, not from memory. The source of truth is one module per chart, ``src/aggregate/charts/_emit_aggregate.py``, ``_emit_portfolio.py``, ``_emit_pnl.py``, ``_emit_severity.py``, ``_emit_reins.py``, ``_emit_distortion.py``, ``_emit_bounds.py`` and ``_emit_bivariate.py``, each ending in its own ``register_chart`` call; the window, survival-depth and float-dust semantics the two-panel charts share live in ``charts/_two_panel.py``. Dump any row in one line with ``doc = charts.build_chart_doc(obj, name)`` then reading ``doc.panels``, ``doc.axes``, ``doc.series`` and ``doc.marks``. To update: edit the summary in ``dev/`` first, then re-transcribe here. A ``list-table`` again, for the same reason: a grid table cannot be edited without redrawing it.
+.. Provenance of the table below. THIS PAGE IS CANONICAL, as for the exhibit table above; the ``dev/`` snapshot it was first transcribed from was retired at 1.0.0a357. Verified against the emitters at 1.0.0a357 by introspection, not from memory. The source of truth is one module per chart, ``src/aggregate/charts/_emit_aggregate.py``, ``_emit_portfolio.py``, ``_emit_pnl.py``, ``_emit_severity.py``, ``_emit_reins.py``, ``_emit_distortion.py``, ``_emit_bounds.py``, ``_emit_bivariate.py``, ``_emit_approximation.py``, ``_emit_ruin.py`` and ``_emit_structure.py``, each ending in its own ``register_chart`` call; the window, survival-depth and float-dust semantics the two-panel charts share live in ``charts/_two_panel.py``. Dump any row in one line with ``doc = charts.build_chart_doc(obj, name)`` then reading ``doc.panels``, ``doc.axes``, ``doc.series``, ``doc.marks`` and, on a tower, ``doc.blocks``. A ``list-table`` again, for the same reason: a grid table cannot be edited without redrawing it.
 
 .. list-table:: What each chart draws
    :header-rows: 1
@@ -331,6 +381,48 @@ Panel by panel
      - one ``SurfaceData``, role ``joint``, values are display-cell masses
      - none
      - log z. ``kinds`` declares only ``'surface'`` today, so the renderer's ``kind`` switch has nothing to choose between
+   * - ``approximation`` / density
+     - ``outcome``, Loss, currency, linear or log, the ``agg`` window, full is the whole grid
+     - ``mass``, Probability mass, density, linear or log, ``(0, peak)``
+     - Exact first, atomic, then one continuous curve per family, ``norm``, ``gamma``, ``lognorm``, ``sgamma``, ``slognorm``, all role ``density`` in grid-mass terms; a family the subject cannot admit is absent rather than drawn flat
+     - mean
+     - log x, log y, full x
+   * - ``approximation_tails`` / tails
+     - ``outcome``, shared with nothing, Loss, currency, linear or log
+     - ``survival``, Exceeding probability, linear or log, ``(1e-9, 1)``, paired with ``p`` (linear only) and ``return_period`` (linear or log, ladder ``1 .. 1e4``, full ``1 .. 1e9``)
+     - Exact then one survival curve per admissible family, role ``survival``, plus ``Implied tail`` in role ``ceiling``, the sub-exponential ``E[N] * S_X(x)``
+     - mean
+     - log x, log y, reflect, return period, invert to the upper Lee plot
+   * - ``kappa`` / kappa
+     - ``outcome``, Loss, currency, linear or log, window is the loss window
+     - ``kappa``, ``E[Xi | X = x]``, currency, linear or log, full to the last kept point
+     - on a Portfolio, one per unit (role ``unit``) then Total (role ``total``), the same series as the ``port`` chart's second panel; on a netceded joint or a reinsured Aggregate, the mean curve plus the two ``levels`` band edges, and the deterministic comb in role ``ceiling`` when ``ceiling=True``
+     - none
+     - log x, log y, full x, full y
+   * - ``ruin`` / paths
+     - ``time``, Time, **linear only**
+     - ``surplus``, Surplus, currency, **linear only**, crosses zero by construction
+     - about fifty decimated paths in role ``sample``, each interval's running minimum preserved so a dip below zero survives the thinning and a ruined path ending on its exact ruin point; then ``Expected trend`` (role ``mean``), ``LIL funnel`` (role ``band``) and ``Ruin times`` (role ``rug``)
+     - none
+     - none: a path plot has one honest reading
+   * - ``ruin`` / psi
+     - ``capital``, Initial surplus, currency, linear
+     - ``ruin_probability``, Probability of eventual ruin, linear or log, ``(0, 1)``
+     - ``psi(u)`` on about 256 log-spaced points (role ``survival``) and a one-point ``psi at u`` (role ``marker``) at the resolved capital
+     - none
+     - log y
+   * - ``structure`` / gross, occ, agg
+     - a placement axis per panel, ``Placement``, ratio, ``(0, 1)``, **no ticks when drawn**, because width is share
+     - the stage's quantity axis, Loss per claim or Aggregate loss, currency, linear **or log**, drawn against the quantity's own support off ``tail_behavior_df``, so it reaches a finite top where one exists
+     - none. A tower carries ``TowerBlock`` rectangles on ``doc.blocks``, roles ``gross``, ``layer``, ``retention``, ``co_participation`` and ``gap``, with ``open_top`` for an unlimited layer
+     - every layer boundary, labeled, on the loss axis; repeated ``faint`` on the Lee panel under ``lee=True``
+     - log y, the reading a geometrically layered program needs. Panel ``kind`` is ``'tower'``, the one kind that is not ``xy``
+   * - ``structure`` / occ_lee, agg_lee
+     - ``occ_p`` or ``agg_p``, Non-exceeding probability, each paired with its own return-period axis
+     - the stage's loss axis, shared with that stage's tower, which is the point of the panel
+     - one curve, the quantile function of the distribution the tower is read against: role ``gross`` on the occurrence stage, role ``subject`` on the aggregate stage. Present only under ``lee=True``, which requires the realized grid
+     - the layer boundaries again, ``faint``
+     - as the tower's loss axis declares, plus the return-period pairing
 
 Rendering
 ~~~~~~~~~
@@ -345,7 +437,7 @@ More details
 -------------
 
 Two panels, one axis, except once.
-    On ``agg``, ``pnl`` and ``severity`` the outcome axis is a single :class:`~aggregate.charts.ir.ChartAxis` referenced as the density panel's x and the Lee panel's y, so a window set on it moves both. On ``port`` both panels take it as x. ``reins`` is the deliberate exception: its two panels share nothing, because a per-claim loss and an annual aggregate are different quantities and one window across both would claim they were the same.
+    On ``agg``, ``pnl`` and ``severity`` the outcome axis is a single :class:`~aggregate.charts.ir.ChartAxis` referenced as the density panel's x and the Lee panel's y, so a window set on it moves both. On ``port`` both panels take it as x. ``structure`` shares one loss axis per *stage*, between that stage's tower and its Lee panel, and keeps the occurrence and aggregate stages on separate axes for the reason ``reins`` does. ``reins`` is the deliberate exception that names the rule: its two panels share nothing, because a per-claim loss and an annual aggregate are different quantities and one window across both would claim they were the same.
 Three floors, all measured rather than chosen.
     ``LOG_FLOOR = 1e-15`` turns float dust into ``None`` gaps that a renderer must break the line at, never bridge. ``SURVIVAL_FLOOR = 1e-9`` is the deepest survival worth a panel, and is what puts the return-period axis' full extent at 1e9; ``RETURN_PERIOD_TOP = 1e4`` is the ladder that axis suggests, so the deep tail is a press away rather than the opening view. ``KAPPA_FLOOR = 1e-14`` on the portfolio kappa panel is a decade above the dust floor because kappa divides by ``p_total``, and the residual of the sum-to-diagonal identity is what measured the cliff.
 Support is a fact about the law.

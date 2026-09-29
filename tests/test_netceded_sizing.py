@@ -1,7 +1,7 @@
 """Tests for the netceded joint's grid sizing.
 
 [Sizing-And-Passthrough], 1.0.0a277, phase one of
-``dev/notes-net-natural-allocation.md``. Three defects, one story: the joint
+``dev/done/notes-net-natural-allocation.md``. Three defects, one story: the joint
 could be built with a grid the caller did not ask for and could not reach.
 
 * the exact common lattice is taken when the budget affords it, so the

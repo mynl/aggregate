@@ -80,6 +80,14 @@ def main() -> int:
     import matplotlib
     matplotlib.use('Agg')                      # no display, no figure windows
 
+    # The page prints kappa, mu and other non-Latin-1 characters. A Windows
+    # console defaults to cp1252, where writing one raises UnicodeEncodeError
+    # from inside qd() and reads as a block failure, so force UTF-8 on both
+    # streams rather than asking the caller to set PYTHONIOENCODING.
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            stream.reconfigure(encoding='utf-8', errors='replace')
+
     bs = blocks(path.read_text(encoding='utf-8'))
     print(f'{path}: {len(bs)} ipython blocks')
     ns: dict = {'__name__': '__main__'}

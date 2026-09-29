@@ -99,10 +99,15 @@
   together before redesigning either.
   **The "what is a first-class citizen" half is DONE** (`1.0.0a170`
   `[FCC-Contract]`): the membership rule and the required surface are declared in
-  `constants.FIRST_CLASS_CLASSES` / `FCC_REQUIRED`, audited by
-  `dev/regen_features.py`, asserted by `tests/test_fcc_surface.py`, and written up
-  as §0 of `dev/reporting-guidelines.md`. What remains here is the other half:
-  what those reports **contain**.
+  `constants.FIRST_CLASS_CLASSES` / `FCC_REQUIRED` with the criteria in the
+  comment block above them, audited by `dev/regen_features.py`, asserted by
+  `tests/test_fcc_surface.py`, and written up for users as "The
+  first-class-citizen contract" in `docs/2_aggregate_overview/features.rst`. §0
+  of `dev/reporting-guidelines.md` was a second copy of the required-member
+  table; at `1.0.0a357` it became a pointer to those homes, after it was found
+  still listing `doc` as required more than fifty releases after `1.0.0a301`
+  dropped it. What remains here is the other half: what those reports
+  **contain**.
 - **[Bivariate-DecL-Label]** — `BivariateAggregate` became a `LabeledMixin` host
   at `1.0.0a171`, but its **object-level** label has no DecL spelling: the nine
   `bv_out` productions in `decl.lark` (copula / discrete / view-pair, each in
@@ -1092,7 +1097,7 @@
   through `_scatter_1d` onto the total grid and take the ratio. Deferred
   because the netceded ask does not need it; recorded because it unifies three
   consumers and should be designed once. Still deferred after
-  `dev/notes-net-natural-allocation.md` and `dev/done/plan-pricing-natural-allocation.md`
+  `dev/done/notes-net-natural-allocation.md` and `dev/done/plan-pricing-natural-allocation.md`
   (`a277` to `a285`): the kappa band conditions on an **axis**, which is the
   easy case and the one the netceded question asks, so nothing there touches
   this. What did land next to it is `JointBandsMixin._row_bands`, the row-wise

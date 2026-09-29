@@ -142,7 +142,7 @@ Per-chart declaration assertions in `test_chart_agg.py` (beside `:77-113`), `tes
 ## Phase 6: docs and release hygiene
 
 - `docs/2_aggregate_overview/pipeline-exhibits-and-charts.rst`: the declared-readings section at `:200-336`, the chart-by-chart entry points at `:214-233`, the "Readings offered" column of the panel table at `:243-333`, and the sentence at `:334` that today says "Its five switches".
-- `dev/summary-exhibits-and-charts.md`, the source that rst table is transcribed from.
+- `docs/2_aggregate_overview/pipeline-exhibits-and-charts.rst`, the canonical catalogue (the `dev/summary-exhibits-and-charts.md` snapshot this plan cited was retired at `1.0.0a357`).
 - `docs/2_aggregate_overview/features.rst`: a worked `reflect=True` example beside the `return_period=True` one at `:948-960`.
 - `dev/TODO.md`, `dev/FEATURES.csv` (`uv run python dev/regen_features.py`, public surface changed), plan moved to `dev/done/` at close.
 - One version bump to `1.0.0a267` in `pyproject.toml`, one `CHANGELOG.md` section under `[Chart-Reflected-Reading]`, one commit, subject only:

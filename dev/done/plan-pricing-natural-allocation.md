@@ -21,7 +21,7 @@
 > it, the `plan-3d-plot.md` arrangement. Nothing is implemented. Line anchors
 > are LIB `1.0.0a275` and API `1.0.0a99`.
 >
-> **Companion document**: LIB `dev/notes-net-natural-allocation.md`
+> **Companion document**: LIB `dev/done/notes-net-natural-allocation.md`
 > (`[NetCeded-Kappa-Band]`, notes, 2026-08-14), a measured working session
 > that specifies the kappa band chart, the band iterator that lifts the
 > massive refusal, and three sizing defects in the joint's public entry

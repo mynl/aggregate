@@ -3,47 +3,37 @@
 > **Status: DRAFT direction (author, 2026-06-29).** The target we move toward as
 > the PnL workflow settles. Captured here so plans can reference it; we are **not**
 > retrofitting every report at once — see each plan's "pended" scope.
+>
+> **Half of this has landed.** §0, what a first-class citizen is, shipped at
+> `1.0.0a170` and is now declared in code; §0 below is a pointer to where. What
+> is still open is §"The reports themselves", what those reports *contain*,
+> tracked as `[Reporting-Guidelines]` in `dev/TODO.md` and gating
+> `[Accounting-Summary-DF]`. This file moves to `dev/done/` when that lands.
 
 ## 0. What a first-class citizen is
 
-*(Author, 2026-07-29. Declared in code as `FIRST_CLASS_CLASSES` / `FCC_REQUIRED`
-in `src/aggregate/constants.py`, audited by `dev/regen_features.py`, asserted by
-`tests/test_fcc_surface.py`. Change the tuple, not this list, and the check
-follows.)*
+**Settled, and declared in code. This section is a pointer, not a
+specification.** The membership rule and the required surface landed at
+`1.0.0a170` (`[FCC-Contract]`), and each part of the contract lives in exactly
+one place:
 
-The **first-class citizens (FCC)** are `Aggregate`, `Portfolio`,
-`BivariateAggregate`, `PnL` and `Distortion`. `Severity` is near-first-class.
-
-Two criteria put a class on the list, and both must hold:
-
-1. **It can be created in DecL.** `Bounds`, `Frequency` and `GridDistribution`
-   are reached *from* an object and never declared, so they are out however
-   useful they are.
-2. **It flows through to the `aggregate_api` (aLL) SPA**, which calls exactly the
-   members below on whatever object it is handed.
-
-An FCC **must** carry:
-
-| Group | Members |
+| What | Where |
 |---|---|
-| Discovery and identity | `info`, `help` |
-| DecL trailer | `note`, `hints`, `tags`, `doc` |
-| Declaration round-trip | `program`, `pprogram` |
-| DataFrame quartet | `summary_df`, `validation_df`, `stats_df`, `density_df` |
-| Graphics | `plot` |
+| Who is first-class, and who is near-first-class | `FIRST_CLASS_CLASSES` / `NEAR_FIRST_CLASS` in `src/aggregate/constants.py` |
+| The two membership criteria, the `Severity` exemption, the optional-member and narrative-pairs rules | the comment block immediately above those tuples, same file |
+| Every member an FCC must carry | `FCC_REQUIRED`, same file, grouped in its own comment |
+| Declared temporary holes | `FCC_CONTRACT_EXCEPTIONS` / `FCC_UNPAIRED_NARRATIVES`, same file: both empty since `1.0.0a172`, and they must stay empty at `1.0.0b1` |
+| The audit | `dev/regen_features.py`, its FCC CONTRACT and NARRATIVE PAIRS sections |
+| The assertion | `tests/test_fcc_surface.py` |
+| The user-facing writeup | "The first-class-citizen contract" in `docs/2_aggregate_overview/features.rst` |
 
-`Severity` carries all of it except the DataFrame quartet: it is a look-through
-onto a frozen scipy random variable, not a compute result, so the frames have
-nothing to report.
+Read the tuples and that comment block, never a prose copy of them. This section
+held such a copy until `1.0.0a357`, and it had already drifted: it still listed
+`doc` as a required trailer value more than fifty releases after `1.0.0a301`
+dropped `doc` from `FCC_REQUIRED`. Nothing it said was unique, which is why it is
+gone rather than corrected.
 
-Everything else is **optional**, and a caller reaches it defensively with
-`getattr`. The `*_description` (short) / `*_explanation` (long) narrative strings
-are the main such family. Optional does not mean unconstrained: wherever one half
-of a pair is present the other must be too.
-
-Both `FCC_CONTRACT_EXCEPTIONS` and `FCC_UNPAIRED_NARRATIVES` are **empty** as of
-`1.0.0a172`, and must stay empty at `1.0.0b1`. Adding an entry is how a
-deliberate, temporary hole gets declared; it is not a way to quiet the check.
+What remains live in this file is the section below.
 
 ## The reports themselves
 

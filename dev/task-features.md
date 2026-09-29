@@ -406,6 +406,44 @@ This task is **part of release hygiene**, not a separately versioned change:
   `reinsurance_*`, and marked two properties `:meth:`. `info-strings.rst`
   named `tail.describe_lines`, which is `describe_rows`.
 
+- **Catch-up run, 2026-09-29, at a353.** Gap was 28 releases (a326 to a353).
+  The ledger went from 310 rows to **338**, cites a1 to a353 and leaves nothing
+  uncited. No new top-level section was needed; fourteen subsections were added
+  across seven existing ones. New DecL elements gained three (`approximate`
+  across all five families, the geometric's trials convention, `sev cantor` and
+  the `aggregate.cantor` module); Better parse errors gained its first
+  subsection, `ErrorReport.hint`; the reporting quartet gained the approximation
+  frames (`approximation_df`, `approximation_density_df`, the centered-mass
+  numbers, the `rel err` block, the cache); Grids gained the closed-support
+  window and the numbers it moves; Bivariate gained three (the `marginal` /
+  `conditional` / `total` accessors, the `summary_df` / `validation_df` /
+  `stats_df` renames, the signed `dbvsev` fix); Renewal and ruin gained
+  `eventual_ruin` and `RuinResult`; Served documents gained four (the two
+  approximation charts, `log` by direction, the `ruin` chart, and the tower
+  cluster a349 to a353 as one subsection). Two internal items named in Under
+  the hood. One new cast member, `cant`, the Cantor severity, shared by the
+  a347 and a348 subsections.
+
+  **No repairs were needed**: every pre-existing block still ran against the
+  current API, so the run was purely additive. Gate passed: **161 code cells,
+  0 errors**. Docs are pending a rebuild.
+
+  One repair outside `features.rst`: `dev/check_features_rst.py` failed on this
+  machine at the P&L `economic_df` block with `UnicodeEncodeError` on `κ`,
+  because a Windows console is cp1252 and `qd()` writes kappa. The harness now
+  reconfigures `stdout` and `stderr` to UTF-8 itself rather than relying on
+  `PYTHONIOENCODING`. The failure was environmental, never an API drift, and it
+  reproduced against the committed page.
+
+  **Gap already reopened: a354 to a357 landed while this run was in progress**
+  and are not covered. All four are user-facing, so none belongs in the
+  appendix: `a354` `hints{}` accepting per-axis `(x, y)` `log2` / `bs` pairs,
+  `a355` an empirical outer frequency sizing the bivariate axes off the true
+  marginal, `a356` the `aggregate[all]` extra, and `a357` a degenerate law
+  reporting `cv` 0 rather than `nan`. The next run starts there. A run that
+  overlaps the author's own work should re-read `git log` at the end, not only
+  at pre-flight, because the ledger caption commits to a range.
+
 ## 6. First-run note (completed 2026-06-11, at a57)
 
 The first execution covered the entire `a1`–`a57` series; `features.rst` now

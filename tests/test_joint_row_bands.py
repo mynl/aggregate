@@ -1,7 +1,7 @@
 """Tests for the joint band iterator and the shared conditional probe.
 
 [Joint-Row-Bands], 1.0.0a278, phase two of
-``dev/notes-net-natural-allocation.md``. Everything the kappa band needs is a
+``dev/done/notes-net-natural-allocation.md``. Everything the kappa band needs is a
 row-wise fold, and a fold should not have to know whether the density is a
 numpy array or a zarr store. :class:`~aggregate.bivariate.JointBandsMixin`
 gives both containers one iterator and one ``slice``.

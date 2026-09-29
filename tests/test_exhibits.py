@@ -56,9 +56,12 @@ PROGRAMS = {
                        'occurrence net of 10 xs 10 '
                        'agg EX.ReB 1 claim dsev [5 10] fixed'),
     # walks, for the economic exhibits ([Exhibits-Economic-Insurer],
-    # [Exhibits-Waterfall]). Tower shares atoms and carries a kappa ladder;
-    # Peel is stitched, so its ladder is marginal and the waterfall's
-    # diversified column blanks.
+    # [Exhibits-Waterfall]). Tower shares atoms and carries a kappa ladder
+    # off the 2-D joint; Peel is stitched but eligible, so since
+    # [Palm-Ledger] (a363) it carries the Palm scenario ladder and its
+    # waterfall diversified column populates; PeelMarginal is the same peel
+    # under a logarithmic frequency, whose missing ``freq_pgf_prime`` keeps
+    # the ladder marginal and blanks the diversified column.
     'Tower': ('xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr '
               'sev lognorm 100 cv 2 '
               'occurrence ceded to 500 xs 500 deposit 100 poisson'),
@@ -66,6 +69,10 @@ PROGRAMS = {
              '70% lr sev lognorm 100 cv 2 '
              'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
              'deposit 40 poisson peel top-down'),
+    'PeelMarginal': ('xpnl EX.PeelM 1000 premium less agg EX.PeelME 1000 '
+                     'premium at 70% lr sev lognorm 100 cv 2 '
+                     'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+                     'deposit 40 logarithmic peel top-down'),
 }
 _WALK_EXHIBITS = ['summary', 'stats', 'validation', 'economic',
                   'economic_ratios', 'economic_waterfall']
@@ -88,6 +95,7 @@ EXPECTED_EXHIBITS = {
                        *_DIAG],
     'Tower': _WALK_EXHIBITS,
     'Peel': _WALK_EXHIBITS,
+    'PeelMarginal': _WALK_EXHIBITS,
     # the pricing result fixtures ([Pricing-Exhibits]); a result serves the
     # pricing leaves and nothing else, because nothing else is registered for
     # its type
@@ -828,20 +836,23 @@ def test_economic_insurer_caption_states_the_ladder_regime(tower):
 
 # --- the abbreviated insurer ledger ([Ledger-Insurer-Abbreviated]) ----------
 
-def test_economic_insurer_is_abbreviated(tower, peel):
+def test_economic_insurer_is_abbreviated(tower, peel, peel_marginal):
     """Four columns: the two moments, the CV, and the **adverse** tail state.
 
     The tail rung is the bottom of the ladder, not the top. A P&L is in
     payoff sign convention, left tail bad, so ``κ01`` is the state a reader
     is scanning the sheet for and ``κ99`` is the benign one; an abbreviation
     ending at ``κ99`` would report the good news in the slot the eye reads as
-    the bad. ``peel`` is stitched, so it takes the same rung under the plain
-    ``P`` header of a marginal ladder.
+    the bad. ``peel`` is stitched but Palm-eligible, so since a363 it takes
+    the ``κ01`` rung too; ``peel_marginal`` (no pgf derivative) takes the
+    same rung under the plain ``P`` header of a marginal ladder.
     """
     _, tower_df, _ = exhibit_frames(tower, 'economic', 'insurer')[0]
     assert list(tower_df.columns) == ['EX', 'SD', 'CV', 'κ01']
     _, peel_df, _ = exhibit_frames(peel, 'economic', 'insurer')[0]
-    assert list(peel_df.columns) == ['EX', 'SD', 'CV', 'P01']
+    assert list(peel_df.columns) == ['EX', 'SD', 'CV', 'κ01']
+    _, marg_df, _ = exhibit_frames(peel_marginal, 'economic', 'insurer')[0]
+    assert list(marg_df.columns) == ['EX', 'SD', 'CV', 'P01']
     # the adverse state really is the adverse one: the bottom line, the row
     # the ledger plan flags ``total``, loses in it rather than making its
     # mean. Read off the flag rather than off ``iloc[-1]``: the last row of a
@@ -912,8 +923,17 @@ def test_economic_ratios_insurer_splits_units(tower):
 
 @pytest.fixture(scope='module')
 def peel(objects):
-    """A stitched walk: no shared atoms, so no kappa ladder."""
+    """A stitched walk, Palm-eligible: the scenario ladder is computed at
+    build time by the 1-D conditional-mean identity ([Palm-Ledger])."""
     return objects['Peel']
+
+
+@pytest.fixture(scope='module')
+def peel_marginal(objects):
+    """The same stitched peel under a logarithmic frequency: no
+    ``freq_pgf_prime``, so the ladder stays marginal and the waterfall's
+    diversified column blanks (the ineligible case)."""
+    return objects['PeelMarginal']
 
 
 def test_waterfall_needs_a_tower(objects, tower):
@@ -1031,12 +1051,55 @@ def test_waterfall_closing_row_standalone_equals_diversified(tower):
         walk['M01 diversified'].iloc[-1], rel=1e-9)
 
 
-def test_waterfall_blanks_diversified_without_shared_atoms(peel):
-    """No shared atoms means no conditioning happened; say so, do not guess."""
-    _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
+def test_waterfall_blanks_diversified_on_ineligible_ladder(peel_marginal):
+    """No conditioning happened (no pgf derivative); say so, do not guess.
+
+    The ineligible fixture is a stitched peel under a logarithmic frequency:
+    ``freq_pgf_prime`` raises, the Palm ladder is not computed, the ledger
+    keeps plain ``P`` headers and the walk's diversified column blanks, with
+    the caption rider naming the blank. (Ruled 2026-09-29: the plan's
+    original swing fixture cannot serve here, since a swing walk is per-atom
+    and carries a populated kappa ladder.)
+    """
+    _, walk, kw = exhibit_frames(peel_marginal, 'economic_waterfall')[0]
     assert walk['M01 diversified'].isna().all()
     assert walk['M01 standalone'].notna().any()
     assert 'blank here' in kw['caption']
+    assert 'P01' in peel_marginal.economic_df.columns
+
+
+def test_waterfall_peel_diversified_populates_and_foots(peel):
+    """[Palm-Ledger] headline: the stitched Peel walk serves diversified.
+
+    Every diversified cell populates, the risk and cession steps foot to the
+    closing row (the tier subtotal is a summary of its two layers, excluded
+    from the footing sum), and the caption carries no blank rider.
+    """
+    _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
+    div = walk['M01 diversified']
+    assert div.notna().all()
+    assert 'blank here' not in kw['caption']
+    footing = [s for s in walk.index[:-1] if not s.startswith('All')]
+    assert div[footing].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
+    # the subtotal is the sum of the two layers it spans
+    layers = [s for s in walk.index if s.startswith('occ ')]
+    assert div['All occurrence'] == pytest.approx(div[layers].sum(), rel=1e-9)
+
+
+def test_swing_walk_keeps_its_kappa_ladder():
+    """A swing walk is per-atom over a shared source: the κ ladder stays.
+
+    Pins the behavior the a362 plan misstated (ruled 2026-09-29): a
+    loss-sensitive feature does NOT blank the diversified column, because
+    the variable-feature walk rides shared atoms, not the stitched seam.
+    """
+    p = build('xpnl EX.SwingPin 10000 premium less agg EX.SwingPinE 10000 '
+              'prem at 85% lr sev lognorm 50 cv 3 poisson '
+              'aggregate net of 5000 xs 4000 swing basic 500 lcm 0.5 '
+              'min 500 max 3000')
+    assert p._probs is not None
+    assert 'κ01' in p.economic_df.columns
+    assert p.walk_df['M01 diversified'].notna().all()
 
 
 def test_waterfall_includes_tier_subtotals(peel):

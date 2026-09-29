@@ -1116,8 +1116,13 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
                     gross_obl, margin_label=margin_key)]
 
     # ----- the peel chain: cumulative cessions, tier by tier ----------
+    # ``cover_maps`` mirrors ``covers`` with the underlying *functions*
+    # (tier tag, per-layer recovery map, cumulative-net map), kept for the
+    # Palm scenario ladder ([Palm-Ledger]): the ladder conditions per claim
+    # ('occ' maps) or per retained-aggregate point ('agg' maps).
     _xs, p_gross_agg = _sev_transform_marginal(agg, lambda x: x)
     occ_rows = []          # per occurrence step: (label, pc, comm, R, N_cum)
+    cover_maps = []
     taken = []
     occ_cum = None
     for site, i, clause, lbl in occ_steps:
@@ -1125,12 +1130,14 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
         occ_cum = _reinsurance.make_ceder_netter(
             [agg.occ_reins[k] for k in sorted(taken)])[0]
         one = _reinsurance.make_ceder_netter([clause])[0]
+        net_cum_fn = lambda x, g=occ_cum: x - g(x)
         _x, recovery = _sev_transform_marginal(agg, one)
-        _x, net_cum = _sev_transform_marginal(
-            agg, lambda x, g=occ_cum: x - g(x))
+        _x, net_cum = _sev_transform_marginal(agg, net_cum_fn)
         pc_by, c_by = econ_by[site]
         occ_rows.append((lbl, pc_by[i], c_by[i], recovery, net_cum))
+        cover_maps.append(('occ', one, net_cum_fn))
     subject = occ_rows[-1][4]        # the net-of-occurrence aggregate
+    retained_fn = cover_maps[len(occ_rows) - 1][2]   # per-claim retained map
 
     agg_rows = []          # per aggregate step: (label, pc, comm, R, N_cum)
     taken = []
@@ -1140,11 +1147,12 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
         agg_cum = _reinsurance.make_ceder_netter(
             [agg.agg_reins[k] for k in sorted(taken)])[0]
         one = _reinsurance.make_ceder_netter([clause])[0]
+        net_cum_fn = lambda s, g=agg_cum: s - g(s)
         _x, recovery = _agg_transform_marginal(agg, one, subject)
-        _x, net_cum = _agg_transform_marginal(
-            agg, lambda s, g=agg_cum: s - g(s), subject)
+        _x, net_cum = _agg_transform_marginal(agg, net_cum_fn, subject)
         pc_by, c_by = econ_by[site]
         agg_rows.append((lbl, pc_by[j], c_by[j], recovery, net_cum))
+        cover_maps.append(('agg', one, net_cum_fn))
 
     # the final net after every cover, and the closing running totals
     final_net = agg_rows[-1][4] if agg_rows else subject
@@ -1184,7 +1192,21 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
     # The plan is re-derived here and must match the one ``PnL`` builds below,
     # so the same ``tier_spans`` goes to both; a mismatch surfaces as the
     # "no entry supplied for ledger row" error.
+    #
+    # ``palm_specs`` records, per plan row, how the row's value depends on
+    # the underlying compound ([Palm-Ledger]): ``('const', v)``,
+    # ``('claim', fn, sign, shift)`` (the compound of the per-claim map
+    # ``fn``), ``('agg', fn, sign, shift)`` (a deterministic map of the
+    # net-of-occurrence aggregate), or ``('delta', target, base)``. Built in
+    # lockstep with ``entries`` so the two cannot drift.
     entries = {}
+    palm_specs = {}
+    # the final-net dependence: a deterministic transform of the retained
+    # aggregate when aggregate covers exist, else the retained compound itself
+    if agg_rows:
+        final_net_spec = ('agg', cover_maps[-1][2])
+    else:
+        final_net_spec = ('claim', retained_fn)
     plan = _ledger_plan(groups, 'margin', tier_spans)
     # running consideration / commission net through each cover step
     running = []
@@ -1198,76 +1220,118 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
             if gi == 0:
                 if side == 'cons':
                     entries[row_label] = _const_row(p_gross, row_label)
+                    palm_specs[row_label] = ('const', p_gross)
                 elif li == 0:
                     entries[row_label] = _affine_row(
                         xs, p_gross_agg, sign=-1.0, label=row_label)
+                    palm_specs[row_label] = (
+                        'claim', lambda x: x, -1.0, 0.0)
                 else:
                     entries[row_label] = _const_row(
                         -expense_vals[li - 1], row_label)
+                    palm_specs[row_label] = ('const', -expense_vals[li - 1])
                 continue
             lbl, pc, comm, recovery, _n = covers[gi - 1]
+            tier_tag, rec_fn, _ncf = cover_maps[gi - 1]
             if side == 'cons':
                 entries[row_label] = _const_row(-pc, row_label)
+                palm_specs[row_label] = ('const', -pc)
             elif li == 0:
                 entries[row_label] = _affine_row(xs, recovery, label=row_label)
+                palm_specs[row_label] = (
+                    'claim' if tier_tag == 'occ' else 'agg',
+                    rec_fn, 1.0, 0.0)
             else:
                 entries[row_label] = _const_row(comm, row_label)
+                palm_specs[row_label] = ('const', comm)
         elif kind == 'group_total':
             gi, side = payload
             if gi == 0:
                 entries[row_label] = _affine_row(
                     xs, p_gross_agg, sign=-1.0, shift=-expense_total,
                     label=row_label)
+                palm_specs[row_label] = (
+                    'claim', lambda x: x, -1.0, -expense_total)
             else:
                 _lbl, _pc, comm, recovery, _n = covers[gi - 1]
+                tier_tag, rec_fn, _ncf = cover_maps[gi - 1]
                 entries[row_label] = _affine_row(
                     xs, recovery, shift=comm, label=row_label)
+                palm_specs[row_label] = (
+                    'claim' if tier_tag == 'occ' else 'agg',
+                    rec_fn, 1.0, comm)
         elif kind == 'group_result':
             gi = payload
             if gi == 0:
                 entries[row_label] = _affine_row(
                     xs, p_gross_agg, sign=-1.0,
                     shift=p_gross - expense_total, label=row_label)
+                palm_specs[row_label] = (
+                    'claim', lambda x: x, -1.0, p_gross - expense_total)
             else:
                 _lbl, pc, comm, recovery, _n = covers[gi - 1]
+                tier_tag, rec_fn, _ncf = cover_maps[gi - 1]
                 entries[row_label] = _affine_row(
                     xs, recovery, shift=comm - pc, label=row_label)
+                palm_specs[row_label] = (
+                    'claim' if tier_tag == 'occ' else 'agg',
+                    rec_fn, 1.0, comm - pc)
         elif kind == 'running_net':
             gi = payload
             _lbl, _pc, _comm, _r, net_cum = covers[gi - 1]
+            tier_tag, _rf, net_cum_fn = cover_maps[gi - 1]
             entries[row_label] = _affine_row(
                 xs, net_cum, sign=-1.0,
                 shift=p_gross - expense_total + running[gi - 1],
                 label=row_label)
+            palm_specs[row_label] = (
+                'claim' if tier_tag == 'occ' else 'agg', net_cum_fn,
+                -1.0, p_gross - expense_total + running[gi - 1])
         elif kind == 'tier_total':
             lo, hi, side = payload
             pc_span, comm_span = span_economics(lo, hi)
             if side == 'cons':
                 entries[row_label] = _const_row(-pc_span, row_label)
+                palm_specs[row_label] = ('const', -pc_span)
             else:
                 entries[row_label] = _affine_row(
                     xs, tier_recovery[(lo, hi)], shift=comm_span,
                     label=row_label)
+                is_occ_span = lo == 1
+                palm_specs[row_label] = (
+                    'claim' if is_occ_span else 'agg',
+                    occ_cum if is_occ_span else agg_cum, 1.0, comm_span)
         elif kind == 'tier_result':
             lo, hi = payload
             pc_span, comm_span = span_economics(lo, hi)
             entries[row_label] = _affine_row(
                 xs, tier_recovery[(lo, hi)], shift=comm_span - pc_span,
                 label=row_label)
+            is_occ_span = lo == 1
+            palm_specs[row_label] = (
+                'claim' if is_occ_span else 'agg',
+                occ_cum if is_occ_span else agg_cum, 1.0,
+                comm_span - pc_span)
         elif kind == 'grand_total':
             if payload == 'cons':
                 entries[row_label] = _const_row(p_gross - total_pc, row_label)
+                palm_specs[row_label] = ('const', p_gross - total_pc)
             else:
                 entries[row_label] = _affine_row(
                     xs, final_net, sign=-1.0,
                     shift=total_comm - expense_total, label=row_label)
+                palm_specs[row_label] = final_net_spec + (
+                    -1.0, total_comm - expense_total)
         elif kind == 'grand_result':
+            grand_shift = p_gross - total_pc + total_comm - expense_total
             entries[row_label] = _affine_row(
-                xs, final_net, sign=-1.0,
-                shift=p_gross - total_pc + total_comm - expense_total,
+                xs, final_net, sign=-1.0, shift=grand_shift,
                 label=row_label)
+            palm_specs[row_label] = final_net_spec + (-1.0, grand_shift)
+            grand_result_label = row_label
         elif kind == 'total_impact':
             entries[row_label] = ('delta', 'margin', f'{base_step} result')
+            palm_specs[row_label] = ('delta', 'margin', f'{base_step} result')
         else:                                        # pragma: no cover
             raise ValueError(
                 f'unknown ledger row kind {kind!r} for row {row_label!r}; '
@@ -1275,7 +1339,127 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
     pnl = PnL(name=name or agg.name, source=None, groups=groups,
               result_name='margin', tier_spans=tier_spans, label=label,
               stitched_rows=entries)
+    pnl._palm_ladder = _palm_scenario_ladder(
+        agg, palm_specs, retained_fn=retained_fn,
+        agg_transform=cover_maps[-1][2] if agg_rows else None,
+        p_subject=subject, grand_gd=entries[grand_result_label][0],
+        grand_shift=grand_shift)
     return pnl, 'stitched'
+
+
+def _palm_scenario_ladder(agg, palm_specs, *, retained_fn, agg_transform,
+                          p_subject, grand_gd, grand_shift):
+    """The build-time Palm scenario ladder of a stitched peel, or ``None``.
+
+    Computes ``{ledger row label: [E[row | grand result at its q-quantile]
+    per PERCENTILE_LADDER point]}`` for every plan row of a marginal-stitched
+    multi-layer occurrence peel, using the 1-D Palm conditional-mean identity
+    (:meth:`Aggregate.palm_kappa`); :attr:`PnL.economic_df` then serves the
+    scenario (``κ``) ladder where it previously fell back to marginal ``P``
+    headers ([Palm-Ledger]).
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The wrapped engine (supplies the grid, severity and frequency).
+    palm_specs : dict
+        Per plan-row dependence specs built by :func:`_peel_stitched`.
+    retained_fn : callable
+        The per-claim occurrence-retained map ``r(x) = x - occ_cum(x)``, the
+        Palm conditioning subject.
+    agg_transform : callable or None
+        The cumulative aggregate-cover net map ``T(u) = u - agg_cum(u)``
+        when aggregate covers exist, else ``None`` (the grand result is then
+        affine in the retained compound directly).
+    p_subject : ndarray
+        The retained compound density on ``agg.xs`` (the builder's
+        ``subject``), the stage-2 transport weight.
+    grand_gd : GridDistribution
+        The grand-result row's distribution (the ladder anchor).
+    grand_shift : float
+        The grand result's constant: ``result = shift - S_final``, so the
+        conditioning bucket at quantile ``q`` is ``shift - gd.q(q)``.
+
+    Returns
+    -------
+    dict or None
+        The ladder, or ``None`` when the build is ineligible: the engine
+        carries loss-sensitive features (``variable_terms`` /
+        ``reinstatement_terms``), or the frequency family has no
+        :meth:`Frequency.freq_pgf_prime` (all-or-nothing; no half-filled
+        ladders).
+
+    Notes
+    -----
+    Two stages, both 1-D (derivation: ``dev/plan-a362-pnl-punchups.md``).
+    **Stage 1** conditions every per-claim row on the retained compound
+    ``S_r`` by the Palm identity, one FFT per row. **Stage 2** transports
+    through the deterministic net map ``T``: conditioning on the final net
+    is a *coarsening* of conditioning on ``S_r``, so each cell is the
+    ``f_{S_r}``-weighted level-set average over ``T^{-1}(bucket)``,
+    implemented with the same linear rebucket scatter that built the
+    served final-net density, so the transport denominator *is* that
+    density and every column foots by construction. With no aggregate
+    covers stage 2 is the identity and the ladder reads the kappa vectors
+    directly, making the grand-result cell its own quantile exactly; under
+    a transport the grand-result cell is the level-set average of the true
+    (pre-scatter) net values, which agrees with the marginal quantile to
+    within one bucket of scatter.
+    """
+    from ._pnl import PERCENTILE_LADDER
+    if getattr(agg, 'variable_terms', None) is not None \
+            or getattr(agg, 'reinstatement_terms', None) is not None:
+        return None
+    xs = agg.xs
+    f_sr = np.asarray(p_subject, dtype=float)
+    # stage 1: per-claim kappa vectors over the retained grid; a family
+    # without a pgf derivative (or a signed / windowed grid) degrades the
+    # whole ladder to marginal, never half of it
+    try:
+        base = {}
+        for label, spec in palm_specs.items():
+            if spec[0] == 'claim':
+                kappa, _f = agg.palm_kappa(spec[1], retained_fn)
+                base[label] = kappa
+            elif spec[0] == 'agg':
+                base[label] = np.asarray(spec[1](xs), dtype=float)
+    except NotImplementedError:
+        return None
+    # stage 2: transport through T where aggregate covers exist
+    if agg_transform is not None:
+        t_vals = np.asarray(agg_transform(xs), dtype=float)
+        den = agg._rebucket_to_grid(t_vals, f_sr)
+        cond = {}
+        for label, vec in base.items():
+            # kappa is NaN only where f_sr is negligible; those cells carry
+            # no transport weight, so zero them rather than poison the sums
+            num = agg._rebucket_to_grid(
+                t_vals, np.nan_to_num(vec, nan=0.0) * f_sr)
+            out = np.full_like(den, np.nan)
+            np.divide(num, den, out=out, where=den > 0)
+            cond[label] = out
+    else:
+        cond = base
+    # anchors: the grand result is affine decreasing in the final net, so
+    # its q-quantile is the final-net bucket at ``shift - x_q``
+    bs = float(agg.bs)
+    idx = [int(round((grand_shift - float(grand_gd.q(q))) / bs))
+           for q in PERCENTILE_LADDER]
+    ladder = {}
+    deltas = []
+    for label, spec in palm_specs.items():
+        if spec[0] == 'const':
+            ladder[label] = [float(spec[1])] * len(idx)
+        elif spec[0] == 'delta':
+            deltas.append((label, spec[1], spec[2]))
+        else:
+            _kind, _fn, sign, shift = spec
+            vec = cond[label]
+            ladder[label] = [float(sign * vec[i] + shift) for i in idx]
+    for label, target, base_label in deltas:
+        ladder[label] = [t - b for t, b in
+                        zip(ladder[target], ladder[base_label])]
+    return ladder
 
 
 def _peel_explanation(agg, pnl, direction, steps, route):

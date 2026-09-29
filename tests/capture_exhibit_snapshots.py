@@ -46,9 +46,12 @@ PROGRAMS = {
                        'occurrence net of 10 xs 10 '
                        'agg EX.ReB 1 claim dsev [5 10] fixed'),
     # walks, for the economic exhibits ([Exhibits-Economic-Insurer],
-    # [Exhibits-Waterfall]). Tower shares atoms and carries a kappa ladder;
-    # Peel is stitched, so its ladder is marginal and the waterfall's
-    # diversified column blanks.
+    # [Exhibits-Waterfall]). Tower shares atoms and carries a kappa ladder
+    # off the 2-D joint; Peel is stitched but eligible, so since
+    # [Palm-Ledger] (a363) it carries the Palm scenario ladder and its
+    # waterfall diversified column populates; PeelMarginal is the same peel
+    # under a logarithmic frequency, whose missing ``freq_pgf_prime`` keeps
+    # the ladder marginal and blanks the diversified column.
     'Tower': ('xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr '
               'sev lognorm 100 cv 2 '
               'occurrence ceded to 500 xs 500 deposit 100 poisson'),
@@ -56,6 +59,10 @@ PROGRAMS = {
              '70% lr sev lognorm 100 cv 2 '
              'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
              'deposit 40 poisson peel top-down'),
+    'PeelMarginal': ('xpnl EX.PeelM 1000 premium less agg EX.PeelME 1000 '
+                     'premium at 70% lr sev lognorm 100 cv 2 '
+                     'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+                     'deposit 40 logarithmic peel top-down'),
 }
 
 

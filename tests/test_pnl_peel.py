@@ -13,8 +13,12 @@ The suite pins the two routes and the boundary between them:
   must reproduce the tier walk exactly. That is the degenerate anchor.
 - **stitched** (two or more occurrence layers) supplies each row as its own
   exact marginal: the ``EX`` column still foots exactly by linearity and agrees
-  with the engine's own ``reins_density_df`` figures, but the ladder carries
-  plain ``P`` headers and ``evaluate`` / ``+`` are unavailable.
+  with the engine's own ``reins_density_df`` figures, and ``+`` is unavailable.
+  Since [Palm-Ledger] (1.0.0a363) an eligible stitched build (guaranteed cost,
+  frequency with an implemented ``freq_pgf_prime``) serves the full scenario
+  (``κ``) ladder anyway, computed at build time by the 1-D Palm
+  conditional-mean identity; a family without a pgf derivative (logarithmic
+  here) keeps the plain ``P`` marginal ladder.
 
 The DecL programs here are mirrored in ``src/aggregate/agg/decl-testers.agg``
 section AI (this module is the canonical source).
@@ -217,11 +221,50 @@ def test_aggregate_layers_sum_to_the_lumped_tier_recovery():
 # ----------------------------------------------------------------------
 # The stitched route (two or more occurrence layers)
 # ----------------------------------------------------------------------
-def test_occurrence_peel_takes_the_marginal_route():
+def test_occurrence_peel_serves_the_palm_kappa_ladder():
+    """[Palm-Ledger]: an eligible stitched peel carries the scenario ladder.
+
+    The build is stitched (no shared atoms), yet the ladder conditions on the
+    grand result via the Palm identity, so the sheet reads ``κ`` headers and
+    the kappa columns foot within every step, exactly as on a per-atom walk.
+    """
     p = build(f'{OCC2} peel top-down')
     assert p._stitched
-    assert not _kappa_columns(p), \
-        'no shared source, so no kappa ladder ([Decision-Kappa-Shared-Source-Rule])'
+    assert p._palm_ladder is not None
+    assert _kappa_columns(p)
+    assert 'P01' not in p.economic_df.columns
+    _assert_column_foots(p, 'κ01')
+    _assert_column_foots(p, 'κ99')
+
+
+def test_palm_tier_subtotal_agrees_with_the_lumped_tier_walk():
+    """Two routes, one number: Palm (1-D, fine grid) vs the 2-D joint.
+
+    The lumped tier walk serves its ceded-occurrence diversified cell off the
+    budget-grid ``occ_bivariate`` joint; the peel's ``All occurrence`` tier
+    subtotal serves the same conditional mean off the Palm identity on the
+    fine engine grid. Observed gap at implementation (2026-09-29): 0.11%
+    relative (618.49 Palm vs 617.78 joint); the 2% tolerance absorbs the
+    joint's coarse grid, and the two builds also anchor their quantiles on
+    different grids.
+    """
+    peeled = build(f'{OCC2} peel top-down')
+    lumped = build(OCC2)
+    palm_cell = peeled.walk_df['M01 diversified']['All occurrence']
+    joint_cell = lumped.walk_df['M01 diversified'].iloc[1]
+    assert palm_cell == pytest.approx(joint_cell, rel=0.02)
+
+
+def test_occurrence_peel_unsupported_frequency_stays_marginal():
+    """A family without ``freq_pgf_prime`` degrades to the marginal ladder.
+
+    All or nothing: the ladder is never half filled, and the walk's
+    diversified column blanks with it.
+    """
+    p = build(f'{OCC2.replace("poisson", "logarithmic")} peel top-down')
+    assert p._stitched
+    assert p._palm_ladder is None
+    assert not _kappa_columns(p)
     assert 'P01' in p.economic_df.columns
 
 

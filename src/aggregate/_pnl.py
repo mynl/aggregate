@@ -941,6 +941,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         #: stitched ledgers carry gd-backed rows with no shared atoms
         #: (no per-atom values, no ``+`` composition) -- see :meth:`_init_stitched`.
         self._stitched = stitched_rows is not None
+        #: the build-time Palm scenario ladder on an eligible stitched build
+        #: ([Palm-Ledger]): ``{ledger row label: [value per PERCENTILE_LADDER
+        #: point]}``, attached by the builder
+        #: (:func:`aggregate._pnl_builders._palm_scenario_ladder`); ``None``
+        #: when not computed, and :attr:`economic_df` then falls back to the
+        #: marginal ladder.
+        self._palm_ladder = None
         #: tower presentation: multi-group, or a forced single-group walk
         #: ([Decision-XPnL-Plain-Is-One-Step-Walk] -- ``force_tower=True``
         #: presents the one-group ledger as its single (Step, Side) block /
@@ -1866,11 +1873,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         ``{result == x_q}``, well-defined but subtler to interpret; and a
         **constant** grand result (fully hedged) makes the conditioning event
         everything, so every cell equals its ``EX``. Ledgers with **no shared
-        atoms** keep **marginal** ladders under plain ``P`` headers
-        ([Decision-Kappa-Shared-Source-Rule]): a massive (one-sweep) source
-        (conditioning needs a second sweep -- [Massive-Kappa-Second-Sweep] in
-        ``dev/TODO.md``) and the stitched guaranteed-cost ``xpnl`` tower
-        (independent marginals, no joint).
+        atoms** fall into two camps ([Decision-Kappa-Shared-Source-Rule]).
+        An **eligible stitched** build (a guaranteed-cost multi-layer
+        occurrence peel under a frequency with an implemented
+        :meth:`~aggregate.distributions.Frequency.freq_pgf_prime`) serves the
+        full scenario ladder anyway ([Palm-Ledger]): the builder computes
+        every cell at build time by the 1-D Palm conditional-mean identity
+        (see :meth:`~aggregate.distributions.Aggregate.palm_kappa`), exact
+        and footing, with no joint ever formed. Everything else keeps a
+        **marginal** ladder under plain ``P`` headers: a massive (one-sweep)
+        source (conditioning needs a second sweep --
+        [Massive-Kappa-Second-Sweep] in ``dev/TODO.md``) and a stitched
+        tower whose frequency family has no pgf derivative.
 
         Returns
         -------
@@ -1881,10 +1895,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         --------
         summary_df : the fixed headline card (marginal range percentiles).
         """
-        if self._probs is None:               # no shared atoms: marginal
-            # ladder, plain ``P`` headers (the massive one-sweep route and
-            # the stitched guaranteed-cost tower -- the on-sheet signature of
-            # [Decision-Kappa-Shared-Source-Rule]).
+        if self._probs is None:               # no shared atoms
+            palm = self._palm_ladder
+            if palm is not None:
+                # eligible stitched build ([Palm-Ledger]): the builder
+                # computed the scenario ladder at build time via the Palm
+                # conditional-mean identity, so the sheet serves ``κ``
+                # headers and foots exactly, as on the per-atom route.
+                data = [[_snap_noise(v) for v in
+                         list(row.moments) + palm[label]]
+                        for label, row in self._rows.items()]
+                cols = _stat_names(scenario=True)
+                return pd.DataFrame(data, index=self._side_index(),
+                                    columns=cols)
+            # marginal ladder, plain ``P`` headers (the massive one-sweep
+            # route and the ineligible stitched towers -- the on-sheet
+            # signature of [Decision-Kappa-Shared-Source-Rule]).
             data = [[_snap_noise(v) for v in row.stat_vector()]
                     for row in self._rows.values()]
             cols = _stat_names()

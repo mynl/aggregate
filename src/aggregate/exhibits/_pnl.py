@@ -249,18 +249,24 @@ def _economic_waterfall_frames(obj):
         f'own 1-in-{t}, so it foots down the walk exactly. The standalone '
         f'column is each step\'s own 1-in-{t}, the capital it would call for '
         f'alone; tail measures do not add, so it does not foot, and the gap '
-        f'between the two columns is the diversification benefit.')
+        f'between the two columns is the diversification benefit. It is blank '
+        f'on a ceded step, whose own 1-in-{t} is the state in which the cover '
+        f'paid nothing, so the quantile would report its premium rather than '
+        f'any capital.')
     if not diversified_available:
         walk_caption += (
             ' The diversified column is blank here: this ledger shares no '
             'atoms across its rows, so no conditioning was possible.')
     evaluation_caption = (
         f'The same walk read as ratios. Premium and margin spent are against '
-        f'the gross block. The last two columns are the return on the capital '
-        f'a 1-in-{t} outcome calls for, on each of the walk\'s two readings of '
-        f'that state; they are blank where the step calls for no capital, '
-        f'which is what a purchased layer does in the adverse state, and there '
-        f'the diversified column is the more meaningful of the two.')
+        f'the gross block. The two M / {m} columns are the return earned on '
+        f'the capital a 1-in-{t} outcome calls for, on each of the walk\'s '
+        f'two readings of that state, and they are served only on the steps '
+        f'that bear risk. A cover does not call for capital, it releases it, '
+        f'so a ceded step reads instead under cost of relief: the margin '
+        f'given up per unit of capital the cover hands back, where a low '
+        f'number is the good one, and the test is whether it comes in under '
+        f'the return the risk-bearing rows earn.')
 
     return [
         ('walk_df', walk_df, dict(caption=walk_caption, row_flags=total_row)),

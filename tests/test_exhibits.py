@@ -960,28 +960,75 @@ def test_waterfall_diversified_foots_and_standalone_does_not(tower):
     sa = walk['M01 standalone']
     # the steps before the closing row sum to the closing row, exactly
     assert div.iloc[:-1].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
-    assert sa.iloc[:-1].sum() != pytest.approx(sa.iloc[-1], rel=1e-6)
+    # standalone is a quantile and does not foot. The tower's one risk step
+    # before the close is Gross, since a361 blanks the ceded step, so the
+    # assertion is stated on that row explicitly rather than through a
+    # NaN-skipping sum whose meaning would drift with the fixture.
+    assert sa['Gross'] != pytest.approx(sa.iloc[-1], rel=1e-6)
     # the expected margin foots too, by linearity
     assert walk['Margin'].iloc[:-1].sum() == pytest.approx(
         walk['Margin'].iloc[-1], rel=1e-9)
 
 
 def test_waterfall_capital_ratio_definition(tower):
-    """``M / -M_100``: margin over the capital that outcome would call for."""
+    """``M / -M_100``: the quotient, routed by role since a361.
+
+    The standalone basis is asserted on risk rows only, since the ceded cells
+    are blank by design. The diversified quotient is one piece of arithmetic
+    landing in ``M / M01 diversified`` on a risk row and in ``Cost of
+    relief`` on a ceded row, with the other column blank.
+    """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
     _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
-    for basis in ('standalone', 'diversified'):
-        m100 = walk[f'M01 {basis}']
-        got = ev[f'M / M01 {basis}']
-        for step in walk.index:
-            capital = -m100[step]
-            if capital > 0:
-                assert got[step] == pytest.approx(
-                    walk['Margin'][step] / capital)
-            else:
-                # a purchased layer releases capital in the adverse state, so
-                # there is no capital to return on and the cell is blank
-                assert pd.isna(got[step])
+    ceded = walk['M01 standalone'].isna()
+    for step in walk.index:
+        margin = walk['Margin'][step]
+        if not ceded[step]:
+            assert ev['M / M01 standalone'][step] == pytest.approx(
+                margin / -walk['M01 standalone'][step])
+        m100 = walk['M01 diversified'][step]
+        got = ev['Cost of relief' if ceded[step]
+                 else 'M / M01 diversified'][step]
+        assert got == pytest.approx(margin / -m100)
+
+
+def test_waterfall_ceded_step_blanks_standalone_and_reads_relief(tower):
+    """[Waterfall-Ceded-Steps]: a hedge answers cost of relief, nothing else.
+
+    A ceded step has no standalone capital (its own 1-in-100 is the state in
+    which it paid nothing) and it releases diversified capital rather than
+    calling for it, so its one ratio is the cost of that relief. A risk step
+    is the mirror image.
+    """
+    import numpy as np
+    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
+    _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
+    ceded_steps = [s for s in walk.index
+                   if tower._step_result_rows()[s][2]]
+    risk_steps = [s for s in walk.index if s not in ceded_steps]
+    assert ceded_steps and len(risk_steps) >= 2
+    for step in ceded_steps:
+        assert pd.isna(walk['M01 standalone'][step])
+        assert pd.isna(ev['M / M01 standalone'][step])
+        assert pd.isna(ev['M / M01 diversified'][step])
+        assert np.isfinite(ev['Cost of relief'][step])
+    for step in risk_steps:
+        assert np.isfinite(walk['M01 standalone'][step])
+        assert np.isfinite(ev['M / M01 standalone'][step])
+        assert np.isfinite(ev['M / M01 diversified'][step])
+        assert pd.isna(ev['Cost of relief'][step])
+
+
+def test_waterfall_closing_row_standalone_equals_diversified(tower):
+    """``E[result | result = x] = x``: the grand row is its own conditional.
+
+    A cheap guard against the anchor silently moving: on the closing row the
+    standalone quantile and the diversified conditional mean are the same
+    number, exactly.
+    """
+    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
+    assert walk['M01 standalone'].iloc[-1] == pytest.approx(
+        walk['M01 diversified'].iloc[-1], rel=1e-9)
 
 
 def test_waterfall_blanks_diversified_without_shared_atoms(peel):

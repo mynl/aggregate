@@ -133,6 +133,8 @@ columns:
   'Margin spent': ratio
   'M / M01 standalone': ratio   # a return on the capital the 1-in-100 state
   'M / M01 diversified': ratio  # calls for, so it reads as ROE and coc do
+  'Cost of relief': ratio       # price per unit of capital released, read as
+                                # a percentage like the two returns beside it
 
   # --- missing from round 1
   Mean: money

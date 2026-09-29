@@ -789,18 +789,26 @@ _RESULT_KINDS = ('group_result', 'tier_result', 'grand_result')
 
 
 def _capital_ratio(margin, bad_outcome):
-    """``M / -M_100``: margin over the capital that outcome would call for.
+    """``M / -M_100``: margin over the capital that state calls for, or releases.
 
-    ``bad_outcome`` is the margin in the 1-in-100 state and is normally
-    negative, so ``-bad_outcome`` is the capital you would have to inject and
-    the ratio reads as a return on it. ``NaN`` when no capital is called for
-    (a non-negative outcome, so nothing to inject and no denominator) or when
-    either input is missing.
+    ``bad_outcome`` is the margin in the 1-in-100 state. On a risk-bearing row
+    it is negative, so ``-bad_outcome`` is the capital you would have to inject
+    and the ratio reads as a return on it. On a ceded row it is positive, so
+    ``-bad_outcome`` is negative: the cover **releases** capital, and the ratio
+    reads as the price paid per unit released. Both are the same arithmetic;
+    the caller separates them into two columns, because a high number is good
+    on the first reading and bad on the second.
+
+    ``NaN`` where either input is missing, or where the capital is zero to
+    within :data:`VALIDATION_NOISE`, which is the one case with genuinely no
+    denominator.
     """
     if not (np.isfinite(margin) and np.isfinite(bad_outcome)):
         return np.nan
     capital = -bad_outcome
-    return margin / capital if capital > 0 else np.nan
+    if abs(capital) <= VALIDATION_NOISE:
+        return np.nan
+    return margin / capital
 
 
 #: Default ``Side`` level names for the :attr:`PnL.economic_df` row MultiIndex,
@@ -2077,24 +2085,42 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return pd.DataFrame(recs, columns=list(_RATIO_COLS),
                             index=pd.Index(index, name='Step'))
 
+    def _step_is_ceded(self, kind, payload):
+        """Does this walk step hedge rather than bear risk?
+
+        A ``buy`` group is a hedge: it pays in the states the book is short of
+        capital, so "the capital it would call for alone" is not a question it
+        can answer. The grand result is the net position, which bears risk, and
+        a tier span is treated as ceded when it contains any cover, since a
+        mixed span's own low tail is no more interpretable than a cession's.
+        """
+        if kind == 'group_result':
+            return self._group_specs[payload].role == 'buy'
+        if kind == 'tier_result':
+            lo, hi = payload
+            return any(g.role == 'buy' for g in self._group_specs[lo:hi])
+        return False
+
     def _step_result_rows(self):
-        """Map each walk step to its own result row: ``{step: (position, label)}``.
+        """Map each walk step to its own result row: ``{step: (position, label, ceded)}``.
 
         Reads the ledger plan rather than pattern matching the index, because
         a step's own result and the running net *after* it both sit under
         ``Margin`` and only the plan distinguishes them. The plan label
         doubles as the :attr:`density_df` key, which is how the standalone
         quantile is reached. A later result for the same step wins, so a tier
-        subtotal supersedes the groups it spans.
+        subtotal supersedes the groups it spans. ``ceded`` is
+        :meth:`_step_is_ceded` of the row, which is how the walk knows which
+        steps hedge rather than bear risk.
         """
         plan = getattr(self, '_plan', None)
         index = self.economic_df.index
         if plan is None or len(plan) != len(index):
             return {}
         out = {}
-        for i, (idx, (label, kind, _payload)) in enumerate(zip(index, plan)):
+        for i, (idx, (label, kind, payload)) in enumerate(zip(index, plan)):
             if kind in _RESULT_KINDS and isinstance(idx, tuple):
-                out[idx[0]] = (i, label)
+                out[idx[0]] = (i, label, self._step_is_ceded(kind, payload))
         return out
 
     def _waterfall_frames(self):
@@ -2115,20 +2141,30 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         for step in ratios.index:
             if step not in steps:
                 continue
-            pos, label = steps[step]
+            pos, label, ceded = steps[step]
             row = ledger.iloc[pos]
             margin, sd = float(row['EX']), float(row['SD'])
             gd = densities.get(label)
-            standalone = float(gd.q(p)) if gd is not None else np.nan
+            # A ceded step hedges rather than bears risk, so its own 1-in-100
+            # is the state in which it paid nothing and the quantile reports
+            # its premium. Blank, rather than serve an exact number that is
+            # not capital.
+            standalone = np.nan if ceded or gd is None else float(gd.q(p))
             divers = float(row[kappa]) if diversified_available else np.nan
             r = ratios.loc[step]
             index.append(step)
             walk.append([margin, standalone, divers])
+            # one evaluation of the diversified quotient, routed to one of two
+            # columns by the row's role, so every column has one meaning: a
+            # high ratio is capital earning well on a risk row and relief
+            # bought expensively on a ceded one
+            divers_ratio = _capital_ratio(margin, divers)
             evaluation.append([
                 float(r['P_share']), float(r['M_share']), float(r['CR']),
                 margin / sd if sd > 0 else np.nan,
                 _capital_ratio(margin, standalone),
-                _capital_ratio(margin, divers),
+                np.nan if ceded else divers_ratio,
+                divers_ratio if ceded else np.nan,
             ])
 
         idx = pd.Index(index, name='Step')
@@ -2143,7 +2179,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         evaluation_df = pd.DataFrame(
             evaluation, index=idx,
             columns=['Premium spent', 'Margin spent', 'CR', 'M / SD',
-                     f'M / {m} standalone', f'M / {m} diversified'])
+                     f'M / {m} standalone', f'M / {m} diversified',
+                     'Cost of relief'])
         return walk_df, evaluation_df
 
     @property
@@ -2165,7 +2202,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ``M01 standalone``
                 The step's result in **its own** 1-in-``t`` state, read off
                 that step's :class:`GridDistribution`. Tail measures do not
-                add, so this column does **not** foot down the walk.
+                add, so this column does **not** foot down the walk. Blank on
+                a ceded step: a hedge's own 1-in-``t`` is the state in which
+                the cover paid nothing, so the quantile would report its
+                premium rather than any capital.
             ``M01 diversified``
                 The step's result conditional on the **whole book** landing at
                 its own 1-in-``t``, read off the ledger's kappa column, so this
@@ -2218,11 +2258,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ``M / SD``
                 Margin over its own standard deviation.
             ``M / M01 standalone``, ``M / M01 diversified``
-                Margin over the capital a 1-in-``t`` outcome would call for,
-                on each of :attr:`walk_df`'s two readings of that state. Blank
-                where the step calls for no capital, which is what a purchased
-                layer does in the adverse state, and there the diversified
-                column is the more meaningful of the two.
+                Margin over the capital a 1-in-``t`` outcome calls for, on
+                each of :attr:`walk_df`'s two readings of that state. Served
+                only on the steps that bear risk; blank on ceded steps.
+            ``Cost of relief``
+                The ceded-step reading of the diversified quotient: the margin
+                given up per unit of capital the cover hands back. Blank on
+                risk-bearing steps.
+
+        Notes
+        -----
+        ``M / M01 diversified`` and ``Cost of relief`` are one quotient routed
+        to one of two columns by the row's role, because the polarity of
+        "good" flips between them. On a risk row a high ratio is capital
+        earning well; on a ceded row a high ratio is relief bought
+        expensively, and the test is whether it comes in under the return the
+        risk-bearing rows earn.
 
         See Also
         --------

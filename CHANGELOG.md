@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a361
+
+**[Waterfall-Ceded-Steps] the margin walk stops asking a hedge for standalone capital, and prices the capital it releases instead.** `PnL.walk_df` now blanks `M01 standalone` on a ceded step: a cover's own 1-in-100 is the state in which it paid nothing, so the quantile reported its premium rather than any capital. `M / M01 standalone` blanks with it. Risk-bearing rows are untouched, and the `M01 diversified` walk column is untouched and still foots.
+
+**Breaking, on a stable-tier class.** `PnL.evaluation_df` gains a `Cost of relief` column: the diversified quotient `M / -M01` is routed by role, landing in `M / M01 diversified` on risk-bearing rows and in `Cost of relief` on ceded rows, where it is the margin given up per unit of capital the cover hands back and a low number is the good one. Those ceded cells were previously suppressed as `NaN`; cells that previously carried numbers (`M01 standalone` and its ratio on ceded rows) are now blank; and a capital within `VALIDATION_NOISE` of zero now blanks instead of exploding. A caller indexing either frame by column has to follow. Both exhibit captions restate the split.
+
 ## 1.0.0a360
 
 **[Commission-Obligation-Side] ceding commissions book as obligation-side commission legs on the consolidated faces, matching the walk.** The consolidated `pnl` net premium is now `gross - ceded premiums` with no commission term; commissions received appear as one obligation-side `'commission'` leg (constant, or the stochastic slide / profit-commission credit), displaying positive. The two faces now report identical Consideration and Obligation totals, not just identical margins; margins are unchanged everywhere. On a slide or profit-commission program the consolidated net premium leg is now constant (`SD == 0`) with the stochastic credit on the commission leg. A reader of `summary_df` Consideration on a commissioned program sees a lower number than before, offset one row down.

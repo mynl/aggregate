@@ -4,7 +4,9 @@
 ``agg_reins_<feature>`` spec key, attaches the matching ``ContractTerms`` to the
 engine, and returns an :class:`~aggregate.PnL` value object. ``pnl`` is the
 **consolidated** single-group net view ([Decision-PnL-Is-Consolidated]: net
-premium / net loss with the feature's map folded in); the two-group step ledger
+premium / net loss with the feature's map folded in; a slide / profit
+commission credit books as its own obligation-side commission leg,
+[Commission-Obligation-Side]); the two-group step ledger
 is the ``xpnl`` **walk**. The feature's terms live on the engine
 (``p.engine.variable_terms``); the treaty maps and waterfall are read off the
 PnL's own ``economic_df``. Retro (account-level rating clause) varies the gross
@@ -102,9 +104,11 @@ def test_slide_build():
     assert terms.anchors == ((0.45, 0.60), (0.25, 0.70), (0.19, 0.80))
     assert _means_add(p)
     assert p.engine.variable_ceded_premium == pytest.approx(1500.0)  # deposit denom
-    # consolidated: the sliding commission credit makes the net premium
-    # stochastic
-    assert _leg(p, 'net premium')['SD'] > 0
+    # consolidated: the net premium is the constant P_G - P_C; the sliding
+    # commission credit is its own stochastic obligation leg
+    # ([Commission-Obligation-Side])
+    assert _leg(p, 'net premium')['SD'] == 0
+    assert _leg(p, 'commission')['SD'] > 0
     # the walk shows the sliding commission as its own stochastic received leg
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%')
@@ -120,8 +124,11 @@ def test_pc_build():
     assert isinstance(terms, ProfitCommissionTerms)
     assert (terms.share, terms.allowance) == (0.25, 0.10)
     assert _means_add(p)
-    # consolidated: the profit commission credit rides the net premium
-    assert _leg(p, 'net premium')['SD'] > 0
+    # consolidated: the net premium is the constant P_G - P_C; the profit
+    # commission credit is its own stochastic obligation leg
+    # ([Commission-Obligation-Side])
+    assert _leg(p, 'net premium')['SD'] == 0
+    assert _leg(p, 'commission')['SD'] > 0
     x = build(_HEAD.replace('pnl V', 'xpnl VX', 1)
               + 'deposit 1500 pc 25% after 10%')
     assert _leg(x, 'profit commission')['SD'] > 0

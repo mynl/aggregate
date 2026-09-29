@@ -4191,10 +4191,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         * **consolidated reinsurance** -- ``make_pnl(gross=Pg, ceded=Pc)`` on
           a reinsurance-bearing aggregate
           (:func:`~aggregate._pnl_builders.build_consolidated_pnl`): one
-          net-premium consideration leg (gross - ceded premiums +
-          commissions) against the engine's net loss over its deepest net
-          marginal. The per-step walk (gross -> each cover -> Total) is the
-          DecL ``xpnl`` face.
+          net-premium consideration leg (gross - ceded premiums) against the
+          engine's net loss over its deepest net marginal, with ceding
+          commissions booked as an obligation-side commission leg
+          ([Commission-Obligation-Side]). The per-step walk (gross -> each
+          cover -> Total) is the DecL ``xpnl`` face.
 
         Parameters
         ----------

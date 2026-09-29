@@ -69,18 +69,21 @@ def _phi(a):
 # ----------------------------------------------------------------------
 def test_gc_feat_consolidated_books_occ_constants(uw):
     """The consolidated net premium carries the inuring occ program's
-    constants ``- pc_occ + c_occ`` and the feature map, all exact against a
-    hand pushforward of the net-of-occ marginal."""
+    constant ``- pc_occ`` and the feature map, exact against a hand
+    pushforward of the net-of-occ marginal; the occ commission books as an
+    obligation-side commission leg ([Commission-Obligation-Side])."""
     p = _build(uw, 'pnl', 'CBGF')
     c_occ = 0.10 * _PC_OCC
     rd = p._source.reins_density_df
     xs = rd['loss'].to_numpy()
     pn = rd['p_agg_net_occ'].to_numpy()
     pn = pn / pn.sum()
-    hand_np = _P_G - _PC_OCC + c_occ - float((_phi(_g(xs)) * pn).sum())
+    hand_np = _P_G - _PC_OCC - float((_phi(_g(xs)) * pn).sum())
     booked = p.economic_df.xs('net premium', level='Label').iloc[0]
     assert booked['EX'] == pytest.approx(hand_np, abs=1e-6)
     assert booked['SD'] > 0                    # the swing premium is live
+    assert p.economic_df.xs('commission', level='Label').iloc[0]['EX'] \
+        == pytest.approx(c_occ)
     hand_nl = -float(((xs - _g(xs)) * pn).sum())
     assert p.economic_df.xs('Gross Loss (net)', level='Label').iloc[0]['EX'] \
         == pytest.approx(hand_nl, abs=1e-6)

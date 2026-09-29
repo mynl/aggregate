@@ -15,8 +15,9 @@ questions (``dev/plan-pnl-consolidated-xpnl-walk.md``):
     loss / expense legs) over the engine's own density.
   * :func:`build_consolidated_pnl` -- a guaranteed-cost reinsurance program
     consolidated over the engine's **deepest net marginal**: one net-premium
-    consideration leg (gross - ceded premiums + commissions), the net loss,
-    the pnl's own expenses ([Decision-PnL-Is-Consolidated]).
+    consideration leg (gross - ceded premiums), the net loss, a commission
+    leg when commissions are received ([Commission-Obligation-Side]), the
+    pnl's own expenses ([Decision-PnL-Is-Consolidated]).
   * :func:`build_variable_pnl` (``walk=False``) -- a variable-rating program
     consolidated over the engine's density (the feature's subject: gross, or
     net-of-occ when an occurrence program inures): the net premium / net
@@ -548,13 +549,15 @@ def build_consolidated_pnl(agg, *, gross, ceded, gcn_economics=None,
     default output is its net, so the consolidated view books
 
     * **consideration** -- one net-premium leg: gross premium minus the ceded
-      premiums plus the ceding commissions received (constant for a
-      guaranteed-cost program);
+      premiums (constant for a guaranteed-cost program). Ceding commissions
+      are NOT premium: they book as an obligation-side ``'commission'`` leg,
+      matching the walk convention ([Commission-Obligation-Side]);
     * **obligation** -- the engine's **net loss** (the deepest net marginal
       of ``reins_density_df``: net-of-agg when an aggregate cover exists,
-      else net-of-occ) plus the pnl's own expense legs. The gross loss is not
-      measurable on the net marginal, so a loss-basis (LAE) expense books as
-      its deterministic ``rate * E[gross loss]``.
+      else net-of-occ), one ``'commission'`` leg carrying the total ceding
+      commission received when nonzero, plus the pnl's own expense legs. The
+      gross loss is not measurable on the net marginal, so a loss-basis (LAE)
+      expense books as its deterministic ``rate * E[gross loss]``.
 
     Ceded economics are netted out and not shown; the walk -- per-step
     results, running nets, the closing impact -- is one ``xpnl`` away
@@ -576,7 +579,7 @@ def build_consolidated_pnl(agg, *, gross, ceded, gcn_economics=None,
     has_agg = agg.agg_reins is not None
     p_gross, pc_occ, pc_agg, c_occ, c_agg = _ledger_economics(
         agg, gross, ceded, gcn_economics)
-    net_premium = p_gross - pc_occ - pc_agg + c_occ + c_agg
+    net_premium = p_gross - pc_occ - pc_agg
     prem_key = (f'{consideration_label} (net)' if consideration_label
                 else 'net premium')
     loss_key = f'{loss_label or "Loss"} (net)'
@@ -584,8 +587,13 @@ def build_consolidated_pnl(agg, *, gross, ceded, gcn_economics=None,
     source = _marginal_gd(agg, persp)
     cons = [Leg(prem_key, net_premium, kind='premium')]
     obl = [Leg(loss_key, lambda x: x, kind='loss')]
+    if c_occ or c_agg:
+        # the sell role books obligations negative and a commission is
+        # received, so the magnitude is written negated and the signed row
+        # books (and displays) positive, matching the walk's commission rows
+        obl.append(Leg('commission', -(c_occ + c_agg), kind='commission'))
     obl += _expense_legs(agg, expense_spec, p_gross, on_source_loss=False,
-                         taken={prem_key, loss_key})
+                         taken={prem_key, loss_key, 'commission'})
     pnl = PnL(name=name or agg.name, role='sell', source=source,
               consideration=cons, obligation=obl, result_name='margin',
               label=label)
@@ -598,7 +606,8 @@ def build_consolidated_pnl(agg, *, gross, ceded, gcn_economics=None,
         f'Consolidated pnl over the engine\'s deepest net marginal '
         f'(reins_density_df[{_GCN_LOSS_MARGINAL[persp]!r}]): one sell group; '
         f'net premium {net_premium:g} = gross {p_gross:g} - ceded premiums '
-        f'{pc_occ + pc_agg:g} + commissions {c_occ + c_agg:g}; scenario (κ) '
+        f'{pc_occ + pc_agg:g}; commissions {c_occ + c_agg:g} book as an '
+        'obligation-side commission leg; scenario (κ) '
         f'ladder (single shared source). The walk is one xpnl away.')
     pnl._construction_explanation = _consolidated_explanation(
         agg, pnl, persp, p_gross, pc_occ, pc_agg, c_occ, c_agg, net_premium)
@@ -617,9 +626,10 @@ def _consolidated_explanation(agg, pnl, persp, p_gross, pc_occ, pc_agg,
            if agg.agg_reins is not None else '') + '.',
         'Economics resolution: '
         f'gross premium {p_gross:g}; ceded premium occ {pc_occ:g} / '
-        f'agg {pc_agg:g}; commissions occ {c_occ:g} / agg {c_agg:g} '
-        f'-> net premium {net_premium:g} (gross - ceded premiums '
-        '+ commissions, one constant consideration leg).',
+        f'agg {pc_agg:g} -> net premium {net_premium:g} (gross - ceded '
+        'premiums, one constant consideration leg); commissions occ '
+        f'{c_occ:g} / agg {c_agg:g} book as one obligation-side commission '
+        'leg ([Commission-Obligation-Side]).',
         f'Source: the deepest net marginal, '
         f"reins_density_df[{_GCN_LOSS_MARGINAL[persp]!r}] -- what comes out "
         'of the engine. The net loss leg reads it per atom; a loss-basis '
@@ -1463,9 +1473,12 @@ def _build_variable_consolidated(agg, terms, P_G, P_C, C, layer, tl,
 
     The source is the engine's own density -- the feature's subject (gross,
     or net-of-occ when an occurrence program inures). The inuring program's
-    guaranteed-cost economics fold into the net premium as the constants
-    ``- pc_occ + c_occ``; loss-basis LAE books deterministic when the gross
-    loss is off-source ([Var-Feature-Composed-With-Occ-Program]).
+    guaranteed-cost ceded premium folds into the net premium as the constant
+    ``- pc_occ``; commissions (the occ constant, a flat ``cede``, or the
+    feature's stochastic slide / profit-commission credit) book as one
+    obligation-side ``'commission'`` leg ([Commission-Obligation-Side]);
+    loss-basis LAE books deterministic when the gross loss is off-source
+    ([Var-Feature-Composed-With-Occ-Program]).
     """
     from . import _reinsurance
     has_occ = getattr(agg, 'occ_reins', None) is not None
@@ -1484,23 +1497,36 @@ def _build_variable_consolidated(agg, terms, P_G, P_C, C, layer, tl,
     net_prem_key = (f'{consideration_label} (net)' if consideration_label
                     else 'net premium')
     net_loss_key = f'{loss_key} (net)'
-    occ_shift = c_occ - pc_occ            # the inuring GC occ constants
+    occ_shift = -pc_occ                   # the inuring GC occ ceded premium
+    # Commissions are obligation-side flows ([Commission-Obligation-Side]).
+    # The sell role books obligations negative and a commission is received,
+    # so each magnitude below is written negated and the signed row books
+    # (and displays) positive, matching the walk's commission rows.
+    comm_leg = None
     if tl == 'ceded_premium':                # swing: stochastic ceded premium
-        net_prem = lambda x: P_G + occ_shift - terms.phi(g_ceder(x)) + C
+        net_prem = lambda x: P_G + occ_shift - terms.phi(g_ceder(x))
+        if c_occ or C:
+            comm_leg = Leg('commission', -(c_occ + C), kind='commission')
     elif tl == 'expense':                    # slide / pc: stochastic credit
-        net_prem = lambda x: (P_G + occ_shift - P_C
-                              + terms.phi(g_ceder(x) / P_C) * P_C)
+        net_prem = P_G + occ_shift - P_C
+        comm_leg = Leg('commission',
+                       lambda x: -(c_occ + terms.phi(g_ceder(x) / P_C) * P_C),
+                       kind='commission')
     else:                                    # corridor: fixed split
-        net_prem = P_G + occ_shift - P_C + C
+        net_prem = P_G + occ_shift - P_C
+        if c_occ or C:
+            comm_leg = Leg('commission', -(c_occ + C), kind='commission')
     if tl == 'ceded_loss':                   # corridor: adjusted recovery
         net_loss = lambda x: x - terms.phi(g_ceder(x) / P_C) * P_C
     else:
         net_loss = lambda x: x - g_ceder(x)
     cons = [Leg(net_prem_key, net_prem, kind='premium')]
     obl = [Leg(net_loss_key, net_loss, kind='loss')]
+    if comm_leg is not None:
+        obl.append(comm_leg)
     obl += _expense_legs(agg, expense_spec, P_G,
                          on_source_loss=not has_occ,
-                         taken={net_prem_key, net_loss_key})
+                         taken={net_prem_key, net_loss_key, 'commission'})
     return PnL(name=name or agg.name, role='sell', source=agg,
                consideration=cons, obligation=obl, result_name='margin',
                label=label)
@@ -1882,9 +1908,12 @@ def _build_reinstatement_consolidated(agg, *, source, terms, gross_premium,
     One ``sell`` group of 2-D legs over the same ``(L, R)`` joint the walk
     uses ([Decision-PnL-Is-Consolidated], closing [2D-Deferred]):
 
-    * **net premium** ``P_G - D - h(R) - P_agg(L, R) + c_occ +
-      commissions`` -- genuinely stochastic (the reinstatement premium, and
-      a swing-rated or slide/pc-commissioned aggregate tier ride along);
+    * **net premium** ``P_G - D - h(R) - P_agg(L, R)`` -- genuinely
+      stochastic (the reinstatement premium, and a swing-rated aggregate
+      tier ride along). Commissions are not premium: they book as one
+      obligation-side ``'commission'`` leg, the constant ``c_occ + c_agg``
+      or the 2-D map ``c_occ + comm(L, R)`` when the aggregate tier carries
+      a slide / profit commission ([Commission-Obligation-Side]);
     * **loss (net)** ``-(L - A(R) - REC_agg(L, R))`` -- net of everything;
     * expenses; loss-basis LAE stays stochastic ``rate * l`` (axis 0
       carries the gross loss -- unlike the guaranteed-cost consolidated
@@ -1901,25 +1930,35 @@ def _build_reinstatement_consolidated(agg, *, source, terms, gross_premium,
     prem_key = (f'{consideration_label} (net)' if consideration_label
                 else 'net premium')
     loss_key = f'{loss_label or "Loss"} (net)'
+    # Commissions are obligation-side flows ([Commission-Obligation-Side]).
+    # The sell role books obligations negative and a commission is received,
+    # so each magnitude below is written negated and the signed row books
+    # (and displays) positive, matching the walk's commission rows.
+    comm_leg = None
     if agg_recovery is not None:
         pc = agg_ceded_premium
         rec, prem, comm = agg_tier_maps(terms, agg_recovery, agg_ceded_premium,
                                         agg_feature_terms)
+        net_prem = lambda l, r: P_G - D - h(r) - prem(l, r)
         if comm is not None:
-            net_prem = lambda l, r: (P_G - D - h(r) - prem(l, r)
-                                     + c_occ + comm(l, r))
-        else:
-            net_prem = lambda l, r: (P_G - D - h(r) - prem(l, r)
-                                     + c_occ + c_agg)
+            comm_leg = Leg('commission',
+                           lambda l, r: -(c_occ + comm(l, r)),
+                           is2d=True, kind='commission')
+        elif c_occ or c_agg:
+            comm_leg = Leg('commission', -(c_occ + c_agg), kind='commission')
         net_loss = lambda l, r: (l - A(r)) - rec(l, r)
     else:
         pc = 0.0
-        net_prem = lambda l, r: P_G - D - h(r) + c_occ
+        net_prem = lambda l, r: P_G - D - h(r)
+        if c_occ:
+            comm_leg = Leg('commission', -c_occ, kind='commission')
         net_loss = lambda l, r: l - A(r)
     cons = [Leg(prem_key, net_prem, is2d=True, kind='premium')]
     obl = [Leg(loss_key, net_loss, is2d=True, kind='loss')]
+    if comm_leg is not None:
+        obl.append(comm_leg)
     obl += _expense_legs(agg, expense_spec, P_G, on_source_loss=True,
-                         taken={prem_key, loss_key})
+                         taken={prem_key, loss_key, 'commission'})
     pnl = PnL(name=name or agg.name, role='sell', source=source,
               consideration=cons, obligation=obl, result_name='margin',
               label=label)
@@ -1931,7 +1970,8 @@ def _build_reinstatement_consolidated(agg, *, source, terms, gross_premium,
         'Consolidated reinstatements pnl over the shared (L, R) joint '
         '([Decision-PnL-Is-Consolidated], closing [2D-Deferred]): one sell '
         f'group; net premium P_G - D - h(R){" - P_agg" if pc or feat else ""}'
-        ' + commissions is genuinely stochastic; '
+        ' is genuinely stochastic; commissions book as an obligation-side '
+        'commission leg ([Commission-Obligation-Side]); '
         + (f'the aggregate cover is {feat}-rated (its map rides the same '
            'joint); ' if feat else '')
         + 'scenario (κ) ladder (one shared joint). The step walk is one '

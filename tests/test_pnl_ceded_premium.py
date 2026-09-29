@@ -3,8 +3,9 @@
 
 ``pnl`` is the **consolidated** net view ([Decision-PnL-Is-Consolidated],
 ``dev/plan-pnl-consolidated-xpnl-walk.md``): always one group -- consideration
-= net premium (gross - ceded premiums + commissions), obligation = net loss +
-own expenses. The per-step split is the ``xpnl`` **walk** (gross -> each
+= net premium (gross - ceded premiums), obligation = net loss + a commission
+leg for the ceding commissions received ([Commission-Obligation-Side]) + own
+expenses. The per-step split is the ``xpnl`` **walk** (gross -> each
 cover -> Total), whose cession groups book contra (``-premium / +recovery /
 +commission``). The premium resolves to currency (``deposit`` an amount,
 ``rol`` = share x rol x limit, ``rate`` = rate x the side's subject premium:
@@ -70,12 +71,14 @@ def test_deposit_and_rol_coincide_when_equal():
     assert rol.economics['ceded'] == pytest.approx(dep.economics['ceded'])
 
 
-def test_cede_books_commission_into_the_net_premium():
+def test_cede_books_commission_as_obligation_leg():
+    # [Commission-Obligation-Side]: the commission received is not premium;
+    # it books as an obligation-side commission leg on the consolidated face,
+    # displaying positive, matching the walk convention
     p = build(_BASE + 'poisson aggregate net of 2000 xs 3000 rol 8% cede 25%')
     assert p.economics['c_agg'] == pytest.approx(0.25 * 160)
-    # the commission received folds into the consolidated net premium:
-    # 5000 - 160 + 40
-    assert _leg(p, 'net premium')['EX'] == pytest.approx(5000 - 160 + 40)
+    assert _leg(p, 'net premium')['EX'] == pytest.approx(5000 - 160)
+    assert _leg(p, 'commission')['EX'] == pytest.approx(40.0)
     # ...and stays a visible leg on the xpnl walk
     x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
               + 'poisson aggregate net of 2000 xs 3000 rol 8% cede 25%')
@@ -144,8 +147,8 @@ def test_both_sides_split_and_walk_ledger():
     assert e['pc_occ'] == pytest.approx(0.05 * 100)
     assert e['pc_agg'] == pytest.approx(0.08 * 2000)
     assert e['c_agg'] == pytest.approx(0.20 * 160)
-    assert _leg(p, 'net premium')['EX'] == pytest.approx(
-        5000 - 5 - 160 + 32)
+    assert _leg(p, 'net premium')['EX'] == pytest.approx(5000 - 5 - 160)
+    assert _leg(p, 'commission')['EX'] == pytest.approx(32.0)
     x = build(_BASE.replace('pnl T', 'xpnl TX', 1)
               + 'occurrence net of 100 xs 200 rol 5% poisson '
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
@@ -187,6 +190,37 @@ def test_walk_means_add_down_the_sheet():
               'aggregate net of 2000 xs 3000 rol 8% cede 20%')
     assert p.est_m == pytest.approx(
         s.loc[('All', 'Margin', 'Net'), 'EX'], rel=5e-3)
+
+
+def test_faces_agree_on_consideration_and_obligation_totals():
+    """[Commission-Obligation-Side] cross-face invariant: the consolidated
+    summary rows match the walk's All row, not just the margin. The
+    consideration totals are constants and agree exactly; the obligation
+    totals and margins agree to joint-grid accuracy when an occurrence
+    program makes the walk ride the (gross, ceded) joint, and exactly when
+    only an aggregate cover exists (the walk rides the exact gross
+    marginal)."""
+    decl = ('poisson aggregate net of 2000 xs 3000 rol 8% cede 20%')
+    p = build(_BASE + decl)
+    x = build(_BASE.replace('pnl T', 'xpnl TX', 1) + decl)
+    ps, xs = p.summary_df, x.economic_df
+    assert ps.loc['Consideration', 'EX'] == pytest.approx(
+        xs.loc[('All', 'Consideration', 'Net'), 'EX'], abs=1e-9)
+    assert ps.loc['Obligation', 'EX'] == pytest.approx(
+        xs.loc[('All', 'Obligation', 'Net'), 'EX'], abs=1e-9)
+    assert ps.loc['Margin', 'EX'] == pytest.approx(
+        xs.loc[('All', 'Margin', 'Net'), 'EX'], abs=1e-9)
+    both = ('occurrence net of 100 xs 200 rol 5% cede 10% poisson '
+            'aggregate net of 2000 xs 3000 rol 8% cede 20%')
+    p2 = build(_BASE + both)
+    x2 = build(_BASE.replace('pnl T', 'xpnl TX', 1) + both)
+    p2s, x2s = p2.summary_df, x2.economic_df
+    assert p2s.loc['Consideration', 'EX'] == pytest.approx(
+        x2s.loc[('All', 'Consideration', 'Net'), 'EX'], abs=1e-9)
+    assert p2s.loc['Obligation', 'EX'] == pytest.approx(
+        x2s.loc[('All', 'Obligation', 'Net'), 'EX'], rel=5e-3)
+    assert p2s.loc['Margin', 'EX'] == pytest.approx(
+        x2s.loc[('All', 'Margin', 'Net'), 'EX'], rel=5e-3)
 
 
 def test_agg_rate_nets_inuring_occ_premium():

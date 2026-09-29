@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a360
+
+**[Commission-Obligation-Side] ceding commissions book as obligation-side commission legs on the consolidated faces, matching the walk.** The consolidated `pnl` net premium is now `gross - ceded premiums` with no commission term; commissions received appear as one obligation-side `'commission'` leg (constant, or the stochastic slide / profit-commission credit), displaying positive. The two faces now report identical Consideration and Obligation totals, not just identical margins; margins are unchanged everywhere. On a slide or profit-commission program the consolidated net premium leg is now constant (`SD == 0`) with the stochastic credit on the commission leg. A reader of `summary_df` Consideration on a commissioned program sees a lower number than before, offset one row down.
+
 ## 1.0.0a359
 
 **[Agg-Rate-Nets-Inuring-Occ] the aggregate-side `rate` clause prices off the subject premium, net of the inuring occurrence cession.** `rate` on an aggregate layer now resolves to `share x rate x (gross - pc_occ)` rather than `share x rate x gross`; the occurrence side still rates off the stated gross (it is first in the tower), the occurrence commission does not add back, and under occurrence reinstatements the netting amount is the constant deposit. `deposit` and `rol` clauses are unchanged. A program combining an occurrence program with an aggregate `rate` clause reports lower `pc_agg` (and proportionally lower `c_agg`) than before; the resolved figures ride on `PnL.economics` as always. Grammar comment and language reference restated to match.

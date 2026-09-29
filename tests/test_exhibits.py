@@ -74,8 +74,8 @@ PROGRAMS = {
                      'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
                      'deposit 40 logarithmic peel top-down'),
 }
-_WALK_EXHIBITS = ['summary', 'tail', 'stats', 'validation', 'economic',
-                  'economic_ratios', 'economic_waterfall']
+_WALK_EXHIBITS = ['summary', 'tail', 'stats', 'validation', 'reins',
+                  'economic', 'economic_ratios', 'economic_waterfall']
 AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
 
@@ -564,6 +564,31 @@ def test_pnl_stats_is_the_engine_moment_store(objects):
     # the ledger is a different exhibit and a different document
     assert build_exhibit(pn, 'stats').hash \
         != build_exhibit(pn, 'economic').hash
+
+
+def test_pnl_reins_serves_through_the_engine(objects, tower):
+    """[PnL-Reins-Passthrough]: the reins exhibit lights for a ceded P&L.
+
+    RAW serves the engine's two frames through the delegating
+    ``PnL.reins_stats_df`` / ``reins_summary_df`` properties; INSURER takes
+    the Aggregate translation (contract, consequence, summary), which reads
+    only the served frames. The plain (uncessioned) P&L must NOT serve it,
+    which is itself the assertion that availability looks through the
+    engine rather than lighting for every P&L.
+    """
+    blocks = exhibit_frames(tower, 'reins')
+    assert [n for n, _, _ in blocks] == ['reins_stats_df',
+                                         'reins_summary_df']
+    pd.testing.assert_frame_equal(blocks[0][1],
+                                  tower.engine.reins_stats_df)
+    pd.testing.assert_frame_equal(blocks[1][1],
+                                  tower.engine.reins_summary_df)
+    ins = exhibit_frames(tower, 'reins', 'insurer')
+    assert [n for n, _, _ in ins] == ['reins_layer_terms',
+                                      'reins_layer_moments',
+                                      'reins_summary_df']
+    plain = objects['PnL']
+    assert 'reins' not in [n for n, _ in available_exhibits(plain)]
 
 
 def test_pnl_validation_serves_the_engine_frame(objects):

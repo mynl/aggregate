@@ -525,6 +525,37 @@ and the CHANGELOG.
   (`test_palm_tier_subtotal_agrees_with_the_lumped_tier_walk`, 2%
   tolerance).
 
+- **[Ledger-Both-Ladders] (a364).** As the plan's default ruled: the insurer
+  economic view is untouched (it reads the first RAW block only), RAW
+  carries both sheets. The RAW `economic` passthrough became a custom
+  frames function in `exhibits/_pnl.py` because the manifest foot would
+  otherwise re-register over it; the single-block (marginal) caption now
+  states the regime instead of claiming kappa columns it does not serve.
+- **[Writer-Standalone-CoC] (a365).** The capstone acceptance numbers came
+  out exactly as the plan projected (Div CoC 0.2332 / 1.3955 / 0.1541 /
+  -0.2136, MSD gross 0.451); the new SA CoC ceded cells are XOL 0.3750
+  (1800 / 4800) and QS 0.1541 (776.25 / 5036.25, agreeing with Div CoC
+  because a quota share of the whole book is comonotone with it), recorded
+  in `test_waterfall_capstone_acceptance`.
+- **[PnL-Overview-Punchups] (a366).** The engine validation frame on ceded
+  books serves `Ceded EX / CV / Sk` columns, added to the vocabulary gate's
+  pending set beside the existing Gross / Net / Subject triplets. The
+  `PeelMarginal` fixture (created a363) gains the tail exhibit alongside
+  the plan's named fixtures, being a P&L like the rest.
+- **[PnL-Reins-Passthrough] (a367).** The insurer override's extra blocks
+  needed **no** extra delegations: `_reins_insurer_aggregate` reads only
+  the served frames, so it is registered for PnL by stacking the decorator
+  (the execution-time decision the plan asked for). `PeelMarginal` gains
+  the reins exhibit too (its engine carries the same occurrence program).
+  The `_has_occurrence` chart predicate was generalized through the
+  charts' `_engine` helper rather than a parallel PnL branch.
+- **[Bivariate-Gate-Flake] observed at the a367 gate.**
+  `test_netceded_refuses_a_pin_it_cannot_honor` failed twice under the full
+  parallel tier-3 run and passed in isolation and on the rerun (5426
+  green); it builds a `2^14 x 2^14` joint, the memory-pressure class the
+  testing notes already document for the bivariate suites, and touches
+  nothing this plan changed.
+
 ## Rulings (author, 2026-09-29)
 
 1. **[palm-scope, now ledger-both-ladders]** Confirmed that `economic` is

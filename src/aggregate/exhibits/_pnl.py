@@ -14,8 +14,8 @@ from .._pnl import (
     PERCENTILE_LADDER, PnL, WATERFALL_RETURN_PERIOD, _kappa_label, _pct_label,
 )
 from ._core import (
-    economic, economic_ratios, economic_waterfall, stats, validation,
-    _stats_insurer_moment_store,
+    economic, economic_ratios, economic_waterfall, reins, stats, validation,
+    _reins_frames, _stats_insurer_moment_store,
 )
 
 #: Ledger row kind to greater_tables row flag ([Exhibits-Economic-Insurer]).
@@ -51,6 +51,15 @@ def _stats_insurer_pnl(obj, blocks):
                    'the economic exhibit.')
         return [(block_name, df, dict(kw, caption=caption))]
     return _stats_insurer_moment_store(obj, blocks)
+
+
+# The reins exhibit serves through the engine ([PnL-Reins-Passthrough]):
+# the delegating ``PnL.reins_stats_df`` / ``reins_summary_df`` properties
+# make the shared ``_reins_frames`` builder work unchanged, and the insurer
+# translation is the Aggregate one (it reads only the served frames), so it
+# is registered for PnL where it lives, in ``exhibits._aggregate``.
+# Availability looks through ``obj.engine`` (``_has_reinsurance``).
+reins.register(PnL)(_reins_frames)
 
 
 @validation.register(PnL)

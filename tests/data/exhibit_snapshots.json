@@ -47781,6 +47781,2835 @@
    "n_stub_levels": 2
   }
  ],
+ "reins/insurer/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 5,
+       "text": "occ"
+      },
+      "Gross",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.01"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00000"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.1",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "0.26294"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "0.11886"
+      },
+      {
+       "raw": 123.7603104282263,
+       "text": "123.76"
+      },
+      {
+       "raw": 1.237603104282263,
+       "text": "1.23760"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.2",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 300.0,
+       "text": "300.00"
+      },
+      {
+       "raw": 200.0,
+       "text": "200.00"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "0.11886"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "0.02852"
+      },
+      {
+       "raw": 123.89265190491155,
+       "text": "123.89"
+      },
+      {
+       "raw": 0.41297550634970515,
+       "text": "0.41298"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Ceded",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 400.0,
+       "text": "400.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "0.26294"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 247.65296233189034,
+       "text": "247.65"
+      },
+      {
+       "raw": 0.6191324058297258,
+       "text": "0.61913"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 452.35324589739406,
+       "text": "452.35"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1,
+       "text": "1"
+      }
+     ]
+    }
+   ],
+   "caption": "The contract, layer by layer: the share of a limit over an attachment, the chance a loss reaches it (pr_attach) and exhausts it (pr_detach), the expected loss and the loss on line. Of that pair, loss is the placed figure, so a half placed layer shows half the dollars, while lol divides by share times limit and reads the same whatever the share. Gross, ceded and net read down the rows, because that is the comparison and the eye makes it down a column.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "layer"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "share"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "limit"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "pr_attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "pr_detach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "loss"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "lol"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c9",
+     "name": [
+      "output"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "view"
+     },
+     {
+      "text": "layer"
+     },
+     {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
+      "text": "pr_attach"
+     },
+     {
+      "text": "pr_detach"
+     },
+     {
+      "text": "loss"
+     },
+     {
+      "text": "lol"
+     },
+     {
+      "text": "output"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 5,
+       "text": "occ"
+      },
+      "Gross",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 100.0008868896853,
+       "text": "100.00"
+      },
+      {
+       "raw": 2.0000008599700423,
+       "text": "2.000"
+      },
+      {
+       "raw": 13.98070394788538,
+       "text": "13.981"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.01"
+      },
+      {
+       "raw": 0.8451545452838103,
+       "text": "0.84515"
+      },
+      {
+       "raw": 4.220553290299274,
+       "text": "4.221"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.1",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 1.8405563157879752,
+       "text": "1.841"
+      },
+      {
+       "raw": 67.24070834658923,
+       "text": "67.24"
+      },
+      {
+       "raw": 0.5403176264454694,
+       "text": "0.540"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.5235951279362957,
+       "text": "-0.524"
+      },
+      {
+       "raw": 123.7603104282263,
+       "text": "123.76"
+      },
+      {
+       "raw": 0.837813125043134,
+       "text": "0.83781"
+      },
+      {
+       "raw": 0.9002897990174502,
+       "text": "0.900"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.2",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 300.0,
+       "text": "300.00"
+      },
+      {
+       "raw": 200.0,
+       "text": "200.00"
+      },
+      {
+       "raw": 0.8320406198640629,
+       "text": "0.832"
+      },
+      {
+       "raw": 148.90216769130268,
+       "text": "148.90"
+      },
+      {
+       "raw": 0.7379754159291921,
+       "text": "0.738"
+      },
+      {
+       "raw": 0.24700460641482036,
+       "text": "0.247"
+      },
+      {
+       "raw": 123.89265190491155,
+       "text": "123.89"
+      },
+      {
+       "raw": 1.3625010174321721,
+       "text": "1.36250"
+      },
+      {
+       "raw": 1.560828492809578,
+       "text": "1.561"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Ceded",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 400.0,
+       "text": "400.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 35.37899461867924,
+       "text": "35.38"
+      },
+      {
+       "raw": 2.511434175388305,
+       "text": "2.511"
+      },
+      {
+       "raw": 2.973575039116768,
+       "text": "2.974"
+      },
+      {
+       "raw": 247.65296233189034,
+       "text": "247.65"
+      },
+      {
+       "raw": 1.021714361255445,
+       "text": "1.02171"
+      },
+      {
+       "raw": 1.2824791109147238,
+       "text": "1.282"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 64.62189227106435,
+       "text": "64.62"
+      },
+      {
+       "raw": 2.1871960033709725,
+       "text": "2.187"
+      },
+      {
+       "raw": 29.764239199639608,
+       "text": "29.764"
+      },
+      {
+       "raw": 452.35324589739406,
+       "text": "452.35"
+      },
+      {
+       "raw": 0.908988948263405,
+       "text": "0.90899"
+      },
+      {
+       "raw": 8.879389576889428,
+       "text": "8.879"
+      }
+     ]
+    }
+   ],
+   "caption": "What each layer does to the three distributions. The cover columns repeat the share, limit and attachment, so the block reads on its own. Layer frequency is the ground up count thinned by the chance a loss reaches the layer, which is what makes freq mean times sev mean come to agg mean on every row. Per layer figures are conditional on a loss reaching the layer; the Ceded and Net rows are unconditional. Raw noncentral moments (ex1, ex2, ex3) and the frequency cv and skew are dropped from this view; the raw perspective keeps the full store. An aggregate stage leaves frequency and severity blank, having changed neither.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "layer"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "cover",
+      "share"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "cover",
+      "limit"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "cover",
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "freq",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "sev",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "sev",
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "sev",
+      "skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "agg",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "agg",
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "agg",
+      "skew"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "colspan": 2,
+      "text": ""
+     },
+     {
+      "colspan": 3,
+      "text": "cover"
+     },
+     {
+      "text": "freq"
+     },
+     {
+      "colspan": 3,
+      "text": "sev"
+     },
+     {
+      "colspan": 3,
+      "text": "agg"
+     }
+    ],
+    [
+     {
+      "text": "view"
+     },
+     {
+      "text": "layer"
+     },
+     {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "skew"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "skew"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 2,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 9,
+       "text": "occ"
+      },
+      {
+       "rowspan": 3,
+       "text": "gross"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0008868896853,
+       "text": "100.00"
+      },
+      {
+       "raw": 2.9110047705671604e-13,
+       "text": "291.100f"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.0000008599700423,
+       "text": "200.0%"
+      },
+      {
+       "raw": 9.500156217256972e-11,
+       "text": "95.002p"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "13.981"
+      },
+      {
+       "raw": 13.98070394788538,
+       "text": "13.981"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.01"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.01"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.7719159473017498e-13,
+       "text": "-177.192f"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.8451545452838103,
+       "text": "84.5%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.2237066915332662e-10,
+       "text": "-122.371p"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.221"
+      },
+      {
+       "raw": 4.220553290299274,
+       "text": "4.221"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ceded"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.00"
+      },
+      {
+       "raw": 35.37899461867924,
+       "text": "35.38"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.646213191511817,
+       "text": "-646.213m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.511434175388305,
+       "text": "251.1%"
+      },
+      {
+       "raw": 0.2557165478741412,
+       "text": "255.717m"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "13.981"
+      },
+      {
+       "raw": 2.973575039116768,
+       "text": "2.974"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.01"
+      },
+      {
+       "raw": 247.65296233189034,
+       "text": "247.65"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.6462131915101945,
+       "text": "-646.213m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 1.021714361255445,
+       "text": "102.2%"
+      },
+      {
+       "raw": 0.20890831958706002,
+       "text": "208.908m"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.221"
+      },
+      {
+       "raw": 1.2824791109147238,
+       "text": "1.282"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "net"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.00"
+      },
+      {
+       "raw": 64.62189227106435,
+       "text": "64.62"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.35378680848730903,
+       "text": "-353.787m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.1871960033709725,
+       "text": "218.7%"
+      },
+      {
+       "raw": 0.093597531558822,
+       "text": "93.598m"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "13.981"
+      },
+      {
+       "raw": 29.764239199639608,
+       "text": "29.764"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.01"
+      },
+      {
+       "raw": 452.35324589739406,
+       "text": "452.35"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.3537868084873893,
+       "text": "-353.787m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.908988948263405,
+       "text": "90.9%"
+      },
+      {
+       "raw": 0.07552985808876533,
+       "text": "75.530m"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.221"
+      },
+      {
+       "raw": 8.879389576889428,
+       "text": "8.879"
+      }
+     ]
+    }
+   ],
+   "caption": "Per stage cession impact on the eight validation columns: Change reads as rebucketing error on the leading gross or subject row and as the percentage impact of the cession on the ceded and net rows.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stage"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Est EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "Change EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c8",
+     "name": [
+      "Change CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stage"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "component"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Change EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Change CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
+ "reins/insurer/PeelMarginal": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 5,
+       "text": "occ"
+      },
+      "Gross",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 700.0063193746327,
+       "text": "700.01"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00000"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.1",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "0.26294"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "0.11886"
+      },
+      {
+       "raw": 123.75562059145297,
+       "text": "123.76"
+      },
+      {
+       "raw": 1.2375562059145297,
+       "text": "1.23756"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.2",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 300.0,
+       "text": "300.00"
+      },
+      {
+       "raw": 200.0,
+       "text": "200.00"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "0.11886"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "0.02852"
+      },
+      {
+       "raw": 123.89086916553458,
+       "text": "123.89"
+      },
+      {
+       "raw": 0.4129695638851153,
+       "text": "0.41297"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Ceded",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 400.0,
+       "text": "400.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "0.26294"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 247.64648445508377,
+       "text": "247.65"
+      },
+      {
+       "raw": 0.6191162111377094,
+       "text": "0.61912"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 452.35983493068426,
+       "text": "452.36"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1,
+       "text": "1"
+      }
+     ]
+    }
+   ],
+   "caption": "The contract, layer by layer: the share of a limit over an attachment, the chance a loss reaches it (pr_attach) and exhausts it (pr_detach), the expected loss and the loss on line. Of that pair, loss is the placed figure, so a half placed layer shows half the dollars, while lol divides by share times limit and reads the same whatever the share. Gross, ceded and net read down the rows, because that is the comparison and the eye makes it down a column.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "layer"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "share"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "limit"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "pr_attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "pr_detach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "loss"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "lol"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c9",
+     "name": [
+      "output"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "view"
+     },
+     {
+      "text": "layer"
+     },
+     {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
+      "text": "pr_attach"
+     },
+     {
+      "text": "pr_detach"
+     },
+     {
+      "text": "loss"
+     },
+     {
+      "text": "lol"
+     },
+     {
+      "text": "output"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 5,
+       "text": "occ"
+      },
+      "Gross",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 100.0009027930976,
+       "text": "100.00"
+      },
+      {
+       "raw": 2.0000259068066164,
+       "text": "2.000"
+      },
+      {
+       "raw": 13.989598604630283,
+       "text": "13.990"
+      },
+      {
+       "raw": 700.0063193746327,
+       "text": "700.01"
+      },
+      {
+       "raw": 1.6871768555957987,
+       "text": "1.687"
+      },
+      {
+       "raw": 4.027742082905048,
+       "text": "4.028"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.1",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 1.8405563157879752,
+       "text": "1.841"
+      },
+      {
+       "raw": 67.23815884889764,
+       "text": "67.24"
+      },
+      {
+       "raw": 0.5405380149248716,
+       "text": "0.541"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.5244563308670936,
+       "text": "-0.524"
+      },
+      {
+       "raw": 123.75562059145297,
+       "text": "123.76"
+      },
+      {
+       "raw": 1.6835624354499303,
+       "text": "1.684"
+      },
+      {
+       "raw": 3.6456451706373865,
+       "text": "3.646"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.2",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 300.0,
+       "text": "300.00"
+      },
+      {
+       "raw": 200.0,
+       "text": "200.00"
+      },
+      {
+       "raw": 0.8320406198640629,
+       "text": "0.832"
+      },
+      {
+       "raw": 148.90002188846472,
+       "text": "148.90"
+      },
+      {
+       "raw": 0.7380289415337419,
+       "text": "0.738"
+      },
+      {
+       "raw": 0.24685167010953418,
+       "text": "0.247"
+      },
+      {
+       "raw": 123.89086916553458,
+       "text": "123.89"
+      },
+      {
+       "raw": 1.997204539921299,
+       "text": "1.997"
+      },
+      {
+       "raw": 3.5397214712004654,
+       "text": "3.540"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Ceded",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 400.0,
+       "text": "400.00"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 35.37806920626909,
+       "text": "35.38"
+      },
+      {
+       "raw": 2.511543134696858,
+       "text": "2.512"
+      },
+      {
+       "raw": 2.9735028686383,
+       "text": "2.974"
+      },
+      {
+       "raw": 247.64648445508377,
+       "text": "247.65"
+      },
+      {
+       "raw": 1.782201989531701,
+       "text": "1.782"
+      },
+      {
+       "raw": 3.581099841055094,
+       "text": "3.581"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 64.62283358718332,
+       "text": "64.62"
+      },
+      {
+       "raw": 2.1872136919869503,
+       "text": "2.187"
+      },
+      {
+       "raw": 29.788854746580135,
+       "text": "29.789"
+      },
+      {
+       "raw": 452.35983493068426,
+       "text": "452.36"
+      },
+      {
+       "raw": 1.7200397848972262,
+       "text": "1.720"
+      },
+      {
+       "raw": 4.752530048392081,
+       "text": "4.753"
+      }
+     ]
+    }
+   ],
+   "caption": "What each layer does to the three distributions. The cover columns repeat the share, limit and attachment, so the block reads on its own. Layer frequency is the ground up count thinned by the chance a loss reaches the layer, which is what makes freq mean times sev mean come to agg mean on every row. Per layer figures are conditional on a loss reaching the layer; the Ceded and Net rows are unconditional. Raw noncentral moments (ex1, ex2, ex3) and the frequency cv and skew are dropped from this view; the raw perspective keeps the full store. An aggregate stage leaves frequency and severity blank, having changed neither.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "layer"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "cover",
+      "share"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "cover",
+      "limit"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "cover",
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "freq",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "sev",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "sev",
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "sev",
+      "skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "agg",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "agg",
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "agg",
+      "skew"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "colspan": 2,
+      "text": ""
+     },
+     {
+      "colspan": 3,
+      "text": "cover"
+     },
+     {
+      "text": "freq"
+     },
+     {
+      "colspan": 3,
+      "text": "sev"
+     },
+     {
+      "colspan": 3,
+      "text": "agg"
+     }
+    ],
+    [
+     {
+      "text": "view"
+     },
+     {
+      "text": "layer"
+     },
+     {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "skew"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "skew"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 2,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 9,
+       "text": "occ"
+      },
+      {
+       "rowspan": 3,
+       "text": "gross"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "150.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.835"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.00090241314709,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0009027930976,
+       "text": "100.00"
+      },
+      {
+       "raw": 3.799470738030664e-09,
+       "text": "3.799n"
+      },
+      {
+       "raw": 2.0000228038449026,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.0000259068066164,
+       "text": "200.0%"
+      },
+      {
+       "raw": 1.551463167270839e-06,
+       "text": "0.00000"
+      },
+      {
+       "raw": 13.984569253202912,
+       "text": "13.985"
+      },
+      {
+       "raw": 13.989598604630283,
+       "text": "13.990"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0063168920293,
+       "text": "700.01"
+      },
+      {
+       "raw": 700.0063193746327,
+       "text": "700.01"
+      },
+      {
+       "raw": 3.546544169452659e-09,
+       "text": "3.547n"
+      },
+      {
+       "raw": 1.687176397318588,
+       "text": "168.7%"
+      },
+      {
+       "raw": 1.6871768555957987,
+       "text": "168.7%"
+      },
+      {
+       "raw": 2.7162376814438005e-07,
+       "text": "0.00000"
+      },
+      {
+       "raw": 4.027601821069045,
+       "text": "4.028"
+      },
+      {
+       "raw": 4.027742082905048,
+       "text": "4.028"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ceded"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "150.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.835"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.00090241314709,
+       "text": "100.00"
+      },
+      {
+       "raw": 35.37806920626909,
+       "text": "35.38"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.6462225004719763,
+       "text": "-646.223m"
+      },
+      {
+       "raw": 2.0000228038449026,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.511543134696858,
+       "text": "251.2%"
+      },
+      {
+       "raw": 0.2557572493016549,
+       "text": "0.25576"
+      },
+      {
+       "raw": 13.984569253202912,
+       "text": "13.985"
+      },
+      {
+       "raw": 2.9735028686383,
+       "text": "2.974"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0063168920293,
+       "text": "700.01"
+      },
+      {
+       "raw": 247.64648445508377,
+       "text": "247.65"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.6462225004559761,
+       "text": "-646.223m"
+      },
+      {
+       "raw": 1.687176397318588,
+       "text": "168.7%"
+      },
+      {
+       "raw": 1.782201989531701,
+       "text": "178.2%"
+      },
+      {
+       "raw": 0.056322262665679856,
+       "text": "0.05632"
+      },
+      {
+       "raw": 4.027601821069045,
+       "text": "4.028"
+      },
+      {
+       "raw": 3.581099841055094,
+       "text": "3.581"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "net"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "150.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.835"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.00090241314709,
+       "text": "100.00"
+      },
+      {
+       "raw": 64.62283358718332,
+       "text": "64.62"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.35377749572500483,
+       "text": "-353.777m"
+      },
+      {
+       "raw": 2.0000228038449026,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.1872136919869503,
+       "text": "218.7%"
+      },
+      {
+       "raw": 0.09359437691519634,
+       "text": "0.09359"
+      },
+      {
+       "raw": 13.984569253202912,
+       "text": "13.985"
+      },
+      {
+       "raw": 29.788854746580135,
+       "text": "29.789"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0063168920293,
+       "text": "700.01"
+      },
+      {
+       "raw": 452.35983493068426,
+       "text": "452.36"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.35377749598157215,
+       "text": "-353.777m"
+      },
+      {
+       "raw": 1.687176397318588,
+       "text": "168.7%"
+      },
+      {
+       "raw": 1.7200397848972262,
+       "text": "172.0%"
+      },
+      {
+       "raw": 0.019478335300842087,
+       "text": "0.01948"
+      },
+      {
+       "raw": 4.027601821069045,
+       "text": "4.028"
+      },
+      {
+       "raw": 4.752530048392081,
+       "text": "4.753"
+      }
+     ]
+    }
+   ],
+   "caption": "Per stage cession impact on the eight validation columns: Change reads as rebucketing error on the leading gross or subject row and as the percentage impact of the cession on the ceded and net rows.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stage"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Est EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "Change EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Change CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stage"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "component"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Change EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Change CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
  "reins/insurer/ReinsAggregate": [
   {
    "body": [
@@ -50112,6 +52941,4129 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 4
+  }
+ ],
+ "reins/insurer/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ"
+      },
+      "Gross",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.01"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.00000"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.1",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "0.02852"
+      },
+      {
+       "raw": 0.0071561871577671575,
+       "text": "0.00716"
+      },
+      {
+       "raw": 51.11309669765466,
+       "text": "51.11"
+      },
+      {
+       "raw": 0.10222619339530932,
+       "text": "0.10223"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Ceded",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "0.02852"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 51.1130966989894,
+       "text": "51.11"
+      },
+      {
+       "raw": 0.10222619339797881,
+       "text": "0.10223"
+      },
+      {
+       "raw": 1,
+       "text": "1"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 648.8931115309935,
+       "text": "648.89"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0,
+       "text": "0"
+      }
+     ]
+    }
+   ],
+   "caption": "The contract, layer by layer: the share of a limit over an attachment, the chance a loss reaches it (pr_attach) and exhausts it (pr_detach), the expected loss and the loss on line. Of that pair, loss is the placed figure, so a half placed layer shows half the dollars, while lol divides by share times limit and reads the same whatever the share. Gross, ceded and net read down the rows, because that is the comparison and the eye makes it down a column.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "layer"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "share"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "limit"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "pr_attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "pr_detach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "loss"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "lol"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c9",
+     "name": [
+      "output"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "view"
+     },
+     {
+      "text": "layer"
+     },
+     {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
+      "text": "pr_attach"
+     },
+     {
+      "text": "pr_detach"
+     },
+     {
+      "text": "loss"
+     },
+     {
+      "text": "lol"
+     },
+     {
+      "text": "output"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 4,
+       "text": "occ"
+      },
+      "Gross",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 100.0008868896853,
+       "text": "100.00"
+      },
+      {
+       "raw": 2.0000008599700423,
+       "text": "2.000"
+      },
+      {
+       "raw": 13.98070394788538,
+       "text": "13.98"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.01"
+      },
+      {
+       "raw": 0.8451545452838103,
+       "text": "0.845"
+      },
+      {
+       "raw": 4.220553290299274,
+       "text": "4.221"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "layer.1",
+      {
+       "raw": 1.0,
+       "text": "1.000"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 0.1996627521103899,
+       "text": "0.200"
+      },
+      {
+       "raw": 255.99715598642123,
+       "text": "256.00"
+      },
+      {
+       "raw": 0.7149136413988533,
+       "text": "0.715"
+      },
+      {
+       "raw": 0.18256339557990037,
+       "text": "0.18"
+      },
+      {
+       "raw": 51.11309669765466,
+       "text": "51.11"
+      },
+      {
+       "raw": 2.7510488151154155,
+       "text": "2.751"
+      },
+      {
+       "raw": 3.1324891356413507,
+       "text": "3.132"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Ceded",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 7.301870956785224,
+       "text": "7.30"
+      },
+      {
+       "raw": 7.209569126214848,
+       "text": "7.210"
+      },
+      {
+       "raw": 8.109315988388497,
+       "text": "8.11"
+      },
+      {
+       "raw": 51.1130966989894,
+       "text": "51.11"
+      },
+      {
+       "raw": 2.751048840110453,
+       "text": "2.751"
+      },
+      {
+       "raw": 3.1325233741443137,
+       "text": "3.133"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "Net",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000"
+      },
+      {
+       "raw": 92.69901593304559,
+       "text": "92.70"
+      },
+      {
+       "raw": 1.7577901245242777,
+       "text": "1.758"
+      },
+      {
+       "raw": 18.460086843986762,
+       "text": "18.46"
+      },
+      {
+       "raw": 648.8931115309935,
+       "text": "648.89"
+      },
+      {
+       "raw": 0.7643695927438586,
+       "text": "0.764"
+      },
+      {
+       "raw": 5.051010280209935,
+       "text": "5.051"
+      }
+     ]
+    }
+   ],
+   "caption": "What each layer does to the three distributions. The cover columns repeat the share, limit and attachment, so the block reads on its own. Layer frequency is the ground up count thinned by the chance a loss reaches the layer, which is what makes freq mean times sev mean come to agg mean on every row. Per layer figures are conditional on a loss reaching the layer; the Ceded and Net rows are unconditional. Raw noncentral moments (ex1, ex2, ex3) and the frequency cv and skew are dropped from this view; the raw perspective keeps the full store. An aggregate stage leaves frequency and severity blank, having changed neither.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "layer"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "cover",
+      "share"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "cover",
+      "limit"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "cover",
+      "attach"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "freq",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "sev",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "sev",
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "sev",
+      "skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "break_depth": 0,
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "agg",
+      "mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "agg",
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c11",
+     "name": [
+      "agg",
+      "skew"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "colspan": 2,
+      "text": ""
+     },
+     {
+      "colspan": 3,
+      "text": "cover"
+     },
+     {
+      "text": "freq"
+     },
+     {
+      "colspan": 3,
+      "text": "sev"
+     },
+     {
+      "colspan": 3,
+      "text": "agg"
+     }
+    ],
+    [
+     {
+      "text": "view"
+     },
+     {
+      "text": "layer"
+     },
+     {
+      "text": "share"
+     },
+     {
+      "text": "limit"
+     },
+     {
+      "text": "attach"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "skew"
+     },
+     {
+      "text": "mean"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "skew"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 2,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 9,
+       "text": "occ"
+      },
+      {
+       "rowspan": 3,
+       "text": "gross"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.0008868896853,
+       "text": "100.00"
+      },
+      {
+       "raw": 2.9110047705671604e-13,
+       "text": "291.100f"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.0000008599700423,
+       "text": "200.0%"
+      },
+      {
+       "raw": 9.500156217256972e-11,
+       "text": "95.002p"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "13.981"
+      },
+      {
+       "raw": 13.98070394788538,
+       "text": "13.981"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.01"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.01"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.7719159473017498e-13,
+       "text": "-177.192f"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.8451545452838103,
+       "text": "84.5%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.2237066915332662e-10,
+       "text": "-122.371p"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.221"
+      },
+      {
+       "raw": 4.220553290299274,
+       "text": "4.221"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ceded"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.00"
+      },
+      {
+       "raw": 7.301870956785224,
+       "text": "7.30"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.9269819380217866,
+       "text": "-926.982m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 7.209569126214848,
+       "text": "721.0%"
+      },
+      {
+       "raw": 2.6047830134471837,
+       "text": "2.605\u00a0"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "13.981"
+      },
+      {
+       "raw": 8.109315988388497,
+       "text": "8.109"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.01"
+      },
+      {
+       "raw": 51.1130966989894,
+       "text": "51.11"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.926981938019654,
+       "text": "-926.982m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 2.751048840110453,
+       "text": "275.1%"
+      },
+      {
+       "raw": 2.2550837655969524,
+       "text": "2.255\u00a0"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.221"
+      },
+      {
+       "raw": 3.1325233741443137,
+       "text": "3.133"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "net"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.00"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.00"
+      },
+      {
+       "raw": 92.69901593304559,
+       "text": "92.70"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07301806197646732,
+       "text": "-73.018m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 1.7577901245242777,
+       "text": "175.8%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1211053155659142,
+       "text": "-121.105m"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "13.981"
+      },
+      {
+       "raw": 18.460086843986762,
+       "text": "18.460"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.01"
+      },
+      {
+       "raw": 648.8931115309935,
+       "text": "648.89"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07301806197693217,
+       "text": "-73.018m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.7643695927438586,
+       "text": "76.4%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.09558601214924523,
+       "text": "-95.586m"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.221"
+      },
+      {
+       "raw": 5.051010280209935,
+       "text": "5.051"
+      }
+     ]
+    }
+   ],
+   "caption": "Per stage cession impact on the eight validation columns: Change reads as rebucketing error on the leading gross or subject row and as the percentage impact of the cession on the ceded and net rows.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stage"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Est EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "Change EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c8",
+     "name": [
+      "Change CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c9",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stage"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "component"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Change EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Change CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
+ "reins/raw/Peel": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "share",
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.000\u00a0"
+      },
+      {
+       "raw": 300.0,
+       "text": "300.000\u00a0"
+      },
+      {
+       "raw": 400.0,
+       "text": "400.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attach",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.000\u00a0"
+      },
+      {
+       "raw": 200.0,
+       "text": "200.000\u00a0"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_attach",
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "262.937m"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "118.863m"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "262.937m"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_detach",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "118.863m"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "28.523m"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_loss",
+      {
+       "raw": 0.9990412753917861,
+       "text": "999.041m"
+      },
+      {
+       "raw": 0.8355397999167758,
+       "text": "835.540m"
+      },
+      {
+       "raw": 0.5600885119668255,
+       "text": "560.089m"
+      },
+      {
+       "raw": 0.8355397999167758,
+       "text": "835.540m"
+      },
+      {
+       "raw": 0.9990412753917861,
+       "text": "999.041m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lol",
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.237603104282263,
+       "text": "1.238\u00a0"
+      },
+      {
+       "raw": 0.41297550634970515,
+       "text": "412.976m"
+      },
+      {
+       "raw": 0.6191324058297258,
+       "text": "619.132m"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "output",
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 1.8405563157879752,
+       "text": "1.841\u00a0"
+      },
+      {
+       "raw": 0.8320406198640629,
+       "text": "832.041m"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 55.99999999999996,
+       "text": "56.000\u00a0"
+      },
+      {
+       "raw": 5.2282038673749796,
+       "text": "5.228\u00a0"
+      },
+      {
+       "raw": 1.5243322129678367,
+       "text": "1.524\u00a0"
+      },
+      {
+       "raw": 55.99999999999996,
+       "text": "56.000\u00a0"
+      },
+      {
+       "raw": 55.99999999999996,
+       "text": "56.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 496.99999999999943,
+       "text": "497.000\u00a0"
+      },
+      {
+       "raw": 18.23865506728612,
+       "text": "18.239\u00a0"
+      },
+      {
+       "raw": 3.4849301254281277,
+       "text": "3.485\u00a0"
+      },
+      {
+       "raw": 496.99999999999943,
+       "text": "497.000\u00a0"
+      },
+      {
+       "raw": 496.99999999999943,
+       "text": "497.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 1.8405563157879752,
+       "text": "1.841\u00a0"
+      },
+      {
+       "raw": 0.8320406198640629,
+       "text": "832.041m"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.3779644730092272,
+       "text": "377.964m"
+      },
+      {
+       "raw": 0.7370983599960265,
+       "text": "737.098m"
+      },
+      {
+       "raw": 1.0962957628108634,
+       "text": "1.096\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "377.964m"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "377.964m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 0.37796447300922775,
+       "text": "377.964m"
+      },
+      {
+       "raw": 0.7370983599960266,
+       "text": "737.098m"
+      },
+      {
+       "raw": 1.0962957628108625,
+       "text": "1.096\u00a0"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "377.964m"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "377.964m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      {
+       "raw": 100.0008868896853,
+       "text": "100.001\u00a0"
+      },
+      {
+       "raw": 67.24070834658923,
+       "text": "67.241\u00a0"
+      },
+      {
+       "raw": 148.90216769130268,
+       "text": "148.902\u00a0"
+      },
+      {
+       "raw": 35.37899461867924,
+       "text": "35.379\u00a0"
+      },
+      {
+       "raw": 64.62189227106435,
+       "text": "64.622\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 50000.92129303742,
+       "text": "50.001k"
+      },
+      {
+       "raw": 5841.279120375727,
+       "text": "5.841k"
+      },
+      {
+       "raw": 34246.81911710989,
+       "text": "34.247k"
+      },
+      {
+       "raw": 9146.354038809572,
+       "text": "9.146k"
+      },
+      {
+       "raw": 24153.19501807381,
+       "text": "24.153k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 124849107.94128726,
+       "text": "124.849M"
+      },
+      {
+       "raw": 545173.0757268163,
+       "text": "545.173k"
+      },
+      {
+       "raw": 9023145.385546396,
+       "text": "9.023M"
+      },
+      {
+       "raw": 2968039.4523658766,
+       "text": "2.968M"
+      },
+      {
+       "raw": 88184857.61324787,
+       "text": "88.185M"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 100.0008868896853,
+       "text": "100.001\u00a0"
+      },
+      {
+       "raw": 67.24070834658923,
+       "text": "67.241\u00a0"
+      },
+      {
+       "raw": 148.90216769130268,
+       "text": "148.902\u00a0"
+      },
+      {
+       "raw": 35.37899461867924,
+       "text": "35.379\u00a0"
+      },
+      {
+       "raw": 64.62189227106435,
+       "text": "64.622\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 2.0000008599700423,
+       "text": "2.000\u00a0"
+      },
+      {
+       "raw": 0.5403176264454694,
+       "text": "540.318m"
+      },
+      {
+       "raw": 0.7379754159291921,
+       "text": "737.975m"
+      },
+      {
+       "raw": 2.511434175388305,
+       "text": "2.511\u00a0"
+      },
+      {
+       "raw": 2.1871960033709725,
+       "text": "2.187\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 13.98070394788538,
+       "text": "13.981\u00a0"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.5235951279362957,
+       "text": "-523.595m"
+      },
+      {
+       "raw": 0.24700460641482036,
+       "text": "247.005m"
+      },
+      {
+       "raw": 2.973575039116768,
+       "text": "2.974\u00a0"
+      },
+      {
+       "raw": 29.764239199639608,
+       "text": "29.764\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      {
+       "raw": 700.0062082274691,
+       "text": "700.006\u00a0"
+      },
+      {
+       "raw": 123.7603104282263,
+       "text": "123.760\u00a0"
+      },
+      {
+       "raw": 123.89265190491155,
+       "text": "123.893\u00a0"
+      },
+      {
+       "raw": 247.65296233189034,
+       "text": "247.653\u00a0"
+      },
+      {
+       "raw": 452.35324589739406,
+       "text": "452.353\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 840015.1404690698,
+       "text": "840.015k"
+      },
+      {
+       "raw": 26067.818360256493,
+       "text": "26.068k"
+      },
+      {
+       "raw": 43844.133789465486,
+       "text": "43.844k"
+      },
+      {
+       "raw": 125356.46832770474,
+       "text": "125.356k"
+      },
+      {
+       "raw": 373695.8241797194,
+       "text": "373.696k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 1951972891.1176457,
+       "text": "1.952G"
+      },
+      {
+       "raw": 6890922.8914109,
+       "text": "6.891M"
+      },
+      {
+       "raw": 20000165.899374392,
+       "text": "20.000M"
+      },
+      {
+       "raw": 83532960.15091866,
+       "text": "83.533M"
+      },
+      {
+       "raw": 939297380.9897778,
+       "text": "939.297M"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 700.0062082274691,
+       "text": "700.006\u00a0"
+      },
+      {
+       "raw": 123.7603104282263,
+       "text": "123.760\u00a0"
+      },
+      {
+       "raw": 123.89265190491155,
+       "text": "123.893\u00a0"
+      },
+      {
+       "raw": 247.65296233189034,
+       "text": "247.653\u00a0"
+      },
+      {
+       "raw": 452.35324589739406,
+       "text": "452.353\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.8451545452838103,
+       "text": "845.155m"
+      },
+      {
+       "raw": 0.837813125043134,
+       "text": "837.813m"
+      },
+      {
+       "raw": 1.3625010174321721,
+       "text": "1.363\u00a0"
+      },
+      {
+       "raw": 1.021714361255445,
+       "text": "1.022\u00a0"
+      },
+      {
+       "raw": 0.908988948263405,
+       "text": "908.989m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 4.220553290299274,
+       "text": "4.221\u00a0"
+      },
+      {
+       "raw": 0.9002897990174502,
+       "text": "900.290m"
+      },
+      {
+       "raw": 1.560828492809578,
+       "text": "1.561\u00a0"
+      },
+      {
+       "raw": 1.2824791109147238,
+       "text": "1.282\u00a0"
+      },
+      {
+       "raw": 8.879389576889428,
+       "text": "8.879\u00a0"
+      }
+     ]
+    }
+   ],
+   "caption": "The program layer by layer, by view: the moments of what is subject to each layer, what it cedes and what is retained. Per layer columns are conditional on a loss reaching the layer; the Ceded and Net totals are not.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "occ",
+      "Gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "occ",
+      "layer.1"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "occ",
+      "layer.2"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "occ",
+      "Ceded"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "occ",
+      "Net"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "colspan": 2,
+      "text": ""
+     },
+     {
+      "colspan": 5,
+      "text": "occ"
+     }
+    ],
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "Gross"
+     },
+     {
+      "text": "layer.1"
+     },
+     {
+      "text": "layer.2"
+     },
+     {
+      "text": "Ceded"
+     },
+     {
+      "text": "Net"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 2,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 9,
+       "text": "occ"
+      },
+      {
+       "rowspan": 3,
+       "text": "gross"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.0009"
+      },
+      {
+       "raw": 100.0008868896853,
+       "text": "100.0009"
+      },
+      {
+       "raw": 2.9110047705671604e-13,
+       "text": "291.100f"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.0000008599700423,
+       "text": "200.0%"
+      },
+      {
+       "raw": 9.500156217256972e-11,
+       "text": "95.002p"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "14"
+      },
+      {
+       "raw": 13.98070394788538,
+       "text": "14"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.0062"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.0062"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.7719159473017498e-13,
+       "text": "-177.192f"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.8451545452838103,
+       "text": "84.5%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.2237066915332662e-10,
+       "text": "-122.371p"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.22"
+      },
+      {
+       "raw": 4.220553290299274,
+       "text": "4.22"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ceded"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.0009"
+      },
+      {
+       "raw": 35.37899461867924,
+       "text": "35.37899"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.646213191511817,
+       "text": "-646.213m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.511434175388305,
+       "text": "251.1%"
+      },
+      {
+       "raw": 0.2557165478741412,
+       "text": "255.717m"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "14"
+      },
+      {
+       "raw": 2.973575039116768,
+       "text": "2.97"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.0062"
+      },
+      {
+       "raw": 247.65296233189034,
+       "text": "247.653"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.6462131915101945,
+       "text": "-646.213m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 1.021714361255445,
+       "text": "102.2%"
+      },
+      {
+       "raw": 0.20890831958706002,
+       "text": "208.908m"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.22"
+      },
+      {
+       "raw": 1.2824791109147238,
+       "text": "1.28"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "net"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.0009"
+      },
+      {
+       "raw": 64.62189227106435,
+       "text": "64.62189"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.35378680848730903,
+       "text": "-353.787m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.1871960033709725,
+       "text": "218.7%"
+      },
+      {
+       "raw": 0.093597531558822,
+       "text": "93.598m"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "14"
+      },
+      {
+       "raw": 29.764239199639608,
+       "text": "29.8"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.0062"
+      },
+      {
+       "raw": 452.35324589739406,
+       "text": "452.3532"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.3537868084873893,
+       "text": "-353.787m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.908988948263405,
+       "text": "90.9%"
+      },
+      {
+       "raw": 0.07552985808876533,
+       "text": "75.530m"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.22"
+      },
+      {
+       "raw": 8.879389576889428,
+       "text": "8.88"
+      }
+     ]
+    }
+   ],
+   "caption": "What each stage of the program does to the book, stage by stage, in the eight column validation layout.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stage"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "Est EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "Change EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c8",
+     "name": [
+      "Change CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c9",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c10",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stage"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "component"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Change EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Change CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
+  }
+ ],
+ "reins/raw/PeelMarginal": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "share",
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.000\u00a0"
+      },
+      {
+       "raw": 300.0,
+       "text": "300.000\u00a0"
+      },
+      {
+       "raw": 400.0,
+       "text": "400.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attach",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.000\u00a0"
+      },
+      {
+       "raw": 200.0,
+       "text": "200.000\u00a0"
+      },
+      {
+       "raw": 100.0,
+       "text": "100.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_attach",
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "262.937m"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "118.863m"
+      },
+      {
+       "raw": 0.2629366165411394,
+       "text": "262.937m"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_detach",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.11886294569486616,
+       "text": "118.863m"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "28.523m"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_loss",
+      {
+       "raw": 0.9964692208818149,
+       "text": "996.469m"
+      },
+      {
+       "raw": 0.6037528484630867,
+       "text": "603.753m"
+      },
+      {
+       "raw": 0.4057176827472553,
+       "text": "405.718m"
+      },
+      {
+       "raw": 0.6037528484630867,
+       "text": "603.753m"
+      },
+      {
+       "raw": 0.9964692208818149,
+       "text": "996.469m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lol",
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.2375562059145297,
+       "text": "1.238\u00a0"
+      },
+      {
+       "raw": 0.4129695638851153,
+       "text": "412.970m"
+      },
+      {
+       "raw": 0.6191162111377094,
+       "text": "619.116m"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "output",
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 1.8405563157879752,
+       "text": "1.841\u00a0"
+      },
+      {
+       "raw": 0.8320406198640629,
+       "text": "832.041m"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 160.48100707648004,
+       "text": "160.481\u00a0"
+      },
+      {
+       "raw": 12.451567700231768,
+       "text": "12.452\u00a0"
+      },
+      {
+       "raw": 3.0004816586425944,
+       "text": "3.000\u00a0"
+      },
+      {
+       "raw": 160.48100707648004,
+       "text": "160.481\u00a0"
+      },
+      {
+       "raw": 160.48100707648004,
+       "text": "160.481\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 7197.848602146741,
+       "text": "7.198k"
+      },
+      {
+       "raw": 156.02090647894494,
+       "text": "156.021\u00a0"
+      },
+      {
+       "raw": 18.640024751540825,
+       "text": "18.640\u00a0"
+      },
+      {
+       "raw": 7197.848602146741,
+       "text": "7.198k"
+      },
+      {
+       "raw": 7197.848602146741,
+       "text": "7.198k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 1.8405563157879752,
+       "text": "1.841\u00a0"
+      },
+      {
+       "raw": 0.8320406198640629,
+       "text": "832.041m"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 1.5083509516679314,
+       "text": "1.508\u00a0"
+      },
+      {
+       "raw": 1.6357198546356415,
+       "text": "1.636\u00a0"
+      },
+      {
+       "raw": 1.8259599804205635,
+       "text": "1.826\u00a0"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "1.508\u00a0"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "1.508\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.835\u00a0"
+      },
+      {
+       "raw": 3.654985078569766,
+       "text": "3.655\u00a0"
+      },
+      {
+       "raw": 3.50820966338611,
+       "text": "3.508\u00a0"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.835\u00a0"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.835\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      {
+       "raw": 100.0009027930976,
+       "text": "100.001\u00a0"
+      },
+      {
+       "raw": 67.23815884889764,
+       "text": "67.238\u00a0"
+      },
+      {
+       "raw": 148.90002188846472,
+       "text": "148.900\u00a0"
+      },
+      {
+       "raw": 35.37806920626909,
+       "text": "35.378\u00a0"
+      },
+      {
+       "raw": 64.62283358718332,
+       "text": "64.623\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 50001.939094860056,
+       "text": "50.002k"
+      },
+      {
+       "raw": 5841.913104886264,
+       "text": "5.842k"
+      },
+      {
+       "raw": 34247.583689855775,
+       "text": "34.248k"
+      },
+      {
+       "raw": 9146.560565716154,
+       "text": "9.147k"
+      },
+      {
+       "raw": 24154.22181518883,
+       "text": "24.154k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 124924832.2641781,
+       "text": "124.925M"
+      },
+      {
+       "raw": 545256.2179960263,
+       "text": "545.256k"
+      },
+      {
+       "raw": 9023406.098927852,
+       "text": "9.023M"
+      },
+      {
+       "raw": 2968100.102364803,
+       "text": "2.968M"
+      },
+      {
+       "raw": 88260322.10790856,
+       "text": "88.260M"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 100.0009027930976,
+       "text": "100.001\u00a0"
+      },
+      {
+       "raw": 67.23815884889764,
+       "text": "67.238\u00a0"
+      },
+      {
+       "raw": 148.90002188846472,
+       "text": "148.900\u00a0"
+      },
+      {
+       "raw": 35.37806920626909,
+       "text": "35.378\u00a0"
+      },
+      {
+       "raw": 64.62283358718332,
+       "text": "64.623\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 2.0000259068066164,
+       "text": "2.000\u00a0"
+      },
+      {
+       "raw": 0.5405380149248716,
+       "text": "540.538m"
+      },
+      {
+       "raw": 0.7380289415337419,
+       "text": "738.029m"
+      },
+      {
+       "raw": 2.511543134696858,
+       "text": "2.512\u00a0"
+      },
+      {
+       "raw": 2.1872136919869503,
+       "text": "2.187\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 13.989598604630283,
+       "text": "13.990\u00a0"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.5244563308670936,
+       "text": "-524.456m"
+      },
+      {
+       "raw": 0.24685167010953418,
+       "text": "246.852m"
+      },
+      {
+       "raw": 2.9735028686383,
+       "text": "2.974\u00a0"
+      },
+      {
+       "raw": 29.788854746580135,
+       "text": "29.789\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      {
+       "raw": 700.0063193746327,
+       "text": "700.006\u00a0"
+      },
+      {
+       "raw": 123.75562059145297,
+       "text": "123.756\u00a0"
+      },
+      {
+       "raw": 123.89086916553458,
+       "text": "123.891\u00a0"
+      },
+      {
+       "raw": 247.64648445508377,
+       "text": "247.646\u00a0"
+      },
+      {
+       "raw": 452.35983493068426,
+       "text": "452.360\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 1884851.2448080548,
+       "text": "1.885M"
+      },
+      {
+       "raw": 58725.306973359424,
+       "text": "58.725k"
+      },
+      {
+       "raw": 76573.2277792706,
+       "text": "76.573k"
+      },
+      {
+       "raw": 256123.950575169,
+       "text": "256.124k"
+      },
+      {
+       "raw": 810033.1030671679,
+       "text": "810.033k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 9907333637.105885,
+       "text": "9.907G"
+      },
+      {
+       "raw": 50984892.92499399,
+       "text": "50.985M"
+      },
+      {
+       "raw": 78280416.46418197,
+       "text": "78.280M"
+      },
+      {
+       "raw": 467790451.3589552,
+       "text": "467.790M"
+      },
+      {
+       "raw": 3152829328.2442603,
+       "text": "3.153G"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 700.0063193746327,
+       "text": "700.006\u00a0"
+      },
+      {
+       "raw": 123.75562059145297,
+       "text": "123.756\u00a0"
+      },
+      {
+       "raw": 123.89086916553458,
+       "text": "123.891\u00a0"
+      },
+      {
+       "raw": 247.64648445508377,
+       "text": "247.646\u00a0"
+      },
+      {
+       "raw": 452.35983493068426,
+       "text": "452.360\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 1.6871768555957987,
+       "text": "1.687\u00a0"
+      },
+      {
+       "raw": 1.6835624354499303,
+       "text": "1.684\u00a0"
+      },
+      {
+       "raw": 1.997204539921299,
+       "text": "1.997\u00a0"
+      },
+      {
+       "raw": 1.782201989531701,
+       "text": "1.782\u00a0"
+      },
+      {
+       "raw": 1.7200397848972262,
+       "text": "1.720\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 4.027742082905048,
+       "text": "4.028\u00a0"
+      },
+      {
+       "raw": 3.6456451706373865,
+       "text": "3.646\u00a0"
+      },
+      {
+       "raw": 3.5397214712004654,
+       "text": "3.540\u00a0"
+      },
+      {
+       "raw": 3.581099841055094,
+       "text": "3.581\u00a0"
+      },
+      {
+       "raw": 4.752530048392081,
+       "text": "4.753\u00a0"
+      }
+     ]
+    }
+   ],
+   "caption": "The program layer by layer, by view: the moments of what is subject to each layer, what it cedes and what is retained. Per layer columns are conditional on a loss reaching the layer; the Ceded and Net totals are not.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "occ",
+      "Gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "occ",
+      "layer.1"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "occ",
+      "layer.2"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "occ",
+      "Ceded"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c6",
+     "name": [
+      "occ",
+      "Net"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "colspan": 2,
+      "text": ""
+     },
+     {
+      "colspan": 5,
+      "text": "occ"
+     }
+    ],
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "Gross"
+     },
+     {
+      "text": "layer.1"
+     },
+     {
+      "text": "layer.2"
+     },
+     {
+      "text": "Ceded"
+     },
+     {
+      "text": "Net"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 2,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 9,
+       "text": "occ"
+      },
+      {
+       "rowspan": 3,
+       "text": "gross"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "150.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.83"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.00090241314709,
+       "text": "100.0009"
+      },
+      {
+       "raw": 100.0009027930976,
+       "text": "100.0009"
+      },
+      {
+       "raw": 3.799470738030664e-09,
+       "text": "3.799n"
+      },
+      {
+       "raw": 2.0000228038449026,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.0000259068066164,
+       "text": "200.0%"
+      },
+      {
+       "raw": 1.551463167270839e-06,
+       "text": "0.00000"
+      },
+      {
+       "raw": 13.984569253202912,
+       "text": "14"
+      },
+      {
+       "raw": 13.989598604630283,
+       "text": "14"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0063168920293,
+       "text": "700.0063"
+      },
+      {
+       "raw": 700.0063193746327,
+       "text": "700.0063"
+      },
+      {
+       "raw": 3.546544169452659e-09,
+       "text": "3.547n"
+      },
+      {
+       "raw": 1.687176397318588,
+       "text": "168.7%"
+      },
+      {
+       "raw": 1.6871768555957987,
+       "text": "168.7%"
+      },
+      {
+       "raw": 2.7162376814438005e-07,
+       "text": "0.00000"
+      },
+      {
+       "raw": 4.027601821069045,
+       "text": "4.03"
+      },
+      {
+       "raw": 4.027742082905048,
+       "text": "4.03"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ceded"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "150.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.83"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.00090241314709,
+       "text": "100.0009"
+      },
+      {
+       "raw": 35.37806920626909,
+       "text": "35.37807"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.6462225004719763,
+       "text": "-646.223m"
+      },
+      {
+       "raw": 2.0000228038449026,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.511543134696858,
+       "text": "251.2%"
+      },
+      {
+       "raw": 0.2557572493016549,
+       "text": "0.25576"
+      },
+      {
+       "raw": 13.984569253202912,
+       "text": "14"
+      },
+      {
+       "raw": 2.9735028686383,
+       "text": "2.97"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0063168920293,
+       "text": "700.0063"
+      },
+      {
+       "raw": 247.64648445508377,
+       "text": "247.6465"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.6462225004559761,
+       "text": "-646.223m"
+      },
+      {
+       "raw": 1.687176397318588,
+       "text": "168.7%"
+      },
+      {
+       "raw": 1.782201989531701,
+       "text": "178.2%"
+      },
+      {
+       "raw": 0.056322262665679856,
+       "text": "0.05632"
+      },
+      {
+       "raw": 4.027601821069045,
+       "text": "4.03"
+      },
+      {
+       "raw": 3.581099841055094,
+       "text": "3.58"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "net"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.5083509516679314,
+       "text": "150.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 3.8347400694878693,
+       "text": "3.83"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.00090241314709,
+       "text": "100.0009"
+      },
+      {
+       "raw": 64.62283358718332,
+       "text": "64.62283"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.35377749572500483,
+       "text": "-353.777m"
+      },
+      {
+       "raw": 2.0000228038449026,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.1872136919869503,
+       "text": "218.7%"
+      },
+      {
+       "raw": 0.09359437691519634,
+       "text": "0.09359"
+      },
+      {
+       "raw": 13.984569253202912,
+       "text": "14"
+      },
+      {
+       "raw": 29.788854746580135,
+       "text": "29.8"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0063168920293,
+       "text": "700.0063"
+      },
+      {
+       "raw": 452.35983493068426,
+       "text": "452.3598"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.35377749598157215,
+       "text": "-353.777m"
+      },
+      {
+       "raw": 1.687176397318588,
+       "text": "168.7%"
+      },
+      {
+       "raw": 1.7200397848972262,
+       "text": "172.0%"
+      },
+      {
+       "raw": 0.019478335300842087,
+       "text": "0.01948"
+      },
+      {
+       "raw": 4.027601821069045,
+       "text": "4.03"
+      },
+      {
+       "raw": 4.752530048392081,
+       "text": "4.75"
+      }
+     ]
+    }
+   ],
+   "caption": "What each stage of the program does to the book, stage by stage, in the eight column validation layout.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stage"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "Est EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "Change EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Change CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c9",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c10",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stage"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "component"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Change EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Change CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
   }
  ],
  "reins/raw/ReinsAggregate": [
@@ -52543,6 +59495,1284 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 4
+  }
+ ],
+ "reins/raw/Tower": [
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "share",
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.000\u00a0"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attach",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.000\u00a0"
+      },
+      {
+       "raw": 500.0,
+       "text": "500.000\u00a0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_attach",
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "28.523m"
+      },
+      {
+       "raw": 0.028523250301484282,
+       "text": "28.523m"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_detach",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.0071561871577671575,
+       "text": "7.156m"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "pr_loss",
+      {
+       "raw": 0.9990412753917861,
+       "text": "999.041m"
+      },
+      {
+       "raw": 0.1798186717298369,
+       "text": "179.819m"
+      },
+      {
+       "raw": 0.1798186717298369,
+       "text": "179.819m"
+      },
+      {
+       "raw": 0.9990412753917861,
+       "text": "999.041m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lol",
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.10222619339530932,
+       "text": "102.226m"
+      },
+      {
+       "raw": 0.10222619339797881,
+       "text": "102.226m"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "output",
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 1.0,
+       "text": "1.000\u00a0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 0.1996627521103899,
+       "text": "199.663m"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 55.99999999999996,
+       "text": "56.000\u00a0"
+      },
+      {
+       "raw": 0.23952796669068488,
+       "text": "239.528m"
+      },
+      {
+       "raw": 55.99999999999996,
+       "text": "56.000\u00a0"
+      },
+      {
+       "raw": 55.99999999999996,
+       "text": "56.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 496.99999999999943,
+       "text": "497.000\u00a0"
+      },
+      {
+       "raw": 0.3272179943078479,
+       "text": "327.218m"
+      },
+      {
+       "raw": 496.99999999999943,
+       "text": "497.000\u00a0"
+      },
+      {
+       "raw": 496.99999999999943,
+       "text": "497.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 0.1996627521103899,
+       "text": "199.663m"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7.000\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.3779644730092272,
+       "text": "377.964m"
+      },
+      {
+       "raw": 2.237955638137499,
+       "text": "2.238\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "377.964m"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "377.964m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 0.37796447300922775,
+       "text": "377.964m"
+      },
+      {
+       "raw": 2.237955638137501,
+       "text": "2.238\u00a0"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "377.964m"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "377.964m"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      {
+       "raw": 100.0008868896853,
+       "text": "100.001\u00a0"
+      },
+      {
+       "raw": 255.99715598642123,
+       "text": "255.997\u00a0"
+      },
+      {
+       "raw": 7.301870956785224,
+       "text": "7.302\u00a0"
+      },
+      {
+       "raw": 92.69901593304559,
+       "text": "92.699\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 50000.92129303742,
+       "text": "50.001k"
+      },
+      {
+       "raw": 99029.3485091281,
+       "text": "99.029k"
+      },
+      {
+       "raw": 2824.638925236359,
+       "text": "2.825k"
+      },
+      {
+       "raw": 35144.31574633718,
+       "text": "35.144k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 124849107.94128726,
+       "text": "124.849M"
+      },
+      {
+       "raw": 43619509.33239497,
+       "text": "43.620M"
+      },
+      {
+       "raw": 1244178.1827158313,
+       "text": "1.244M"
+      },
+      {
+       "raw": 88046061.21995096,
+       "text": "88.046M"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 100.0008868896853,
+       "text": "100.001\u00a0"
+      },
+      {
+       "raw": 255.99715598642123,
+       "text": "255.997\u00a0"
+      },
+      {
+       "raw": 7.301870956785224,
+       "text": "7.302\u00a0"
+      },
+      {
+       "raw": 92.69901593304559,
+       "text": "92.699\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 2.0000008599700423,
+       "text": "2.000\u00a0"
+      },
+      {
+       "raw": 0.7149136413988533,
+       "text": "714.914m"
+      },
+      {
+       "raw": 7.209569126214848,
+       "text": "7.210\u00a0"
+      },
+      {
+       "raw": 1.7577901245242777,
+       "text": "1.758\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 13.98070394788538,
+       "text": "13.981\u00a0"
+      },
+      {
+       "raw": 0.18256339557990037,
+       "text": "182.563m"
+      },
+      {
+       "raw": 8.109315988388497,
+       "text": "8.109\u00a0"
+      },
+      {
+       "raw": 18.460086843986762,
+       "text": "18.460\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      {
+       "raw": 700.0062082274691,
+       "text": "700.006\u00a0"
+      },
+      {
+       "raw": 51.11309669765466,
+       "text": "51.113\u00a0"
+      },
+      {
+       "raw": 51.1130966989894,
+       "text": "51.113\u00a0"
+      },
+      {
+       "raw": 648.8931115309935,
+       "text": "648.893\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": 840015.1404690698,
+       "text": "840.015k"
+      },
+      {
+       "raw": 22385.021166766157,
+       "text": "22.385k"
+      },
+      {
+       "raw": 22385.02152722637,
+       "text": "22.385k"
+      },
+      {
+       "raw": 667072.480314519,
+       "text": "667.072k"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 1951972891.1176457,
+       "text": "1.952G"
+      },
+      {
+       "raw": 11874688.104118243,
+       "text": "11.875M"
+      },
+      {
+       "raw": 11874783.590800392,
+       "text": "11.875M"
+      },
+      {
+       "raw": 1368449796.0117555,
+       "text": "1.368G"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 700.0062082274691,
+       "text": "700.006\u00a0"
+      },
+      {
+       "raw": 51.11309669765466,
+       "text": "51.113\u00a0"
+      },
+      {
+       "raw": 51.1130966989894,
+       "text": "51.113\u00a0"
+      },
+      {
+       "raw": 648.8931115309935,
+       "text": "648.893\u00a0"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.8451545452838103,
+       "text": "845.155m"
+      },
+      {
+       "raw": 2.7510488151154155,
+       "text": "2.751\u00a0"
+      },
+      {
+       "raw": 2.751048840110453,
+       "text": "2.751\u00a0"
+      },
+      {
+       "raw": 0.7643695927438586,
+       "text": "764.370m"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": 4.220553290299274,
+       "text": "4.221\u00a0"
+      },
+      {
+       "raw": 3.1324891356413507,
+       "text": "3.132\u00a0"
+      },
+      {
+       "raw": 3.1325233741443137,
+       "text": "3.133\u00a0"
+      },
+      {
+       "raw": 5.051010280209935,
+       "text": "5.051\u00a0"
+      }
+     ]
+    }
+   ],
+   "caption": "The program layer by layer, by view: the moments of what is subject to each layer, what it cedes and what is retained. Per layer columns are conditional on a loss reaching the layer; the Ceded and Net totals are not.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c2",
+     "name": [
+      "occ",
+      "Gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c3",
+     "name": [
+      "occ",
+      "layer.1"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c4",
+     "name": [
+      "occ",
+      "Ceded"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "occ",
+      "Net"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "colspan": 2,
+      "text": ""
+     },
+     {
+      "colspan": 4,
+      "text": "occ"
+     }
+    ],
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "measure"
+     },
+     {
+      "text": "Gross"
+     },
+     {
+      "text": "layer.1"
+     },
+     {
+      "text": "Ceded"
+     },
+     {
+      "text": "Net"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 2,
+   "n_stub_levels": 2
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      {
+       "rowspan": 9,
+       "text": "occ"
+      },
+      {
+       "rowspan": 3,
+       "text": "gross"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.0009"
+      },
+      {
+       "raw": 100.0008868896853,
+       "text": "100.0009"
+      },
+      {
+       "raw": 2.9110047705671604e-13,
+       "text": "291.100f"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 2.0000008599700423,
+       "text": "200.0%"
+      },
+      {
+       "raw": 9.500156217256972e-11,
+       "text": "95.002p"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "14"
+      },
+      {
+       "raw": 13.98070394788538,
+       "text": "14"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.0062"
+      },
+      {
+       "raw": 700.0062082274691,
+       "text": "700.0062"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.7719159473017498e-13,
+       "text": "-177.192f"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.8451545452838103,
+       "text": "84.5%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.2237066915332662e-10,
+       "text": "-122.371p"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.22"
+      },
+      {
+       "raw": 4.220553290299274,
+       "text": "4.22"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "ceded"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.0009"
+      },
+      {
+       "raw": 7.301870956785224,
+       "text": "7.301871"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.9269819380217866,
+       "text": "-926.982m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 7.209569126214848,
+       "text": "721.0%"
+      },
+      {
+       "raw": 2.6047830134471837,
+       "text": "2.605\u00a0"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "14"
+      },
+      {
+       "raw": 8.109315988388497,
+       "text": "8.11"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.0062"
+      },
+      {
+       "raw": 51.1130966989894,
+       "text": "51.1131"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.926981938019654,
+       "text": "-926.982m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 2.751048840110453,
+       "text": "275.1%"
+      },
+      {
+       "raw": 2.2550837655969524,
+       "text": "2.255\u00a0"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.22"
+      },
+      {
+       "raw": 3.1325233741443137,
+       "text": "3.13"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "net"
+      },
+      "freq",
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 6.999999999999997,
+       "text": "7"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.000\u00a0"
+      },
+      {
+       "raw": 0.3779644730092272,
+       "text": "37.8%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.37796447300922775,
+       "text": "0.378"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "sev",
+      {
+       "raw": 100.0008868896562,
+       "text": "100.0009"
+      },
+      {
+       "raw": 92.69901593304559,
+       "text": "92.69902"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07301806197646732,
+       "text": "-73.018m"
+      },
+      {
+       "raw": 2.000000859780039,
+       "text": "200.0%"
+      },
+      {
+       "raw": 1.7577901245242777,
+       "text": "175.8%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1211053155659142,
+       "text": "-121.105m"
+      },
+      {
+       "raw": 13.980703702175552,
+       "text": "14"
+      },
+      {
+       "raw": 18.460086843986762,
+       "text": "18.5"
+      }
+     ]
+    },
+    {
+     "break_depth": 2,
+     "cells": [
+      "agg",
+      {
+       "raw": 700.0062082275931,
+       "text": "700.0062"
+      },
+      {
+       "raw": 648.8931115309935,
+       "text": "648.8931"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.07301806197693217,
+       "text": "-73.018m"
+      },
+      {
+       "raw": 0.8451545453872324,
+       "text": "84.5%"
+      },
+      {
+       "raw": 0.7643695927438586,
+       "text": "76.4%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.09558601214924523,
+       "text": "-95.586m"
+      },
+      {
+       "raw": 4.220553472846022,
+       "text": "4.22"
+      },
+      {
+       "raw": 5.051010280209935,
+       "text": "5.05"
+      }
+     ]
+    }
+   ],
+   "caption": "What each stage of the program does to the book, stage by stage, in the eight column validation layout.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "stage"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "level": 1,
+     "name": [
+      "view"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c2",
+     "level": 2,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "Est EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c5",
+     "name": [
+      "Change EX"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "si"
+     },
+     "key": "c8",
+     "name": [
+      "Change CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c9",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c10",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "stage"
+     },
+     {
+      "text": "view"
+     },
+     {
+      "text": "component"
+     },
+     {
+      "text": "EX"
+     },
+     {
+      "text": "Est EX"
+     },
+     {
+      "text": "Change EX"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Change CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 3
   }
  ],
  "stats/insurer/Aggregate": [

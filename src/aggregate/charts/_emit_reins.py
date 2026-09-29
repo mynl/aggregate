@@ -18,10 +18,13 @@ readings live on: log on both axes, the return-period reading of its
 probability axis, and the inversion that turns it into the distribution
 function.
 
-**Aggregate only, at 1.0** (author's decision). A portfolio's units cede on
-different stages, so a book-level triple would have to pretend they cede on
-the same one, and the aggregate cover is a separate contract with a
-separate picture. Both are restorable; neither is guessed at here.
+**Aggregate, and a P&L through its engine** (the author's 2026-09-29 ruling,
+[PnL-Reins-Passthrough], superseding the 1.0 "Aggregate only" note for the
+P&L case: an ``xpnl`` wraps a single aggregate, so the a244 portfolio-level
+objection does not apply). A portfolio's units cede on different stages, so
+a book-level triple would have to pretend they cede on the same one, and
+the aggregate cover is a separate contract with a separate picture; the
+portfolio case stays restorable, not guessed at here.
 
 The three curves are separate distributions, not a decomposition: they no
 more satisfy ``gross = net (+) ceded`` than a portfolio's marginals do. The
@@ -37,9 +40,11 @@ Pure numpy and pandas; no matplotlib.
 
 from .._aggregate import Aggregate
 from .._grid_distribution import GridDistribution
+from .._pnl import PnL
 from ..constants import (REINS_LABEL_CEDED, REINS_LABEL_GROSS,
                          REINS_LABEL_NET)
 from . import register_chart, _emitter_base
+from ._emit_structure import _engine
 from ._payload import collapse_empty_runs, lattice_payload
 from ._two_panel import (RETURN_PERIOD_TOP, SURVIVAL_FLOOR, loss_window,
                          quantile_curve)
@@ -64,9 +69,16 @@ LIMIT_PAD = 0.02
 chart_reins = _emitter_base('reins')
 
 
-def _has_occurrence(agg):
-    """Availability: there is an occurrence program to draw."""
-    return getattr(agg, 'occ_reins', None) is not None
+def _has_occurrence(obj):
+    """Availability: a live engine carrying an occurrence program to draw.
+
+    An :class:`Aggregate` is its own engine; a :class:`PnL` looks through
+    ``_engine`` ([PnL-Reins-Passthrough]), so a stitched ledger with no
+    engine, or one wrapping something other than a single aggregate,
+    answers False.
+    """
+    agg = _engine(obj)
+    return agg is not None and getattr(agg, 'occ_reins', None) is not None
 
 
 def _claim_window(agg):
@@ -187,6 +199,17 @@ def _reins(agg):
         series=tuple(series),
         meta={'ordinate': 'mass', 'return_period_map': 'complement'},
     ))
+
+
+@chart_reins.register(PnL)
+def _reins_pnl(pn, **options):
+    """Emit the occurrence-reinsurance chart for a P&L, through its engine.
+
+    [PnL-Reins-Passthrough]: an ``xpnl`` wraps a single aggregate, so the
+    chart is the engine's own; :func:`_has_occurrence` gates availability
+    on the engine carrying an occurrence program.
+    """
+    return _reins(_engine(pn), **options)
 
 
 register_chart('reins', chart_reins, predicate=_has_occurrence,

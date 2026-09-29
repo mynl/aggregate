@@ -137,3 +137,22 @@ def test_log_acts_on_the_ordinate_alone(pnl):
     assert density.get_yscale() == 'log'
     assert density.get_xscale() == 'linear'
     plt.close('all')
+
+
+def test_reins_chart_lights_through_the_engine():
+    """[PnL-Reins-Passthrough]: a ceded P&L offers the reins chart.
+
+    The emitter delegates to the wrapped engine (an ``xpnl`` wraps a single
+    aggregate, so the a244 portfolio objection does not apply), and the
+    availability predicate looks through ``obj.engine``: a P&L with no
+    occurrence program, like the plain fixture here, must not offer it.
+    """
+    from aggregate.charts import build_chart_doc
+    tower = build('xpnl CP.Tower 1000 prem less agg CP.TowerE 1000 prem '
+                  'at 70% lr sev lognorm 100 cv 2 '
+                  'occurrence ceded to 500 xs 500 deposit 100 poisson')
+    assert 'reins' in available_charts(tower)
+    assert 'reins' not in available_charts(build(_PNL))
+    doc = build_chart_doc(tower, 'reins')
+    assert doc.name == 'reins'
+    assert [p.id for p in doc.panels] == ['occurrence', 'aggregate']

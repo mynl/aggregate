@@ -346,10 +346,18 @@ def _perspectives_updated(obj):
 
 
 def _has_reinsurance(obj):
-    """True when the object (or any unit of a portfolio) carries a cession."""
+    """True when the object (or any unit of a portfolio) carries a cession.
+
+    A :class:`PnL` looks through to its wrapped engine
+    ([PnL-Reins-Passthrough]), mirroring the charts' ``_engine`` pattern;
+    a hand-built kernel P&L has no engine and answers False.
+    """
     if getattr(obj, 'occ_reins', None) is not None \
             or getattr(obj, 'agg_reins', None) is not None:
         return True
+    engine = getattr(obj, 'engine', None)
+    if engine is not None:
+        return _has_reinsurance(engine)
     agg_list = getattr(obj, 'agg_list', None)
     if agg_list is not None:
         return any(_has_reinsurance(a) for a in agg_list)

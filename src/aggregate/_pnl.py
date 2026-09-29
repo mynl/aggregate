@@ -1852,6 +1852,26 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return engine.validation_df
 
     @property
+    def reins_stats_df(self):
+        """The wrapped engine's reinsurance layering store, or an empty frame.
+
+        Delegates as :attr:`stats_df` does ([PnL-Reins-Passthrough]): the
+        program layer by layer, by view, is the engine's story. Empty frame
+        when no engine is attached or the engine carries no such frame.
+        """
+        frame = getattr(self.engine, 'reins_stats_df', None)
+        return pd.DataFrame() if frame is None else frame
+
+    @property
+    def reins_summary_df(self):
+        """The wrapped engine's per-stage cession summary, or an empty frame.
+
+        Delegates as :attr:`stats_df` does ([PnL-Reins-Passthrough]).
+        """
+        frame = getattr(self.engine, 'reins_summary_df', None)
+        return pd.DataFrame() if frame is None else frame
+
+    @property
     def economic_df(self):
         """The full ledger x metrics sheet, in currency units -- the
         alignment/footing exhibit.

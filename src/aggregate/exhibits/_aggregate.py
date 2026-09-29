@@ -10,6 +10,7 @@ is edited.
 import pandas as pd
 
 from .._aggregate import Aggregate
+from .._pnl import PnL
 from ._core import (
     reins, stats, summary, tail, validation,
     _moment_validation_emphasis, _reins_frames,
@@ -157,6 +158,10 @@ def _layer_rows(frame, index):
     return out.dropna(axis=0, how='all')
 
 
+# Registered for PnL too ([PnL-Reins-Passthrough]): the translation reads
+# only the served frames, which a P&L delegates to its wrapped engine, so
+# one function covers both hosts.
+@reins.insurer.register(PnL)
 @reins.insurer.register(Aggregate)
 def _reins_insurer_aggregate(obj, blocks):
     """Split the layering analysis into the contract and its consequence.

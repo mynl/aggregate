@@ -787,10 +787,14 @@ def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
     **The window and the full range** ([Kappa-Full-Range]). The view is
     windowed to ``cdf_range`` on the conditioning density the kernel
     returns (the gross compound), but the data is not: the Palm pass
-    computes the whole curve in one FFT, so the series run from the first
-    finite cell out to the :data:`KAPPA_FULL_FLOOR` survival, and the two
-    value axes declare that extent as ``full_range`` beside the windowed
-    ``suggested_range``, which is what offers the zoom out. Cells where
+    computes the whole curve in one FFT, so the series run from the cell
+    where the gross cdf first clears :data:`KAPPA_FULL_FLOOR` out to the
+    matching survival, and the two value axes declare that extent as
+    ``full_range`` beside the windowed ``suggested_range``, which is what
+    offers the zoom out. The left cut matters as much as the right: when
+    the minimum claim count is high the true left-tail mass sits far below
+    the FFT noise floor, the noise clears the kernel's machine-eps 0/0
+    guard, and the ratio below the floor is noise, not a curve. Cells where
     the density is negligible (the kernel's ``NaN`` guard) are dropped: on
     a continuous compound the extent is a contiguous lattice slice and
     ships as three numbers, on a gappy one the grid goes out explicit,
@@ -816,16 +820,22 @@ def _kappa_palm(agg, levels=KAPPA_LEVELS, cdf_range=KAPPA_CDF_RANGE,
     lo_p, hi_p = (float(v) for v in cdf_range)
     cdf = np.cumsum(np.asarray(f_n, dtype=float))
     xs = np.asarray(agg.xs, dtype=float)
-    # The drawn extent runs from the first finite cell out to the
-    # full-range floor ([Kappa-Full-Range]): the Palm pass computed the
-    # whole curve already, so the zoom out costs bytes, never a second
-    # computation. The view the document opens on stays the cdf_range
-    # window, carried by suggested_range below.
+    # The drawn extent runs from the cell where the gross cdf first clears
+    # the full-range floor out to the matching survival ([Kappa-Full-Range]):
+    # the Palm pass computed the whole curve already, so the zoom out costs
+    # bytes, never a second computation. The left cut is load-bearing, not
+    # symmetry for its own sake: below it the conditioning density is FFT
+    # noise that clears the kernel's machine-eps 0/0 guard (a high minimum
+    # claim count puts the true left-tail mass far below the noise floor),
+    # and the conditional-mean ratio there is unreliable. The view the
+    # document opens on stays the cdf_range window, carried by
+    # suggested_range below.
+    i_bot = int(np.searchsorted(cdf, KAPPA_FULL_FLOOR))
     i_top = min(int(np.searchsorted(cdf, 1.0 - KAPPA_FULL_FLOOR)) + 1,
                 cdf.size)
     i0 = int(np.searchsorted(cdf, lo_p))
     i1 = min(int(np.searchsorted(cdf, hi_p)) + 1, i_top)
-    idx = np.arange(i_top)
+    idx = np.arange(i_bot, i_top)
     idx = idx[np.isfinite(total[idx])]
     # Strictly above zero, as on the band route: the share is undefined at
     # g = 0 and NaN cannot ride in the document.

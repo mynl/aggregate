@@ -372,3 +372,99 @@ signature and generated docstring unchanged. The name was vetted free across
 `tests/test_exhibits.py`; the extension surface table in
 `3_x_API_Stability.rst`, the `3_x_Exhibits.rst` autosummary and the pipeline
 page all name it. Gate: **5481 passed**.
+
+
+### Stage 2 [Reference-Plugin] exhibit, landed `aggregate-relativity` 0.1.0
+
+New repo at `V:\dev\aggregate-relativity`, git initialized, first commit
+`[Reference-Plugin] 0.1.0`. `derive.py` (the arithmetic), `register.py` (the
+entry point), `tests/` (22 cases, five of them the golden regression),
+`CLAUDE.md`, `CHANGELOG.md`, `README.md`, `.gitignore`, `dev/TODO.md`.
+
+**The golden regression passes on all five approved outputs**, which is the
+claim that mattered: the port off the original's HTTP-and-parse route onto the
+library's public frames moved **no number**. `ir_to_df`, `_block_with`,
+`fetch_frames` and `_call` are gone, as are `render_view45`, the palette, the
+`mpl.rcParams` block, `_tidy` and `_save`, per decision 12.
+
+Divergences:
+
+1. **The duplicated arithmetic is gone structurally, not by discipline.** The
+   plan says to lift the `rel_row` / `act_row` / `msd_pos` closures to module
+   level so the exhibit and the chart cannot disagree. Better: `relativity_frame`
+   is now the **actuals frame divided by one of its own rows**, so there is one
+   computation and a disagreement is not possible rather than merely unlikely.
+2. **`classify_positions` returns structure, not presentation.** The original
+   returned `(label, grid, walk, color, marker, linestyle)`. Colors and markers
+   are the renderer's under decision 12, so a `Position` carries a `tier` and
+   the chart maps that to a role.
+3. **The availability gate is `len(pnl.evaluation_df) > 1`.** The original asked
+   the api whether `economic_waterfall` was registered. In process the analogue
+   would be `available_exhibits(pnl)`, which **recurses**: that function calls
+   every exhibit's predicate, this one among them. The library's own gate reads
+   the private `_tower`, which the extension surface forbids. The walk being
+   empty on a plain P&L is the public fact that says the same thing.
+4. **Version `0.1.0`, a declared departure from the house rule.** Ruling 3 above.
+5. **`tests/programs.py` transcribes the two DecL programs** rather than
+   importing them from `reference/gini_decl.py`, so the frozen spec is not a
+   dependency of the thing it specifies.
+
+Found and left alone: `reference/data/grid (1).csv` and `grid.csv` **differ**,
+so one is from a different run. Neither is used by any test. Tracked as
+`[Reference-Data-Duplicate]` in that repo's `dev/TODO.md` rather than deleted,
+because `reference/` is frozen material.
+
+### Stage 3 [Lab-Tab], landed `aggregate-api` 1.0.0a179
+
+Transcribed into `V:\dev\aggregate-api\dev\plan-a179-lab-tab.md` per section
+6, and executed there. That file carries its own execution log and its own
+divergences; the headline one is that **`capability.py` was not touched**,
+against section 6's instruction to add a per-entry `provenance` field, because
+provenance is process-wide rather than per object and the manifest on meta
+already carries it.
+
+Verified end to end: the entry point is discovered with no configuration,
+`/v1/meta` names the plugin, and
+`GET /v1/objects/{id}/exhibit/relativity` serves eight rows through the
+**pre-existing** generic route with zero endpoint changes.
+
+### Stage 4 [Matrix-Panel], the library half, landed `1.0.0a379`
+
+Section 8 said to design the panel kind against one working case rather than
+speculatively. With stages 2 and 3 in hand that case existed, and the author
+ruled on 2026-09-30 to design and implement it in the same pass.
+
+**`matrix` is a new panel kind carrying a `MatrixData` on `ChartSeries.matrix`**,
+exactly as `heatmap` carries a `SurfaceData` on `surface`. That parallel is the
+design: a matrix is a grid whose axes are categorical, so it wants the grid
+shape and none of the lattice machinery. The alternative the plan floated, a
+categorical mode on `heatmap`, was rejected because `SurfaceData`'s whole surface
+(`x0/dx/nx`, `bs`, `k`, block reduction, exact marginals, `window`) is
+meaningless over categories, and a renderer that took those coordinates
+seriously would draw a lie.
+
+Two fields are semantic and would have been easy to mistake for styling, so they
+are worth naming. **`neutral`** is the half-width of the signal-free band around
+`center`: it states how large a departure must be before it means anything,
+which is a judgment about the quantities and not about color. **`row_polarity`**
+says per row whether above `center` is favorable, which this very page needs in
+both directions at once, since a book priced above the reference has improved
+while a cover bought above the reference has not. A renderer that ignored it
+would draw a consistent scale that is simply backwards for two of the rows.
+
+`CHART_IR_VERSION` moves **3 to 4** on the version-3 precedent: a reader that
+knows neither the kind nor the payload sees a panel it cannot realize and a
+series with no coordinates, so the panel is missing rather than plainer.
+
+**A cross-repo break this uncovered, and it is the reason stage 4 could not have
+been a library-only change.** `web/src/charts/chartdoc-to-echarts.js` pins
+`CHART_IR_VERSION = 3` and returns `null` for anything higher, so the moment the
+library reports 4 the app draws **no chart at all**, not merely no matrix. The
+api must move in the same breath; that is the [Matrix-Renderer] phase.
+
+Not done, and owed to the author: **a baseline image for the matrix panel.**
+`tests/test_chartdoc_render.py` gates the converted charts against *approved*
+pictures, and an approved picture is the author's to approve. A baseline
+generated and blessed in the same commit that wrote the renderer measures
+nothing. `tests/test_chartdoc_matrix.py` pins the structure instead (ticks, cell
+text, the polarity flip, the hard neutral band, the band gaps), 14 cases.

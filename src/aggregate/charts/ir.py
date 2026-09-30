@@ -78,8 +78,8 @@ import numpy as np
 __all__ = [
     'CHART_IR_VERSION', 'SUPPORT_KINDS', 'SURFACE_DTYPES', 'SURFACE_EDGES',
     'ChartAxis', 'ChartCapabilityError',
-    'ChartDoc', 'ChartSeries', 'Mark', 'Panel', 'SurfaceData', 'SurfaceZBlock',
-    'TowerBlock',
+    'ChartDoc', 'ChartSeries', 'Mark', 'MatrixData', 'Panel', 'SurfaceData',
+    'SurfaceZBlock', 'TowerBlock',
     'canonical_dict', 'canonical_json', 'complete_tex', 'decode_z_block',
     'doc_hash', 'encode_z_block',
     'human_strings', 'load_chart_doc', 'stamp',
@@ -110,7 +110,13 @@ __all__ = [
 #: document whose rectangles are invisible to it, so the whole picture is
 #: missing rather than merely plainer, which is the "would draw something
 #: wrong" case again.
-CHART_IR_VERSION = 3
+#:
+#: **Version 4** (1.0.0a379) adds the 'matrix' panel kind and the
+#: :class:`MatrixData` payload it draws (:attr:`ChartSeries.matrix`), by the
+#: same reading as version 3: a reader that knows neither sees a panel kind it
+#: cannot realize and a series carrying no coordinates it recognizes, so the
+#: panel is missing rather than plainer.
+CHART_IR_VERSION = 4
 
 #: Panel kinds. 'xy' is a family of curves over a shared pair of axes;
 #: 'heatmap' and 'surface' carry one z grid each (a ``SurfaceData``), read
@@ -118,8 +124,11 @@ CHART_IR_VERSION = 3
 #: quantity axis and one placement axis (a reinsurance program's layers),
 #: carrying :class:`TowerBlock`s rather than series. A renderer that cannot
 #: realize a kind declares so (see :class:`ChartCapabilityError`) rather
-#: than approximating silently.
-PANEL_KINDS = ('xy', 'heatmap', 'surface', 'tower')
+#: than approximating silently. 'matrix' is named rows against named columns
+#: with a value and an optional second text per cell (a :class:`MatrixData`),
+#: which is a different animal from 'heatmap' despite both being grids: see
+#: that class' Notes for why a categorical matrix is not a numeric lattice.
+PANEL_KINDS = ('xy', 'heatmap', 'surface', 'tower', 'matrix')
 
 #: Axis scales. Log or linear is statistical meaning (a heavy tail is
 #: legible only on log), never styling.
@@ -589,6 +598,141 @@ class SurfaceData:
 
 
 @dataclass(frozen=True)
+class MatrixData:
+    """The payload of a 'matrix' panel: named rows against named columns.
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+
+    Parameters
+    ----------
+    rows : tuple of str
+        Row labels, in reading order, top to bottom.
+    columns : tuple of str
+        Column labels, left to right.
+    values : tuple of tuple of float
+        ``len(rows)`` by ``len(columns)``. ``None`` in a cell means the
+        quantity does not exist there, which is different from zero and is
+        drawn as an empty cell rather than as a value.
+    annotations : tuple of tuple of str, optional
+        A second text per cell, the same shape as ``values``, **already
+        formatted**. Formatting is the emitter's job here for the reason
+        :attr:`TowerBlock.label_lines` gives: whether a cell's companion
+        number reads as a percentage, a ratio to three places or a currency
+        amount is domain knowledge, and the renderer has none.
+    center : float, optional
+        Where a diverging scale is neutral. ``1.0`` for a frame of ratios,
+        ``0.0`` for differences. ``None`` says the values are not diverging
+        and a sequential scale is the honest reading.
+    neutral : float, default 0.0
+        Half-width of the **signal-free band** around ``center``, in the
+        values' own units. Within it a cell carries no signal and a renderer
+        must not shade it as though it did. This is semantic and not a
+        styling knob: it states how large a departure has to be before it
+        means anything, which is a judgment about the quantities. Zero says
+        every departure counts.
+    row_polarity : tuple of int, optional
+        ``+1`` or ``-1`` per row: is a value **above** ``center`` favorable
+        for that row? Empty means ``+1`` throughout. Needed because one
+        matrix can hold rows read in opposite directions: on a book row,
+        pricing above the reference is an improvement, while on a row for
+        something *bought*, paying above the reference is not. A renderer
+        that ignores it draws a consistent scale that is simply backwards
+        for half the rows, which is why it is here and not in the renderer.
+    row_groups, column_groups : tuple of str, optional
+        A group name per row or per column, same lengths as ``rows`` and
+        ``columns``. Adjacent equal names form a band, and a renderer draws
+        the boundaries between bands however it likes. Empty means no
+        grouping. Semantic: the bands are the structure of the thing being
+        tabulated, not a visual rhythm.
+
+    Notes
+    -----
+    **Why this is not a 'heatmap'.** ``'heatmap'`` carries a
+    :class:`SurfaceData`, which is a **numeric lattice**: ``x0/dx/nx``, a
+    bucket size, mass-preserving block reduction, exact marginals, a drawn
+    window. Every one of those is meaningless here. A matrix's axes are
+    categorical, so there is no spacing to preserve, nothing between two
+    rows to integrate, no marginal to be exact about, and no window to zoom.
+    Forcing one into the other would mean inventing coordinates for
+    categories and then ignoring them, and the first renderer to take them
+    seriously would draw a lie.
+
+    The cells carry no law and nothing is interpolated between them, which
+    is the same argument :class:`TowerBlock` makes: this is an exact
+    statement about a finite set of named comparisons.
+    """
+
+    rows: tuple
+    columns: tuple
+    values: tuple
+    annotations: tuple = ()
+    center: float = None
+    neutral: float = 0.0
+    row_polarity: tuple = ()
+    row_groups: tuple = ()
+    column_groups: tuple = ()
+
+    def __post_init__(self):
+        for name in ('rows', 'columns', 'row_polarity', 'row_groups',
+                     'column_groups'):
+            _freeze_seq(self, name)
+        for name in ('values', 'annotations'):
+            object.__setattr__(
+                self, name,
+                tuple(tuple(row) for row in (getattr(self, name) or ())))
+        if not self.rows or not self.columns:
+            raise ValueError(
+                'MatrixData needs at least one row and one column; '
+                f'got {len(self.rows)} by {len(self.columns)}')
+        shape = (len(self.rows), len(self.columns))
+        for name in ('values', 'annotations'):
+            grid = getattr(self, name)
+            if name == 'annotations' and not grid:
+                continue
+            if len(grid) != shape[0] or any(len(r) != shape[1] for r in grid):
+                got = f'{len(grid)} by ' + ', '.join(
+                    str(len(r)) for r in grid) if grid else 'empty'
+                raise ValueError(
+                    f'MatrixData {name} must be {shape[0]} by {shape[1]}, '
+                    f'the shape of rows by columns; got {got}')
+        if self.neutral < 0:
+            raise ValueError(
+                f'MatrixData neutral = {self.neutral} is a half-width and '
+                'cannot be negative')
+        if self.row_polarity:
+            if len(self.row_polarity) != shape[0]:
+                raise ValueError(
+                    f'MatrixData row_polarity has {len(self.row_polarity)} '
+                    f'entries, expected one per row ({shape[0]})')
+            bad = sorted({p for p in self.row_polarity if p not in (1, -1)})
+            if bad:
+                raise ValueError(
+                    f'MatrixData row_polarity entries must be 1 or -1; '
+                    f'got {bad}')
+        for name, expected in (('row_groups', shape[0]),
+                               ('column_groups', shape[1])):
+            groups = getattr(self, name)
+            if groups and len(groups) != expected:
+                raise ValueError(
+                    f'MatrixData {name} has {len(groups)} entries, expected '
+                    f'{expected}')
+
+    @property
+    def polarity(self):
+        """``row_polarity``, filled to one entry per row.
+
+        Returns
+        -------
+        tuple of int
+            All ``+1`` where none was declared, which is the reading an
+            absent declaration names.
+        """
+        return self.row_polarity or (1,) * len(self.rows)
+
+
+@dataclass(frozen=True)
 class ChartAxis:
     """One axis: a labeled, scaled reading of a quantity.
 
@@ -872,6 +1016,9 @@ class ChartSeries:
         ``y2`` over ``x``. Same length as ``y``; only with an x/y payload.
     surface : SurfaceData, optional
         The z grid for 'heatmap' and 'surface' panels, instead of x/y.
+    matrix : MatrixData, optional
+        The named grid for a 'matrix' panel, instead of x/y. One series
+        carries the whole panel, as ``surface`` does for the z grids.
     support : str
         One of :data:`SUPPORT_KINDS`, default 'atomic'. Whether the points
         are the whole law or samples of a function that lives between
@@ -907,6 +1054,7 @@ class ChartSeries:
     y_lattice: tuple = None
     y2: tuple = None
     surface: SurfaceData = None
+    matrix: MatrixData = None
     support: str = 'atomic'
     value: float = None
 
@@ -926,12 +1074,20 @@ class ChartSeries:
                              f'expected one of {SUPPORT_KINDS}')
         carries_xy = not (self.x is None and self.y is None
                           and self.x_lattice is None and self.y_lattice is None)
-        if (self.surface is None) == (not carries_xy):
+        # Exactly one payload. Three now rather than two, and the count is
+        # written out rather than tested pairwise so that adding a fourth does
+        # not need the condition rethought.
+        carried = [name for name, present in
+                   (('x/y', carries_xy), ('surface', self.surface is not None),
+                    ('matrix', self.matrix is not None)) if present]
+        if len(carried) != 1:
             raise ValueError(
-                f'series {self.name!r} must carry either x/y or surface')
-        if self.surface is not None and self.y2 is not None:
+                f'series {self.name!r} must carry exactly one of x/y, surface '
+                f'or matrix; it carries '
+                f'{", ".join(carried) if carried else "none of them"}')
+        if not carries_xy and self.y2 is not None:
             raise ValueError(f'series {self.name!r}: y2 needs an x/y payload')
-        if self.surface is not None:
+        if not carries_xy:
             return
         lengths = {}
         for side in ('x', 'y'):
@@ -1244,6 +1400,29 @@ class ChartDoc:
                 raise ValueError(
                     f'panel {pid!r} carries {count} surface series, '
                     'expected exactly one')
+        # A 'matrix' panel carries exactly one matrix and nothing else. Unlike
+        # a grid panel it takes no x/y overlays: there are no coordinates to
+        # overlay onto, since the axes are categorical and a curve drawn across
+        # them would be asserting a path between named things that have no
+        # order beyond the one the emitter listed them in.
+        matrices = {p.id: 0 for p in self.panels if p.kind == 'matrix'}
+        for s in self.series:
+            if s.matrix is not None:
+                if kinds[s.panel_id] != 'matrix':
+                    raise ValueError(
+                        f'series {s.name!r} carries a matrix but panel '
+                        f'{s.panel_id!r} is kind {kinds[s.panel_id]!r}')
+                matrices[s.panel_id] += 1
+            elif kinds[s.panel_id] == 'matrix':
+                raise ValueError(
+                    f'series {s.name!r} draws in matrix panel '
+                    f'{s.panel_id!r} but carries no matrix: a matrix panel '
+                    'has no coordinates for a curve to use')
+        for pid, count in matrices.items():
+            if count != 1:
+                raise ValueError(
+                    f'panel {pid!r} carries {count} matrix series, '
+                    'expected exactly one')
         for m in self.marks:
             if m.panel_id not in kinds:
                 raise ValueError(
@@ -1306,6 +1485,9 @@ _ALWAYS = {
     TowerBlock: ('panel_id', 'x0', 'x1', 'y0', 'y1', 'role'),
     SurfaceData: ('x', 'y', 'z'),
     SurfaceZBlock: ('dtype', 'data', 'order'),
+    # Every cell, because a matrix with no values is not a matrix, and the
+    # labels are what its axes are made of.
+    MatrixData: ('rows', 'columns', 'values'),
 }
 
 
@@ -1401,9 +1583,11 @@ def _load_surface(data):
 
 
 def _load_series(data):
-    """One canonical series dict, rebuilding its nested surface if it has one."""
+    """One canonical series dict, rebuilding whichever nested payload it has."""
     if isinstance(data, dict) and isinstance(data.get('surface'), dict):
         data = {**data, 'surface': _load_surface(data['surface'])}
+    if isinstance(data, dict) and isinstance(data.get('matrix'), dict):
+        data = {**data, 'matrix': _load_member(MatrixData, data['matrix'])}
     return _load_member(ChartSeries, data)
 
 
@@ -1554,7 +1738,11 @@ def human_strings(doc):
                  + [s.name for s in doc.series]
                  + [m.label for m in doc.marks]
                  + [b.label for b in doc.blocks]
-                 + [line for b in doc.blocks for line in b.label_lines]):
+                 + [line for b in doc.blocks for line in b.label_lines]
+                 + [text for s in doc.series if s.matrix is not None
+                    for text in (list(s.matrix.rows) + list(s.matrix.columns)
+                                 + list(s.matrix.row_groups)
+                                 + list(s.matrix.column_groups))]):
         if text and text not in out:
             out.append(text)
     return tuple(out)

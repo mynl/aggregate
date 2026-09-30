@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a379
+
+**[Matrix-Panel] the chart IR gains a `matrix` panel kind, and `CHART_IR_VERSION` moves 3 to 4.** `MatrixData(rows, columns, values, annotations, center, neutral, row_polarity, row_groups, column_groups)` rides on the new `ChartSeries.matrix`, the way `SurfaceData` rides on `surface`: named categorical rows against named categorical columns, one value and an optional second pre-formatted text per cell. `center` and `neutral` carry the diverging reading, where `neutral` is the half-width of the signal-free band around `center`, and `row_polarity` says per row whether above `center` is favorable, which one matrix can need in both directions at once. `row_groups` / `column_groups` band the axes. A cell value of `None` is the absence of a quantity, not a zero. `aggregate.plots.plot_chartdoc` draws the kind natively. A `matrix` panel carries exactly one matrix series and no curves, since categorical axes give a curve no coordinates to use.
+
+Not a `heatmap`: `SurfaceData` is a numeric lattice (`x0/dx/nx`, block reduction, exact marginals, a window), every part of which is meaningless over categories. `ChartSeries.__post_init__` now requires **exactly one** of x/y, `surface` or `matrix`, and its message names all three, so one existing test's expected wording moved.
+
+**Downstream action required.** Every document this build emits now reports `ir_version` 4, and a consumer that refuses a later version refuses all of them. `aggregate-api` must be at `1.0.0a180` or later, which raises its adapter's pin and teaches it the new kind; an older api draws no charts at all rather than drawing them plainly.
+
 ## 1.0.0a378
 
 **[Exhibit-Builder-Registration] new `aggregate.exhibits.register_exhibit`, the general form that takes a frames builder instead of an attribute name.** `register_exhibit(name, title, frames, classes, *, predicate=None, doc=None)` declares an exhibit whose blocks are **computed**: derived from two frames, read off a method's result, or assembled for an object carrying no such attribute at all. `register_simple_exhibit` is now a thin wrapper over it and is unchanged in behavior, signature and generated docstring. Both extend an existing name rather than replacing it, as before. Found by the first out-of-tree plugin: `register_simple_exhibit` does `getattr(obj, frame_attr)`, so it cannot express an exhibit over a derived frame, and the only workaround was to declare a passthrough and immediately overwrite its builder.

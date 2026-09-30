@@ -43,7 +43,7 @@ __all__ = ['plot_chartdoc']
 # Panel kinds this renderer realizes natively today. 'surface' is the
 # declared degradation (projection); anything else raises until its
 # conversion lands.
-_NATIVE = {'heatmap', 'xy', 'tower'}
+_NATIVE = {'heatmap', 'xy', 'tower', 'matrix'}
 _DEGRADED = {'surface'}
 
 
@@ -829,6 +829,202 @@ def _label_block(ax, doc, block, reading, x_span):
             fontsize=LABEL_POINTS, linespacing=1.3)
 
 
+#: The diverging ramp a matrix is read on: favorable, neutral, unfavorable.
+#: Green and red rather than a perceptual ramp because the reading is a verdict
+#: and not a magnitude, and the neutral is a warm grey rather than white so a
+#: cell inside the signal-free band is plainly a cell rather than a hole.
+MATRIX_FAVORABLE = '#008300'
+MATRIX_NEUTRAL = '#f0efec'
+MATRIX_UNFAVORABLE = '#e34948'
+
+#: Gap between two column bands, in cell widths. Wide enough to read as a break
+#: and narrow enough that the matrix stays one object.
+MATRIX_BAND_GAP = 0.35
+
+#: Luminance below which a cell's text flips to white. The usual 0.5 leaves the
+#: mid greens unreadable either way, so the threshold sits under it.
+MATRIX_DARK_TEXT_LUMA = 0.45
+
+
+def _matrix_offsets(groups, count):
+    """Per-column x offsets that open a gap between column bands.
+
+    Parameters
+    ----------
+    groups : tuple of str
+        One group name per column, or empty for no grouping.
+    count : int
+        How many columns there are.
+
+    Returns
+    -------
+    numpy.ndarray
+        The offset to add to each column's left edge, cumulative so every band
+        after the first is pushed clear of the one before it.
+    """
+    offsets = np.zeros(count)
+    if not groups:
+        return offsets
+    gaps = 0.0
+    for i in range(1, count):
+        if groups[i] != groups[i - 1]:
+            gaps += MATRIX_BAND_GAP
+        offsets[i] = gaps
+    return offsets
+
+
+def _matrix_norm(signed, center, neutral):
+    """The diverging colormap and norm for a matrix, with its neutral band.
+
+    Parameters
+    ----------
+    signed : numpy.ndarray
+        The polarity-applied departures from center, NaN where a cell carries
+        no value or where the departure is not finite.
+    center : float or None
+        Where neutral sits. ``None`` means the values do not diverge.
+    neutral : float
+        Half-width of the signal-free band, in the values' own units.
+
+    Returns
+    -------
+    (Colormap, Normalize) or (None, None)
+        ``(None, None)`` where there is nothing to scale, meaning no center was
+        declared or every departure is zero. The caller then draws text only.
+
+    Notes
+    -----
+    The band is a **hard** stop rather than a soft midpoint: two segments of the
+    ramp are pinned to the neutral color and the first step outside the band is
+    unmistakably green or red. The document's claim is that a departure inside
+    the band carries no signal, and a gradient running through it would show the
+    reader a signal the emitter said was not there.
+    """
+    from matplotlib.colors import LinearSegmentedColormap, TwoSlopeNorm
+
+    finite = signed[np.isfinite(signed)]
+    if center is None or finite.size == 0:
+        return None, None
+    amplitude = float(np.abs(finite).max())
+    if amplitude <= 0:
+        return None, None
+    # Where the band edges fall on a 0-to-1 ramp, clipped off the ends so a band
+    # as wide as the data still leaves a sliver of each signal color.
+    lo = float(np.clip(0.5 - neutral / (2 * amplitude), 0.02, 0.49))
+    hi = float(np.clip(0.5 + neutral / (2 * amplitude), 0.51, 0.98))
+    cmap = LinearSegmentedColormap.from_list('matrix_diverging', [
+        (0.0, MATRIX_FAVORABLE), (lo, '#8fca8f'), (lo, MATRIX_NEUTRAL),
+        (hi, MATRIX_NEUTRAL), (hi, '#f0a09f'), (1.0, MATRIX_UNFAVORABLE)])
+    return cmap, TwoSlopeNorm(vmin=-amplitude, vcenter=0.0, vmax=amplitude)
+
+
+def _render_matrix_panel(ax, doc, panel, series):
+    """Draw a 'matrix' panel: named rows against named columns.
+
+    Parameters
+    ----------
+    ax : matplotlib Axes
+    doc : ChartDoc
+    panel : Panel
+        Kind 'matrix'. Its x and y axes are categorical; its z axis names what
+        the values measure.
+    series : list of ChartSeries
+        The panel's series. Exactly one carries the matrix, which the document's
+        own validation has already enforced.
+
+    Notes
+    -----
+    The number printed in a cell is the raw value and the **color** is the
+    polarity-applied departure from center. Keeping those apart is the point: a
+    row read in the opposite direction shows the same multiple as its neighbors
+    and colors it the other way, which is what ``row_polarity`` is for. Printing
+    a negated number instead would be a lie about the quantity.
+
+    A cell whose signed departure is not finite, which a ratio through a
+    negative denominator produces, is drawn with no color and muted text rather
+    than dropped. The number is real; it is the diverging scale that cannot read
+    it.
+    """
+    from matplotlib.colors import to_rgb
+
+    matrix = next(s.matrix for s in series if s.matrix is not None)
+    axes = {a.id: a for a in doc.axes}
+    nrow, ncol = len(matrix.rows), len(matrix.columns)
+    values = np.array([[np.nan if v is None else float(v) for v in row]
+                       for row in matrix.values], dtype=float)
+
+    # The signed departure the color reads. With no center declared there is
+    # nothing to depart from and the panel is text only.
+    if matrix.center is None:
+        signed = np.full_like(values, np.nan)
+    else:
+        polarity = np.array(matrix.polarity, dtype=float).reshape(-1, 1)
+        with np.errstate(invalid='ignore'):
+            signed = polarity * (values - matrix.center)
+    cmap, norm = _matrix_norm(signed, matrix.center, matrix.neutral)
+
+    offsets = _matrix_offsets(matrix.column_groups, ncol)
+    # One quadmesh per column band: a band gap is a break in the x coordinate,
+    # and a single mesh would stretch a cell across it.
+    starts = [0] + [i for i in range(1, ncol)
+                    if matrix.column_groups
+                    and matrix.column_groups[i] != matrix.column_groups[i - 1]]
+    bounds = starts + [ncol]
+    if cmap is not None:
+        for lo, hi in zip(bounds, bounds[1:]):
+            ax.pcolormesh(np.arange(lo, hi + 1) + offsets[lo],
+                          np.arange(nrow + 1), signed[:, lo:hi],
+                          cmap=cmap, norm=norm, edgecolors='white',
+                          linewidth=2)
+
+    annotations = matrix.annotations
+    for i in range(nrow):
+        for j in range(ncol):
+            x = j + 0.5 + offsets[j]
+            if cmap is None or not np.isfinite(signed[i, j]):
+                ink, faint = '#52514e', '#898781'
+            elif (0.2126 * to_rgb(cmap(norm(signed[i, j])))[0]
+                    + 0.7152 * to_rgb(cmap(norm(signed[i, j])))[1]
+                    + 0.0722 * to_rgb(cmap(norm(signed[i, j])))[2]
+                    <= MATRIX_DARK_TEXT_LUMA):
+                ink, faint = 'white', '#ffffffd0'
+            else:
+                ink, faint = '#0b0b0b', '#52514e'
+            if np.isfinite(values[i, j]):
+                # A minus sign, not a hyphen: this is a number being read.
+                text = f'{values[i, j]:.2f}×'.replace('-', '−')
+                ax.text(x, i + (0.36 if annotations else 0.5), text,
+                        ha='center', va='center', color=ink,
+                        fontsize=FONT_SIZE + 1)
+            if annotations and annotations[i][j]:
+                ax.text(x, i + 0.72,
+                        f'({annotations[i][j]})'.replace('-', '−'),
+                        ha='center', va='center', color=faint,
+                        fontsize=FONT_SIZE - 1.7)
+
+    # Row band boundaries, drawn in the background color rather than as rules,
+    # so a break reads as space between groups instead of another line.
+    if matrix.row_groups:
+        span = ncol + (offsets[-1] if ncol else 0.0)
+        for i in range(1, nrow):
+            if matrix.row_groups[i] != matrix.row_groups[i - 1]:
+                ax.hlines(i, 0, span, color='white', linewidth=5, zorder=4)
+
+    ax.set_xlim(0, ncol + (offsets[-1] if ncol else 0.0))
+    ax.set_ylim(0, nrow)
+    ax.set_xticks(np.arange(ncol) + 0.5 + offsets,
+                  [_typeset(doc, c) for c in matrix.columns])
+    ax.set_yticks(np.arange(nrow) + 0.5,
+                  [_typeset(doc, r) for r in matrix.rows])
+    # Rows read top to bottom, the order the document lists them in.
+    ax.invert_yaxis()
+    ax.tick_params(length=0)
+    for side in ('top', 'right', 'left', 'bottom'):
+        ax.spines[side].set_visible(False)
+    ax.set(xlabel=_typeset(doc, axes[panel.x_axis].label),
+           ylabel=_typeset(doc, axes[panel.y_axis].label))
+
+
 def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False,
                         floor=None):
     """Draw a 'tower' panel: labeled rectangles over a quantity axis.
@@ -1289,7 +1485,9 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
             # names it; with no name to use, say so rather than invent one.
             panel_title = (panel.inverse_title
                            or f'{panel_title}, inverted')
-        if realization == 'tower':
+        if realization == 'matrix':
+            _render_matrix_panel(panel_ax, doc, panel, series)
+        elif realization == 'tower':
             _render_tower_panel(
                 panel_ax, doc, panel,
                 [b for b in doc.blocks if b.panel_id == panel.id],

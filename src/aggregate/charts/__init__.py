@@ -51,7 +51,8 @@ from functools import singledispatch
 from .ir import (
     CHART_IR_VERSION, SUPPORT_KINDS, SURFACE_DTYPES, SURFACE_EDGES,
     ChartAxis, ChartCapabilityError,
-    ChartDoc, ChartSeries, Mark, Panel, SurfaceData, SurfaceZBlock, TowerBlock,
+    ChartDoc, ChartSeries, Mark, MatrixData, Panel, SurfaceData,
+    SurfaceZBlock, TowerBlock,
     canonical_dict, canonical_json, complete_tex, decode_z_block, doc_hash,
     encode_z_block, human_strings, load_chart_doc, stamp,
 )
@@ -60,7 +61,8 @@ __all__ = [
     'CHART_IR_VERSION', 'CHARTS', 'SUPPORT_KINDS', 'SURFACE_DTYPES',
     'SURFACE_EDGES', 'ChartAxis',
     'ChartCapabilityError', 'ChartDoc', 'ChartEntry', 'ChartSeries', 'Mark',
-    'Panel', 'SurfaceData', 'SurfaceZBlock', 'TowerBlock', 'available_charts',
+    'MatrixData', 'Panel', 'SurfaceData', 'SurfaceZBlock', 'TowerBlock',
+    'available_charts',
     'build_chart_doc',
     'canonical_dict', 'canonical_json', 'complete_tex', 'decode_z_block',
     'doc_hash', 'encode_z_block',

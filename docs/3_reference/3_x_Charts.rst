@@ -76,6 +76,7 @@ Every human-facing string in a document is plain text, never markup in any rende
    ChartAxis
    Mark
    TowerBlock
+   MatrixData
    SurfaceData
    SurfaceZBlock
    ChartCapabilityError

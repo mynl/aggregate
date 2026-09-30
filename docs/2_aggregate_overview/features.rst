@@ -365,6 +365,7 @@ appendix but not exampled.
    "``sev cantor`` is a DecL severity", "a347", "New DecL elements", "``cant``"
    "**numbers move:** the grid strictly contains the window it was sized for", "a348", "Grids, buckets & windows", "``cant``"
    "the ``tower`` panel kind and ``TowerBlock``; ``CHART_IR_VERSION`` 2 to 3", "a349", "Served documents", "``reins``"
+   "the ``matrix`` panel kind and ``MatrixData``; ``CHART_IR_VERSION`` 3 to 4", "a379", "Served documents", "``doc``"
    "new chart ``structure``: a reinsurance program as a tower of layers", "a350", "Served documents", "``reins``"
    "``plot_chartdoc`` draws a tower natively", "a351", "Served documents", "``reins``"
    "the ``structure`` loss axis is drawn against the quantity's own support", "a352", "Served documents", "``reins``"
@@ -3378,7 +3379,7 @@ surface mirrors exhibits exactly:
 
 A ``ChartDoc`` is panels over axes over series, plus marks, the rectangles of
 any tower panel, metadata and a ``tex`` map, stamped with a content hash.
-``CHART_IR_VERSION`` is 3. The governing principle, settled at a233, is that
+``CHART_IR_VERSION`` is 4. The governing principle, settled at a233, is that
 **which readings a quantity admits is a fact about the quantity, not about the
 drawing**: an axis declares the scales and ranges it may honestly be read on,
 and a panel the forms it may take. A log reading of a heavy tail is meaningful

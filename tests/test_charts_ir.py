@@ -15,7 +15,8 @@ import pytest
 
 from aggregate import charts
 from aggregate.charts import (
-    CHART_IR_VERSION, ChartAxis, ChartDoc, ChartSeries, Mark, Panel,
+    CHART_IR_VERSION, ChartAxis, ChartDoc, ChartSeries, Mark, MatrixData,
+    Panel,
     SurfaceData, TowerBlock, available_charts, canonical_dict,
     canonical_json, complete_tex, doc_hash, human_strings,
     load_chart_doc, stamp,
@@ -402,7 +403,10 @@ def test_xy_lengths_must_agree():
 
 
 def test_series_needs_exactly_one_payload():
-    with pytest.raises(ValueError, match='either x/y or surface'):
+    # Three payloads since 1.0.0a379, not two: 'matrix' joined x/y and surface,
+    # and the message names all three because a series carrying none of them is
+    # most often a series whose author picked the wrong one.
+    with pytest.raises(ValueError, match='exactly one of x/y, surface or matrix'):
         ChartSeries(name='s', role='density', panel_id='p')
 
 
@@ -634,7 +638,7 @@ def test_the_lattice_form_is_why_the_version_moved():
     marks the point where a reader that ignores what it does not know would
     draw something wrong, and an unread lattice draws nothing.
     """
-    assert CHART_IR_VERSION == 3
+    assert CHART_IR_VERSION == 4
     with pytest.raises(ValueError, match='unsupported ir_version'):
         small_xy_doc(ir_version=1)
 
@@ -967,3 +971,177 @@ def test_import_charts_does_not_load_matplotlib():
     result = subprocess.run([sys.executable, '-c', code],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
+
+
+# --- the 'matrix' panel kind ([Matrix-Panel]) --------------------------------
+
+def matrix_data(**kw):
+    """A small well-formed matrix: two rows, two columns, one band each."""
+    base = dict(
+        rows=('gross book', 'QS'),
+        columns=('gini ph', 'margin'),
+        values=((1.0, 1.0), (0.05, 0.04)),
+        annotations=(('0.209', '7.3%'), ('0.011', '0.3%')),
+        center=1.0,
+        neutral=0.05,
+        row_polarity=(-1, 1),
+        row_groups=('book', 'aggregate'),
+        column_groups=('family', 'point'),
+    )
+    base.update(kw)
+    return MatrixData(**base)
+
+
+def matrix_doc(matrix=None, **kw):
+    """A one-panel matrix document."""
+    return ChartDoc(
+        name='relativity',
+        axes=(ChartAxis(id='x', label='reading', kind='category'),
+              ChartAxis(id='y', label='position', kind='category'),
+              ChartAxis(id='z', label='multiple of gross')),
+        panels=(Panel(id='m', kind='matrix', x_axis='x', y_axis='y',
+                      z_axis='z'),),
+        series=(ChartSeries(name='relativity', role='identity', panel_id='m',
+                            matrix=matrix or matrix_data()),),
+        **kw)
+
+
+def test_a_matrix_is_why_version_four_moved():
+    """The version-3 reading again: an unrealizable kind and no coordinates.
+
+    A reader that knows neither 'matrix' nor ``MatrixData`` sees a panel kind it
+    cannot draw and a series carrying no x/y at all, so the panel is missing
+    rather than merely plainer. That is the rule beside the constant.
+    """
+    assert CHART_IR_VERSION == 4
+    assert 'matrix' in charts.ir.PANEL_KINDS
+    doc = matrix_doc()
+    assert canonical_dict(doc)['ir_version'] == 4
+
+
+def test_a_matrix_round_trips_exactly():
+    doc = stamp(matrix_doc())
+    back = load_chart_doc(canonical_dict(doc))
+    assert back == doc
+    assert doc_hash(back) == doc.hash
+    assert isinstance(back.series[0].matrix, MatrixData)
+
+
+def test_the_labels_are_human_text():
+    """Row, column and band names reach ``human_strings``.
+
+    They are the panel's tick labels, so a consumer collecting the document's
+    prose (for a translation pass, or to measure the longest string it has to
+    fit) must see them. An emitter's label that never reaches that list is a
+    string nobody can find.
+    """
+    strings = human_strings(matrix_doc(title='Relativity'))
+    for text in ('gross book', 'QS', 'gini ph', 'margin', 'book', 'aggregate',
+                 'family', 'point'):
+        assert text in strings, text
+
+
+def test_row_polarity_defaults_to_favorable_above_center():
+    assert matrix_data(row_polarity=()).polarity == (1, 1)
+    assert matrix_data().polarity == (-1, 1)
+
+
+def test_a_missing_cell_is_none_rather_than_zero():
+    """A quantity that does not exist there is not a quantity of zero."""
+    data = matrix_data(values=((1.0, None), (0.05, 0.04)))
+    assert data.values[0][1] is None
+
+
+# --- what a malformed matrix must not be ------------------------------------
+
+def test_a_ragged_matrix_is_refused():
+    with pytest.raises(ValueError, match='must be 2 by 2'):
+        matrix_data(values=((1.0, 1.0), (0.05,)))
+
+
+def test_annotations_must_match_the_value_shape():
+    with pytest.raises(ValueError, match='annotations must be 2 by 2'):
+        matrix_data(annotations=(('a', 'b'),))
+
+
+def test_an_empty_matrix_is_refused():
+    with pytest.raises(ValueError, match='at least one row and one column'):
+        MatrixData(rows=(), columns=('a',), values=())
+
+
+def test_a_negative_neutral_band_is_refused():
+    """It is a half-width, so a negative one names no band at all."""
+    with pytest.raises(ValueError, match='cannot be negative'):
+        matrix_data(neutral=-0.1)
+
+
+def test_row_polarity_must_be_one_per_row_and_signed():
+    with pytest.raises(ValueError, match='one per row'):
+        matrix_data(row_polarity=(1,))
+    with pytest.raises(ValueError, match='must be 1 or -1'):
+        matrix_data(row_polarity=(1, 0))
+
+
+def test_group_lengths_must_match():
+    with pytest.raises(ValueError, match='row_groups has 1'):
+        matrix_data(row_groups=('book',))
+    with pytest.raises(ValueError, match='column_groups has 3'):
+        matrix_data(column_groups=('a', 'b', 'c'))
+
+
+# --- how a matrix composes into a document ----------------------------------
+
+def test_a_matrix_on_a_non_matrix_panel_is_refused():
+    """The payload and the kind disagree, and a renderer would drop one."""
+    with pytest.raises(ValueError, match='carries a matrix but panel'):
+        ChartDoc(
+            name='x',
+            axes=(ChartAxis(id='x', label='a'), ChartAxis(id='y', label='b')),
+            panels=(Panel(id='p', kind='xy', x_axis='x', y_axis='y'),),
+            series=(ChartSeries(name='s', role='identity', panel_id='p',
+                                matrix=matrix_data()),))
+
+
+def test_a_matrix_panel_refuses_a_curve():
+    """There are no coordinates for one to use.
+
+    A curve across categorical ticks asserts a path between named things that
+    have no order beyond the one the emitter listed them in.
+    """
+    with pytest.raises(ValueError, match='carries no matrix'):
+        ChartDoc(
+            name='x',
+            axes=(ChartAxis(id='x', label='a'), ChartAxis(id='y', label='b'),
+                  ChartAxis(id='z', label='c')),
+            panels=(Panel(id='m', kind='matrix', x_axis='x', y_axis='y',
+                          z_axis='z'),),
+            series=(ChartSeries(name='s', role='identity', panel_id='m',
+                                x=(0.0, 1.0), y=(0.0, 1.0)),))
+
+
+def test_a_matrix_panel_carries_exactly_one():
+    with pytest.raises(ValueError, match='carries 2 matrix series'):
+        ChartDoc(
+            name='x',
+            axes=(ChartAxis(id='x', label='a'), ChartAxis(id='y', label='b'),
+                  ChartAxis(id='z', label='c')),
+            panels=(Panel(id='m', kind='matrix', x_axis='x', y_axis='y',
+                          z_axis='z'),),
+            series=(ChartSeries(name='one', role='identity', panel_id='m',
+                                matrix=matrix_data()),
+                    ChartSeries(name='two', role='identity', panel_id='m',
+                                matrix=matrix_data())))
+
+
+def test_a_series_carries_exactly_one_payload():
+    with pytest.raises(ValueError, match='exactly one of x/y, surface or matrix'):
+        ChartSeries(name='s', role='identity', panel_id='m',
+                    x=(0.0,), y=(1.0,), matrix=matrix_data())
+    with pytest.raises(ValueError, match='none of them'):
+        ChartSeries(name='s', role='identity', panel_id='m')
+
+
+def test_a_matrix_series_refuses_a_band():
+    with pytest.raises(ValueError, match='y2 needs an x/y payload'):
+        ChartSeries(name='s', role='identity', panel_id='m',
+                    matrix=matrix_data(), y2=(1.0,))

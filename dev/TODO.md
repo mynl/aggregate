@@ -557,6 +557,16 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Matrix-Panel]** DONE (`1.0.0a379`), under
+  `dev/plan-a376-plugins-and-extension-surface.md` section 12: the chart IR
+  gains a `matrix` panel kind and `MatrixData`, named categorical rows against
+  named categorical columns with a value and a second text per cell, a diverging
+  `center` / `neutral` band and a per-row polarity. `CHART_IR_VERSION` 3 to 4.
+  Driven by an out-of-tree consumer, which is the feedback loop the provisional
+  tier exists for. **Owed:** a baseline image in
+  `tests/data/chartdoc_baselines/`, which is the author's to approve;
+  `tests/test_chartdoc_matrix.py` pins the structure meanwhile.
+
 - **[Exhibit-Builder-Registration]** DONE (`1.0.0a378`), under
   `dev/plan-a376-plugins-and-extension-surface.md` section 12:
   `aggregate.exhibits.register_exhibit` takes a frames builder where

@@ -61,6 +61,7 @@ Precedence, low to high: greater_tables' dtype and tag inference, the shipped ra
    available_exhibits
    exhibit_frames
    build_exhibit
+   register_exhibit
    register_simple_exhibit
    summary
    tail

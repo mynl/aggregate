@@ -86,8 +86,8 @@ This is what a plugin author codes against.
      - The load record: name, version, source, leaves, the chart and exhibit keys added, and the error if it failed
    * - :func:`aggregate.charts.register_chart` and the :class:`~aggregate.charts.ir.ChartDoc` family
      - Contributing a chart. The plugin emits a document; the existing renderers draw it. A plugin that draws its own figures is a second rendering pipeline, and the two diverge within a month
-   * - :func:`aggregate.exhibits.register_simple_exhibit`, and the per-exhibit ``.register(Cls)`` / ``.insurer.register(Cls)`` hooks
-     - Contributing a table, or a new type's treatment of an existing exhibit
+   * - :func:`aggregate.exhibits.register_exhibit` and :func:`~aggregate.exhibits.register_simple_exhibit`, and the per-exhibit ``.register(Cls)`` / ``.insurer.register(Cls)`` hooks
+     - Contributing a table, or a new type's treatment of an existing exhibit. The simple form serves one named attribute unchanged; the general form takes the frames builder, which is what an exhibit over a *computed* frame needs
    * - The public frames of the first-class classes
      - The input. These are stable, per the table above
 

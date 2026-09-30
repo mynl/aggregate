@@ -1003,8 +1003,10 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
                             formatters=None):
     """Declare a passthrough exhibit over one named frame, in one line.
 
-    The common case: an exhibit that serves a single frame with no business
-    translation. It registers **no insurer override**, so INSURER equals RAW
+    The common case, and a thin wrapper over :func:`register_exhibit`: an
+    exhibit that serves a single frame with no business translation. Reach for
+    the general form when what the exhibit serves is *computed* rather than
+    read off an attribute. It registers **no insurer override**, so INSURER equals RAW
     by the default rule and both perspectives serve the same table, with no
     extra code. Register an override later (``<name>.insurer.register(Cls)``)
     and only that (exhibit, type) pair changes.
@@ -1062,9 +1064,22 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
        Provisional, in the sense of PEP 411: not part of the 1.0 API
        contract. See :doc:`/3_reference/3_x_API_Stability`.
     """
-    fn = EXHIBITS[name][0] if name in EXHIBITS else _make_exhibit_function(
-        name, title,
-        doc or f"""{title} exhibit. Source frame ``{frame_attr}``.
+    kw = {}
+    if caption is not None:
+        kw['caption'] = caption
+    if formatters is not None:
+        kw['formatters'] = formatters
+
+    def _frames(obj, _attr=frame_attr, _kw=kw):
+        # a fresh dict per call: the builders downstream do dict(kw, ...) but
+        # an insurer override is free to mutate, and this one is shared
+        return [(_attr, getattr(obj, _attr), dict(_kw))]
+
+    _frames.__name__ = f'_{name}_frames'
+    _frames.__doc__ = f'Serve ``{frame_attr}`` unchanged.'
+    return register_exhibit(
+        name, title, _frames, classes, predicate=predicate,
+        doc=doc or f"""{title} exhibit. Source frame ``{frame_attr}``.
 
     A passthrough: RAW and INSURER serve the same table, since no insurer
     override is registered (the INSURER default rule).
@@ -1079,24 +1094,100 @@ def register_simple_exhibit(name, title, frame_attr, classes, *,
     -------
     Exhibit
     """)
+
+
+def register_exhibit(name, title, frames, classes, *, predicate=None,
+                     doc=None):
+    """Declare an exhibit over a **frames builder**, in one call.
+
+    The general form of :func:`register_simple_exhibit`. Where that one serves
+    one named attribute unchanged, and so can only exist where the object
+    already carries the frame, this one takes the builder itself. An exhibit
+    may therefore serve something *derived*: computed from two frames, read off
+    a method's result, or assembled for an object that carries no such
+    attribute at all. That is the case an out-of-tree plugin usually has, since
+    a plugin's whole reason to exist is arithmetic the library does not do.
+
+    Like :func:`register_simple_exhibit` it registers **no insurer override**,
+    so INSURER equals RAW by the default rule until one is registered on the
+    returned function.
+
+    Parameters
+    ----------
+    name : str
+        Registry key and the URL segment the app serves it under.
+    title : str
+        Display title, used as ``"<title>: <object>"``.
+    frames : callable
+        ``builder(obj) -> [(block_name, DataFrame, spec_kwargs), ...]``. The
+        block name is free text and should say what the block is; the
+        ``spec_kwargs`` are greater_tables ``TableSpec`` keyword arguments
+        (``caption``, ``row_flags``, ``formatters``, ...), plain data, so the
+        frame stage stays free of greater_tables.
+    classes : iterable of type
+        The types this exhibit is registered for.
+    predicate : callable, optional
+        ``perspectives_fn(obj) -> list[Perspective]``, the availability gate.
+        Defaults to :func:`_perspectives_always`. Ignored when ``name`` is
+        already registered, since the gate belongs to the exhibit and not to
+        one of its type registrations.
+    doc : str, optional
+        Docstring for the generated exhibit function.
+
+    Returns
+    -------
+    callable
+        The generic exhibit function, so a caller can hang an insurer override
+        on it (``<name>.insurer.register(Cls)``) or register further types
+        (``<name>.register(Cls)``).
+
+    Notes
+    -----
+    Calling it twice for one ``name`` **extends** the existing exhibit to more
+    classes rather than replacing it, the same rule
+    :func:`register_simple_exhibit` follows, so a class module may add itself
+    to an exhibit the manifest already declared. Across a *trust* boundary that
+    rule is wrong, since it would merge two unrelated plugins into one exhibit,
+    and :mod:`aggregate.plugins` polices the case there rather than changing
+    the behavior here.
+
+    Examples
+    --------
+    ::
+
+        def _relativity_frames(pnl):
+            return [('relativity', relativity_frame(pnl),
+                     {'caption': 'Pricing relative to the gross book.'})]
+
+        relativity = register_exhibit('relativity', 'Relativity',
+                                      _relativity_frames, [PnL],
+                                      predicate=_perspectives_tower)
+
+    .. versionadded:: 1.0
+       Provisional, in the sense of PEP 411: not part of the 1.0 API
+       contract. See :doc:`/3_reference/3_x_API_Stability`.
+    """
+    fn = EXHIBITS[name][0] if name in EXHIBITS else _make_exhibit_function(
+        name, title,
+        doc or f"""{title} exhibit.
+
+    RAW and INSURER serve the same table until an insurer override is
+    registered (the INSURER default rule).
+
+    Parameters
+    ----------
+    obj : object
+        A registered first class object.
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
     if name not in EXHIBITS:
         EXHIBITS[name] = (fn, predicate or _perspectives_always)
-
-    kw = {}
-    if caption is not None:
-        kw['caption'] = caption
-    if formatters is not None:
-        kw['formatters'] = formatters
-
-    def _frames(obj, _attr=frame_attr, _kw=kw):
-        # a fresh dict per call: the builders downstream do dict(kw, ...) but
-        # an insurer override is free to mutate, and this one is shared
-        return [(_attr, getattr(obj, _attr), dict(_kw))]
-
-    _frames.__name__ = f'_{name}_frames'
-    _frames.__doc__ = f'Serve ``{frame_attr}`` unchanged.'
     for cls in classes:
-        fn.register(cls)(_frames)
+        fn.register(cls)(frames)
     return fn
 
 

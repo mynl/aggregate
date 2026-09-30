@@ -1629,6 +1629,77 @@ def test_register_simple_exhibit_is_open(dice):
         EXHIBITS.pop('sev_density', None)
 
 
+def test_register_exhibit_serves_a_computed_frame(dice):
+    """The general form: what the exhibit serves need not be an attribute.
+
+    The case an out-of-tree plugin has, since a plugin exists to do arithmetic
+    the library does not. ``register_simple_exhibit`` cannot express it: it
+    takes an attribute name and calls ``getattr``.
+    """
+    from aggregate.exhibits import register_exhibit
+    from aggregate._aggregate import Aggregate
+
+    def _derived_frames(obj):
+        """Two columns computed from the object, carried by no attribute."""
+        return [('derived', pd.DataFrame({'m': [obj.est_m], 'cv': [obj.est_cv]}),
+                 {'caption': 'Computed, not read.'})]
+
+    try:
+        fn = register_exhibit('derived_probe', 'Derived probe',
+                              _derived_frames, [Aggregate])
+        assert 'derived_probe' in EXHIBITS
+        assert fn.title == 'Derived probe'
+        assert 'derived_probe' in [n for n, _ in available_exhibits(dice)]
+        name, df, kw = exhibit_frames(dice, 'derived_probe')[0]
+        assert name == 'derived' and kw['caption'] == 'Computed, not read.'
+        assert list(df.columns) == ['m', 'cv'] and len(df) == 1
+        # no attribute of that name exists anywhere on the object
+        assert not hasattr(dice, 'derived') and not hasattr(dice, 'derived_df')
+    finally:
+        EXHIBITS.pop('derived_probe', None)
+
+
+def test_register_exhibit_extends_rather_than_replaces(dice):
+    """A second call for one name adds classes, it does not start over."""
+    from aggregate.exhibits import register_exhibit
+    from aggregate._aggregate import Aggregate
+    from aggregate._portfolio import Portfolio
+
+    def _one(obj):
+        return [('one', pd.DataFrame({'a': [1]}), {})]
+
+    def _two(obj):
+        return [('two', pd.DataFrame({'b': [2]}), {})]
+
+    try:
+        first = register_exhibit('extend_probe', 'Extend probe', _one, [Aggregate])
+        second = register_exhibit('extend_probe', 'Ignored title', _two, [Portfolio])
+        assert first is second
+        assert second.title == 'Extend probe'          # the first title stands
+        assert exhibit_frames(dice, 'extend_probe')[0][0] == 'one'
+    finally:
+        EXHIBITS.pop('extend_probe', None)
+
+
+def test_register_simple_exhibit_delegates_to_register_exhibit(dice):
+    """The passthrough is the general form with a getattr builder.
+
+    Asserted on the observable consequence rather than on the call: the simple
+    form still names its block after the attribute and still carries the
+    passthrough wording in the generated docstring.
+    """
+    from aggregate.exhibits import register_simple_exhibit
+    from aggregate._aggregate import Aggregate
+    try:
+        fn = register_simple_exhibit('delegate_probe', 'Delegate probe',
+                                     'sev_density_df', [Aggregate])
+        assert exhibit_frames(dice, 'delegate_probe')[0][0] == 'sev_density_df'
+        assert 'Source frame' in fn.__doc__
+        assert 'passthrough' in fn.__doc__
+    finally:
+        EXHIBITS.pop('delegate_probe', None)
+
+
 # --- errors -----------------------------------------------------------------
 
 def test_unknown_exhibit_name(dice):

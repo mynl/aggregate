@@ -557,6 +557,14 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Exhibit-Builder-Registration]** DONE (`1.0.0a378`), under
+  `dev/plan-a376-plugins-and-extension-surface.md` section 12:
+  `aggregate.exhibits.register_exhibit` takes a frames builder where
+  `register_simple_exhibit` takes an attribute name, so an exhibit may serve a
+  **computed** frame. The simple form is now a thin wrapper over it. Found by
+  the first out-of-tree plugin, whose frame is derived from two P&L frames and
+  is no attribute of `PnL`.
+
 - **[Plugin-Loader]** DONE (`1.0.0a376`), plan `dev/plan-a376-plugins-and-extension-surface.md`
   (still live for its later stages, execution log in its section 11): new
   `aggregate.plugins`, the extension surface a third-party `aggregate-<thing>`

@@ -1,6 +1,6 @@
 # plan-a376: the plugin loader and the extension surface
 
-**Status:** ruled 2026-09-30 (section 10). Stage 1 [Plugin-Loader] landed at `1.0.0a376`; stages 2 to 4 not started. Execution log in section 11.
+**Status:** ruled 2026-09-30 (section 10), plus three rulings of 2026-09-30 recorded in section 12. Stage 1 landed at `1.0.0a376`; stages 2 to 4 in flight. Execution log in sections 11 and 12.
 **Repos touched:** `aggregate` (this one), `aggregate-api`, and a new `aggregate-relativity`.
 **Version:** `1.0.0a376` for the library step. The api repo bumps on its own line when its section lands.
 
@@ -326,3 +326,49 @@ exists to judge it against. Decide it there.
   plugin leaving `build()` working with its traceback in `loaded_plugins()`.
   The remaining three checks are the api and plugin repos' and wait on stages
   2 to 4.
+
+
+---
+
+## 12. Execution log, stages 2 to 4
+
+Opened 2026-09-30. Three rulings taken before starting, in answer to questions
+this plan did not settle.
+
+1. **Stage 4 is executed now, not deferred.** Section 8 says to design the
+   categorical matrix panel against one working case rather than
+   speculatively. The author ruled: build stages 2 and 3 first, then design and
+   implement stage 4 in the same pass, so the working case is in hand when the
+   panel kind is designed but the work is not split across sessions.
+2. **The exhibits gap is fixed upstream, not worked around.** See the finding
+   below. `aggregate.exhibits.register_exhibit` was added.
+3. **`aggregate-relativity` starts at `0.1.0` and carries its own
+   `CLAUDE.md`.** It registers into a PEP 411 provisional surface and its chart
+   is unbuilt, so `1.0.0` would claim a stability it does not have. This is a
+   declared departure from the house rule "SemVer, starting at 1.0.0", taken
+   because the house rule exists to stop version numbers crawling rather than
+   to force a stability claim.
+
+### A finding stage 2 uncovered, fixed before it: [Exhibit-Builder-Registration]
+
+`register_simple_exhibit(name, title, frame_attr, classes, ...)` serves
+`getattr(obj, frame_attr)`. The relativity exhibit's frame is **computed** from
+two P&L frames and is not an attribute of `PnL`, so the plan's section 6
+instruction to put `actuals_frame` "behind `register_simple_exhibit`" cannot be
+followed as written. There was no public route to declare an exhibit over a
+derived frame. The only workaround available through public names was to declare
+a passthrough over a non-existent attribute and then overwrite its builder via
+`fn.register(PnL)(...)` (legal, since `fn.register` aliases
+`fn.frames.register`), which leaves `frame_attr` a fiction. That is a poor thing
+to teach in the plugin that exists to be the template.
+
+Fixed upstream instead, which is the route section 5 of this plan prescribes for
+exactly this case: **`1.0.0a378` adds
+`aggregate.exhibits.register_exhibit(name, title, frames, classes, *,
+predicate=None, doc=None)`**, taking the frames builder itself.
+`register_simple_exhibit` became a thin wrapper over it, with its behavior,
+signature and generated docstring unchanged. The name was vetted free across
+`src`, `tests` and `docs` before it was added. Three tests in
+`tests/test_exhibits.py`; the extension surface table in
+`3_x_API_Stability.rst`, the `3_x_Exhibits.rst` autosummary and the pipeline
+page all name it. Gate: **5481 passed**.

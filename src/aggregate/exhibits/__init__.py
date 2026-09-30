@@ -88,7 +88,8 @@ from ..spectral import Distortion
 from ._core import (
     CAPITAL_ANCHOR_PERIODS, EXHIBITS, Exhibit, INCLUDE_RAW, MAX_ROWS,
     Perspective, RAW_MOMENT_MEASURES,
-    available_exhibits, build_exhibit, exhibit_frames, register_simple_exhibit,
+    available_exhibits, build_exhibit, exhibit_frames, register_exhibit,
+    register_simple_exhibit,
     dependency, economic, economic_ratios, economic_waterfall, reins, stats,
     summary, tail, validation,
     pricing_allocate, pricing_calibrate, pricing_evaluate,
@@ -112,7 +113,7 @@ from ._pricing import (  # noqa: F401
 __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
-    'register_simple_exhibit',
+    'register_exhibit', 'register_simple_exhibit',
     'FormatSheet', 'format_sheet', 'reload_format_sheets', 'sheet_paths',
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',

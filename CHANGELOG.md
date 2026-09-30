@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a378
+
+**[Exhibit-Builder-Registration] new `aggregate.exhibits.register_exhibit`, the general form that takes a frames builder instead of an attribute name.** `register_exhibit(name, title, frames, classes, *, predicate=None, doc=None)` declares an exhibit whose blocks are **computed**: derived from two frames, read off a method's result, or assembled for an object carrying no such attribute at all. `register_simple_exhibit` is now a thin wrapper over it and is unchanged in behavior, signature and generated docstring. Both extend an existing name rather than replacing it, as before. Found by the first out-of-tree plugin: `register_simple_exhibit` does `getattr(obj, frame_attr)`, so it cannot express an exhibit over a derived frame, and the only workaround was to declare a passthrough and immediately overwrite its builder.
+
 ## 1.0.0a377
 
 **[Kappa-Left-Floor] the Palm kappa chart cuts its left end at the full-range cdf floor.** The shipped extent now runs from the cell where the gross cdf first clears `KAPPA_FULL_FLOOR` (1e-9) out to the matching survival, mirroring the existing right-end cut. Previously the curves started at the first cell passing the kernel's machine-eps 0/0 guard, and on a book with a high minimum claim count that guard admits FFT noise far to the left of any real mass, so the Pricing Plot opened on a noisy conditional-mean ratio near zero. Curves on such books now start visibly later on the x axis; that region was never a curve.

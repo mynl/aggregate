@@ -214,3 +214,39 @@ def test_no_grouping_means_no_gaps():
 def test_every_band_after_the_first_clears_the_one_before():
     offsets = _matrix_offsets(('a', 'b', 'c'), 3)
     assert list(offsets) == [0.0, MATRIX_BAND_GAP, 2 * MATRIX_BAND_GAP]
+
+
+# --- a ratio that crossed zero ----------------------------------------------
+
+def test_a_ratio_through_zero_is_dropped_from_the_color(doc, matrix):
+    """A negative multiple is off the scale, not far along it.
+
+    The 5x5 layer's diversified cost of capital is negative, so its ratio
+    against a positive book is about -9. Colored, that is the deepest favorable
+    cell on the page, saying the layer is nine times better than the book when
+    what actually happened is that the quantity changed sign. The number is
+    kept; the color is not. The original script made the same call by taking a
+    logarithm and letting the negatives fall out.
+    """
+    import dataclasses
+    import numpy as np
+
+    holed = dataclasses.replace(matrix, values=((1.0, 1.0), (-9.3, 0.4)))
+    fig = plot_chartdoc(dataclasses.replace(
+        doc, series=(dataclasses.replace(doc.series[0], matrix=holed),)))
+    texts = [t.get_text() for t in _axes(fig).texts]
+    assert '−9.30×' in texts, texts
+    # The muted ink is what says "this cell carries no verdict".
+    muted = [t for t in _axes(fig).texts if t.get_text() == '−9.30×']
+    assert muted[0].get_color() == '#52514e'
+    matplotlib.pyplot.close(fig)
+    assert np.sign(-9.3) != np.sign(1.0)
+
+
+def test_a_center_of_zero_keeps_both_directions():
+    """Differences, not ratios: a negative is a real reading and stays colored."""
+    import numpy as np
+    signed = np.array([[-2.0, 2.0]])
+    cmap, norm = _matrix_norm(signed, 0.0, 0.0)
+    assert cmap is not None
+    assert cmap(norm(-2.0)) != cmap(norm(2.0))

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a380
+
+**[Matrix-Panel] a matrix cell whose ratio crossed zero is drawn without color.** Where a `MatrixData` declares a non-zero `center`, the values are ratios, and a ratio of opposite sign to the center is off the scale rather than far along it. Such a cell keeps its number and its annotation, loses its fill, and is excluded from the amplitude the rest of the scale is built on. Found by rendering the real page: a layer whose diversified cost of capital is negative scored about -9 against a positive book and drew as the deepest **favorable** cell on the page, saying it was nine times better than the book when the quantity had merely changed sign. It also flattened every other cell, since that -9 set the amplitude. A `center` of zero is the other case, differences, where both directions are meaningful and nothing is excluded.
+
 ## 1.0.0a379
 
 **[Matrix-Panel] the chart IR gains a `matrix` panel kind, and `CHART_IR_VERSION` moves 3 to 4.** `MatrixData(rows, columns, values, annotations, center, neutral, row_polarity, row_groups, column_groups)` rides on the new `ChartSeries.matrix`, the way `SurfaceData` rides on `surface`: named categorical rows against named categorical columns, one value and an optional second pre-formatted text per cell. `center` and `neutral` carry the diverging reading, where `neutral` is the half-width of the signal-free band around `center`, and `row_polarity` says per row whether above `center` is favorable, which one matrix can need in both directions at once. `row_groups` / `column_groups` band the axes. A cell value of `None` is the absence of a quantity, not a zero. `aggregate.plots.plot_chartdoc` draws the kind natively. A `matrix` panel carries exactly one matrix series and no curves, since categorical axes give a curve no coordinates to use.

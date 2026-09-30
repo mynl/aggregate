@@ -961,6 +961,21 @@ def _render_matrix_panel(ax, doc, panel, series):
         polarity = np.array(matrix.polarity, dtype=float).reshape(-1, 1)
         with np.errstate(invalid='ignore'):
             signed = polarity * (values - matrix.center)
+        # A non-zero center means the values are **ratios**, and a ratio that
+        # has crossed zero is off the scale rather than far along it. The 5x5
+        # layer's diversified cost of capital is negative, so its ratio against
+        # a positive book is about -9, and coloring that as the deepest
+        # favorable cell on the page would say it is nine times better when
+        # what happened is that the quantity changed sign. Dropped from the
+        # color, kept in the text, which is the same call the original script
+        # made by taking a logarithm and letting the negatives fall out.
+        #
+        # A center of zero is the other case: the values are differences, both
+        # directions are meaningful, and nothing is excluded.
+        if matrix.center != 0:
+            with np.errstate(invalid='ignore'):
+                signed = np.where(np.sign(values) == np.sign(matrix.center),
+                                  signed, np.nan)
     cmap, norm = _matrix_norm(signed, matrix.center, matrix.neutral)
 
     offsets = _matrix_offsets(matrix.column_groups, ncol)

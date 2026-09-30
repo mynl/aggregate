@@ -468,3 +468,18 @@ pictures, and an approved picture is the author's to approve. A baseline
 generated and blessed in the same commit that wrote the renderer measures
 nothing. `tests/test_chartdoc_matrix.py` pins the structure instead (ticks, cell
 text, the polarity flip, the hard neutral band, the band gaps), 14 cases.
+
+**A correctness finding from looking at the output, `1.0.0a380`.** The first
+render of the real page drew the `5x5` layer's `Div CoC` cell, whose ratio is
+about -9 because that layer's diversified cost of capital is negative, as the
+deepest **favorable** cell on the page. That reads as "nine times better than
+the book" when the quantity had merely changed sign, and because -9 set the
+amplitude it also flattened the color out of every other cell. A ratio of
+opposite sign to the center is off the scale, not far along it, so it is now
+dropped from the color and from the amplitude while keeping its number. The
+original script made the same call implicitly, by taking `arctan(log(ratio))`
+and letting the negatives fall out as NaN.
+
+This is the argument for rendering the thing rather than trusting the tests:
+every assertion passed before the fix, because none of them had a negative
+ratio in it.

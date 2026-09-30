@@ -240,3 +240,61 @@ def test_frames_emit_no_runtime_warning():
         cdf = bd.cloud_df
     assert not wdf.isna().any().any()
     assert not cdf.isna().any().any()
+
+
+# ----------------------------------------------------------------------
+# PnL input ([Bounds-PnL-Engine]): Bounds sees through to the engine
+# ----------------------------------------------------------------------
+
+PNL_PROGRAM = (
+    'pnl BoundsPnL 100 premium less agg BoundsPnL_e 100 premium at 70% lr '
+    'sev 10 * beta 2 3 occurrence net of 4 xs 4 deposit 10 fixed'
+)
+
+
+@pytest.fixture(scope='module')
+def reinsured_pnl():
+    """A small reinsured P&L whose engine is a net-of Aggregate."""
+    return build(PNL_PROGRAM)
+
+
+def test_bounds_pnl_agrees_with_engine(reinsured_pnl):
+    """``Bounds(pnl)`` and ``Bounds(pnl.engine)`` answer identically: the
+    bounds are on the engine's loss distribution, named for the engine."""
+    pnl = reinsured_pnl
+    eng = pnl.engine
+    prem = float(eng.tvar(0.5))
+    bd_p = Bounds(pnl, premium=prem)
+    bd_e = Bounds(eng, premium=prem)
+    assert bd_p.name == bd_e.name
+    assert bd_p.p_star == pytest.approx(bd_e.p_star, rel=1e-12)
+    head_p = bd_p.tvar_df.head()
+    head_e = bd_e.tvar_df.head()
+    assert (head_p.values == head_e.values).all()
+
+
+def test_bounds_kernel_pnl_raises():
+    """A hand-built kernel P&L wraps no engine and is refused."""
+    from aggregate._grid_distribution import GridDistribution
+    from aggregate._pnl import Group, Leg, PnL
+
+    src = GridDistribution(np.array([0.0, 10.0]), np.array([0.5, 0.5]),
+                           bs=None, is_loss_value=False)
+    kernel = PnL(name='kernel', source=src,
+                 groups=[Group('only', 'sell', [Leg('p', 6.0)],
+                               [Leg('o', lambda x: x)])],
+                 result_name='margin')
+    assert kernel.engine is None
+    with pytest.raises(TypeError, match='wraps no engine'):
+        Bounds(kernel, premium=7.0)
+
+
+def test_pricing_bounds_accepts_pnl(reinsured_pnl):
+    """``PricingBounds`` unwraps a P&L ``x_source`` the same way: the vertex
+    table matches the one built straight from the engine."""
+    from aggregate.bounds import PricingBounds
+    pnl = reinsured_pnl
+    eng = pnl.engine
+    pb = PricingBounds(pnl, {'engine': eng})
+    pb_e = PricingBounds(eng, {'engine': eng})
+    assert np.allclose(pb._T, pb_e._T)

@@ -39,7 +39,7 @@ How they differ
      - the allocation image of G_P (NA premium by unit)
      - the price image of G_P (price of another risk Y)
    * - Input
-     - Portfolio, Aggregate, or pmf Series
+     - Portfolio, Aggregate, PnL (via engine), or pmf Series
      - Portfolio only (needs ``exeqa_*``)
      - two risks X, Y (or callable TVaR sources)
    * - Premium
@@ -112,16 +112,32 @@ def _resolve_obj(obj, unit):
       ``gd.tvar_of_limited(p, a)`` (used by :meth:`Bounds._tvar_x_a`).
     - ``name`` is a display string.
 
-    Accepted obj types: ``Portfolio``, ``Aggregate``, ``pd.Series``,
-    ``pd.DataFrame``. For Series/DataFrame the index is interpreted as outcomes
-    and values as the pmf; for DataFrame the first column is the pmf.
+    Accepted obj types: ``Portfolio``, ``Aggregate``, ``PnL`` (through its
+    engine), ``pd.Series``, ``pd.DataFrame``. For Series/DataFrame the index
+    is interpreted as outcomes and values as the pmf; for DataFrame the first
+    column is the pmf.
 
     For ``Aggregate`` / ``Portfolio`` the object's own ``GridDistribution`` view
     is reused (the same value type the risk measures already flow through).
+
+    A ``PnL`` unwraps to its :attr:`~aggregate.PnL.engine` and the display
+    name is the engine's own: the bounds answer on the engine's loss
+    distribution (the P&L's stochastic obligation leg, net for a net-of
+    program), not on the P&L margin, which is signed and is not a loss
+    variable. A hand-built kernel P&L wraps no engine and raises.
     """
     # Local imports to keep this module decoupled at import time.
     from .distributions import Aggregate
     from .portfolio import Portfolio
+    from ._pnl import PnL
+
+    if isinstance(obj, PnL):
+        if obj.engine is None:
+            raise TypeError(
+                'Bounds: this P&L wraps no engine (hand-built kernel P&L). '
+                'Bounds needs the loss distribution of an Aggregate or '
+                'Portfolio engine.')
+        obj = obj.engine
 
     if isinstance(obj, Portfolio):
         if unit == 'total':
@@ -143,7 +159,8 @@ def _resolve_obj(obj, unit):
     else:
         raise TypeError(
             f'Bounds: unsupported obj type {type(obj).__name__}. '
-            'Accepted: Portfolio, Aggregate, pd.Series, pd.DataFrame.')
+            'Accepted: Portfolio, Aggregate, PnL (through its engine), '
+            'pd.Series, pd.DataFrame.')
 
     if not ser.index.is_unique:
         raise ValueError('pmf index must be unique')
@@ -159,8 +176,11 @@ class Bounds(HelpMixin):
 
     Parameters
     ----------
-    obj : Portfolio, Aggregate, pd.Series, or pd.DataFrame
-        The risk X.
+    obj : Portfolio, Aggregate, PnL, pd.Series, or pd.DataFrame
+        The risk X. A ``PnL`` unwraps to its engine: the bounds answer on
+        the engine's loss distribution (net for a net-of program), not on
+        the signed P&L margin; a kernel P&L with no engine raises
+        ``TypeError``.
     premium : float
         Target premium. Required: ``E[X] < premium <= a``.
     a : float, default ``np.inf``
@@ -661,9 +681,11 @@ def _extract_pmf(obj, a=np.inf):
 
     Parameters
     ----------
-    obj : Aggregate, Portfolio, pd.Series, or pd.DataFrame
+    obj : Aggregate, Portfolio, PnL, pd.Series, or pd.DataFrame
         For ``Aggregate`` / ``Portfolio`` the total ``p_total`` pmf is used;
-        for ``Series`` / ``DataFrame`` the index is outcomes and the values
+        a ``PnL`` unwraps to its engine (the loss distribution answers, not
+        the signed margin; a kernel P&L with no engine raises); for
+        ``Series`` / ``DataFrame`` the index is outcomes and the values
         (first column for a frame) the pmf.
     a : float, default ``np.inf``
         Asset cap.  Mass at outcomes ``>= a`` collapses into a single atom at
@@ -679,6 +701,15 @@ def _extract_pmf(obj, a=np.inf):
     """
     from .distributions import Aggregate
     from .portfolio import Portfolio
+    from ._pnl import PnL
+
+    if isinstance(obj, PnL):
+        if obj.engine is None:
+            raise TypeError(
+                'Bounds: this P&L wraps no engine (hand-built kernel P&L). '
+                'Bounds needs the loss distribution of an Aggregate or '
+                'Portfolio engine.')
+        obj = obj.engine
 
     if isinstance(obj, (Aggregate, Portfolio)):
         ser = obj.density_df.query('p_total > 0').p_total
@@ -693,8 +724,8 @@ def _extract_pmf(obj, a=np.inf):
     else:
         raise TypeError(
             f'PricingBounds: unsupported source type {type(obj).__name__}. '
-            'Accepted: Aggregate, Portfolio, pd.Series, pd.DataFrame, '
-            "a TVaR source, or 'uniform'.")
+            'Accepted: Aggregate, Portfolio, PnL (through its engine), '
+            "pd.Series, pd.DataFrame, a TVaR source, or 'uniform'.")
 
     if not ser.index.is_unique:
         raise ValueError('pmf index must be unique')
@@ -1524,11 +1555,12 @@ class PricingBounds(_HullEngine):
 
     Parameters
     ----------
-    x_source : Aggregate, Portfolio, pd.Series, ``'uniform'``, or TVaR source
-        The reference risk ``X`` carrying the pricing constraint.  Pass
-        ``'uniform'`` (or :func:`uniform_source`) for the Gini lens, where
-        ``TVaR_p(X) = (1 + p) / 2`` and the constraint becomes the mean
-        Kusuoka level ``E_mu[p] = 2P - 1``.
+    x_source : Aggregate, Portfolio, PnL, pd.Series, ``'uniform'``, or TVaR source
+        The reference risk ``X`` carrying the pricing constraint.  A ``PnL``
+        unwraps to its engine's loss distribution (a kernel P&L with no
+        engine raises).  Pass ``'uniform'`` (or :func:`uniform_source`) for
+        the Gini lens, where ``TVaR_p(X) = (1 + p) / 2`` and the constraint
+        becomes the mean Kusuoka level ``E_mu[p] = 2P - 1``.
     y_sources : source or list/dict of sources
         The risk(s) ``Y`` whose price range is wanted.  A dict supplies
         explicit names; a list/single uses each source's own name.  Any

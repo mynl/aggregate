@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a375
+
+**[Bounds-PnL-Engine] `Bounds` and `PricingBounds` accept a `PnL` through its engine.** `_resolve_obj` and `_extract_pmf` unwrap a P&L to its wrapped `Aggregate` / `Portfolio` before the type ladder, so every pmf path (including `PricingBounds` sources via `_coerce_source`) takes a P&L unchanged; the display name and the bounds are the engine's, since the bounds answer on the engine's loss distribution (net for a net-of program), not on the signed P&L margin. A hand-built kernel P&L wraps no engine and raises `TypeError`. `AllocationBounds` stays `Portfolio` only. Accepted-type docstrings updated throughout `bounds.py`.
+
 ## 1.0.0a374
 
 **[Ledger-Net-Of-Tier] the ledger gains a cumulative net-of-tier Consideration / Obligation / Margin block.** Every tier span followed by a later group emits, after its subtotal block, `net of <tier> consideration` / `net of <tier> obligation` (new row kind `net_total`, the position through groups `[0, hi)` by side) and `net of <tier>` (`net_result`, the same atom as the running net through the tier's last group, aliased on all three evaluation routes). Presentation: `(Net of occurrence, Consideration|Obligation|Margin, Net)` rows in `economic_df` and the `summary_df` card, between the tier subtotal and the next tier. The plain tier walk now passes tier spans, so an unpeeled occurrence-plus-aggregate walk shows the block too (its step list gains `Net of occurrence`). `evaluate()`, `economic_ratios_df`, the waterfall and the charts are unchanged by design. `Capstone.PnL` shows Net of occurrence 24,062.50 / -23,175.00 / 887.50 between `All occurrence` and `QS`.

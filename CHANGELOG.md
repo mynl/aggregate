@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a372
+
+**[Kappa-Full-Range] the Palm kappa chart's full extent deepens to the survival floor.** `KAPPA_FULL_FLOOR` is now `SURVIVAL_FLOOR` itself (1e-9, single-sourced from `_two_panel`) rather than the a370 1e-6, so the zoom out reaches the whole readable support of the gross compound. The view the document opens on is unchanged; Palm document hashes move and documents grow (about 2.8 MB on the log2 16 tower fixture, from 2.1).
+
 ## 1.0.0a371
 
 **[Lee-Read-By-Outcome] the quantile (Lee) panels are read by outcome.** `read_axis='y'` on the reins chart's `aggregate` panel, the aggregate chart's `lee` panel and the severity chart's `lee` panel, joining the structure chart's Lee panels, which already declared it. A client interrogating a panel along `read_axis` can answer only for the series whose nearest sample ties, and the outcome lattice is the sole coordinate those curves share, so a hover now reads gross, ceded and net together rather than one of them. Document hashes on the three charts move; no numbers change. `Panel.read_axis` documents the rule, and a new sweep in `tests/test_charts_ir.py` holds every multi-series `xy` panel to it.

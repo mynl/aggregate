@@ -55,6 +55,7 @@ from ..bivariate import BivariateAggregate
 from . import register_chart, _emitter_base
 from ._emit_structure import _engine
 from ._payload import lattice_payload
+from ._two_panel import SURVIVAL_FLOOR
 from .ir import (ChartAxis, ChartDoc, ChartSeries, Panel, SurfaceData,
                  complete_tex, encode_z_block)
 
@@ -495,13 +496,14 @@ KAPPA_LEVELS = (0.01, 0.99)
 #: compound ([Kappa-Full-Range]). The Palm pass computes the whole curve in
 #: one FFT, so the view window of :data:`KAPPA_CDF_RANGE` is a display
 #: choice, not a cost control, and cropping the *data* to it hid exactly
-#: the tail a high-attaching program acts in. Three decades past the view
-#: window, so the zoom out has something real to show; short of
-#: ``_two_panel.SURVIVAL_FLOOR`` (1e-9), because every shipped cell is an
-#: explicit float on each curve and past one in a million the picture is
-#: parallel to the identity to the eye. The band routes keep the plain
-#: window: there each cell is a fold over the joint.
-KAPPA_FULL_FLOOR = 1e-6
+#: the tail a high-attaching program acts in. The
+#: :data:`~aggregate.charts._two_panel.SURVIVAL_FLOOR` itself (1e-9, the
+#: deepest survival worth a panel anywhere in this package), per the
+#: author's 2026-09-30 ruling: the zoom out shows the whole readable
+#: support, and the extra cells past one in a million cost bytes on a
+#: curve already shipped in full. The band routes keep the plain window:
+#: there each cell is a fold over the joint.
+KAPPA_FULL_FLOOR = SURVIVAL_FLOOR
 
 chart_kappa = _emitter_base('kappa')
 

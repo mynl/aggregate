@@ -2433,37 +2433,38 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         ``MultiIndex (component, measure)``:
 
         * ``meta``: ``share`` (proportion covered), ``limit``, ``attach``,
-          ``pr_attach`` and ``pr_detach`` -- the **ground-up exposure
-          probabilities** that the underlying loss attaches / fully exhausts
-          the view, ``P(X > exp_attach + view_attach)`` and ``P(X > exp_attach
-          + view_attach + view_limit)``. These come from the **underlying**
-          severity (``self.sevs[i].fz``), not the modeled ``sev_density``,
-          which is conditional (claims to the policy layer) and would report 0
-          at the policy cap. ``pr_detach`` is ``NaN`` for unlimited layers /
-          net totals. ``pr_loss`` (``P(aggregate > 0)`` from the column's
-          aggregate density), ``lol`` (loss on line = expected layer aggregate
-          loss / placed limit), and ``output`` (``0/1`` flag marking each
-          stage's output view -- two 1s for an occ+agg program; ``Gross``
-          carries the 1 when there is no occurrence program). ``Gross`` carries
-          the claim-count-weighted policy ``limit`` / ``attach`` (``share`` 1);
-          the occurrence ``Ceded`` total carries the share-placed sum of layer
-          limits and the minimum attachment. (The layer ``freq`` ``n'`` uses
-          the *conditional* ``P(subject > attach | policy loss)`` -- the model
-          count is claims to the policy -- a separate basis from the absolute
-          ``pr_attach``.)
+          ``pr_attach`` and ``pr_detach`` -- probabilities **per modeled
+          claim**, read from the picks-adjusted bucketed subject severity
+          (the grid): ``P(subject > attach)`` (exclusive) and ``P(subject >=
+          attach + limit)`` (inclusive). One basis serves the whole frame:
+          the same ``pr_attach`` conditions the layer severity and thins the
+          layer frequency, so ``freq mean = n * pr_attach`` and ``sev_cond =
+          sev_uncond / pr_attach`` hold exactly. ``pr_detach`` is ``NaN`` for
+          unlimited layers / net totals. ``pr_loss`` (``P(aggregate > 0)``
+          from the column's aggregate density), ``lol`` (loss on line =
+          expected layer aggregate loss / placed limit), and ``output``
+          (``0/1`` flag marking each stage's output view -- two 1s for an
+          occ+agg program; ``Gross`` carries the 1 when there is no
+          occurrence program). ``Gross`` carries the widest policy terms over
+          the mixture components -- max ``limit`` (``inf`` if any component
+          is unlimited) over min ``attach`` (``share`` 1). The occurrence
+          ``Ceded`` total deliberately carries the **placed capacity**
+          ``sum(share * limit)`` and the minimum layer attachment: the placed
+          sum is the program's capacity, which a max would understate.
         * ``('freq'|'sev'|'agg', ex1|ex2|ex3|mean|cv|skew)`` -- moments
           (``ex1`` duplicates ``mean`` for easy ``filter(regex=...)`` access).
 
         Notes
         -----
         **Occurrence layers are conditional** on a loss reaching the layer:
-        the frequency is the expected penetrating count ``n' = E[N] * P(X >
-        attach)`` and the severity is the unconditional layer severity divided
-        by ``P(X > attach)`` (conditional given attach), which leaves the layer
-        aggregate mean ``n' * sev`` equal to the unconditional ``E[N] *
-        E[ceded]``. The ``agg`` row is the column's actual aggregate
-        distribution (FFT of the unconditional layer ceded severity), so its
-        higher moments and ``pr_loss`` are exact.
+        the frequency is the expected penetrating count ``n' = E[N] *
+        P(subject > attach)`` and the severity is the unconditional layer
+        severity divided by the same ``P(subject > attach)`` (conditional
+        given attach), which leaves the layer aggregate mean ``n' * sev``
+        equal to the unconditional ``E[N] * E[ceded]``. The ``agg`` row is
+        the column's actual aggregate distribution (FFT of the unconditional
+        layer ceded severity), so its higher moments and ``pr_loss`` are
+        exact.
 
         **The occurrence ``Ceded`` / ``Net`` columns are unconditional**
         totals: the same claim count as ``Gross`` and unconditional

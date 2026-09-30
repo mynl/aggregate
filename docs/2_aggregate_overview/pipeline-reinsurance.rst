@@ -157,13 +157,13 @@ The meta block holds:
 ``share``
     proportion covered.
 ``limit``
-    for Gross, the claim-count-weighted policy limit at share 1; for occurrence Ceded, the share-placed sum of layer limits.
+    for Gross, the maximum component policy limit at share 1 (``inf`` if any component is unlimited); for occurrence Ceded, the share-placed sum of layer limits, the program's placed capacity, a deliberate convention (a max would understate it).
 ``attach``
-    for Gross, the claim-count-weighted attachment; for occurrence Ceded, the minimum attachment.
+    for Gross, the minimum component attachment; for occurrence Ceded, the minimum layer attachment.
 ``pr_attach``
-    the ground-up probability that the underlying loss attaches the view, :math:`\Pr(X > \mathrm{exp\_attach} + \mathrm{view\_attach})`, taken from the underlying frozen severity ``fz``, not from the conditional ``sev_density``, which reads 0 at the policy cap.
+    the probability per modeled claim that the subject loss attaches the view, :math:`\Pr(\mathrm{subject} > \mathrm{attach})` (exclusive), read from the picks-adjusted bucketed subject severity, the grid. One basis serves the whole frame: the same number conditions the layer severity and thins the layer frequency.
 ``pr_detach``
-    the ground-up probability that it exhausts the view, :math:`\Pr(X > \mathrm{attach} + \mathrm{limit})`. ``NaN`` for unlimited layers and for net totals.
+    the probability per modeled claim that it exhausts the view, :math:`\Pr(\mathrm{subject} \ge \mathrm{attach} + \mathrm{limit})` (inclusive), on the same grid basis. ``NaN`` for unlimited layers and for net totals.
 ``pr_loss``
     :math:`\Pr(\text{aggregate} > 0)` from the column's aggregate density.
 ``lol``
@@ -171,7 +171,7 @@ The meta block holds:
 ``output``
     a 0/1 flag marking each stage's output view. An occurrence-plus-aggregate program carries two 1s; Gross carries it when there is no occurrence program.
 
-Occurrence layers are conditional on a loss reaching the layer. The frequency is the penetrating count :math:`n' = \mathsf E[N] \Pr(X > \mathrm{attach})` and the severity is the unconditional layer severity divided by the same :math:`\Pr(X > \mathrm{attach})`, which leaves the layer aggregate mean :math:`n' \cdot \mathrm{sev}` equal to the unconditional :math:`\mathsf E[N]\,\mathsf E[\mathrm{ceded}]`. The ``agg`` row is the column's actual aggregate distribution, the FFT of the unconditional layer ceded severity, so its higher moments and ``pr_loss`` are exact and the layer aggregate means sum to the Ceded total. The conditioning :math:`\Pr(\mathrm{subject} > \mathrm{attach} \mid \text{policy loss})` uses the modeled ``self.sev.sf(attach)``, while the displayed ``pr_attach`` and ``pr_detach`` are absolute ground-up probabilities, a separate basis.
+Occurrence layers are conditional on a loss reaching the layer. The frequency is the penetrating count :math:`n' = \mathsf E[N] \Pr(\mathrm{subject} > \mathrm{attach})` and the severity is the unconditional layer severity divided by the same :math:`\Pr(\mathrm{subject} > \mathrm{attach})`, which leaves the layer aggregate mean :math:`n' \cdot \mathrm{sev}` equal to the unconditional :math:`\mathsf E[N]\,\mathsf E[\mathrm{ceded}]`. The ``agg`` row is the column's actual aggregate distribution, the FFT of the unconditional layer ceded severity, so its higher moments and ``pr_loss`` are exact and the layer aggregate means sum to the Ceded total. The displayed ``pr_attach`` is the same grid probability used for the conditioning and the thinning, so the identities hold exactly by construction.
 
 The Ceded and Net totals are unconditional: the same claim count as Gross and unconditional severities, so Ceded severity plus Net severity equals Gross severity. The aggregate block leaves frequency and severity all ``NaN``, because a cover on the aggregate has no per-claim frequency and severity that combine in the usual way.
 

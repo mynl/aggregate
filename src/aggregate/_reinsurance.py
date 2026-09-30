@@ -1021,12 +1021,6 @@ def reins_stats_df(agg):
         """P(loss > 0) = 1 - mass in the zero bucket."""
         return float(1.0 - np.asarray(density, dtype=float)[0])
 
-    def _sf(a):
-        try:
-            return float(agg.sev.sf(a))
-        except Exception:  # pragma: no cover - exotic severities
-            return np.nan
-
     def _ge(density, t):
         """P(loss >= t) from a density, ``NaN`` if ``t`` is not finite.
         Used for the *aggregate*-level attach/detach probabilities (the
@@ -1035,47 +1029,24 @@ def reins_stats_df(agg):
             return np.nan
         return float(np.sum(np.asarray(density, dtype=float)[xs >= t]))
 
-    # Claim-count weights and the ground-up severity survival, used for the
-    # occurrence attach/detach probabilities. The modeled ``sev_density``
-    # is *conditional* (claims to the policy layer, ``n`` the conditional
-    # count), so the unconditional exposure probabilities -- P(a ground-up
-    # claim's subject loss exceeds a threshold) -- come from the underlying
-    # frozen severity ``fz`` with each component's policy attachment as the
-    # offset. The limited ``agg.sev.sf`` would report 0 at the policy cap
-    # by definition; the ground-up ``fz`` gives the true detachment prob.
-    en = np.asarray(agg.en, dtype=float)
-    ws = (en / en.sum() if en.sum() > 0
-          else np.full(len(agg.sevs), 1.0 / max(len(agg.sevs), 1)))
+    # Every probability in the frame reads the picks-adjusted, bucketed
+    # subject severity (the grid) -- the only basis consistent with the
+    # layer moments and the only one the picks adjustment reaches. The
+    # semantics are per modeled claim (the conditional count ``n``), not
+    # ground-up exposure probabilities. Attach thresholds are exclusive
+    # (P(subject > t)), detach inclusive (P(subject >= t)), matching the
+    # aggregate stage's ``_pr_agg`` / ``_ge`` convention.
+    p_sev_gross = rd['p_sev_gross'].to_numpy()
 
-    def _gsf(t, inclusive=False):
-        """Weighted P(subject loss > t) (``>= t`` if ``inclusive``).
+    def _sev_gt(t):
+        """P(subject > t) per modeled claim, from the bucketed severity."""
+        return float(np.sum(p_sev_gross[xs > t]))
 
-        ``subject_i = layer(X_i; attach_i, limit_i)``, so subject > t iff
-        the ground-up ``X_i > attach_i + t`` (and t below the cap)."""
-        try:
-            tot = 0.0
-            for i, sev in enumerate(agg.sevs):
-                lim = float(sev.limit)
-                if t < lim or (inclusive and t <= lim):
-                    tot += ws[i] * float(sev.fz.sf(float(sev.attachment) + t))
-            return float(tot)
-        except Exception:  # pragma: no cover - exotic severities
+    def _sev_ge(t):
+        """P(subject >= t) per modeled claim; ``NaN`` if ``t`` not finite."""
+        if not np.isfinite(t):
             return np.nan
-
-    def _gross_detach():
-        """Weighted P(policy detaches) = P(ground-up >= attach + limit)
-        over finite-limit components; ``NaN`` if every component unlimited."""
-        fin = [i for i, sev in enumerate(agg.sevs)
-               if np.isfinite(float(sev.limit))]
-        if not fin:
-            return np.nan
-        try:
-            return float(sum(
-                ws[i] * float(agg.sevs[i].fz.sf(
-                    float(agg.sevs[i].attachment) + float(agg.sevs[i].limit)))
-                for i in fin))
-        except Exception:  # pragma: no cover - exotic severities
-            return np.nan
+        return float(np.sum(p_sev_gross[xs >= t]))
 
     def _lol(mean, placed_limit):
         """Loss on line: expected layer aggregate loss / placed limit."""
@@ -1095,16 +1066,13 @@ def reins_stats_df(agg):
     f1, f2, f3 = agg.frequency.freq_moms(n)
     freq_full = moments6((f1, f2, f3))
 
-    # Claim-count-weighted gross policy limit / attachment (mixtures);
-    # ``en`` / ``ws`` were set with the ground-up survival helpers above.
+    # Gross policy terms over the mixture components: the widest cover on
+    # the book (max limit, ``inf`` if any component is unlimited) over the
+    # lowest entry point (min attachment).
     lim = np.asarray(agg.limit, dtype=float)
     att = np.asarray(agg.attachment, dtype=float)
-    if en.sum() > 0:
-        gross_limit = float(np.average(lim, weights=en))
-        gross_attach = float(np.average(att, weights=en))
-    else:  # zero-risk fallback
-        gross_limit = float(np.mean(lim))
-        gross_attach = float(np.mean(att))
+    gross_limit = float(np.max(lim))
+    gross_attach = float(np.min(att))
 
     # Which view carries each stage's output=1 flag.
     occ_out = (REINS_LABEL_NET if agg.occ_kind == 'net of'
@@ -1117,13 +1085,12 @@ def reins_stats_df(agg):
                            and agg.occ_reins is None) else 0.0
 
     # ----- gross book (always present) -----
-    p_sev_gross = rd['p_sev_gross'].to_numpy()
     gross_agg6 = reins_density6(agg, rd['p_agg_gross'].to_numpy())
     data[('occ', REINS_LABEL_GROSS)] = col(
         share=1.0, limit=gross_limit, attach=gross_attach,
-        # exposure probabilities from the underlying ground-up severity
-        pr_attach=_gsf(0.0),            # P(a ground-up claim hits the policy)
-        pr_detach=_gross_detach(),      # P(it exhausts the policy limit)
+        # per modeled claim, on the grid basis
+        pr_attach=_sev_gt(0.0),        # P(a claim produces a positive subject loss)
+        pr_detach=_sev_ge(gross_limit),  # P(it exhausts the largest policy)
         pr_loss=_pr_pos(rd['p_agg_gross'].to_numpy()),
         lol=_lol(gross_agg6[3], gross_limit),
         output=gross_output,
@@ -1133,16 +1100,18 @@ def reins_stats_df(agg):
 
     # ----- occurrence layering (conditional layers; unconditional totals) -----
     if agg.occ_reins is not None:
-        p_gross = rd['p_sev_gross'].to_numpy()
         for k, (s, y, a) in enumerate(agg.occ_reins, 1):
             ceder_k, _ = make_ceder_netter([(s, y, a)])
-            ceded_k = _layer_ceded(ceder_k, p_gross)
-            # Conditioning for the layer freq / sev is relative to the
-            # *policy* claims (the modeled count ``n``): P(subject > a |
-            # policy loss) = agg.sev.sf(a). The displayed pr_attach /
-            # pr_detach are the absolute ground-up exposure probabilities.
-            pr = _sf(a)
-            u1, u2, u3 = _raw3(ceded_k)              # raw (conditional on policy)
+            ceded_k = _layer_ceded(ceder_k, p_sev_gross)
+            # One number, three uses, one basis: P(subject > a) per modeled
+            # claim from the grid is the displayed pr_attach, the divisor
+            # conditioning the layer severity on a loss to the layer, and
+            # the frequency thinning probability. Numerator and denominator
+            # come from the same measure, so the conditional mean is bounded
+            # by ``share * limit`` and the variance is nonnegative by
+            # construction.
+            pr = _sev_gt(a)
+            u1, u2, u3 = _raw3(ceded_k)              # raw (per modeled claim)
             if pr and not np.isnan(pr):              # condition on the layer
                 cond = (u1 / pr, u2 / pr, u3 / pr)
             else:
@@ -1157,8 +1126,8 @@ def reins_stats_df(agg):
             agg6 = reins_density6(agg, agg_k)
             data[('occ', f'layer.{k}')] = col(
                 share=s, limit=y, attach=a,
-                pr_attach=_gsf(a),
-                pr_detach=_gsf(a + y, inclusive=True) if np.isfinite(y) else np.nan,
+                pr_attach=pr,
+                pr_detach=_sev_ge(a + y),
                 pr_loss=_pr_pos(agg_k),
                 lol=_lol(agg6[3], s * y),
                 freq6=moments6(lf), sev6=moments6(cond), agg6=agg6)
@@ -1167,7 +1136,7 @@ def reins_stats_df(agg):
         ceded_agg6 = reins_density6(agg, rd['p_agg_ceded_occ'].to_numpy())
         data[('occ', REINS_LABEL_CEDED)] = col(
             limit=placed, attach=min_attach,
-            pr_attach=_gsf(min_attach),   # P(any ceding) = P(hit lowest layer)
+            pr_attach=_sev_gt(min_attach),  # P(any ceding) = P(hit lowest layer)
             pr_loss=_pr_pos(rd['p_agg_ceded_occ'].to_numpy()),
             lol=_lol(ceded_agg6[3], placed),
             output=1.0 if occ_out == REINS_LABEL_CEDED else 0.0,
@@ -1175,7 +1144,7 @@ def reins_stats_df(agg):
             sev6=reins_density6(agg, rd['p_sev_ceded'].to_numpy()),
             agg6=ceded_agg6)
         data[('occ', REINS_LABEL_NET)] = col(
-            pr_attach=_gsf(0.0),          # P(any subject loss retained)
+            pr_attach=_sev_gt(0.0),       # P(any subject loss retained)
             pr_loss=_pr_pos(rd['p_agg_net_occ'].to_numpy()),
             output=1.0 if occ_out == REINS_LABEL_NET else 0.0,
             freq6=freq_full,

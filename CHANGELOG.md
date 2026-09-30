@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a373
+
+**[Reins-Stats-Grid-Basis] every probability in `reins_stats_df` reads the picks-adjusted bucketed severity, and the gross cover terms become max limit over min attach.** The old frame mixed three probability bases, two of them blind to the picks adjustment: on a picks book the conditional layer severity could exceed `share * limit` (20,734 on a 5,000 limit for `agg.Capstone.FullProgram`) with negative implied variance showing as `NaN` cv / skew. Now one grid number per layer, `P(subject > attach)` exclusive and `P(subject >= detach)` inclusive, is the displayed `pr_attach` / `pr_detach`, the severity conditioning divisor and the frequency thinning probability, so `freq mean = n * pr`, `sev_cond = sev_uncond / pr` and nonnegative variance hold by construction. `Gross` `limit` / `attach` are the max component limit (`inf` if any unlimited) over the min component attachment, replacing the claim-count-weighted averages; the occurrence `Ceded` total deliberately keeps placed capacity `sum(share * limit)` over the min layer attachment. Numbers move on every reinsured book (grid vs continuous, half-bucket size); the eight reins exhibit snapshots were recaptured. Docs pending rebuild (`pipeline-reinsurance.rst`).
+
 ## 1.0.0a372
 
 **[Kappa-Full-Range] the Palm kappa chart's full extent deepens to the survival floor.** `KAPPA_FULL_FLOOR` is now `SURVIVAL_FLOOR` itself (1e-9, single-sourced from `_two_panel`) rather than the a370 1e-6, so the zoom out reaches the whole readable support of the gross compound. The view the document opens on is unchanged; Palm document hashes move and documents grow (about 2.8 MB on the log2 16 tower fixture, from 2.1).

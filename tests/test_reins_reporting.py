@@ -146,10 +146,21 @@ def test_stats_df_meta_rows():
     assert rs.loc[('meta', 'share'), ('occ', 'layer.1')] == pytest.approx(0.5)
     assert rs.loc[('meta', 'limit'), ('occ', 'layer.1')] == pytest.approx(32)
     assert rs.loc[('meta', 'attach'), ('occ', 'layer.1')] == pytest.approx(32)
-    # P(X > 32) for uniform[0, 128]
-    assert rs.loc[('meta', 'pr_attach'), ('occ', 'layer.1')] == pytest.approx(0.75)
-    # Gross carries the claim-count-weighted policy terms (share 1)
+    # P(X > 32) for uniform[0, 128], on the grid basis (half-bucket tolerance)
+    assert rs.loc[('meta', 'pr_attach'), ('occ', 'layer.1')] == pytest.approx(0.75, abs=1e-3)
+    # Gross carries the widest policy terms: max limit over min attach (share 1)
     assert rs.loc[('meta', 'share'), ('occ', 'Gross')] == pytest.approx(1.0)
+
+
+def test_stats_df_gross_terms_max_min():
+    """Gross terms on a mixture are max component limit over min component
+    attachment, not the claim-count-weighted average (which here would be
+    limit 125 / attach 37.5 at weights [1, 3])."""
+    a = build('agg RR.Mix [1 3] claims [200 100] xs [0 50] '
+              'sev lognorm 50 cv 1 occurrence net of 50 xs 50 poisson')
+    rs = a.reins_stats_df
+    assert rs.loc[('meta', 'limit'), ('occ', 'Gross')] == pytest.approx(200)
+    assert rs.loc[('meta', 'attach'), ('occ', 'Gross')] == pytest.approx(0)
 
 
 def test_stats_df_pricing_meta_rows():
@@ -222,6 +233,34 @@ def test_stats_df_occ_layer_conditional_severity():
     assert cond == pytest.approx(uncond / pr, rel=1e-6)
     # conditional count n' = n * pr
     assert rs.loc[('freq', 'mean'), ('occ', 'layer.1')] == pytest.approx(2 * pr)
+
+
+@pytest.mark.slow
+def test_stats_df_picks_book_conditional_severity():
+    """On a picks-adjusted mixture book every probability reads the grid, so
+    the conditional layer severity is bounded by share * limit, cv and skew
+    are finite wherever the layer is reachable, and freq * sev == agg holds
+    exactly (the same grid ``pr_attach`` conditions and thins)."""
+    a = build('agg.Capstone.FullProgram')
+    rs = a.reins_stats_df
+    # widest policy terms on the gross book
+    assert rs.loc[('meta', 'limit'), ('occ', 'Gross')] == pytest.approx(10000)
+    assert rs.loc[('meta', 'attach'), ('occ', 'Gross')] == pytest.approx(0)
+    layer_cols = [c for c in rs.columns
+                  if c[0] == 'occ' and c[1].startswith('layer.')]
+    assert layer_cols
+    for c in layer_cols:
+        share = rs.loc[('meta', 'share'), c]
+        limit = rs.loc[('meta', 'limit'), c]
+        pr = rs.loc[('meta', 'pr_attach'), c]
+        sev_mean = rs.loc[('sev', 'mean'), c]
+        assert sev_mean <= share * limit * (1 + 1e-9), c
+        if pr > 0:
+            assert np.isfinite(rs.loc[('sev', 'cv'), c]), c
+            assert np.isfinite(rs.loc[('sev', 'skew'), c]), c
+        freq_mean = rs.loc[('freq', 'mean'), c]
+        agg_mean = rs.loc[('agg', 'mean'), c]
+        assert freq_mean * sev_mean == pytest.approx(agg_mean, rel=1e-9), c
 
 
 def test_stats_df_ceded_plus_net_equals_gross_sev():

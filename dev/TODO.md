@@ -557,6 +557,24 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Plugin-Loader]** DONE (`1.0.0a376`), plan `dev/plan-a376-plugins-and-extension-surface.md`
+  (still live for its later stages, execution log in its section 11): new
+  `aggregate.plugins`, the extension surface a third-party `aggregate-<thing>`
+  distribution registers charts and exhibits through. Entry point group
+  `aggregate.plugins` plus an `AGGREGATE_PLUGINS` environment on-ramp,
+  `AGGREGATE_NO_PLUGINS` kill switch, provenance from a before-and-after
+  registry snapshot, recorded-not-fatal failures, and a refusal when a plugin
+  reuses a name the library or another plugin owns. No auto-load on import: the
+  host calls `load()`. Documented in `docs/3_reference/3_x_Plugins.rst` and the
+  new "extension surface" section of `3_x_API_Stability.rst`. **Open, in other
+  repos:** [Reference-Plugin] wants the `aggregate-relativity` repo created at
+  `V:\dev\aggregate-relativity` (only its `reference/` porting spec is there
+  today), and [Lab-Tab] is `aggregate-api`'s, to be transcribed into that
+  repo's own plan. One library question deferred to [Reference-Plugin]'s chart
+  stage: whether `charts._emitter_base` gets a public spelling, since a
+  chart-contributing plugin otherwise hand-rolls the singledispatch base that
+  `available_charts` reads.
+
 - **[Pr-Ruin-Pill]** DONE (`dev/done/plan-pk-tab.md`, execution notes
   `dev/done/plan-pk-tab-LIB.md`): the Pricing > Pr Ruin pill, probability
   of eventual ruin for poisson and renewal frequencies. LIB half `a339` to

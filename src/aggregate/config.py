@@ -353,9 +353,17 @@ _SECTIONS = {
 # ---------------------------------------------------------------------------
 # Environment-variable allow-list (Phase 1 starter set). Each entry maps an
 # AGGREGATE_* variable to (section, field, coercion). Unknown AGGREGATE_*
-# variables warn loudly rather than silently no-op. AGGREGATE_CONFIG is handled
-# separately in config_path.
+# variables warn loudly rather than silently no-op.
 # ---------------------------------------------------------------------------
+
+#: AGGREGATE_* variables this module deliberately does not own, so the
+#: allow-list above passes over them instead of warning. AGGREGATE_CONFIG is
+#: read by :func:`config_path`; the two plugin variables are read by
+#: :mod:`aggregate.plugins`, which runs before any settings object exists and
+#: whose values change no numerical answer.
+_ENV_IGNORED = frozenset({
+    'AGGREGATE_CONFIG', 'AGGREGATE_PLUGINS', 'AGGREGATE_NO_PLUGINS',
+})
 
 def _env_databases(s: str) -> tuple[str, ...]:
     """Parse a comma-separated ``AGGREGATE_DATABASES`` value into a tuple."""
@@ -514,12 +522,13 @@ def load_settings(*, path='__use_config_path__', env=None) -> Settings:
 
     # Environment overrides.
     for var, raw_val in env.items():
-        if not var.startswith('AGGREGATE_') or var == 'AGGREGATE_CONFIG':
+        if not var.startswith('AGGREGATE_') or var in _ENV_IGNORED:
             continue
         if var not in _ENV_MAP:
             warnings.warn(
                 f"Unknown environment variable '{var}' "
-                f"(known: {sorted(_ENV_MAP)} and AGGREGATE_CONFIG); ignored.")
+                f"(known: {sorted(_ENV_MAP)} "
+                f"and {sorted(_ENV_IGNORED)}); ignored.")
             continue
         sec_name, fname, coerce = _ENV_MAP[var]
         try:

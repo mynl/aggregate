@@ -9,7 +9,9 @@ this file.
 ``Tweedie``, ``FourierTools``, ``Pentagon``, anything in ``pedagogy``,
 and the ``exhibits`` module are intentionally NOT re-exported here --
 reach them via submodule import (``from aggregate.tweedie import
-Tweedie``, ``from aggregate import exhibits``, etc.).
+Tweedie``, ``from aggregate import exhibits``, etc.). ``plugins`` is the
+one submodule bound here, so a host can write ``aggregate.plugins.load()``;
+nothing is star-exported from it either.
 """
 
 # Pandas Copy-on-Write: enabled unconditionally for the library. On
@@ -39,6 +41,12 @@ from .decl_pygments import *  # noqa: F401,F403
 # tweedie depends on Aggregate / build / qd already being bound on the
 # package, so import last.
 from .tweedie       import *  # noqa: F401,F403
+
+# The extension surface, bound as a submodule rather than star-exported: a host
+# calls `aggregate.plugins.load()` to run third-party registrations. The module
+# imports nothing heavy and reaches charts / exhibits only inside load(), so
+# `import aggregate` still pulls in neither provisional package.
+from . import plugins  # noqa: F401
 
 
 __docformat__ = 'restructuredtext'

@@ -63,6 +63,40 @@ Explicitly post-1.0, and not gating the release: conversion of the charts the ap
 
 One thing that is *not* a stability signal: ``greater_tables`` is a plain dependency rather than an optional extra, chosen so the exhibit surface never raises ``ImportError`` on a supported interpreter. That is a fact about installation. It does not move :mod:`aggregate.exhibits` into the 1.0 contract.
 
+.. _extension-surface:
+
+The extension surface
+---------------------
+
+A third-party package contributes charts and exhibits to ``aggregate`` without the library carrying any of its code. The mechanism is :mod:`aggregate.plugins`: a distribution named ``aggregate-<thing>`` declares an entry point in the group ``aggregate.plugins``, resolving to a zero-argument ``register()`` callable that performs its registry calls and returns the app-facing strings for what it registered. Nothing loads on ``import aggregate``; the **host** calls :func:`aggregate.plugins.load`, so a notebook's results stay a function of the notebook's own text rather than of what happens to be installed.
+
+This is what a plugin author codes against.
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 65
+
+   * - Surface
+     - What it is for
+   * - :func:`aggregate.plugins.load`, :func:`~aggregate.plugins.loaded_plugins`
+     - Discovery, run once by the host. ``loaded_plugins`` reports every candidate found, failures included, each with the registry keys it actually added
+   * - :class:`aggregate.plugins.PluginLeaf`
+     - The plugin's own label, hint and ``why`` for one contributed document. Presentation strings live here rather than on a registry entry, because a navigation hint is a client concern and a chart entry is an IR concern
+   * - :class:`aggregate.plugins.LoadedPlugin`
+     - The load record: name, version, source, leaves, the chart and exhibit keys added, and the error if it failed
+   * - :func:`aggregate.charts.register_chart` and the :class:`~aggregate.charts.ir.ChartDoc` family
+     - Contributing a chart. The plugin emits a document; the existing renderers draw it. A plugin that draws its own figures is a second rendering pipeline, and the two diverge within a month
+   * - :func:`aggregate.exhibits.register_simple_exhibit`, and the per-exhibit ``.register(Cls)`` / ``.insurer.register(Cls)`` hooks
+     - Contributing a table, or a new type's treatment of an existing exhibit
+   * - The public frames of the first-class classes
+     - The input. These are stable, per the table above
+
+And this is what it deliberately does not cover: anything underscore-prefixed. A plugin that reaches into ``_pnl`` internals is a ``contrib`` bag with extra steps, and the lock on the 1.0 contract is theater again. If a plugin needs something the public frames do not expose, that is an upstream request against ``aggregate``.
+
+The honest stability statement: the extension surface sits **inside** the provisional tier. :mod:`aggregate.charts` and :mod:`aggregate.exhibits` may break in a minor release with no deprecation period, so anything registering into them inherits that, and :mod:`aggregate.plugins` itself carries the same freedom. Naming the surface is not a promise of stability. It tells a plugin author exactly what their blast radius is, and it makes the feedback loop explicit: a real out-of-tree plugin is the best evidence available about whether the chart IR and the exhibit vocabulary carry the right knowledge.
+
+Two properties of the mechanism are worth stating because a plugin author will meet them. A plugin whose import or ``register()`` raises is recorded and skipped, never fatal, so one broken experiment cannot take :func:`aggregate.build` or a server down. And a plugin may not reuse a chart or exhibit name the library or another plugin already owns: ``register_chart`` raises on a duplicate, and for exhibits, where ``register_simple_exhibit`` deliberately *extends* rather than raises, the loader refuses the plugin itself. Neither registry has a removal API, so a refused plugin is not unwound and the process warrants a restart once the collision is fixed.
+
 Reading a version number
 ------------------------
 

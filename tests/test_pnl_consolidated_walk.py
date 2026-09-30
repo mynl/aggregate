@@ -78,7 +78,9 @@ def test_acceptance_walk_steps(cat):
     # step key is 'All' (a140 rename)
     steps = list(dict.fromkeys(
         x.economic_df.index.get_level_values('Step')))
-    assert steps == ['Gross', 'Occ Cover', 'Agg Cover', 'All']
+    # the net-of-occurrence block sits between the tiers ([Ledger-Net-Of-Tier])
+    assert steps == ['Gross', 'Occ Cover', 'Net of occurrence', 'Agg Cover',
+                     'All']
     # the engine's own label names the direct block's loss leg and margin
     assert ('Gross', 'Obligation', 'Gross Book1') in x.economic_df.index
     assert ('Gross', 'Margin', 'Gross Book1') in x.economic_df.index

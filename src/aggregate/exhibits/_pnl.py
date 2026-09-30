@@ -21,8 +21,10 @@ from ._core import (
 #: Ledger row kind to greater_tables row flag ([Exhibits-Economic-Insurer]).
 #: The grand result is the bottom line; each group's and each tier's own
 #: result, and the grand side totals, are subtotals; a running net is a
-#: cumulative reading aid rather than a booked line, so it is muted. Legs and
-#: ``total_impact`` are unflagged, the latter because it is a difference
+#: cumulative reading aid rather than a booked line, so it is muted, and the
+#: net-of-tier result ([Ledger-Net-Of-Tier]) is the same position under a
+#: tier-level name, so it mutes with it. Legs, the net-of-tier side totals,
+#: and ``total_impact`` are unflagged, the latter because it is a difference
 #: between two positions rather than one of them.
 LEDGER_ROW_FLAGS = {
     'grand_result': ('total',),
@@ -30,6 +32,7 @@ LEDGER_ROW_FLAGS = {
     'tier_result': ('subtotal',),
     'grand_total': ('subtotal',),
     'running_net': ('muted',),
+    'net_result': ('muted',),
 }
 
 

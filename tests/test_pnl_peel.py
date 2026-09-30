@@ -177,10 +177,11 @@ def test_occurrence_tier_precedes_the_aggregate_tier():
         'poisson aggregate net of 150 xs 300 deposit 25 peel top-down'
     )
     # the occurrence tier peels into two steps so it earns a subtotal; the
-    # single-layer aggregate tier is already its own subtotal
+    # single-layer aggregate tier is already its own subtotal; the net-of-tier
+    # block follows the occurrence tier ([Ledger-Net-Of-Tier])
     assert _steps(build(prog)) == [
         'Gross', 'occ 300 xs 200', 'occ 100 xs 100', 'All occurrence',
-        'agg 150 xs 300', 'All']
+        'Net of occurrence', 'agg 150 xs 300', 'All']
 
 
 # ----------------------------------------------------------------------
@@ -592,7 +593,8 @@ def test_both_tiers_get_their_own_subtotal():
     p = build(f'{TWO_EACH} peel top-down')
     assert _steps(p) == [
         'Gross', 'occ 300 xs 200', 'occ 100 xs 100', 'All occurrence',
-        'agg 200 xs 400', 'agg 100 xs 300', 'All aggregate', 'All']
+        'Net of occurrence', 'agg 200 xs 400', 'agg 100 xs 300',
+        'All aggregate', 'All']
 
 
 @pytest.mark.parametrize('direction', ['top-down', 'bottom-up'])
@@ -663,6 +665,78 @@ def test_summary_df_gains_the_tier_block():
         assert (tier, 'Net') not in card.index
 
 
+# ----------------------------------------------------------------------
+# Net-of-tier blocks ([Ledger-Net-Of-Tier])
+#
+# Every tier span followed by a later group earns a cumulative net block:
+# the position through the tier, split Consideration / Obligation / Margin.
+# The final tier earns none, because the grand All block already is the
+# net-of-tier position.
+# ----------------------------------------------------------------------
+def test_net_block_follows_the_occurrence_tier_only():
+    p = build(f'{TWO_EACH} peel top-down')
+    steps = _steps(p)
+    assert steps.index('Net of occurrence') == steps.index('All occurrence') + 1
+    assert 'Net of aggregate' not in steps
+    s = p.economic_df
+    for view in ('Consideration', 'Obligation', 'Margin'):
+        assert ('Net of occurrence', view, 'Net') in s.index
+
+
+@pytest.mark.parametrize('column_set', ['EX', 'kappa'])
+def test_net_block_foots_and_equals_the_running_net(column_set):
+    """``net cons + net obl == net result`` in EX and every kappa column, and
+    the net result IS the last occurrence layer's running net (one atom,
+    two labels), on the stitched route."""
+    p = build(f'{TWO_EACH} peel top-down')
+    s = p.economic_df
+    columns = ['EX'] if column_set == 'EX' else _kappa_columns(p)
+    assert columns, column_set
+    last_occ = 'occ 100 xs 100'          # top-down introduces high layer first
+    for column in columns:
+        cons = s.loc[('Net of occurrence', 'Consideration', 'Net'), column]
+        obl = s.loc[('Net of occurrence', 'Obligation', 'Net'), column]
+        net = s.loc[('Net of occurrence', 'Margin', 'Net'), column]
+        assert cons + obl == pytest.approx(net, abs=FOOTS), column
+        assert net == s.loc[(last_occ, 'Margin', 'Net'), column], column
+
+
+def test_net_block_on_the_per_atom_route():
+    """A single-layer-per-tier peel takes the per-atom route and still earns
+    the net block, footing in every kappa column."""
+    p = build(f'{ONE_EACH} peel top-down')
+    assert not p._stitched
+    s = p.economic_df
+    steps = _steps(p)
+    assert 'Net of occurrence' in steps
+    for column in ['EX'] + _kappa_columns(p):
+        cons = s.loc[('Net of occurrence', 'Consideration', 'Net'), column]
+        obl = s.loc[('Net of occurrence', 'Obligation', 'Net'), column]
+        net = s.loc[('Net of occurrence', 'Margin', 'Net'), column]
+        assert cons + obl == pytest.approx(net, abs=FOOTS), column
+        assert net == s.loc[('occ 500 xs 500', 'Margin', 'Net'), column]
+
+
+def test_net_block_on_the_plain_tier_walk():
+    """The plain (unpeeled) tier walk shows the net-of-occurrence block when
+    an aggregate tier follows."""
+    p = build(ONE_EACH)
+    steps = _steps(p)
+    assert 'Net of occurrence' in steps
+    assert steps.index('Net of occurrence') == steps.index('agg 200 xs 400') - 1
+    occ_walk = build(OCC2)               # occurrence tier only: nothing follows
+    assert 'Net of occurrence' not in _steps(occ_walk)
+
+
+def test_net_block_leaves_the_evaluation_panel_unchanged():
+    """``net_result`` is the same position as the last running net, already
+    evaluated, so the panel gains no rows."""
+    p = build(f'{TWO_EACH} peel top-down')
+    panel = p.evaluate().evaluation_df
+    steps = set(panel.index.get_level_values('Step'))
+    assert not any(st.startswith('net of') for st in steps)
+
+
 def test_density_df_carries_the_tier_results():
     dd = build(f'{TWO_EACH} peel top-down').density_df
     assert 'All occurrence result' in dd
@@ -717,7 +791,10 @@ def test_unknown_row_kind_raises(monkeypatch):
 # ----------------------------------------------------------------------
 def test_ratio_df_has_a_row_per_block_including_the_tier_subtotals():
     p = build(f'{TWO_EACH} peel top-down')
-    assert list(p.economic_ratios_df.index) == _steps(p)
+    # the net-of-tier block ([Ledger-Net-Of-Tier]) is a cumulative position,
+    # not a block of its own, so it earns no ratio row
+    blocks = [st for st in _steps(p) if not st.startswith('Net of ')]
+    assert list(p.economic_ratios_df.index) == blocks
 
 
 def test_ratio_df_amounts_add_across_the_peeled_blocks():

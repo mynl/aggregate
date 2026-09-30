@@ -617,6 +617,15 @@ class _EvaluatedGroup:
         self.result_values = cons_vals + obl_vals
 
 
+def _net_of_label(span_label):
+    """The net-of-tier step label derived from a tier span label: a leading
+    ``All `` is replaced by ``Net of `` (``All occurrence`` becomes
+    ``Net of occurrence``), any other label is prefixed ``Net of ``."""
+    if span_label.startswith('All '):
+        return 'Net of ' + span_label[4:]
+    return 'Net of ' + span_label
+
+
 def _ledger_plan(groups, result_name, tier_spans=()):
     """The ledger row template as ``(label, kind, payload)`` triples.
 
@@ -635,6 +644,7 @@ def _ledger_plan(groups, result_name, tier_spans=()):
     Kinds and payloads: ``'leg'`` ``(gi, side, li)``; ``'group_total'``
     ``(gi, side)``; ``'group_result'`` / ``'running_net'`` ``gi``;
     ``'tier_total'`` ``(lo, hi, side)``; ``'tier_result'`` ``(lo, hi)``;
+    ``'net_total'`` ``(hi, side)``; ``'net_result'`` ``hi``;
     ``'grand_total'`` ``side``; ``'grand_result'`` / ``'total_impact'``
     ``None``. Duplicate labels raise here, once, for every route. (A forced
     single-group tower -- the one-step walk -- keeps this single-group
@@ -652,9 +662,18 @@ def _ledger_plan(groups, result_name, tier_spans=()):
         ``hi`` exclusive ([Tier-Subtotal-Rows]). A layer-peeled walk passes one
         span per reinsurance tier, so a peeled tower still shows the whole
         occurrence and whole aggregate program. A span of fewer than two groups
-        emits nothing, mirroring the group totals: with one group the group's
-        own rows already *are* the subtotal, which is why the plain tier walk
-        is untouched.
+        emits no subtotal, mirroring the group totals: with one group the
+        group's own rows already *are* the subtotal.
+
+        Every span followed by at least one later group (``hi <
+        len(groups)``) also earns a cumulative **net block**
+        ([Ledger-Net-Of-Tier]), regardless of span width: ``net of <tier>
+        consideration`` / ``net of <tier> obligation`` (the sum of that
+        side's legs over groups ``[0, hi)``) and ``net of <tier>`` (the
+        running position through group ``hi - 1``, the same atom as
+        ``('running_net', hi - 1)``). When nothing follows the span the
+        grand ``All`` block already *is* the net-of-tier position, so the
+        block is dropped.
 
     Notes
     -----
@@ -666,9 +685,15 @@ def _ledger_plan(groups, result_name, tier_spans=()):
     seen = set()
     # spans that earn a block, keyed by the group they follow
     spans_after = {}
+    net_after = {}
     for label, lo, hi in tier_spans:
         if hi - lo >= 2:
             spans_after.setdefault(hi - 1, []).append((label, lo, hi))
+        # the net block needs a nonempty span (builders pass an empty span
+        # for an absent tier), a later group to be net *before*, and a
+        # running net at hi - 1 to alias (hi >= 2)
+        if lo < hi < len(groups) and hi >= 2:
+            net_after.setdefault(hi - 1, []).append((label, lo, hi))
 
     def add(label, kind, payload):
         if label in seen:
@@ -695,6 +720,11 @@ def _ledger_plan(groups, result_name, tier_spans=()):
             add(f'{label} total consideration', 'tier_total', (lo, hi, 'cons'))
             add(f'{label} total obligation', 'tier_total', (lo, hi, 'obl'))
             add(f'{label} result', 'tier_result', (lo, hi))
+        for label, lo, hi in net_after.get(gi, ()):
+            net = _net_of_label(label).lower()
+            add(f'{net} consideration', 'net_total', (hi, 'cons'))
+            add(f'{net} obligation', 'net_total', (hi, 'obl'))
+            add(net, 'net_result', hi)
     if multi:
         add('total consideration', 'grand_total', 'cons')
         add('total obligation', 'grand_total', 'obl')
@@ -959,6 +989,15 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         self._tier_spans = tuple(tier_spans)
         self._span_labels = {(lo, hi): lbl for lbl, lo, hi in self._tier_spans
                              if hi - lo >= 2}
+        #: net-of-tier presentation labels ([Ledger-Net-Of-Tier]), keyed by
+        #: the exclusive span end ``hi``; only spans followed by a later
+        #: group carry the block (the grand ``All`` block already is the
+        #: net-of-tier position otherwise). Kept separate from
+        #: ``_span_labels``, which gates the subtotal block (>= 2 groups)
+        #: and feeds ``_blocks`` / ``density_df``.
+        self._net_span_labels = {hi: _net_of_label(lbl)
+                                 for lbl, lo, hi in self._tier_spans
+                                 if lo < hi < len(groups) and hi >= 2}
         #: the shared row template -- one source of truth for all routes
         self._plan = _ledger_plan(groups, self.result_name, self._tier_spans)
         if stitched_rows is not None:
@@ -1048,6 +1087,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 lo, hi = payload
                 vals = sum((g.result_values for g in egs[lo:hi]), np.zeros(n))
                 row = _EvaluatedLeg(label, vals, probs)
+            elif kind == 'net_total':
+                # the grand total restricted to groups [0, hi): the position
+                # through the tier, one side ([Ledger-Net-Of-Tier])
+                hi, side = payload
+                vals = sum((g.cons_total_values if side == 'cons'
+                            else g.obl_total_values for g in egs[:hi]),
+                           np.zeros(n))
+                row = _EvaluatedLeg(label, vals, probs)
+            elif kind == 'net_result':
+                # the same atom as the preceding running net; alias the row
+                # rather than recomputing ([Ledger-Net-Of-Tier])
+                row = self._by_kind[('running_net', payload - 1)]
             elif kind == 'grand_total':
                 vals = sum((g.cons_total_values if payload == 'cons'
                             else g.obl_total_values for g in egs),
@@ -1148,6 +1199,15 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 lo, hi = payload
                 entries = [e for gi in range(lo, hi)
                            for e in group_entries[gi]]
+            elif kind == 'net_total':
+                hi, side = payload
+                entries = [(fn, bs) for (gi, sd, li), (fn, bs)
+                           in leg_entries.items()
+                           if sd == side and gi < hi]
+            elif kind == 'net_result':
+                # same position as ('running_net', hi - 1): no sweep entry,
+                # the row aliases it below ([Ledger-Net-Of-Tier])
+                continue
             elif kind == 'grand_total':
                 entries = [(fn, bs) for (gi, side, li), (fn, bs)
                            in leg_entries.items() if side == payload]
@@ -1176,6 +1236,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         grand_total_rows = {}
         group_rows = {gi: {'cons': [], 'obl': []} for gi in range(len(groups))}
         for label, kind, payload in self._plan:
+            if kind == 'net_result':
+                # alias the running-net row swept above; running_net precedes
+                # in plan order so it is already materialized
+                row = self._by_kind[('running_net', payload - 1)]
+                rows[label] = row
+                self._by_kind[(kind, payload)] = row
+                continue
             row = _EvaluatedLeg(
                 label, gd=results[label], sign=signs.get(label, 1.0),
                 bs=results[label].bs,
@@ -1607,8 +1674,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ('All occurrence', 'Consideration' | 'Obligation' | 'Margin')
 
         so a peeled tower still shows the whole occurrence and whole aggregate
-        program. There is no ``Net`` row on a tier block: the running net
-        through the tier is already the last layer's ``Net``.
+        program. Every tier followed by a later step also carries a cumulative
+        **net block** ([Ledger-Net-Of-Tier]), the position through the tier::
+
+            ('Net of occurrence', 'Consideration' | 'Obligation' | 'Margin')
+
+        whose ``Margin`` is the running net through the tier's last step (the
+        same number as that step's ``Net`` row). The final tier carries no net
+        block: the grand ``All`` block already is the net-of-tier position.
 
         Columns ``EX`` / ``SD`` / ``CV`` / ``Skew`` / ``P01`` / ``Median`` /
         ``P99``. The percentiles are **marginal quantiles of each card row's
@@ -1667,6 +1740,17 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                         ('Obligation', ('tier_total', (lo, hi, 'obl'))),
                         ('Margin', ('tier_result', (lo, hi)))):
                     index.append((lbl, view))
+                    recs.append(self._card_stat_row(self._by_kind[key]))
+            # the cumulative net-of-tier block ([Ledger-Net-Of-Tier]),
+            # after the tier subtotal, before the next tier's first group
+            for hi, nlbl in self._net_span_labels.items():
+                if hi - 1 != gi:
+                    continue
+                for view, key in (
+                        ('Consideration', ('net_total', (hi, 'cons'))),
+                        ('Obligation', ('net_total', (hi, 'obl'))),
+                        ('Margin', ('net_result', hi))):
+                    index.append((nlbl, view))
                     recs.append(self._card_stat_row(self._by_kind[key]))
         if len(self._group_specs) > 1:
             # the closing grand block ('All' since a140 -- too many things
@@ -1751,6 +1835,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 t = (self._span_labels[(lo, hi)], v[side], 'Total')
             elif kind == 'tier_result':
                 t = (self._span_labels[payload], v['margin'], 'Total')
+            elif kind == 'net_total':
+                hi, side = payload
+                t = (self._net_span_labels[hi], v[side], 'Net')
+            elif kind == 'net_result':
+                t = (self._net_span_labels[payload], v['margin'], 'Net')
             elif kind == 'grand_total':
                 t = ('All', v[payload], net)
             elif kind == 'grand_result':
@@ -2499,7 +2588,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     #: survives is not a question with an answer. (On a stitched peel it does
     #: not even have a law, being a delta of two statistics whose sides ride
     #: different marginals.) The ceded program *as a position* is already in the
-    #: sheet, under the tier subtotal rows.
+    #: sheet, under the tier subtotal rows. ``net_result`` is also absent: it is
+    #: the same position as the running net after the tier's last group, which
+    #: is already evaluated, so including it would duplicate a panel row.
     _MARGIN_KINDS = ('group_result', 'running_net', 'tier_result',
                      'grand_result')
 

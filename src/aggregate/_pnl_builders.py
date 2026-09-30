@@ -719,8 +719,19 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
             a_obl.append(Leg(f'{agg_base} commission', c_agg, kind='commission'))
         groups.append(Group(agg_base, 'buy',
                             [Leg(f'{agg_base} premium', pc_agg, kind='premium')], a_obl))
+    # One-group tier spans: no subtotal block (a one-group tier's own rows
+    # already are its subtotal), but a tier followed by a later group earns
+    # the cumulative net-of-tier block ([Ledger-Net-Of-Tier]), so the walk
+    # shows the running position net of the occurrence program before the
+    # aggregate tier starts.
+    if has_occ and has_agg:
+        tier_spans = (('All occurrence', 1, 2), ('All aggregate', 2, 3))
+    elif has_occ:
+        tier_spans = (('All occurrence', 1, 2),)
+    else:
+        tier_spans = (('All aggregate', 1, 2),)
     pnl = PnL(name=name or agg.name, source=source, groups=groups,
-              result_name='margin', label=label)
+              result_name='margin', tier_spans=tier_spans, label=label)
     pnl.economics = dict(gcn_economics) if gcn_economics is not None \
         else {'gross': float(gross), 'ceded': float(ceded)}
     src_desc = ('the occurrence (gross, ceded) joint' if has_occ
@@ -1286,6 +1297,35 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
                 'claim' if is_occ_span else 'agg',
                 occ_cum if is_occ_span else agg_cum, 1.0,
                 comm_span - pc_span)
+        elif kind == 'net_total':
+            # the position through groups [0, hi), one side
+            # ([Ledger-Net-Of-Tier])
+            hi, side = payload
+            if side == 'cons':
+                # every consideration leg on this route is a constant:
+                # gross premium less the ceded premiums bought so far
+                cum = p_gross - float(sum(c[1] for c in covers[:hi - 1]))
+                entries[row_label] = _const_row(cum, row_label)
+                palm_specs[row_label] = ('const', cum)
+            else:
+                # obligations through the tier: -(cumulative net loss)
+                # - expenses + commissions, an affine of the cumulative-net
+                # marginal already in hand
+                net_cum = covers[hi - 2][4]
+                tier_tag, _rf, net_cum_fn = cover_maps[hi - 2]
+                comm_cum = float(sum(c[2] for c in covers[:hi - 1]))
+                entries[row_label] = _affine_row(
+                    xs, net_cum, sign=-1.0,
+                    shift=comm_cum - expense_total, label=row_label)
+                palm_specs[row_label] = (
+                    'claim' if tier_tag == 'occ' else 'agg', net_cum_fn,
+                    -1.0, comm_cum - expense_total)
+        elif kind == 'net_result':
+            # the same position as the running net through group hi - 1;
+            # reuse its entry ([Ledger-Net-Of-Tier])
+            prev = f'net through {groups[payload - 1].label}'
+            entries[row_label] = entries[prev]
+            palm_specs[row_label] = palm_specs[prev]
         elif kind == 'grand_total':
             if payload == 'cons':
                 entries[row_label] = _const_row(p_gross - total_pc, row_label)

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a371
+
+**[Lee-Read-By-Outcome] the quantile (Lee) panels are read by outcome.** `read_axis='y'` on the reins chart's `aggregate` panel, the aggregate chart's `lee` panel and the severity chart's `lee` panel, joining the structure chart's Lee panels, which already declared it. A client interrogating a panel along `read_axis` can answer only for the series whose nearest sample ties, and the outcome lattice is the sole coordinate those curves share, so a hover now reads gross, ceded and net together rather than one of them. Document hashes on the three charts move; no numbers change. `Panel.read_axis` documents the rule, and a new sweep in `tests/test_charts_ir.py` holds every multi-series `xy` panel to it.
+
 ## 1.0.0a370
 
 **[Kappa-Full-Range] the Palm kappa chart ships its full extent and offers the zoom out.** The Palm route's curves now run from the first finite cell out to the new `KAPPA_FULL_FLOOR` survival of the gross compound (one in a million), and the outcome and cession axes declare that extent as `full_range` beside the unchanged `cdf_range` view in `suggested_range`, the same axis vocabulary the reins chart uses, so the app's zoom out appears by presence. The initial view is identical to a369; Palm document hashes move (series carry more cells) and documents grow to roughly 2 MB on a log2 16 tower. The band routes (a `BivariateAggregate` input and the 2-D fallback) keep the plain window and declare no `full_range`, since there each drawn cell is a fold over the joint.

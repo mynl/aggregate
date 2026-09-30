@@ -168,8 +168,12 @@ def _severity(sev, n=GRID_POINTS):
                   title='Severity density'),
             # Inverting it gives the distribution function, which is the
             # fourth panel the compositor drew as a picture of its own.
+            # Read by loss, as every Lee panel in the library is. One
+            # series here, so nothing is at stake in the hover; the panel
+            # is read the same way as the aggregate's so the two agree.
             Panel(id='lee', kind='xy', x_axis='p', y_axis='loss',
-                  invertible=True, title='Quantile (Lee) plot',
+                  read_axis='y', invertible=True,
+                  title='Quantile (Lee) plot',
                   inverse_title='Distribution function'),
         ),
         series=(

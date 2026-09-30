@@ -236,6 +236,54 @@ def test_support_is_always_serialized():
     assert doc_hash(cts) != doc_hash(plain)
 
 
+def test_a_shared_lattice_panel_is_read_on_its_lattice():
+    """Sweep the live emitters: interrogate the coordinate the series share.
+
+    A consumer reading a panel along an axis picks, per series, the sample
+    nearest the cursor, and can only answer for the series that are equally
+    near. Where one coordinate is a lattice every series is drawn on and
+    the other is a per-series list, the lattice is therefore the only
+    coordinate at which the whole panel answers at once, and reading the
+    other leaves all but one series blank. That is exactly the shape of a
+    quantile curve, whose outcomes are the common grid and whose
+    probabilities are cumulative sums no two laws share.
+
+    Panels with no lattice at all (a set of sample paths) are outside the
+    rule: their series really are separate objects and reading one at a
+    time is the point.
+    """
+    from aggregate import build
+    from aggregate.charts import available_charts, CHARTS
+
+    objs = [
+        build('agg IR.Lat 100 claims sev lognorm 50 cv 2 '
+              'occurrence net of 100 xs 100 poisson'),
+        build('port IR.LatP agg A 50 claims sev lognorm 50 cv 1.5 '
+              'occurrence net of 100 xs 100 poisson '
+              'agg B 30 claims sev lognorm 40 cv 1.2 poisson'),
+    ]
+    seen = 0
+    for obj in objs:
+        for name in available_charts(obj):
+            doc = CHARTS[name][0](obj)
+            for panel in doc.panels:
+                if panel.kind != 'xy':
+                    continue
+                members = [s for s in doc.series if s.panel_id == panel.id]
+                if len(members) < 2:
+                    continue
+                on = {'x' if s.x_lattice else 'y' if s.y_lattice else None
+                      for s in members}
+                if on != {'x'} and on != {'y'}:
+                    continue
+                shared = on.pop()
+                assert panel.read_axis == shared, (
+                    f'{name}/{panel.id}: series share the {shared} lattice '
+                    f'but the panel is read on {panel.read_axis}')
+                seen += 1
+    assert seen                          # the sweep actually swept something
+
+
 def test_every_emitted_series_declares_its_support():
     """Sweep the live emitters: no series may reach a client without it.
 

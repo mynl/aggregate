@@ -732,7 +732,9 @@ class Panel:
     read_axis : str
         'x' or 'y': which axis the reader interrogates. A density is read
         by loss ('x'); a tail panel is read probability to loss ('y'),
-        because at a chosen survival the answer is the VaR.
+        because at a chosen survival the answer is the VaR. On a panel
+        carrying more than one series, name the coordinate the series
+        **share** (see Notes).
     invertible : bool
         The panel's two axes may be exchanged. Mechanically that is a
         transpose, but what it performs is an **inversion**: a Lee diagram
@@ -764,6 +766,21 @@ class Panel:
     A panel does not list its series; each series names its panel via
     ``panel_id`` and draw order is document order. One source of truth,
     checked in :meth:`ChartDoc.__post_init__`.
+
+    **``read_axis`` decides how many series a hover can answer for, so on a
+    multi-series panel it must name the shared coordinate.** A consumer
+    that reads a panel along an axis has to pick, per series, the sample
+    nearest the cursor, and it can only report the series that are equally
+    near: anything else would print values taken at coordinates that
+    differ, under one heading that claims they do not. So every series
+    whose sample sits exactly on the interrogated value answers, and the
+    rest drop out. Where the series are drawn on one lattice that is all
+    of them; where each carries its own irregular grid it is one. A
+    quantile curve is the case that bites, because the probabilities are
+    cumulative sums and no two laws share them, while the outcomes are the
+    common lattice the laws were discretized on. Hence the library's Lee
+    panels are read by outcome: gross, ceded and net then answer together
+    at one loss, which is the comparison the panel exists for.
 
     .. versionadded:: 1.0
        Provisional, in the sense of PEP 411: not part of the 1.0 API

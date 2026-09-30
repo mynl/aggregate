@@ -16,7 +16,9 @@ rather than offering a control that draws a worse picture.
 diagram, so a chosen probability reads off as a loss. It is the panel the
 readings live on: log on both axes, the return-period reading of its
 probability axis, and the inversion that turns it into the distribution
-function.
+function. It is *interrogated* the other way round, by loss, since that
+is the coordinate the three curves share and so the only one at which all
+three can answer together; see :attr:`~aggregate.charts.ir.Panel.read_axis`.
 
 **Aggregate, and a P&L through its engine** (the author's 2026-09-29 ruling,
 [PnL-Reins-Passthrough], superseding the 1.0 "Aggregate only" note for the
@@ -192,8 +194,12 @@ def _reins(agg):
         panels=(
             Panel(id='occurrence', kind='xy', x_axis='claim',
                   y_axis='sev_density', title='Occurrence'),
+            # Read by loss, not by probability: the three curves share the
+            # outcome lattice and nothing else, so it is the only
+            # coordinate at which all three can answer at once. See
+            # `Panel.read_axis`.
             Panel(id='aggregate', kind='xy', x_axis='p', y_axis='annual',
-                  invertible=True, title='Aggregate',
+                  read_axis='y', invertible=True, title='Aggregate',
                   inverse_title='Distribution function'),
         ),
         series=tuple(series),

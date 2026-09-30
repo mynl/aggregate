@@ -172,8 +172,13 @@ def outcome_doc(name, title, subject, companion=None, *, window, full_range,
                   title='Probability mass function'),
             # Inverting it gives the distribution function, which is why
             # the compositor's cdf panel did not survive as a panel.
+            # Read by outcome: a companion curve has its own cumulative
+            # probabilities and shares only the lattice, so reading the
+            # panel by probability would answer for one of the two. See
+            # `Panel.read_axis`.
             Panel(id='lee', kind='xy', x_axis='p', y_axis='outcome',
-                  invertible=True, title='Quantile (Lee) plot',
+                  read_axis='y', invertible=True,
+                  title='Quantile (Lee) plot',
                   inverse_title='Distribution function'),
         ),
         series=tuple(series),

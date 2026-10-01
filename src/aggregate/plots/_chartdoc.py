@@ -1672,12 +1672,18 @@ def plot_chartdoc(doc, ax=None, strict=False, log=False, full_range=False,
     floors = _tower_floors(doc, realized)
     for panel, realization, panel_ax in zip(doc.panels, realized, axs):
         series = [s for s in doc.series if s.panel_id == panel.id]
-        panel_title = panel.title or title
+        # ``None`` inherits the document's title, ``''`` is a panel declaring
+        # it has none. Testing truthiness collapses the two and leaves no way
+        # to ask for no heading: an empty string fell through to the document
+        # and the panel drew the very title it was trying to drop.
+        panel_title = panel.title if panel.title is not None else title
         if invert and panel.invertible:
             # Exchanged axes draw a different picture, and the document
             # names it; with no name to use, say so rather than invent one.
+            # A panel with no title keeps none when it is exchanged.
             panel_title = (panel.inverse_title
-                           or f'{panel_title}, inverted')
+                           or (f'{panel_title}, inverted' if panel_title
+                               else ''))
         if realization == 'matrix':
             _render_matrix_panel(panel_ax, doc, panel, series)
         elif realization == 'tower':

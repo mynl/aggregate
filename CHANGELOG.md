@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a383
+
+**[Panel-No-Title] an empty `Panel.title` means the panel has no heading, where `None` still inherits the document's.** The two were collapsed by a truthiness test, so an emitter asking for no heading got the document title back: the very line it was trying to drop. `plot_chartdoc` and the app's adapter both read `None` as "no title of its own, take the document's" and `''` as "no title, draw none"; an exchanged panel that declared none keeps none rather than falling back to naming the exchange.
+
+Clearing `ChartDoc.title` was never the alternative, which is why this needed a fix: other consumers read it, and a saved figure takes its file name from it. A single-panel document whose panel repeats the document's heading says the same thing twice on one picture, and this is how an emitter declines that.
+
 ## 1.0.0a382
 
 **[Series-Groups] a series can declare which family of things it is one of, and a mark can declare itself the base.** `ChartSeries.group` is open text naming a natural set a panel draws several of: the occurrence layers of a program against its aggregate covers, the units of a book against its total. The xy analogue of `MatrixData.row_groups`, and semantic for the same reason: that a cover is an occurrence cover is a fact about the program, not a decision about color. `role` stays the near neighbor and the different question, saying what a series **is** against the panel's subject out of a closed vocabulary the library shares, where a group says which of several like things it is one of.

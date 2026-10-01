@@ -289,3 +289,42 @@ def test_a_series_with_no_group_keeps_the_house_cycle():
     series = [ChartSeries(name='solo', role='gross', panel_id='p',
                           x=(0.0,), y=(1.0,))]
     assert group_styles(series) == {}
+
+
+# --- an explicitly untitled panel ([Panel-No-Title]) -------------------------
+
+def _titled(panel_title):
+    """A one-panel xy document whose panel title is whatever is passed."""
+    return ChartDoc(
+        name='spectrum', title='Distortion spectrum: Capstone, gross base',
+        axes=(ChartAxis(id='f', label='family'),
+              ChartAxis(id='m', label='multiple')),
+        panels=(Panel(id='p', kind='xy', x_axis='f', y_axis='m',
+                      title=panel_title),),
+        series=(ChartSeries(name='gross book', role='gross', panel_id='p',
+                            x=(0.0, 1.0), y=(1.0, 1.0)),))
+
+
+def test_an_empty_panel_title_draws_no_title():
+    """``''`` is a panel saying it has none, and it is the only way to say so.
+
+    Testing truthiness collapsed it with ``None`` and fell through to the
+    document, so an emitter that set ``''`` got back the very heading it was
+    trying to drop.
+    """
+    fig = plot_chartdoc(_titled(''))
+    assert _axes(fig).get_title() == ''
+    matplotlib.pyplot.close(fig)
+
+
+def test_no_panel_title_still_inherits_the_document():
+    """``None`` is a panel with no title of its own, which takes the document's."""
+    fig = plot_chartdoc(_titled(None))
+    assert _axes(fig).get_title() == 'Distortion spectrum: Capstone, gross base'
+    matplotlib.pyplot.close(fig)
+
+
+def test_a_panel_title_still_wins():
+    fig = plot_chartdoc(_titled('Its own heading'))
+    assert _axes(fig).get_title() == 'Its own heading'
+    matplotlib.pyplot.close(fig)

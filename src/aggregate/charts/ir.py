@@ -942,6 +942,15 @@ class Panel:
         The panel's own heading ('Density', 'Survival'). Semantic: it
         names what is drawn, not how.
 
+        ``None`` and ``''`` mean **different things**, and the difference is
+        the only way to ask for no heading at all. ``None`` is a panel with
+        no title of its own, which takes the document's; ``''`` is a panel
+        saying it has no title, and a renderer draws none. A single panel
+        document whose panel repeats the document's title says the same
+        thing twice on one picture, and ``''`` is how an emitter declines
+        that without also clearing :attr:`ChartDoc.title`, which other
+        consumers use (a saved figure takes its file name from it).
+
     Notes
     -----
     A panel does not list its series; each series names its panel via

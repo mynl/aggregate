@@ -1471,7 +1471,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
     def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25, *,
                     net_combined_ratio=None, occ_combined_ratio=None,
-                    agg_combined_ratio=None) -> str:
+                    agg_combined_ratio=None, premium_style='deposit') -> str:
         """The program that wraps this aggregate in a P&L.
 
         Returns ``pnl NAME_PnL <premium> less <engine> less <expense>``, with
@@ -1504,6 +1504,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         occ_combined_ratio, agg_combined_ratio : float or sequence, optional
             Each tier's combined ratio, defaulting to ``net_combined_ratio``.
             A sequence gives one value per layer, in declaration order.
+        premium_style : {'deposit', 'rate'}, default 'deposit'
+            How each ladder-priced layer premium is written: a currency
+            ``deposit``, or a ``rate`` of the P&L's stated gross premium, the
+            identical premium in the quote-sheet spelling. Moot with no
+            ladder, and a clause the author wrote is kept verbatim.
 
         Returns
         -------
@@ -1525,7 +1530,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                                     expense_ratio=expense_ratio,
                                     net_combined_ratio=net_combined_ratio,
                                     occ_combined_ratio=occ_combined_ratio,
-                                    agg_combined_ratio=agg_combined_ratio)
+                                    agg_combined_ratio=agg_combined_ratio,
+                                    premium_style=premium_style)
 
     def reins_program(self, cession) -> str:
         """The program that rebuilds this aggregate with ``cession`` added.

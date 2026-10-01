@@ -908,3 +908,90 @@ def test_pnl_ladder_keeps_derive_premium_with_no_cover_to_pay_for():
     priced = ceded_engine.pnl_program(net_combined_ratio=0.9)
     assert 'derive premium' not in priced
     assert 'deposit' in priced
+
+
+# --------------------------------- pnl_program: the rate premium style
+#
+# [PnL-Program-Rate-Style]. ``premium_style='rate'`` respells each
+# ladder-priced deposit as a fraction of the booked premium after the ladder
+# has finished, so it is a spelling change and never a repricing. The bases
+# mirror the resolver: an occurrence rate is quoted against the stated gross
+# premium, an aggregate rate against the gross less the occurrence cession.
+
+_LADDER = dict(net_combined_ratio=0.9)
+
+
+def _rates(program):
+    """Every ceded-premium rate the program states, in order."""
+    return [float(line.split(' rate ')[1].split()[0])
+            for line in program.splitlines() if ' rate ' in line]
+
+
+def _stated_premium(program):
+    """The premium the program's head states."""
+    return float(program.splitlines()[1].split()[0])
+
+
+def test_pnl_rate_style_is_a_respelling_of_the_deposits():
+    """Each rate resolves to the deposit it replaced, on the resolver's bases."""
+    a = build(TOWER)
+    dep = a.pnl_program(**_LADDER)
+    rate = a.pnl_program(premium_style='rate', **_LADDER)
+    assert 'deposit' not in rate
+    assert _stated_premium(rate) == _stated_premium(dep)
+    p = _stated_premium(rate)
+    d_occ, d_agg = _deposits(dep)
+    r_occ, r_agg = _rates(rate)
+    assert r_occ * p == pytest.approx(d_occ, rel=1e-6)
+    # the aggregate tier inures behind the occurrence program, so its rate is
+    # quoted against the gross less the occurrence cession as it will resolve
+    assert r_agg * (p - r_occ * p) == pytest.approx(d_agg, rel=1e-6)
+
+
+def test_pnl_rate_style_is_moot_without_the_ladder():
+    """No ladder, no priced layers: the style is accepted and changes nothing."""
+    a = build(TOWER)
+    assert a.pnl_program(premium_style='rate') == a.pnl_program()
+
+
+def test_pnl_program_rejects_an_unknown_premium_style():
+    a = build(TOWER)
+    with pytest.raises(ValueError, match='premium_style'):
+        a.pnl_program(premium_style='percent', **_LADDER)
+
+
+def test_pnl_rate_style_keeps_a_layer_the_author_already_priced():
+    """Only the ladder's own entries respell; an authored clause is verbatim."""
+    a = build(PRICED_DEPOSIT)
+    rate = a.pnl_program(premium_style='rate', **_LADDER)
+    assert 'deposit 200' in rate
+    assert len(_rates(rate)) == 1
+
+
+def test_pnl_rate_style_is_share_invariant_and_resolves_back():
+    """A half placed layer writes the full-placement rate, like a deposit.
+
+    The resolver scales by the share, so the written rate matches the whole
+    line's and the placed premium comes back at half of what full placement
+    pays. The margin identity then holds on the built book, which is the
+    end-to-end check that respelling repriced nothing.
+    """
+    half, full = build(HALF), build(FULL)
+    hp = half.pnl_program(premium_style='rate', **_LADDER)
+    fp = full.pnl_program(premium_style='rate', **_LADDER)
+    assert _rates(hp) == _rates(fp)
+    face = build(hp)
+    _, occ_layers, _ = _ceded_premium(face)
+    assert occ_layers == [
+        pytest.approx(0.5 * _rates(hp)[0] * _stated_premium(hp))]
+    assert _margin(face) == pytest.approx(_identity(face), rel=1e-12)
+
+
+def test_pnl_rate_style_books_the_same_economics():
+    """The two spellings build to the same book, within the rate's rounding."""
+    a = build(TOWER)
+    dep_face = build(a.pnl_program(**_LADDER))
+    rate_face = build(a.pnl_program(premium_style='rate', **_LADDER))
+    assert _ceded_premium(rate_face)[0] == pytest.approx(
+        _ceded_premium(dep_face)[0], rel=1e-6)
+    assert _margin(rate_face) == pytest.approx(_margin(dep_face), rel=1e-6)

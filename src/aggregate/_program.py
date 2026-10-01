@@ -874,8 +874,75 @@ def _pnl_layer_premium(basis, val, share, limit, name, tier, index, caller):
         f'{caller}: unknown ceded-premium basis {basis!r}.')
 
 
+def _respell_as_rates(spec, priced, written, booked, name, caller):
+    """Respell each ladder-priced deposit as a ``rate`` of the booked premium.
+
+    Mutates the ``priced`` entry lists in place, after the ladder has finished:
+    an entry the ladder wrote becomes ``('rate', r)``, and a clause the author
+    stated (a ``deposit`` or ``rol``) is kept verbatim, exactly as the deposit
+    style keeps it.
+
+    Parameters
+    ----------
+    spec : dict
+        The engine's re-parsed spec, read for the layer lists.
+    priced : dict
+        ``{'occ': entries, 'agg': entries}`` as :func:`_pnl_technical` built
+        them, every ladder-priced entry still ``('deposit', d)``.
+    written : dict
+        Parallel ``{'occ': [bool], 'agg': [bool]}``: which entries the ladder
+        wrote, since only those are the ladder's to respell.
+    booked : float
+        The booked (stated gross) premium ``P`` the program will state.
+    name : str
+        The engine name, for messages.
+    caller : str
+        Name of the calling member, for messages.
+
+    Notes
+    -----
+    **The bases mirror the resolver**
+    (:meth:`aggregate.underwriter.Underwriter._resolve_reins_economics`): an
+    occurrence rate is a fraction of the stated gross premium, while the
+    aggregate tier inures behind the occurrence program and rates off the
+    gross less the occurrence ceded premium. The subtraction here uses the
+    premiums as they will actually resolve, spelled rates included, so the
+    written program and the resolver agree to the rate's own rounding.
+
+    **Precision.** A rate is spelled to eight significant figures, so the
+    resolved premium ``share x r x base`` returns the deposit it respells to
+    within five parts in a billion, far inside the whole-unit rounding the
+    deposit itself carries (:func:`_round_consideration`). Full float repr
+    would be exact and unreadable; this is the convention's worth of
+    precision, same reasoning as the deposit rounding rule.
+    """
+    base = float(booked)
+    for key, tier in (('occ', 'occurrence'), ('agg', 'aggregate')):
+        layers = spec.get(f'{key}_reins') or []
+        entries = priced[key]
+        resolved = 0.0
+        for j, entry in enumerate(entries):
+            share, limit, _attach = layers[j]
+            if written[key][j]:
+                if base <= 0:
+                    raise ValueError(
+                        f'{caller}: cannot write {name!r} {tier} layer '
+                        f'{j + 1} as a rate: the subject premium it would be '
+                        f'quoted against is {base:g}, so no positive rate '
+                        'reproduces its price. Use the deposit style.')
+                rate = float(f'{entry[1] / base:.8g}')
+                entries[j] = ('rate', rate)
+                resolved += float(share) * rate * base
+            else:
+                resolved += _pnl_layer_premium(
+                    *entry, share, limit, name, tier, j, caller)
+        # the aggregate tier rates off the gross less the occurrence cession
+        base -= resolved
+
+
 def _pnl_technical(ob, spec, expense_ratio, net_combined_ratio,
-                   occ_combined_ratio, agg_combined_ratio, caller):
+                   occ_combined_ratio, agg_combined_ratio, caller,
+                   premium_style='deposit'):
     """The technical premium ladder: price each cover, then gross up once.
 
     Parameters
@@ -899,14 +966,21 @@ def _pnl_technical(ob, spec, expense_ratio, net_combined_ratio,
         Per tier, resolved by :func:`_pnl_layer_ratios`.
     caller : str
         Name of the calling member, for the messages.
+    premium_style : {'deposit', 'rate'}, default 'deposit'
+        How each **ladder-priced** layer's premium is spelled. ``'deposit'``
+        writes the currency amount; ``'rate'`` respells it as a fraction of
+        the booked premium once the ladder has finished
+        (:func:`_respell_as_rates`), the identical premium in the other
+        spelling. A layer's own existing clause is kept verbatim either way.
 
     Returns
     -------
     (float or DERIVE_PREMIUM, list, list)
         The booked premium and the per layer ceded-premium spec entries for
-        the occurrence and aggregate tiers, each ``('deposit', amount)`` for a
-        layer the ladder priced and the layer's existing entry where it had
-        one. Both lists are empty when the tier carries no cession.
+        the occurrence and aggregate tiers, each ``('deposit', amount)`` (or
+        ``('rate', r)`` under the rate style) for a layer the ladder priced
+        and the layer's existing entry where it had one. Both lists are empty
+        when the tier carries no cession.
 
     Raises
     ------
@@ -972,6 +1046,7 @@ def _pnl_technical(ob, spec, expense_ratio, net_combined_ratio,
     name = getattr(ob, 'name', ob)
     ceded_total = 0.0
     priced = {}
+    written = {}
     for tier, key, arg in (('occurrence', 'occ', occ_combined_ratio),
                            ('aggregate', 'agg', agg_combined_ratio)):
         layers = spec.get(f'{key}_reins') or []
@@ -979,19 +1054,23 @@ def _pnl_technical(ob, spec, expense_ratio, net_combined_ratio,
         ratios = _pnl_layer_ratios(arg, net_combined_ratio, len(layers),
                                    tier, caller)
         entries = []
+        flags = []
         for j, (share, limit, _attach) in enumerate(layers):
             clause = existing[j] if existing is not None else None
             if clause is not None:
                 ceded_total += _pnl_layer_premium(
                     *clause, share, limit, name, tier, j, caller)
                 entries.append(clause)
+                flags.append(False)
                 continue
             ceded_loss = float(
                 stats.loc[('agg', 'mean'), (key, f'layer.{j + 1}')])
             deposit = _round_consideration(ceded_loss / ratios[j] / share)
             ceded_total += share * deposit
             entries.append(('deposit', deposit))
+            flags.append(True)
         priced[key] = entries
+        written[key] = flags
     premium = getattr(ob, 'exp_premium', 0.0)
     stated = (0.0 if premium is None
               else float(np.sum(np.asarray(premium, dtype=float))))
@@ -1015,15 +1094,20 @@ def _pnl_technical(ob, spec, expense_ratio, net_combined_ratio,
                 'technical premium is the computed net mean divided by '
                 'net_combined_ratio.')
         technical = net_loss / net_combined_ratio + ceded_total
-    return (_round_consideration(
-                derive_consideration(expense_spec, technical, str(name))),
-            priced['occ'], priced['agg'])
+    booked = _round_consideration(
+        derive_consideration(expense_spec, technical, str(name)))
+    if premium_style == 'rate':
+        # After the booked premium is final, since a rate is a fraction of it:
+        # the respell is a spelling change, never a repricing.
+        _respell_as_rates(spec, priced, written, booked, name, caller)
+    return booked, priced['occ'], priced['agg']
 
 
 def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25, *,
                 net_combined_ratio=None,
                 occ_combined_ratio=None,
-                agg_combined_ratio=None):
+                agg_combined_ratio=None,
+                premium_style='deposit'):
     """The program that wraps ``ob`` in a P&L.
 
     Writing this out by hand means knowing that the trailer belongs to the
@@ -1059,6 +1143,14 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25, *,
         prices the whole tower; a scalar applies to every layer on the tier; a
         sequence gives one value per layer, in declaration order, which is
         ascending attachment. Ignored when ``net_combined_ratio`` is ``None``.
+    premium_style : {'deposit', 'rate'}, default 'deposit'
+        How each **ladder-priced** layer's premium is written. ``'deposit'``
+        is the currency amount; ``'rate'`` respells it as a fraction of the
+        P&L's stated gross premium, the identical premium in the quote-sheet
+        spelling (see :func:`_respell_as_rates` for the bases and the
+        precision rule). A layer whose clause the author wrote is kept
+        verbatim either way, and with no ladder engaged there are no priced
+        layers, so the style is accepted and moot.
 
     Returns
     -------
@@ -1069,10 +1161,14 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25, *,
     ------
     ValueError
         When ``ob`` carries no DecL program, when its program is already a P&L,
-        or when the premium cannot be resolved (see
-        :func:`_pnl_consideration`). Under the ladder, also for a portfolio
-        engine, an unusable combined ratio, a per tier sequence of the wrong
-        length, or a layer already priced with a ``rate`` clause.
+        when ``premium_style`` is not one of the two spellings, or when the
+        premium cannot be resolved (see :func:`_pnl_consideration`). Under the
+        ladder, also for a portfolio engine, an unusable combined ratio, a per
+        tier sequence of the wrong length, or a layer already priced with a
+        ``rate`` clause. That last refusal is about the ladder's *inputs*: a
+        stated rate quotes a fraction of the premium the ladder has not
+        computed yet, where ``premium_style='rate'`` respells an output after
+        it has.
 
     Notes
     -----
@@ -1119,6 +1215,12 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25, *,
         poisson
       less 0.25 premium expenses
     """
+    if premium_style not in ('deposit', 'rate'):
+        raise ValueError(
+            f'pnl_program: unknown premium_style {premium_style!r}. '
+            "'deposit' writes each ladder-priced layer premium as a currency "
+            "amount; 'rate' writes it as a fraction of the P&L's stated "
+            'gross premium.')
     kind, name, spec = _require_program(ob, 'pnl_program')
     if kind in ('pnl', 'xpnl'):
         raise ValueError(
@@ -1145,7 +1247,8 @@ def pnl_program(ob, loss_ratio=0.70, expense_ratio=0.25, *,
     else:
         consideration, occ_priced, agg_priced = _pnl_technical(
             ob, spec, expense_ratio, net_combined_ratio,
-            occ_combined_ratio, agg_combined_ratio, 'pnl_program')
+            occ_combined_ratio, agg_combined_ratio, 'pnl_program',
+            premium_style=premium_style)
     if kind == 'port':
         # The units written out, never a ``port.NAME`` reference: the reference
         # resolves only against the underwriter holding the name, so the text

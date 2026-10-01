@@ -1102,7 +1102,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
     def pnl_program(self, loss_ratio=0.70, expense_ratio=0.25, *,
                     net_combined_ratio=None, occ_combined_ratio=None,
-                    agg_combined_ratio=None) -> str:
+                    agg_combined_ratio=None, premium_style='deposit') -> str:
         """The program that wraps this portfolio in a P&L.
 
         Returns ``pnl NAME_PnL <premium> less port NAME <units> less
@@ -1130,6 +1130,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             engine**: a unit's cession would have to be quoted against the
             whole book's premium, which wants its own ruling. Passing
             ``net_combined_ratio`` raises.
+        premium_style : {'deposit', 'rate'}, default 'deposit'
+            Accepted for the same signature parity. It respells only
+            ladder-priced layers, and the ladder refuses a portfolio, so on
+            this class it is validated and moot.
 
         Returns
         -------
@@ -1147,7 +1151,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                                     expense_ratio=expense_ratio,
                                     net_combined_ratio=net_combined_ratio,
                                     occ_combined_ratio=occ_combined_ratio,
-                                    agg_combined_ratio=agg_combined_ratio)
+                                    agg_combined_ratio=agg_combined_ratio,
+                                    premium_style=premium_style)
 
     @property
     def tail_behavior_df(self) -> 'pd.DataFrame':

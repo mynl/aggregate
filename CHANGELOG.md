@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a386
+
+**[PnL-Program-Rate-Style] `pnl_program` takes `premium_style='deposit'|'rate'`.** Under the combined-ratio ladder, `'rate'` respells each ladder-priced layer's deposit as a `rate` clause once the booked premium is final: occurrence rates are quoted against the stated gross premium, aggregate rates against the gross less the occurrence cession, mirroring the resolver, and each rate carries eight significant figures so the resolved premium returns the deposit well inside the deposit's own rounding. A clause the author wrote stays verbatim, the style is moot without the ladder, and an unknown style raises. Asked for by `aggregate_api`'s PnL (rate) menu items, which feature-detect the keyword by signature.
+
 ## 1.0.0a385
 
 **[Evaluate-Insurer-Pivot] the INSURER reading of `pricing.evaluate` is the gini_p comparison, positions down and families across.** The tidy panel served both perspectives whole, which is the honest raw shape and a poor comparison: `gini_p` repeats down a long column with the fitted parameter, the solver error and the status word between every pair a reader wants side by side. INSURER now serves `evaluation_df['gini_p'].unstack('distortion')`, one number per position and family, columns narrowed to the families actually evaluated in reporting order and rows put back in the panel's own step order, since `unstack` would alphabetize a walk's ledger. The block is named `gini_p`, formatted `.5g` uniformly, and its caption carries the anchor, the consideration, and the blank-cell reading, pointing at RAW for status and parameters. RAW is unchanged: the full panel, as the `[Exhibit-Perspective-Contract]` requires.

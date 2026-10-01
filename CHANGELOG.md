@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a381
+
+**[Category-Ticks] an ordinal axis can name its positions, and a series across one is drawn as a trend.** `ChartAxis.categories` carries the names of a `kind='category'` axis' positions, in order, so a series plotted at 0, 1, 2 is ticked with what those positions **are**. A category axis had nowhere to put them: the grid payloads carry their own labels (`SurfaceData`'s coordinates, `MatrixData.rows` and `.columns`) and an `xy` panel on a category axis had none. Naming them on a `kind='value'` axis raises, as does an empty list. `CHART_IR_VERSION` **did not move**, and the call is recorded next to the constant: a reader ignoring the field draws every series in the right place and ticks by index, which is plainer rather than false, where bumping would make an older reader refuse the document and blank the picture instead of labeling it.
+
+`plot_chartdoc` now draws an atomic series on a category x axis as a marked line rather than as a staircase. A step asserts that the value holds across the gap between two named positions, and there is no gap for it to hold over.
+
+**[Matrix-Panel] the matrix panel reads better.** Band gaps shrink to 0.12 of a cell across and 0.1 down (`MATRIX_BAND_GAP`, `MATRIX_ROW_GAP`); a row band break is now real space rather than a thick white rule drawn over the cells, so the cells keep their height. An axis whose label is empty draws no name, which is what lets an emitter leave a self-evident categorical axis unlabeled.
+
 ## 1.0.0a380
 
 **[Matrix-Panel] a matrix cell whose ratio crossed zero is drawn without color.** Where a `MatrixData` declares a non-zero `center`, the values are ratios, and a ratio of opposite sign to the center is off the scale rather than far along it. Such a cell keeps its number and its annotation, loses its fill, and is excluded from the amplitude the rest of the scale is built on. Found by rendering the real page: a layer whose diversified cost of capital is negative scored about -9 against a positive book and drew as the deepest **favorable** cell on the page, saying it was nine times better than the book when the quantity had merely changed sign. It also flattened every other cell, since that -9 set the amplitude. A `center` of zero is the other case, differences, where both directions are meaningful and nothing is excluded.

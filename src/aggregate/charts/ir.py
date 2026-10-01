@@ -773,6 +773,25 @@ class ChartAxis:
         series, and working that out is emitter knowledge.
     kind : str
         'value' (continuous) or 'category' (ordinal positions).
+    categories : tuple of str, optional
+        The names of an ordinal axis' positions, in order, so that a series
+        plotted at 0, 1, 2 can be ticked with what those positions **are**.
+        Only meaningful with ``kind='category'``.
+
+        A category axis without them is incomplete in a way the rest of the
+        IR is not: nothing else in the document says what position 2 is, and
+        a renderer left to itself ticks it `2`. The grid payloads dodge this
+        by carrying their own labels (``SurfaceData``'s coordinates,
+        ``MatrixData.rows`` and ``.columns``); an ``xy`` panel on a category
+        axis has nowhere else to put them.
+
+        **This did not move** ``CHART_IR_VERSION``, and the call is worth
+        recording because it is close. A reader that ignores the field draws
+        every series in the right place and ticks the axis by index, which is
+        plainer than intended rather than false, and the alternative is worse
+        by a wide margin: bumping the version makes an older reader refuse the
+        whole document, so a tick-label improvement would blank the picture
+        rather than label it.
     unit : str, optional
         One of :data:`AXIS_UNITS`; what the numbers measure.
     reciprocal_of : str, optional
@@ -810,6 +829,7 @@ class ChartAxis:
     suggested_range: tuple = None
     full_range: tuple = None
     kind: str = 'value'
+    categories: tuple = None
     unit: str = None
     reciprocal_of: str = None
     complement_of: str = None
@@ -821,6 +841,17 @@ class ChartAxis:
         if self.kind not in ('value', 'category'):
             raise ValueError(f'unknown axis kind {self.kind!r}; '
                              "expected 'value' or 'category'")
+        if self.categories is not None:
+            _freeze_seq(self, 'categories')
+            if self.kind != 'category':
+                raise ValueError(
+                    f'axis {self.id!r} names categories but is kind '
+                    f'{self.kind!r}: names for the positions of an axis that '
+                    'has no positions are names for nothing')
+            if not self.categories:
+                raise ValueError(
+                    f'axis {self.id!r} declares an empty category list; omit '
+                    'the field to tick by index')
         if self.scales is None:
             object.__setattr__(self, 'scales', (self.scale,))
         else:
@@ -1735,6 +1766,7 @@ def human_strings(doc):
     for text in ([doc.title] + [p.title for p in doc.panels]
                  + [p.inverse_title for p in doc.panels]
                  + [a.label for a in doc.axes]
+                 + [c for a in doc.axes for c in (a.categories or ())]
                  + [s.name for s in doc.series]
                  + [m.label for m in doc.marks]
                  + [b.label for b in doc.blocks]

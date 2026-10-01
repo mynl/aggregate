@@ -557,6 +557,12 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Category-Ticks]** DONE (`1.0.0a381`): `ChartAxis.categories` names an
+  ordinal axis' positions, and an atomic series across one draws as a marked
+  line rather than a staircase. Driven by the relativity plugin's distortion
+  spectrum, which is an `xy` panel over four named families. No
+  `CHART_IR_VERSION` move; the reasoning is beside the constant.
+
 - **[Matrix-Panel]** DONE (`1.0.0a379`), under
   `dev/plan-a376-plugins-and-extension-surface.md` section 12: the chart IR
   gains a `matrix` panel kind and `MatrixData`, named categorical rows against

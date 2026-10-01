@@ -370,6 +370,15 @@ def _draw_atomic(ax, x, y, label, x_axis, y_axis, window):
     another accumulated probability, and a third the same probability
     read back to an outcome.
     """
+    # An **ordinal** x axis first, because none of the three readings below
+    # applies to one. A step between two named things asserts that the value
+    # holds across the gap between them, and there is no gap: there is nothing
+    # between `ph` and `wang` for a level to hold over. What a reader wants
+    # across ordered categories is the trend, so the points are marked and
+    # joined. The points are the readings; the line is the shape they make.
+    if getattr(x_axis, 'kind', 'value') == 'category':
+        ax.plot(x, y, label=label, marker='o', ms=4, lw=1.6)
+        return
     seen, pixels = _atom_room(ax, window, x)
     unit = getattr(y_axis, 'unit', None)
     if unit == 'probability':
@@ -838,29 +847,37 @@ MATRIX_NEUTRAL = '#f0efec'
 MATRIX_UNFAVORABLE = '#e34948'
 
 #: Gap between two column bands, in cell widths. Wide enough to read as a break
-#: and narrow enough that the matrix stays one object.
-MATRIX_BAND_GAP = 0.35
+#: and narrow enough that the matrix stays one object. A third of a cell read as
+#: a column missing from the table; an eighth reads as a break.
+MATRIX_BAND_GAP = 0.12
+
+#: Gap between two row bands, in cell heights. Smaller than the column gap
+#: because a row band break is already carried by the labels changing, and
+#: because vertical space is what the cells are short of.
+MATRIX_ROW_GAP = 0.1
 
 #: Luminance below which a cell's text flips to white. The usual 0.5 leaves the
 #: mid greens unreadable either way, so the threshold sits under it.
 MATRIX_DARK_TEXT_LUMA = 0.45
 
 
-def _matrix_offsets(groups, count):
-    """Per-column x offsets that open a gap between column bands.
+def _matrix_offsets(groups, count, gap=MATRIX_BAND_GAP):
+    """Per-cell offsets along one axis that open a gap between bands.
 
     Parameters
     ----------
     groups : tuple of str
-        One group name per column, or empty for no grouping.
+        One group name per position, or empty for no grouping.
     count : int
-        How many columns there are.
+        How many positions there are.
+    gap : float, default :data:`MATRIX_BAND_GAP`
+        The break, in cell widths.
 
     Returns
     -------
     numpy.ndarray
-        The offset to add to each column's left edge, cumulative so every band
-        after the first is pushed clear of the one before it.
+        The offset to add to each position's leading edge, cumulative so every
+        band after the first is pushed clear of the one before it.
     """
     offsets = np.zeros(count)
     if not groups:
@@ -868,9 +885,30 @@ def _matrix_offsets(groups, count):
     gaps = 0.0
     for i in range(1, count):
         if groups[i] != groups[i - 1]:
-            gaps += MATRIX_BAND_GAP
+            gaps += gap
         offsets[i] = gaps
     return offsets
+
+
+def _matrix_bands(groups, count):
+    """The band boundaries along one axis, as slice edges.
+
+    Parameters
+    ----------
+    groups : tuple of str
+        One group name per position, or empty for no grouping.
+    count : int
+        How many positions there are.
+
+    Returns
+    -------
+    list of int
+        ``[0, ..., count]``, with a cut wherever the group name changes, so
+        consecutive pairs are the half-open spans of each band.
+    """
+    cuts = [i for i in range(1, count)
+            if groups and groups[i] != groups[i - 1]]
+    return [0] + cuts + [count]
 
 
 def _matrix_norm(signed, center, neutral):
@@ -979,23 +1017,25 @@ def _render_matrix_panel(ax, doc, panel, series):
     cmap, norm = _matrix_norm(signed, matrix.center, matrix.neutral)
 
     offsets = _matrix_offsets(matrix.column_groups, ncol)
-    # One quadmesh per column band: a band gap is a break in the x coordinate,
-    # and a single mesh would stretch a cell across it.
-    starts = [0] + [i for i in range(1, ncol)
-                    if matrix.column_groups
-                    and matrix.column_groups[i] != matrix.column_groups[i - 1]]
-    bounds = starts + [ncol]
+    row_offsets = _matrix_offsets(matrix.row_groups, nrow, MATRIX_ROW_GAP)
+    # One quadmesh per band of cells, in both directions: a band gap is a break
+    # in the coordinate, and a single mesh would stretch a cell across it.
+    col_bounds = _matrix_bands(matrix.column_groups, ncol)
+    row_bounds = _matrix_bands(matrix.row_groups, nrow)
     if cmap is not None:
-        for lo, hi in zip(bounds, bounds[1:]):
-            ax.pcolormesh(np.arange(lo, hi + 1) + offsets[lo],
-                          np.arange(nrow + 1), signed[:, lo:hi],
-                          cmap=cmap, norm=norm, edgecolors='white',
-                          linewidth=2)
+        for rlo, rhi in zip(row_bounds, row_bounds[1:]):
+            for clo, chi in zip(col_bounds, col_bounds[1:]):
+                ax.pcolormesh(np.arange(clo, chi + 1) + offsets[clo],
+                              np.arange(rlo, rhi + 1) + row_offsets[rlo],
+                              signed[rlo:rhi, clo:chi],
+                              cmap=cmap, norm=norm, edgecolors='white',
+                              linewidth=2)
 
     annotations = matrix.annotations
     for i in range(nrow):
         for j in range(ncol):
             x = j + 0.5 + offsets[j]
+            y = i + row_offsets[i]
             if cmap is None or not np.isfinite(signed[i, j]):
                 ink, faint = '#52514e', '#898781'
             elif (0.2126 * to_rgb(cmap(norm(signed[i, j])))[0]
@@ -1008,28 +1048,20 @@ def _render_matrix_panel(ax, doc, panel, series):
             if np.isfinite(values[i, j]):
                 # A minus sign, not a hyphen: this is a number being read.
                 text = f'{values[i, j]:.2f}×'.replace('-', '−')
-                ax.text(x, i + (0.36 if annotations else 0.5), text,
+                ax.text(x, y + (0.36 if annotations else 0.5), text,
                         ha='center', va='center', color=ink,
                         fontsize=FONT_SIZE + 1)
             if annotations and annotations[i][j]:
-                ax.text(x, i + 0.72,
+                ax.text(x, y + 0.72,
                         f'({annotations[i][j]})'.replace('-', '−'),
                         ha='center', va='center', color=faint,
                         fontsize=FONT_SIZE - 1.7)
 
-    # Row band boundaries, drawn in the background color rather than as rules,
-    # so a break reads as space between groups instead of another line.
-    if matrix.row_groups:
-        span = ncol + (offsets[-1] if ncol else 0.0)
-        for i in range(1, nrow):
-            if matrix.row_groups[i] != matrix.row_groups[i - 1]:
-                ax.hlines(i, 0, span, color='white', linewidth=5, zorder=4)
-
     ax.set_xlim(0, ncol + (offsets[-1] if ncol else 0.0))
-    ax.set_ylim(0, nrow)
+    ax.set_ylim(0, nrow + (row_offsets[-1] if nrow else 0.0))
     ax.set_xticks(np.arange(ncol) + 0.5 + offsets,
                   [_typeset(doc, c) for c in matrix.columns])
-    ax.set_yticks(np.arange(nrow) + 0.5,
+    ax.set_yticks(np.arange(nrow) + 0.5 + row_offsets,
                   [_typeset(doc, r) for r in matrix.rows])
     # Rows read top to bottom, the order the document lists them in.
     ax.invert_yaxis()
@@ -1307,6 +1339,13 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     # as the grid panels already do.
     ax.set(xlabel=_typeset(doc, x_axis.label),
            ylabel=_typeset(doc, y_axis.label))
+    # An ordinal axis is ticked with what its positions are, where the document
+    # says. Without the names the ticks read 0, 1, 2, which places every series
+    # correctly and tells the reader nothing about what it is looking at.
+    for axis, setter in ((x_axis, ax.set_xticks), (y_axis, ax.set_yticks)):
+        names = getattr(axis, 'categories', None)
+        if names:
+            setter(range(len(names)), [_typeset(doc, n) for n in names])
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
     if labeled and sum(s.role != 'identity' for s in series_list) > 1:

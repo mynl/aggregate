@@ -1145,3 +1145,59 @@ def test_a_matrix_series_refuses_a_band():
     with pytest.raises(ValueError, match='y2 needs an x/y payload'):
         ChartSeries(name='s', role='identity', panel_id='m',
                     matrix=matrix_data(), y2=(1.0,))
+
+
+# --- naming an ordinal axis's positions ([Category-Ticks]) -------------------
+
+def test_a_category_axis_may_name_its_positions():
+    axis = ChartAxis(id='family', label='distortion family', kind='category',
+                     categories=('ph', 'wang', 'dual', 'tvar'))
+    assert axis.categories == ('ph', 'wang', 'dual', 'tvar')
+
+
+def test_naming_positions_on_a_value_axis_is_refused():
+    """Names for the positions of an axis that has no positions."""
+    with pytest.raises(ValueError, match='names categories but is kind'):
+        ChartAxis(id='loss', label='Loss', categories=('a', 'b'))
+
+
+def test_an_empty_category_list_is_refused():
+    with pytest.raises(ValueError, match='empty category list'):
+        ChartAxis(id='f', label='F', kind='category', categories=())
+
+
+def test_category_names_are_human_text():
+    """They are the axis' tick labels, so a prose collector must see them."""
+    doc = ChartDoc(
+        name='spectrum',
+        axes=(ChartAxis(id='f', label='family', kind='category',
+                        categories=('ph', 'wang')),
+              ChartAxis(id='m', label='multiple')),
+        panels=(Panel(id='p', kind='xy', x_axis='f', y_axis='m'),),
+        series=(ChartSeries(name='gross book', role='gross', panel_id='p',
+                            x=(0.0, 1.0), y=(1.0, 1.0)),))
+    strings = human_strings(doc)
+    assert 'ph' in strings and 'wang' in strings
+
+
+def test_naming_positions_did_not_move_the_version():
+    """And the call is recorded, because it is a close one.
+
+    A reader that ignores the field draws every series in the right place and
+    ticks by index, which is plainer rather than false. Bumping would make an
+    older reader refuse the whole document, so a tick-label improvement would
+    blank the picture instead of labeling it.
+    """
+    assert CHART_IR_VERSION == 4
+    doc = ChartDoc(
+        name='spectrum',
+        axes=(ChartAxis(id='f', label='family', kind='category',
+                        categories=('ph', 'wang')),
+              ChartAxis(id='m', label='multiple')),
+        panels=(Panel(id='p', kind='xy', x_axis='f', y_axis='m'),),
+        series=(ChartSeries(name='s', role='gross', panel_id='p',
+                            x=(0.0, 1.0), y=(1.0, 1.0)),))
+    back = load_chart_doc(canonical_dict(doc))
+    assert back.axes[0].categories == ('ph', 'wang')
+    # absent on an axis that does not name them, so no existing hash moved
+    assert 'categories' not in canonical_dict(doc)['axes'][1]

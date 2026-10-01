@@ -813,9 +813,14 @@ _RATIO_COLS = ('P', 'L', 'E', 'M', 'LR', 'ER', 'CR',
 #: with the two frames it describes.
 WATERFALL_RETURN_PERIOD = 100
 
-#: Ledger row kinds that ARE a step's own result, for the walk. A running net
-#: is excluded: it is the cumulative position after the step, not the step.
-_RESULT_KINDS = ('group_result', 'tier_result', 'grand_result')
+#: Ledger row kinds the walk reports. A step's own results, plus the
+#: net-of-tier position ([Ledger-Net-Of-Tier], carried since a387): the
+#: running position through a tier is the one cumulative row worth a line of
+#: its own, the book as it stands once that tier's program has worked, and
+#: the ledger and summary card both carry it. Plain running nets stay
+#: excluded: the walk already accumulates by being read down, and a net
+#: after every single step would say so after every row.
+_RESULT_KINDS = ('group_result', 'tier_result', 'net_result', 'grand_result')
 
 
 def _capital_ratio(margin, bad_outcome):
@@ -2127,9 +2132,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
     def _blocks(self):
         """The ``(step label, group indices)`` pairs :attr:`economic_ratios_df` reports.
 
-        Every group, then each tier span, then the whole ledger under ``'All'``
-        (only where the grand rows exist, i.e. a genuinely multi-group ledger).
-        Spans sit after the last group they cover, matching the sheet.
+        Every group, then each tier span, then the net-of-tier position
+        ([Ledger-Net-Of-Tier]) where the ledger carries one, then the whole
+        ledger under ``'All'`` (only where the grand rows exist, i.e. a
+        genuinely multi-group ledger). Spans and net blocks sit after the last
+        group they cover, matching the sheet. The net block spans groups
+        ``[0, hi)``: it is the running position through the tier, which is
+        why it reads as a cumulative row rather than a step of its own.
         """
         out = []
         for gi, g in enumerate(self._group_specs):
@@ -2137,6 +2146,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             for (lo, hi), lbl in self._span_labels.items():
                 if hi - 1 == gi:
                     out.append((lbl, tuple(range(lo, hi))))
+            for hi, nlbl in self._net_span_labels.items():
+                if hi - 1 == gi:
+                    out.append((nlbl, tuple(range(hi))))
         if len(self._group_specs) > 1:
             out.append(('All', tuple(range(len(self._group_specs)))))
         return out
@@ -2210,8 +2222,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         needs :attr:`Leg.kind`, and the ``E_`` columns need the per-atom
         vectors, neither of which survives into the ledger sheet.
 
-        One row per block: each group, each tier subtotal, and ``'All'`` on a
-        multi-group ledger. Deliberately unformatted and absent from ``qd`` /
+        One row per block: each group, each tier subtotal, the net-of-tier
+        position where the ledger carries one ([Ledger-Net-Of-Tier], the
+        running position through the tier, over groups ``[0, hi)``), and
+        ``'All'`` on a multi-group ledger. The net rows are cumulative, so
+        the amounts do not add across blocks once one is present; read them
+        as the ledger reads its running nets. Deliberately unformatted and
+        absent from ``qd`` /
         the notebook repr, which render :attr:`summary_df`: this is the frame to
         slice, unstack and build presentation tables from, in the spirit of
         ``Portfolio.analyze_distortions``' ``pricing_df``. Transpose for the
@@ -2360,7 +2377,6 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         p = 1.0 / WATERFALL_RETURN_PERIOD
         kappa = f'κ{int(round(p * 100)):02d}'
         diversified_available = kappa in ledger.columns
-        densities = self.density_df
         # the gross-anchored basis ([Waterfall-Gross-Basis]): the per-atom
         # twin where atoms are shared, the stitched gross Palm ladder where
         # the builder computed one, else no gross column
@@ -2377,7 +2393,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             pos, label, ceded = steps[step]
             row = ledger.iloc[pos]
             margin, sd = float(row['EX']), float(row['SD'])
-            gd = densities.get(label)
+            # Off the row store rather than `density_df`, which excludes the
+            # net-of-tier rows (they alias a running net); every route's rows
+            # carry a GridDistribution, the same contract density_df reads.
+            row_obj = self._rows.get(label)
+            gd = None if row_obj is None else row_obj.gd
             # The standalone state is two-sided by role ([Writer-Standalone]):
             # a risk-bearing step reads its own left tail (the state that
             # calls for capital); a ceded step reads its own RIGHT tail, the
@@ -2390,16 +2410,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             else:
                 standalone = float(gd.q(1 - p)) if ceded else float(gd.q(p))
             divers = float(row[kappa]) if diversified_available else np.nan
-            divers_gross = (float(gross_ladder[label][q_index])
-                            if gross_ladder is not None else np.nan)
+            # `.get` rather than indexing: a Palm ladder may not carry every
+            # row the walk now reports (the net-of-tier rows alias a running
+            # net), and a missing entry is an honest blank, not an error.
+            gross_cells = (gross_ladder.get(label)
+                           if gross_ladder is not None else None)
+            divers_gross = (float(gross_cells[q_index])
+                            if gross_cells is not None else np.nan)
             r = ratios.loc[step]
+            cr = float(r['CR'])
             index.append(step)
             walk.append([margin, standalone, divers, divers_gross])
             # one quotient per capital basis, on every row; the sign carries
             # the reading (risk rows: margin > 0, M01 < 0, a return on
             # capital; ceded rows: margin < 0, M01 > 0, a cost of relief)
             evaluation.append([
-                float(r['P_share']), float(r['M_share']), float(r['CR']),
+                float(r['P_share']), float(r['M_share']), cr, 1.0 - cr,
                 margin / sd if sd > 0 else np.nan,
                 _capital_ratio(margin, standalone),
                 _capital_ratio(margin, divers),
@@ -2418,8 +2444,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                      f'{m} div gross'])
         evaluation_df = pd.DataFrame(
             evaluation, index=idx,
-            columns=['Premium spent', 'Margin spent', 'CR', 'MSD',
-                     'SA CoC', 'Div CoC net', 'Div CoC gross'])
+            columns=['Premium spent', 'Margin spent', 'CR', 'Margin ratio',
+                     'MSD', 'SA CoC', 'Div CoC net', 'Div CoC gross'])
         return walk_df, evaluation_df
 
     @property
@@ -2427,9 +2453,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         """The margin walk in currency: gross, each cession, the closing net.
 
         One row per step that books a result of its own, in ledger order, so
-        the last row is the net position. Running nets are excluded: a running
-        net is the cumulative position after a step rather than the step
-        itself, and the walk already accumulates by being read down.
+        the last row is the net position. The net-of-tier position rides along
+        where the ledger carries one (``Net of occurrence``, since a387): the
+        book as it stands once that tier's program has worked, the one
+        cumulative row the ledger and the summary card also carry. It
+        duplicates the rows above it by construction, so the div columns foot
+        down the walk only over the non-cumulative steps. Plain running nets
+        stay excluded: the walk already accumulates by being read down.
 
         Returns
         -------
@@ -2523,6 +2553,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 which is the first block in every builder.
             ``CR``
                 The step's combined ratio, ``(L + E) / P``.
+            ``Margin ratio``
+                ``1 - CR``, the margin per unit of premium: the same fact as
+                ``CR`` read from the earning side, beside it because that is
+                how a rubric is scanned.
             ``MSD``
                 Margin over its own standard deviation (margin to standard
                 deviation, a multiple).

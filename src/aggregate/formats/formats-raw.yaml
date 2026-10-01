@@ -132,6 +132,8 @@ columns:
   M_share: ratio
   'Premium spent': ratio
   'Margin spent': ratio
+  'Margin ratio': ratio    # 1 - CR, the margin per unit of premium, beside
+                           # CR on evaluation_df (the walk's Margin is money)
   MSD: '.3f'           # margin to standard deviation, a multiple, read to
                        # the same places as PQ and VaR/Mean
   'SA CoC': ratio      # cost of capital on the standalone basis: a return

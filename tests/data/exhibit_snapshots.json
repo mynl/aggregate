@@ -27713,7 +27713,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
    "columns": [
     {
      "align": "l",
@@ -28170,235 +28170,6 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "0",
-      "Gross",
-      "Consideration",
-      "Premium",
-      "premium",
-      {
-       "raw": 1000.0,
-       "text": "1,000.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "1",
-      "Gross",
-      "Obligation",
-      "Loss",
-      "loss",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -700.006208118447,
-       "text": "-700.01"
-      },
-      {
-       "raw": 591.6134045211008,
-       "text": "591.61"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "2",
-      "occ 300 xs 200",
-      "Consideration",
-      "occ 300 xs 200 premium",
-      "premium",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -40.0,
-       "text": "-40.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "3",
-      "occ 300 xs 200",
-      "Obligation",
-      "occ 300 xs 200 recovery",
-      "recovery",
-      {
-       "raw": 123.89265190491155,
-       "text": "123.89"
-      },
-      {
-       "raw": 168.8038642728119,
-       "text": "168.80"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "4",
-      "occ 100 xs 100",
-      "Consideration",
-      "occ 100 xs 100 premium",
-      "premium",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -60.0,
-       "text": "-60.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "5",
-      "occ 100 xs 100",
-      "Obligation",
-      "occ 100 xs 100 recovery",
-      "recovery",
-      {
-       "raw": 123.76031042534639,
-       "text": "123.76"
-      },
-      {
-       "raw": 103.68800879739482,
-       "text": "103.69"
-      }
-     ]
-    }
-   ],
-   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "int",
-     "format": {
-      "group": true,
-      "kind": "int"
-     },
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "leg"
-     ],
-     "role": "stub"
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c1",
-     "name": [
-      "Step"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c2",
-     "name": [
-      "Side"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c3",
-     "name": [
-      "Label"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c4",
-     "name": [
-      "kind"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "EX"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "SD"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "leg"
-     },
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Side"
-     },
-     {
-      "text": "Label"
-     },
-     {
-      "text": "kind"
-     },
-     {
-      "text": "EX"
-     },
-     {
-      "text": "SD"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
   }
  ],
  "economic_ratios/insurer/PeelMarginal": [
@@ -28535,7 +28306,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
    "columns": [
     {
      "align": "l",
@@ -28992,235 +28763,6 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "0",
-      "Gross",
-      "Consideration",
-      "Premium",
-      "premium",
-      {
-       "raw": 1000.0,
-       "text": "1,000.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "1",
-      "Gross",
-      "Obligation",
-      "Loss",
-      "loss",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -700.006319270119,
-       "text": "-700.01"
-      },
-      {
-       "raw": 1181.0344463520967,
-       "text": "1,181.03"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "2",
-      "occ 300 xs 200",
-      "Consideration",
-      "occ 300 xs 200 premium",
-      "premium",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -40.0,
-       "text": "-40.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "3",
-      "occ 300 xs 200",
-      "Obligation",
-      "occ 300 xs 200 recovery",
-      "recovery",
-      {
-       "raw": 123.89086651234096,
-       "text": "123.89"
-      },
-      {
-       "raw": 247.43364715765637,
-       "text": "247.43"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "4",
-      "occ 100 xs 100",
-      "Consideration",
-      "occ 100 xs 100 premium",
-      "premium",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -60.0,
-       "text": "-60.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "5",
-      "occ 100 xs 100",
-      "Obligation",
-      "occ 100 xs 100 recovery",
-      "recovery",
-      {
-       "raw": 123.75561793216384,
-       "text": "123.76"
-      },
-      {
-       "raw": 208.3482212559716,
-       "text": "208.35"
-      }
-     ]
-    }
-   ],
-   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "int",
-     "format": {
-      "group": true,
-      "kind": "int"
-     },
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "leg"
-     ],
-     "role": "stub"
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c1",
-     "name": [
-      "Step"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c2",
-     "name": [
-      "Side"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c3",
-     "name": [
-      "Label"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c4",
-     "name": [
-      "kind"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "EX"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "SD"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "leg"
-     },
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Side"
-     },
-     {
-      "text": "Label"
-     },
-     {
-      "text": "kind"
-     },
-     {
-      "text": "EX"
-     },
-     {
-      "text": "SD"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
   }
  ],
  "economic_ratios/insurer/PnL": [
@@ -29248,7 +28790,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
    "columns": [
     {
      "align": "l",
@@ -29541,157 +29083,6 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "0",
-      "EX.B",
-      "Consideration",
-      "Premium",
-      "premium",
-      {
-       "raw": 1000.0,
-       "text": "1,000.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "1",
-      "EX.B",
-      "Obligation",
-      "Loss",
-      "loss",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -849.9999927797967,
-       "text": "-850.00"
-      },
-      {
-       "raw": 412.31045794601505,
-       "text": "412.31"
-      }
-     ]
-    }
-   ],
-   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "int",
-     "format": {
-      "group": true,
-      "kind": "int"
-     },
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "leg"
-     ],
-     "role": "stub"
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c1",
-     "name": [
-      "Step"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c2",
-     "name": [
-      "Side"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c3",
-     "name": [
-      "Label"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c4",
-     "name": [
-      "kind"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "EX"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "SD"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "leg"
-     },
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Side"
-     },
-     {
-      "text": "Label"
-     },
-     {
-      "text": "kind"
-     },
-     {
-      "text": "EX"
-     },
-     {
-      "text": "SD"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
   }
  ],
  "economic_ratios/insurer/Tower": [
@@ -29775,7 +29166,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. The legs block below itemizes both.",
+   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
    "columns": [
     {
      "align": "l",
@@ -30147,196 +29538,6 @@
      },
      {
       "text": "M_share"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "0",
-      "Gross",
-      "Consideration",
-      "Premium",
-      "premium",
-      {
-       "raw": 1000.0,
-       "text": "1,000.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "1",
-      "Gross",
-      "Obligation",
-      "Loss",
-      "loss",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -700.0061449405243,
-       "text": "-700.01"
-      },
-      {
-       "raw": 593.2132248768913,
-       "text": "593.21"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "2",
-      "occ 500 xs 500",
-      "Consideration",
-      "occ 500 xs 500 premium",
-      "premium",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -100.0,
-       "text": "-100.00"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "3",
-      "occ 500 xs 500",
-      "Obligation",
-      "occ 500 xs 500 recovery",
-      "recovery",
-      {
-       "raw": 51.11309650691787,
-       "text": "51.11"
-      },
-      {
-       "raw": 140.82601881509245,
-       "text": "140.83"
-      }
-     ]
-    }
-   ],
-   "caption": "One row per declared leg, the itemized companion. Derived rows (totals, results, running nets) are absent by design: they are sums of these.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "int",
-     "format": {
-      "group": true,
-      "kind": "int"
-     },
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "leg"
-     ],
-     "role": "stub"
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c1",
-     "name": [
-      "Step"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c2",
-     "name": [
-      "Side"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c3",
-     "name": [
-      "Label"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c4",
-     "name": [
-      "kind"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c5",
-     "name": [
-      "EX"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "SD"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "leg"
-     },
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Side"
-     },
-     {
-      "text": "Label"
-     },
-     {
-      "text": "kind"
-     },
-     {
-      "text": "EX"
-     },
-     {
-      "text": "SD"
      }
     ]
    ],
@@ -33035,7 +32236,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
    "columns": [
     {
      "align": "l",
@@ -33146,6 +32347,10 @@
        "text": "70.0%"
       },
       {
+       "raw": 0.29999379188155295,
+       "text": "30.0%"
+      },
+      {
        "raw": 0.5070774083024571,
        "text": "0.507"
       },
@@ -33181,6 +32386,13 @@
       {
        "raw": 3.097316297622789,
        "text": "309.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097316297622789,
+       "text": "-209.7%"
       },
       {
        "raw": 0.4969830060840827,
@@ -33229,6 +32441,13 @@
        "text": "206.3%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.06267184042244,
+       "text": "-106.3%"
+      },
+      {
        "raw": 0.614924629808769,
        "text": "0.615"
       },
@@ -33275,6 +32494,13 @@
        "text": "247.7%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4765296233025795,
+       "text": "-147.7%"
+      },
+      {
        "raw": 0.5835379976351804,
        "text": "0.584"
       },
@@ -33318,6 +32544,10 @@
        "text": "50.3%"
       },
       {
+       "raw": 0.49738528245756763,
+       "text": "49.7%"
+      },
+      {
        "raw": 1.0886772129543212,
        "text": "1.089"
       },
@@ -33339,7 +32569,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -33398,10 +32628,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "Margin ratio"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 3,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "MSD"
      ],
@@ -33414,7 +32658,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SA CoC"
      ],
@@ -33428,7 +32672,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "Div CoC net"
      ],
@@ -33442,7 +32686,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "Div CoC gross"
      ],
@@ -33463,6 +32707,9 @@
      },
      {
       "text": "CR"
+     },
+     {
+      "text": "Margin ratio"
      },
      {
       "text": "MSD"
@@ -33605,7 +32852,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. Both div columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. Both div columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -33716,6 +32963,10 @@
        "text": "70.0%"
       },
       {
+       "raw": 0.299993680729881,
+       "text": "30.0%"
+      },
+      {
        "raw": 0.25400925574735117,
        "text": "0.254"
       },
@@ -33751,6 +33002,13 @@
       {
        "raw": 3.097271662808524,
        "text": "309.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097271662808524,
+       "text": "-209.7%"
       },
       {
        "raw": 0.3390438910634031,
@@ -33793,6 +33051,13 @@
        "text": "206.3%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.0625936322027307,
+       "text": "-106.3%"
+      },
+      {
        "raw": 0.3060050983292784,
        "text": "0.306"
       },
@@ -33833,6 +33098,13 @@
        "text": "247.6%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.476464844445048,
+       "text": "-147.6%"
+      },
+      {
        "raw": 0.33452919345393833,
        "text": "0.335"
       },
@@ -33870,6 +33142,10 @@
        "text": "50.3%"
       },
       {
+       "raw": 0.4973779613048731,
+       "text": "49.7%"
+      },
+      {
        "raw": 0.5753160949722593,
        "text": "0.575"
       },
@@ -33891,7 +33167,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -33950,10 +33226,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "Margin ratio"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 3,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "MSD"
      ],
@@ -33966,7 +33256,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SA CoC"
      ],
@@ -33980,7 +33270,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "Div CoC net"
      ],
@@ -33994,7 +33284,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "Div CoC gross"
      ],
@@ -34015,6 +33305,9 @@
      },
      {
       "text": "CR"
+     },
+     {
+      "text": "Margin ratio"
      },
      {
       "text": "MSD"
@@ -34128,7 +33421,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
    "columns": [
     {
      "align": "l",
@@ -34239,6 +33532,10 @@
        "text": "70.0%"
       },
       {
+       "raw": 0.2999938550594756,
+       "text": "30.0%"
+      },
+      {
        "raw": 0.5057099917516722,
        "text": "0.506"
       },
@@ -34279,6 +33576,10 @@
        "text": "51.1%"
       },
       {
+       "raw": 0.48886903493082134,
+       "text": "48.9%"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -34316,6 +33617,10 @@
        "text": "72.1%"
       },
       {
+       "raw": 0.2790077239626594,
+       "text": "27.9%"
+      },
+      {
        "raw": 0.5042702204366026,
        "text": "0.504"
       },
@@ -34337,7 +33642,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -34396,10 +33701,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "Margin ratio"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 3,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "MSD"
      ],
@@ -34412,7 +33731,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SA CoC"
      ],
@@ -34426,7 +33745,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "Div CoC net"
      ],
@@ -34440,7 +33759,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "Div CoC gross"
      ],
@@ -34461,6 +33780,9 @@
      },
      {
       "text": "CR"
+     },
+     {
+      "text": "Margin ratio"
      },
      {
       "text": "MSD"
@@ -34615,7 +33937,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
    "columns": [
     {
      "align": "l",
@@ -34726,6 +34048,10 @@
        "text": "70.0%"
       },
       {
+       "raw": 0.29999379188155295,
+       "text": "30.0%"
+      },
+      {
        "raw": 0.5070774083024571,
        "text": "0.507"
       },
@@ -34761,6 +34087,13 @@
       {
        "raw": 3.097316297622789,
        "text": "309.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097316297622789,
+       "text": "-209.7%"
       },
       {
        "raw": 0.4969830060840827,
@@ -34809,6 +34142,13 @@
        "text": "206.3%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.06267184042244,
+       "text": "-106.3%"
+      },
+      {
        "raw": 0.614924629808769,
        "text": "0.615"
       },
@@ -34855,6 +34195,13 @@
        "text": "247.7%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4765296233025795,
+       "text": "-147.7%"
+      },
+      {
        "raw": 0.5835379976351804,
        "text": "0.584"
       },
@@ -34898,6 +34245,10 @@
        "text": "50.3%"
       },
       {
+       "raw": 0.49738528245756763,
+       "text": "49.7%"
+      },
+      {
        "raw": 1.0886772129543212,
        "text": "1.089"
       },
@@ -34919,7 +34270,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -34978,10 +34329,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "Margin ratio"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 3,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "MSD"
      ],
@@ -34994,7 +34359,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SA CoC"
      ],
@@ -35008,7 +34373,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "Div CoC net"
      ],
@@ -35022,7 +34387,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "Div CoC gross"
      ],
@@ -35043,6 +34408,9 @@
      },
      {
       "text": "CR"
+     },
+     {
+      "text": "Margin ratio"
      },
      {
       "text": "MSD"
@@ -35185,7 +34553,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. Both div columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. Both div columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -35296,6 +34664,10 @@
        "text": "70.0%"
       },
       {
+       "raw": 0.299993680729881,
+       "text": "30.0%"
+      },
+      {
        "raw": 0.25400925574735117,
        "text": "0.254"
       },
@@ -35331,6 +34703,13 @@
       {
        "raw": 3.097271662808524,
        "text": "309.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097271662808524,
+       "text": "-209.7%"
       },
       {
        "raw": 0.3390438910634031,
@@ -35373,6 +34752,13 @@
        "text": "206.3%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.0625936322027307,
+       "text": "-106.3%"
+      },
+      {
        "raw": 0.3060050983292784,
        "text": "0.306"
       },
@@ -35413,6 +34799,13 @@
        "text": "247.6%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.476464844445048,
+       "text": "-147.6%"
+      },
+      {
        "raw": 0.33452919345393833,
        "text": "0.335"
       },
@@ -35450,6 +34843,10 @@
        "text": "50.3%"
       },
       {
+       "raw": 0.4973779613048731,
+       "text": "49.7%"
+      },
+      {
        "raw": 0.5753160949722593,
        "text": "0.575"
       },
@@ -35471,7 +34868,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -35530,10 +34927,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "Margin ratio"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 3,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "MSD"
      ],
@@ -35546,7 +34957,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SA CoC"
      ],
@@ -35560,7 +34971,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "Div CoC net"
      ],
@@ -35574,7 +34985,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "Div CoC gross"
      ],
@@ -35595,6 +35006,9 @@
      },
      {
       "text": "CR"
+     },
+     {
+      "text": "Margin ratio"
      },
      {
       "text": "MSD"
@@ -35708,7 +35122,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit.",
+   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
    "columns": [
     {
      "align": "l",
@@ -35819,6 +35233,10 @@
        "text": "70.0%"
       },
       {
+       "raw": 0.2999938550594756,
+       "text": "30.0%"
+      },
+      {
        "raw": 0.5057099917516722,
        "text": "0.506"
       },
@@ -35859,6 +35277,10 @@
        "text": "51.1%"
       },
       {
+       "raw": 0.48886903493082134,
+       "text": "48.9%"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -35896,6 +35318,10 @@
        "text": "72.1%"
       },
       {
+       "raw": 0.2790077239626594,
+       "text": "27.9%"
+      },
+      {
        "raw": 0.5042702204366026,
        "text": "0.504"
       },
@@ -35917,7 +35343,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
    "columns": [
     {
      "align": "l",
@@ -35976,10 +35402,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "Margin ratio"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 3,
       "kind": "dec"
      },
-     "key": "c4",
+     "key": "c5",
      "name": [
       "MSD"
      ],
@@ -35992,7 +35432,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "SA CoC"
      ],
@@ -36006,7 +35446,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "Div CoC net"
      ],
@@ -36020,7 +35460,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "Div CoC gross"
      ],
@@ -36041,6 +35481,9 @@
      },
      {
       "text": "CR"
+     },
+     {
+      "text": "Margin ratio"
      },
      {
       "text": "MSD"

@@ -250,37 +250,58 @@ _AMOUNT_COLS = ('P', 'L', 'E', 'M')
 _RATIO_COLS = ('LR', 'ER', 'CR', 'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 
+def _ratio_row_flags(obj, df):
+    """Total on the last row, and the net-of-tier rows muted.
+
+    The same treatment the ledger gives them (:data:`LEDGER_ROW_FLAGS`): a
+    net-of-tier row is the running position through the tier, a cumulative
+    reading aid rather than a block of its own, so it reads quiet. Matched by
+    label against the P&L's own net-span labels, with the ledger exhibit's
+    declining rule: presentation code never guesses a row.
+    """
+    nets = set(getattr(obj, '_net_span_labels', {}).values())
+    flags = {i: ('muted',) for i, label in enumerate(df.index)
+             if label in nets}
+    if len(df) > 1:
+        flags[len(df) - 1] = ('total',)
+    return flags
+
+
 @economic_ratios.insurer.register(PnL)
 def _economic_ratios_insurer(obj, blocks):
     """Split amounts from ratios, so no column mixes two units.
 
     The raw frame is deliberately mixed: it is raw materials, the frame to
     slice and pivot. Presented, it wants the reporting rule applied, one unit
-    per column, which means two blocks rather than one wide one. The legs
-    block passes through with a caption noting what it omits.
+    per column, which means two blocks rather than one wide one. The itemized
+    legs block stays on RAW (author's ruling, 2026-10-01): the insurer view is a
+    client-facing exhibit, and a third table by leg confused more than it
+    itemized.
     """
-    (ratios_name, ratios_df, ratios_kw), (legs_name, legs_df, legs_kw) = blocks
+    (ratios_name, ratios_df, ratios_kw), _legs = blocks
     amounts = [c for c in _AMOUNT_COLS if c in ratios_df.columns]
     ratios = [c for c in _RATIO_COLS if c in ratios_df.columns]
-    total_row = {len(ratios_df) - 1: ('total',)} if len(ratios_df) > 1 else {}
+    flags = _ratio_row_flags(obj, ratios_df)
     out = []
     if amounts:
         out.append((
             'amounts', ratios_df[amounts],
-            dict(ratios_kw, row_flags=total_row, caption=(
+            dict(ratios_kw, row_flags=flags, caption=(
                 'Premium, loss and expense per block, signed in the gross '
                 'direction so they add across blocks and the margin identity '
                 'M = P - L - E holds exactly. Loss absorbs cession recoveries '
                 'and any unclassified obligation leg; expense absorbs ceding '
-                'commission, a contra expense. The legs block below itemizes '
-                'both.'))))
+                'commission, a contra expense. A net of tier row is the '
+                'running position through that tier and sits outside the '
+                'sum, which is why it reads muted. The raw view itemizes '
+                'the declared legs.'))))
     if ratios:
         # no ratio_cols here: every one of these labels points at the `ratio`
         # style in the format sheets, which stamps greater_tables' own ratio
         # column tag as well as the reading ([Format-Sheets] decision 6)
         out.append((
             'ratios', ratios_df[ratios],
-            dict(ratios_kw, row_flags=total_row,
+            dict(ratios_kw, row_flags=flags,
                  caption=(
                 'LR, ER and CR are ratios of means, the convention of a rate '
                 'filing, re-derived from each block\'s own amounts and never '
@@ -290,10 +311,6 @@ def _economic_ratios_insurer(obj, blocks):
                 'random and correlated with loss, which is what a retro, a '
                 'swing, a slide or a profit commission is. Share columns are '
                 'against the first (gross) block.'))))
-    out.append(('legs', legs_df, dict(legs_kw, caption=(
-        'One row per declared leg, the itemized companion. Derived rows '
-        '(totals, results, running nets) are absent by design: they are sums '
-        'of these.'))))
     return out
 
 
@@ -319,7 +336,13 @@ def _economic_waterfall_frames(obj):
     gross_available = not gross_col.isna().all()
     gross_truncated = gross_available and gross_col.isna().any()
 
-    total_row = {len(idx) - 1: ('total',)} if len(idx) > 1 else {}
+    # Total on the closing net; the net-of-tier rows muted, the ledger's own
+    # treatment: each is the running position through its tier, a cumulative
+    # reading aid that sits outside the walk's sum.
+    nets = set(getattr(obj, '_net_span_labels', {}).values())
+    total_row = {i: ('muted',) for i, step in enumerate(idx) if step in nets}
+    if len(idx) > 1:
+        total_row[len(idx) - 1] = ('total',)
     walk_caption = (
         f'The margin walk in currency: gross, what each layer cedes, and the '
         f'closing net. Margin is the expected result and {m} is the result in '
@@ -337,7 +360,10 @@ def _economic_waterfall_frames(obj):
         f'the capital the writer of that cover would hold, so the cell is '
         f'positive there and the sign flip marks which reading a row takes. '
         f'Tail measures do not add, so standalone does not foot, and its '
-        f'gap against the div columns is the diversification benefit.')
+        f'gap against the div columns is the diversification benefit. A '
+        f'muted net of tier row is the running position through that tier, '
+        f'the book once that tier\'s program has worked; it restates the '
+        f'rows above it, so the footing runs over the unmuted steps alone.')
     if not net_available and not gross_available:
         walk_caption += (
             ' Both div columns are blank here: this ledger shares no '
@@ -350,7 +376,8 @@ def _economic_waterfall_frames(obj):
             'the aggregate cover and everything downstream of it are blank '
             'and the column foots only over the sub-ledger it serves.')
     evaluation_caption = (
-        f'The same walk read as ratios: the rubric for the program. MSD is '
+        f'The same walk read as ratios: the rubric for the program. Margin '
+        f'ratio is 1 less CR, the margin per unit of premium. MSD is '
         f'margin over its own standard deviation, a multiple. The CoC '
         f'columns are one quotient, M over the negated {m}, on the '
         f'standalone, net diversified and gross diversified capital bases: '

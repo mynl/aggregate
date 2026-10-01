@@ -791,10 +791,10 @@ def test_unknown_row_kind_raises(monkeypatch):
 # ----------------------------------------------------------------------
 def test_ratio_df_has_a_row_per_block_including_the_tier_subtotals():
     p = build(f'{TWO_EACH} peel top-down')
-    # the net-of-tier block ([Ledger-Net-Of-Tier]) is a cumulative position,
-    # not a block of its own, so it earns no ratio row
-    blocks = [st for st in _steps(p) if not st.startswith('Net of ')]
-    assert list(p.economic_ratios_df.index) == blocks
+    # the net-of-tier block ([Ledger-Net-Of-Tier]) rides along since a387:
+    # the running position through the tier, the row the ledger and the
+    # summary card already carry, so the three frames name the same steps
+    assert list(p.economic_ratios_df.index) == _steps(p)
 
 
 def test_ratio_df_amounts_add_across_the_peeled_blocks():
@@ -844,8 +844,10 @@ def test_ratio_df_commission_folds_into_expense_as_a_contra():
     assert r.loc[ceded, 'E'] == pytest.approx(-amount, abs=FOOTS)
     # ...and reads back as the cede rate, sign conventional (both negative)
     assert r.loc[ceded, 'ER'] == pytest.approx(0.2, abs=FOOTS)
-    # no other layer declares one
-    others = [s for s in r.index if s not in (ceded, 'All occurrence', 'All')]
+    # no other layer declares one; the cumulative rows (the tier subtotal,
+    # the net-of-tier position, All) carry the ceded layer's credit inside
+    others = [s for s in r.index if s not in
+              (ceded, 'All occurrence', 'Net of occurrence', 'All')]
     assert all(r.loc[s, 'E'] == 0.0 for s in others)
     # All: the statutory expense ratio, net of the commission received
     assert r.loc['All', 'E'] == pytest.approx(-amount, abs=FOOTS)

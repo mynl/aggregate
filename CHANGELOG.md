@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a387
+
+**[Waterfall-Net-Of-Tier] the net-of-tier position reaches the ratio frame and the walk; `evaluation_df` gains `Margin ratio`; the insurer ratios drop the legs block.** `economic_ratios_df` and the two waterfall frames now carry the `Net of occurrence` row the ledger and summary card already had (the running position through the tier, cumulative, so it sits outside the footing and renders muted); `evaluation_df` adds `Margin ratio`, `1 - CR`, between `CR` and `MSD`, with a `ratio` entry in the format sheet; and the `economic_ratios` INSURER view serves amounts and ratios only, the itemized legs staying on RAW (author's rulings, 2026-10-01). Sync of `tests/data/exhibit_snapshots.json` required; a caller indexing `evaluation_df` positionally gains a column, and one summing `economic_ratios_df` rows must skip the `Net of` rows.
+
 ## 1.0.0a386
 
 **[PnL-Program-Rate-Style] `pnl_program` takes `premium_style='deposit'|'rate'`.** Under the combined-ratio ladder, `'rate'` respells each ladder-priced layer's deposit as a `rate` clause once the booked premium is final: occurrence rates are quoted against the stated gross premium, aggregate rates against the gross less the occurrence cession, mirroring the resolver, and each rate carries eight significant figures so the resolved premium returns the deposit well inside the deposit's own rounding. A clause the author wrote stays verbatim, the style is moot without the ladder, and an unknown style raises. Asked for by `aggregate_api`'s PnL (rate) menu items, which feature-detect the keyword by signature.

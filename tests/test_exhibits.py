@@ -371,8 +371,12 @@ def test_a_perspective_may_restructure_the_block_list(tower):
     insurer = [b for b, _, _ in
                exhibit_frames(tower, 'economic_ratios', Perspective.INSURER)]
     assert raw == ['economic_ratios_df', 'legs_df']
-    assert insurer == ['amounts', 'ratios', 'legs']
-    assert len(insurer) != len(raw)
+    # the itemized legs stay on RAW since a387: the insurer view is the
+    # client-facing read, and a third table by leg confused more than it said
+    assert insurer == ['amounts', 'ratios']
+    # the point is non-parity of the lists, not of their lengths: since a387
+    # both happen to be two blocks, and they are still different blocks
+    assert insurer != raw
 
 
 def test_available_exhibits_pre_update():
@@ -993,10 +997,15 @@ def test_measure_formats_where_measures_are_columns(dice, tower):
 
 
 def test_economic_ratios_insurer_splits_units(tower):
-    """One unit per column: amounts, ratios, legs, per the reporting rule."""
+    """One unit per column: amounts then ratios, per the reporting rule.
+
+    The itemized legs block stays on RAW since a387; a net-of-tier row, when
+    present, is cumulative, so the M identity below is asserted per row,
+    which it satisfies either way.
+    """
     blocks = exhibit_frames(tower, 'economic_ratios', 'insurer')
-    assert [b for b, _, _ in blocks] == ['amounts', 'ratios', 'legs']
-    (_, amounts, amounts_kw), (_, ratios, ratios_kw), _ = blocks
+    assert [b for b, _, _ in blocks] == ['amounts', 'ratios']
+    (_, amounts, amounts_kw), (_, ratios, ratios_kw) = blocks
     assert set(amounts.columns) == {'P', 'L', 'E', 'M'}
     assert set(ratios.columns).isdisjoint(amounts.columns)
     # every ratio column points at the `ratio` style in the format sheets,
@@ -1162,14 +1171,22 @@ def test_waterfall_capstone_acceptance():
         'aggregate net of 75% po inf xs 0 rate 1 cede 0.275 as QS '
         'less 0.25 premium expenses as "G&A" peel bottom-up')
     ev = p.evaluation_df
+    # the walk carries the net-of-occurrence position since a387 (third row);
+    # the a365 numbers stand unchanged around it
+    assert list(ev.index) == ['Gross', 'XOL layer', 'Net of occurrence',
+                              'QS', 'All']
     got = [round(v, 4) for v in ev['Div CoC net']]
-    assert got == [0.2332, 1.3955, 0.1541, -0.2136]
+    assert got == [0.2332, 1.3955, 0.0333, 0.1541, -0.2136]
     assert round(ev['MSD']['Gross'], 3) == 0.451
     got_sa = [round(v, 4) for v in ev['SA CoC']]
-    assert got_sa == [0.199, 0.375, 0.1541, -0.2136]
+    assert got_sa == [0.199, 0.375, 0.0333, 0.1541, -0.2136]
+    # Margin ratio is 1 - CR, rung by rung
+    import numpy as np
+    np.testing.assert_allclose(ev['Margin ratio'], 1 - ev['CR'], atol=1e-12)
     walk = p.walk_df
     assert walk['M01 standalone']['XOL layer'] == pytest.approx(4800.0)
     assert walk['M01 standalone']['QS'] == pytest.approx(5036.25)
+    assert walk['M01 standalone']['Net of occurrence'] == pytest.approx(-7500.0)
 
 
 def test_waterfall_closing_row_standalone_equals_diversified(tower):
@@ -1318,7 +1335,9 @@ def test_waterfall_gross_affine_aggregate_serves_the_full_column(
     _, walk, kw = exhibit_frames(peel_agg_affine, 'economic_waterfall')[0]
     gross = walk['M01 div gross']
     assert gross.notna().all()
-    footing = [s for s in walk.index[:-1] if not s.startswith('All')]
+    # subtotal and net-of-tier rows restate steps already in the sum
+    footing = [s for s in walk.index[:-1]
+               if not s.startswith(('All', 'Net of'))]
     assert gross[footing].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
     assert 'cannot see through' not in kw['caption']
 
@@ -1338,7 +1357,8 @@ def test_waterfall_gross_truncates_at_a_nonlinear_aggregate_tier(
     _, ev, _ = blocks[1]
     gross = walk['M01 div gross']
     occ_steps = [s for s in walk.index
-                 if s.startswith(('Gross', 'occ ', 'All occurrence'))]
+                 if s.startswith(('Gross', 'occ ', 'All occurrence',
+                                  'Net of occurrence'))]
     agg_steps = [s for s in walk.index if s not in occ_steps]
     assert agg_steps and gross[occ_steps].notna().all()
     assert gross[agg_steps].isna().all()

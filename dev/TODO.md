@@ -557,6 +557,13 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Series-Groups]** DONE (`1.0.0a382`): `ChartSeries.group` names the family a
+  series is one of, and `MARK_ROLES` gains `'base'`. `plot_chartdoc` gives one
+  color family per group with shade and marker varying inside it, washes the
+  halves either side of a base mark, and insets an ordinal axis by half a band.
+  Driven by the relativity spectrum, where eight curves in three families were
+  indistinguishable on one prop cycle.
+
 - **[Category-Ticks]** DONE (`1.0.0a381`): `ChartAxis.categories` names an
   ordinal axis' positions, and an atomic series across one draws as a marked
   line rather than a staircase. Driven by the relativity plugin's distortion

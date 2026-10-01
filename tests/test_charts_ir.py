@@ -1201,3 +1201,47 @@ def test_naming_positions_did_not_move_the_version():
     assert back.axes[0].categories == ('ph', 'wang')
     # absent on an axis that does not name them, so no existing hash moved
     assert 'categories' not in canonical_dict(doc)['axes'][1]
+
+
+# --- series families ([Series-Groups]) ---------------------------------------
+
+def test_a_series_may_declare_its_family():
+    s = ChartSeries(name='500x500', role='ceded', panel_id='p',
+                    x=(0.0, 1.0), y=(1.0, 2.0), group='occurrence')
+    assert s.group == 'occurrence'
+    assert ChartSeries(name='x', role='gross', panel_id='p',
+                       x=(0.0,), y=(1.0,)).group is None
+
+
+def test_a_family_name_is_human_text():
+    doc = ChartDoc(
+        name='spectrum',
+        axes=(ChartAxis(id='f', label='family'), ChartAxis(id='m', label='mult')),
+        panels=(Panel(id='p', kind='xy', x_axis='f', y_axis='m'),),
+        series=(ChartSeries(name='500x500', role='ceded', panel_id='p',
+                            x=(0.0,), y=(1.0,), group='occurrence'),))
+    assert 'occurrence' in human_strings(doc)
+
+
+def test_a_family_survives_the_round_trip():
+    doc = ChartDoc(
+        name='spectrum',
+        axes=(ChartAxis(id='f', label='family'), ChartAxis(id='m', label='mult')),
+        panels=(Panel(id='p', kind='xy', x_axis='f', y_axis='m'),),
+        series=(ChartSeries(name='a', role='ceded', panel_id='p',
+                            x=(0.0,), y=(1.0,), group='occurrence'),
+                ChartSeries(name='b', role='gross', panel_id='p',
+                            x=(0.0,), y=(1.0,))))
+    back = load_chart_doc(canonical_dict(doc))
+    assert back.series[0].group == 'occurrence'
+    assert back.series[1].group is None
+    # absent on a series that declares none, so no existing hash moved
+    assert 'group' not in canonical_dict(doc)['series'][1]
+
+
+def test_a_base_mark_is_a_documented_role():
+    """It is what tells a renderer the panel has two halves worth naming."""
+    from aggregate.charts.ir import MARK_ROLES
+    assert 'base' in MARK_ROLES
+    mark = Mark(panel_id='p', orient='h', at=1.0, role='base', faint=True)
+    assert mark.role == 'base'

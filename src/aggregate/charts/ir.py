@@ -185,8 +185,14 @@ SERIES_ROLES = ('density', 'survival', 'cdf', 'identity', 'distortion',
                 'iso_total', 'ceiling')
 
 #: Mark roles: 'mean', 'break_even' (the zero of a signed outcome axis),
-#: 'capital_anchor' (a return-period quantile such as 1-in-200).
-MARK_ROLES = ('mean', 'break_even', 'capital_anchor')
+#: 'capital_anchor' (a return-period quantile such as 1-in-200), 'base' (the
+#: reference every series on the panel is read against, which divides it into
+#: two halves worth naming: a renderer may wash them, and one that does not
+#: draws a plain rule and is still correct).
+#:
+#: Open vocabulary, and :class:`Mark` does not validate it, so a documented
+#: addition here is the whole ceremony.
+MARK_ROLES = ('mean', 'break_even', 'capital_anchor', 'base')
 
 #: Block roles, the working vocabulary (open; documented additions only):
 #: 'layer' (a placed reinsurance layer), 'retention' (what the cedent keeps
@@ -1050,6 +1056,26 @@ class ChartSeries:
     matrix : MatrixData, optional
         The named grid for a 'matrix' panel, instead of x/y. One series
         carries the whole panel, as ``surface`` does for the z grids.
+    group : str, optional
+        Which **family** of things this series belongs to, where a panel draws
+        several and they fall into natural sets: the occurrence layers of a
+        program against its aggregate covers, the units of a book against its
+        total. The xy analogue of :attr:`MatrixData.row_groups`, and semantic
+        for the same reason: that a cover is an occurrence cover is a fact
+        about the program, not a decision about color.
+
+        A renderer is expected to give one **color family** per group and to
+        vary within it, and to vary the marker by group, so a reader can tell
+        two families apart at a glance and still tell members of one apart.
+        **Which** family is the renderer's, and must be: colors have no fields
+        in this IR. Assigning them in order of appearance is enough and keeps a
+        renderer from needing to know what 'occurrence' means.
+
+        ``role`` is the near neighbor and a different question. A role says
+        what a series **is** against the panel's subject (``'gross'``,
+        ``'ceded'``, ``'net'``), which is a closed vocabulary the whole library
+        shares. A group says which of several like things it is **one of**,
+        which only the emitter knows and which is open text.
     support : str
         One of :data:`SUPPORT_KINDS`, default 'atomic'. Whether the points
         are the whole law or samples of a function that lives between
@@ -1086,6 +1112,7 @@ class ChartSeries:
     y2: tuple = None
     surface: SurfaceData = None
     matrix: MatrixData = None
+    group: str = None
     support: str = 'atomic'
     value: float = None
 
@@ -1767,6 +1794,7 @@ def human_strings(doc):
                  + [p.inverse_title for p in doc.panels]
                  + [a.label for a in doc.axes]
                  + [c for a in doc.axes for c in (a.categories or ())]
+                 + [s.group for s in doc.series]
                  + [s.name for s in doc.series]
                  + [m.label for m in doc.marks]
                  + [b.label for b in doc.blocks]

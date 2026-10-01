@@ -250,3 +250,42 @@ def test_a_center_of_zero_keeps_both_directions():
     cmap, norm = _matrix_norm(signed, 0.0, 0.0)
     assert cmap is not None
     assert cmap(norm(-2.0)) != cmap(norm(2.0))
+
+
+# --- families on an xy panel ([Series-Groups]) -------------------------------
+
+def test_one_color_family_per_group_and_a_marker_per_member():
+    """Families are assigned in order of appearance, never by what they mean.
+
+    The renderer has no business knowing that 'occurrence' is blue; the document
+    says these series are one family and those are another, and the first family
+    gets the first ramp. Within a family the shade moves and the marker changes,
+    so two members read as kin and still read apart.
+    """
+    from aggregate.plots._chartdoc import GROUP_MARKERS, group_styles
+
+    series = [
+        ChartSeries(name='a1', role='ceded', panel_id='p', x=(0.0,), y=(1.0,),
+                    group='occurrence'),
+        ChartSeries(name='a2', role='ceded', panel_id='p', x=(0.0,), y=(1.0,),
+                    group='occurrence'),
+        ChartSeries(name='b1', role='ceded', panel_id='p', x=(0.0,), y=(1.0,),
+                    group='aggregate'),
+    ]
+    styles = group_styles(series)
+    assert set(styles) == {'a1', 'a2', 'b1'}
+    # kin differ in shade and in marker
+    assert styles['a1'][0] != styles['a2'][0]
+    assert styles['a1'][1] != styles['a2'][1]
+    assert styles['a1'][1] == GROUP_MARKERS[0]
+    # the two families start from different base colors
+    assert styles['a1'][0] != styles['b1'][0]
+    # and a family of one is left on its base color rather than pushed to an end
+    assert styles['b1'][1] == GROUP_MARKERS[0]
+
+
+def test_a_series_with_no_group_keeps_the_house_cycle():
+    from aggregate.plots._chartdoc import group_styles
+    series = [ChartSeries(name='solo', role='gross', panel_id='p',
+                          x=(0.0,), y=(1.0,))]
+    assert group_styles(series) == {}

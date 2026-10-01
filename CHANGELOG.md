@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a382
+
+**[Series-Groups] a series can declare which family of things it is one of, and a mark can declare itself the base.** `ChartSeries.group` is open text naming a natural set a panel draws several of: the occurrence layers of a program against its aggregate covers, the units of a book against its total. The xy analogue of `MatrixData.row_groups`, and semantic for the same reason: that a cover is an occurrence cover is a fact about the program, not a decision about color. `role` stays the near neighbor and the different question, saying what a series **is** against the panel's subject out of a closed vocabulary the library shares, where a group says which of several like things it is one of.
+
+`MARK_ROLES` gains `'base'`: the reference every series on a panel is read against, which divides it into two halves worth naming.
+
+`plot_chartdoc` acts on both. One color family per group, assigned **in order of appearance** rather than by what a group is called, with the shade moving and the marker changing within a family, so kin read as kin and still read apart; a series with no group keeps the house prop cycle. A `'base'` mark washes the halves either side of it, faintly, after the limits settle. An ordinal axis' limits inset by half a band, so the positions sit at band centers rather than hard against the frame.
+
+No `CHART_IR_VERSION` move: both fields are absent at their defaults, so no existing document's hash changed, and a reader ignoring either draws the same picture a shade plainer.
+
 ## 1.0.0a381
 
 **[Category-Ticks] an ordinal axis can name its positions, and a series across one is drawn as a trend.** `ChartAxis.categories` carries the names of a `kind='category'` axis' positions, in order, so a series plotted at 0, 1, 2 is ticked with what those positions **are**. A category axis had nowhere to put them: the grid payloads carry their own labels (`SurfaceData`'s coordinates, `MatrixData.rows` and `.columns`) and an `xy` panel on a category axis had none. Naming them on a `kind='value'` axis raises, as does an empty list. `CHART_IR_VERSION` **did not move**, and the call is recorded next to the constant: a reader ignoring the field draws every series in the right place and ticks by index, which is plainer rather than false, where bumping would make an older reader refuse the document and blank the picture instead of labeling it.

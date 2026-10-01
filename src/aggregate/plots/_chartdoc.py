@@ -341,7 +341,111 @@ def _atom_room(ax, window, x):
     return seen, (_axes_width_px(ax) / seen if seen else float('inf'))
 
 
-def _draw_atomic(ax, x, y, label, x_axis, y_axis, window):
+#: How strong the base wash is. Barely there: it names which half of the panel
+#: is which and must never compete with the curves drawn over it.
+WASH_ALPHA = 0.05
+
+#: Markers a family cycles through, one per member, in a deliberate order:
+#: round, square, triangle, diamond, cross, plus. The first four read at small
+#: sizes and the last two are strokes only, which is why they come last.
+GROUP_MARKERS = ('o', 's', '^', 'D', 'X', 'P')
+
+
+def marker_size(marker):
+    """Point size for one marker, so the shapes read as the same weight.
+
+    A filled circle and an open cross do not look the same size at the same
+    number, and a legend that mixes them looks ragged.
+    """
+    return 5.5 if marker in ('X', 'P', 'D') else 4.5
+
+
+def group_styles(series_list):
+    """``series name -> (color, marker)``, one family per declared group.
+
+    Parameters
+    ----------
+    series_list : list of ChartSeries
+        The panel's series, in document order.
+
+    Returns
+    -------
+    dict
+
+    Notes
+    -----
+    Families are assigned **in order of appearance**, not by what a group is
+    called. The renderer has no business knowing that 'occurrence' means blue;
+    what the document says is that these series are one family and those are
+    another, and the first family gets the first ramp. That keeps the rule
+    general and keeps domain words out of the renderer.
+
+    Within a family the color darkens and the marker changes, so two members of
+    one family read as kin and still read apart. A series with no group falls
+    back to the house prop cycle, which is what every other panel does.
+    """
+    from ._style import plt
+
+    groups = []
+    for s in series_list:
+        if s.group and s.group not in groups:
+            groups.append(s.group)
+    if not groups:
+        return {}
+    cycle = plt.rcParams['axes.prop_cycle'].by_key().get('color', [])
+    out = {}
+    for s in series_list:
+        if not s.group:
+            continue
+        family = groups.index(s.group)
+        kin = [e for e in series_list if e.group == s.group]
+        member = kin.index(s)
+        base = cycle[family % len(cycle)] if cycle else None
+        out[s.name] = (_shade(base, member, len(kin)),
+                       GROUP_MARKERS[member % len(GROUP_MARKERS)])
+    return out
+
+
+#: How far a family's shades spread either side of its base color. Wide enough
+#: to tell five members apart, narrow enough that they still read as one family.
+GROUP_SHADE_SPREAD = 0.45
+
+
+def _shade(color, member, count):
+    """The ``member``-th shade of ``color``, out of ``count``.
+
+    Parameters
+    ----------
+    color : str or None
+        The family's base color. ``None`` passes through, which leaves the
+        series on the house prop cycle.
+    member, count : int
+        Which member, and how many the family has.
+
+    Returns
+    -------
+    str or None
+
+    Notes
+    -----
+    Lightness only, never hue: the hue is what says which family this is, so
+    moving it would undo the grouping the shade exists to decorate. A family of
+    one is left on its base color rather than pushed to one end of a spread it
+    does not need.
+    """
+    if color is None or count <= 1:
+        return color
+    from matplotlib.colors import to_hex, to_rgb
+
+    rgb = to_rgb(color)
+    # -spread (darker) to +spread (lighter), evenly over the members.
+    t = (member / (count - 1) - 0.5) * 2 * GROUP_SHADE_SPREAD
+    toward = 1.0 if t > 0 else 0.0
+    return to_hex(tuple(c + (toward - c) * abs(t) for c in rgb))
+
+
+def _draw_atomic(ax, x, y, label, x_axis, y_axis, window,
+                 color=None, marker=None):
     """Draw an atomic series at the honest density for the room available.
 
     Three drawings of one truth, chosen by how much room each atom gets,
@@ -377,7 +481,8 @@ def _draw_atomic(ax, x, y, label, x_axis, y_axis, window):
     # across ordered categories is the trend, so the points are marked and
     # joined. The points are the readings; the line is the shape they make.
     if getattr(x_axis, 'kind', 'value') == 'category':
-        ax.plot(x, y, label=label, marker='o', ms=4, lw=1.6)
+        ax.plot(x, y, label=label, marker=marker or 'o', ms=marker_size(marker),
+                lw=1.6, **(dict(color=color) if color else {}))
         return
     seen, pixels = _atom_room(ax, window, x)
     unit = getattr(y_axis, 'unit', None)
@@ -1261,6 +1366,11 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
         # cap stands in: a billion-year event is past anyone's question.
         x_window = (x_window[0], min(x_window[1], MAX_RETURN_PERIOD))
     labeled = False
+    # One color family per declared group, resolved over the panel's whole
+    # series list before any of it is drawn, because a family's members have to
+    # agree with each other and a per-series decision cannot see its kin.
+    styles = group_styles([s for s, _, _, _ in drawn])
+    base_marks = []
     for s, x, y, y2 in drawn:
         if s.role == 'identity':
             # The reference diagonal: neutral, thin, never in the legend.
@@ -1292,16 +1402,23 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
                     color=_value_color(series_list, s.value))
             continue
         label = _typeset(doc, s.name)
+        color, marker = styles.get(s.name, (None, None))
         if s.support == 'continuous':
             # Samples of a function that exists between them: a line is the
             # truthful drawing and no ladder applies.
-            ax.plot(x, y, label=label)
+            ax.plot(x, y, label=label, **(dict(color=color) if color else {}))
         else:
-            _draw_atomic(ax, x, y, label, x_axis, y_axis, x_window)
+            _draw_atomic(ax, x, y, label, x_axis, y_axis, x_window,
+                         color=color, marker=marker)
         labeled = True
     for m in doc.marks:
         if m.panel_id != panel.id:
             continue
+        if m.role == 'base' and (m.orient == 'h') != inverted:
+            # Recorded, not drawn: the wash spans the panel's final height and
+            # the limits are not settled until below. Drawn here it dragged the
+            # view open to whatever autoscale happened to be holding.
+            base_marks.append(m.at)
         # A mark names the axis it sits on, so exchanged axes exchange it too.
         orient = m.orient if not inverted else ('h' if m.orient == 'v' else 'v')
         at, mapping = m.at, (x_map if orient == 'v' else y_map)
@@ -1342,10 +1459,32 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     # An ordinal axis is ticked with what its positions are, where the document
     # says. Without the names the ticks read 0, 1, 2, which places every series
     # correctly and tells the reader nothing about what it is looking at.
-    for axis, setter in ((x_axis, ax.set_xticks), (y_axis, ax.set_yticks)):
+    #
+    # The limits inset by half a band either side, so the positions sit at the
+    # centers of equal bands rather than hard against the frame. A first point
+    # drawn on the axis line reads as the start of something cut off, and the
+    # last one as running out of the picture.
+    for axis, setter, limiter in ((x_axis, ax.set_xticks, ax.set_xlim),
+                                  (y_axis, ax.set_yticks, ax.set_ylim)):
         names = getattr(axis, 'categories', None)
         if names:
             setter(range(len(names)), [_typeset(doc, n) for n in names])
+            limiter(-0.5, len(names) - 0.5)
+    # The base wash, last, because it spans the panel's settled height. A base
+    # mark divides the panel into dearer above and cheaper below, so the halves
+    # are washed rather than left to be inferred from one thin rule. It is a
+    # **price** statement and not a verdict: above the base costs more for
+    # everyone, where whether costing more is *good* depends on which side of
+    # the trade a series sits, which is the trap ``MatrixData.row_polarity``
+    # exists for on the grid.
+    for at in base_marks:
+        lo, hi = ax.get_ylim()
+        if lo < at < hi:
+            ax.axhspan(at, hi, color=MATRIX_UNFAVORABLE, alpha=WASH_ALPHA,
+                       zorder=0, lw=0)
+            ax.axhspan(lo, at, color=MATRIX_FAVORABLE, alpha=WASH_ALPHA,
+                       zorder=0, lw=0)
+            ax.set_ylim(lo, hi)
     if panel.aspect == 'equal':
         ax.set_aspect('equal')
     if labeled and sum(s.role != 'identity' for s in series_list) > 1:

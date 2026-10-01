@@ -314,31 +314,48 @@ def _economic_waterfall_frames(obj):
     # the walk's own heading for the 1-in-t state, derived the same way the
     # frame derives it, so the caption and the columns cannot drift apart
     m = f'M{100 // t:02d}'
-    diversified_available = not walk_df[f'{m} diversified'].isna().all()
+    net_available = not walk_df[f'{m} div net'].isna().all()
+    gross_col = walk_df[f'{m} div gross']
+    gross_available = not gross_col.isna().all()
+    gross_truncated = gross_available and gross_col.isna().any()
 
     total_row = {len(idx) - 1: ('total',)} if len(idx) > 1 else {}
     walk_caption = (
         f'The margin walk in currency: gross, what each layer cedes, and the '
         f'closing net. Margin is the expected result and {m} is the result in '
-        f'the 1-in-{t} state. The diversified column conditions on the whole '
-        f'book landing at its own 1-in-{t}, so it foots down the walk '
-        f'exactly. The standalone column is two-sided by role: a risk '
+        f'the 1-in-{t} state. The div columns are one conditioning each and '
+        f'answer different questions: div net conditions on the whole book '
+        f'landing at its own 1-in-{t}, the return on the capital the firm '
+        f'actually holds, while div gross conditions on the gross result '
+        f'landing at its own 1-in-{t}, the program\'s performance in the '
+        f'gross stress state. Each is a ladder of conditional means and '
+        f'foots down the walk where complete. The standalone column is '
+        f'two-sided by role: a risk '
         f'bearing step reads its own left tail, the state that calls for '
         f'capital, while a ceded step reads its own right tail, the '
         f'writer\'s 1-in-{t}, the state in which the cover pays most and '
         f'the capital the writer of that cover would hold, so the cell is '
         f'positive there and the sign flip marks which reading a row takes. '
-        f'Tail measures do not add, so standalone does not foot, and the '
-        f'gap between the two columns is the diversification benefit.')
-    if not diversified_available:
+        f'Tail measures do not add, so standalone does not foot, and its '
+        f'gap against the div columns is the diversification benefit.')
+    if not net_available and not gross_available:
         walk_caption += (
-            ' The diversified column is blank here: this ledger shares no '
-            'atoms across its rows, so no conditioning was possible.')
+            ' Both div columns are blank here: this ledger shares no '
+            'atoms across its rows and carries no Palm ladder, so no '
+            'conditioning was possible.')
+    elif gross_truncated:
+        walk_caption += (
+            ' The div gross column ends at the aggregate tier: the gross '
+            'basis cannot see through a nonlinear aggregate transform, so '
+            'the aggregate cover and everything downstream of it are blank '
+            'and the column foots only over the sub-ledger it serves.')
     evaluation_caption = (
         f'The same walk read as ratios: the rubric for the program. MSD is '
-        f'margin over its own standard deviation, a multiple. SA CoC and '
-        f'Div CoC are one quotient, M over the negated {m}, on the '
-        f'standalone and diversified capital bases. The sign convention '
+        f'margin over its own standard deviation, a multiple. The CoC '
+        f'columns are one quotient, M over the negated {m}, on the '
+        f'standalone, net diversified and gross diversified capital bases: '
+        f'net reads as the return on held capital, gross as the step\'s '
+        f'performance in the gross stress state. The sign convention '
         f'carries the reading: gross and net rows have margin above zero '
         f'and {m} below, so the ratio is the return earned on the capital '
         f'that state calls for; a ceded row has both reversed (margin '

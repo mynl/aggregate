@@ -1069,7 +1069,7 @@ def test_waterfall_diversified_foots_and_standalone_does_not(tower):
     and quantiles do not add. Showing both side by side is the point.
     """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    div = walk['M01 diversified']
+    div = walk['M01 div net']
     sa = walk['M01 standalone']
     # the steps before the closing row sum to the closing row, exactly
     assert div.iloc[:-1].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
@@ -1079,6 +1079,10 @@ def test_waterfall_diversified_foots_and_standalone_does_not(tower):
     # the expected margin foots too, by linearity
     assert walk['Margin'].iloc[:-1].sum() == pytest.approx(
         walk['Margin'].iloc[-1], rel=1e-9)
+    # the gross basis is the same ladder arithmetic under the other anchor,
+    # so it foots the same way ([Waterfall-Gross-Basis])
+    gross = walk['M01 div gross']
+    assert gross.iloc[:-1].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
 
 
 def test_waterfall_capital_ratio_definition(tower):
@@ -1095,8 +1099,10 @@ def test_waterfall_capital_ratio_definition(tower):
         margin = walk['Margin'][step]
         assert ev['SA CoC'][step] == pytest.approx(
             margin / -walk['M01 standalone'][step])
-        assert ev['Div CoC'][step] == pytest.approx(
-            margin / -walk['M01 diversified'][step])
+        assert ev['Div CoC net'][step] == pytest.approx(
+            margin / -walk['M01 div net'][step])
+        assert ev['Div CoC gross'][step] == pytest.approx(
+            margin / -walk['M01 div gross'][step])
 
 
 def test_waterfall_sign_convention_by_role(tower):
@@ -1118,14 +1124,20 @@ def test_waterfall_sign_convention_by_role(tower):
     for step in ceded_steps:
         assert walk['Margin'][step] < 0
         assert walk['M01 standalone'][step] > 0
-        assert walk['M01 diversified'][step] > 0
+        assert walk['M01 div net'][step] > 0
+        assert walk['M01 div gross'][step] > 0
         assert np.isfinite(ev['SA CoC'][step]) and ev['SA CoC'][step] > 0
-        assert np.isfinite(ev['Div CoC'][step]) and ev['Div CoC'][step] > 0
+        assert np.isfinite(ev['Div CoC net'][step])
+        assert ev['Div CoC net'][step] > 0
+        assert np.isfinite(ev['Div CoC gross'][step])
+        assert ev['Div CoC gross'][step] > 0
     for step in risk_steps:
         assert walk['M01 standalone'][step] < 0
-        assert walk['M01 diversified'][step] < 0
+        assert walk['M01 div net'][step] < 0
+        assert walk['M01 div gross'][step] < 0
         assert np.isfinite(ev['SA CoC'][step])
-        assert np.isfinite(ev['Div CoC'][step])
+        assert np.isfinite(ev['Div CoC net'][step])
+        assert np.isfinite(ev['Div CoC gross'][step])
 
 
 def test_waterfall_capstone_acceptance():
@@ -1150,7 +1162,7 @@ def test_waterfall_capstone_acceptance():
         'aggregate net of 75% po inf xs 0 rate 1 cede 0.275 as QS '
         'less 0.25 premium expenses as "G&A" peel bottom-up')
     ev = p.evaluation_df
-    got = [round(v, 4) for v in ev['Div CoC']]
+    got = [round(v, 4) for v in ev['Div CoC net']]
     assert got == [0.2332, 1.3955, 0.1541, -0.2136]
     assert round(ev['MSD']['Gross'], 3) == 0.451
     got_sa = [round(v, 4) for v in ev['SA CoC']]
@@ -1169,7 +1181,19 @@ def test_waterfall_closing_row_standalone_equals_diversified(tower):
     """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
     assert walk['M01 standalone'].iloc[-1] == pytest.approx(
-        walk['M01 diversified'].iloc[-1], rel=1e-9)
+        walk['M01 div net'].iloc[-1], rel=1e-9)
+
+
+def test_waterfall_gross_row_standalone_equals_div_gross(tower):
+    """The anchor symmetry's other half ([Waterfall-Gross-Basis]).
+
+    On the Gross row the gross basis anchors to that row's own quantile:
+    ``E[gross result | gross result = x] = x``, so the cell coincides with
+    the row's standalone M01 exactly on the per-atom route.
+    """
+    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
+    assert walk['M01 standalone'].iloc[0] == pytest.approx(
+        walk['M01 div gross'].iloc[0], rel=1e-9)
 
 
 def test_waterfall_blanks_diversified_on_ineligible_ladder(peel_marginal):
@@ -1183,7 +1207,8 @@ def test_waterfall_blanks_diversified_on_ineligible_ladder(peel_marginal):
     and carries a populated kappa ladder.)
     """
     _, walk, kw = exhibit_frames(peel_marginal, 'economic_waterfall')[0]
-    assert walk['M01 diversified'].isna().all()
+    assert walk['M01 div net'].isna().all()
+    assert walk['M01 div gross'].isna().all()
     assert walk['M01 standalone'].notna().any()
     assert 'blank here' in kw['caption']
     assert 'P01' in peel_marginal.economic_df.columns
@@ -1197,7 +1222,7 @@ def test_waterfall_peel_diversified_populates_and_foots(peel):
     from the footing sum), and the caption carries no blank rider.
     """
     _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
-    div = walk['M01 diversified']
+    div = walk['M01 div net']
     assert div.notna().all()
     assert 'blank here' not in kw['caption']
     footing = [s for s in walk.index[:-1] if not s.startswith('All')]
@@ -1205,6 +1230,25 @@ def test_waterfall_peel_diversified_populates_and_foots(peel):
     # the subtotal is the sum of the two layers it spans
     layers = [s for s in walk.index if s.startswith('occ ')]
     assert div['All occurrence'] == pytest.approx(div[layers].sum(), rel=1e-9)
+
+
+def test_waterfall_gross_populates_and_foots_on_the_stitched_peel(peel):
+    """[Waterfall-Gross-Basis] on the stitched route, occurrence-only.
+
+    Every row of an occurrence-only peel is a per-claim sum, so the gross
+    ladder is exact 1-D Palm under the identity conditioning and the full
+    column serves. It foots down the walk, and on the Gross row the cell
+    agrees with the row's own standalone M01 to within one bucket (the
+    anchor rounds the quantile to the grid).
+    """
+    _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
+    gross = walk['M01 div gross']
+    assert gross.notna().all()
+    assert 'blank here' not in kw['caption']
+    footing = [s for s in walk.index[:-1] if not s.startswith('All')]
+    assert gross[footing].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
+    assert walk['M01 div gross'].iloc[0] == pytest.approx(
+        walk['M01 standalone'].iloc[0], abs=float(peel.engine.bs))
 
 
 def test_swing_walk_keeps_its_kappa_ladder():
@@ -1220,7 +1264,7 @@ def test_swing_walk_keeps_its_kappa_ladder():
               'min 500 max 3000')
     assert p._probs is not None
     assert 'κ01' in p.economic_df.columns
-    assert p.walk_df['M01 diversified'].notna().all()
+    assert p.walk_df['M01 div net'].notna().all()
 
 
 def test_waterfall_includes_tier_subtotals(peel):
@@ -1230,6 +1274,119 @@ def test_waterfall_includes_tier_subtotals(peel):
     assert 'tier_result' in kinds
     assert len(walk) > 3
     assert walk.index[-1] == 'All'
+
+
+@pytest.fixture(scope='module')
+def peel_agg_affine():
+    """The stitched peel plus an aggregate quota share: the affine carve-out.
+
+    ``50% po inf xs 0`` is globally affine on the subject's support, so the
+    aggregate tier transports through gross conditioning by linearity
+    ([Waterfall-Gross-Basis]) and the full gross column serves.
+    """
+    return build('xpnl EX.PeelQS 1000 premium less agg EX.PeelQSE 1000 '
+                 'premium at 70% lr sev lognorm 100 cv 2 '
+                 'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+                 'deposit 40 poisson '
+                 'aggregate net of 50% po inf xs 0 deposit 150 '
+                 'peel top-down')
+
+
+@pytest.fixture(scope='module')
+def peel_agg_nonlinear():
+    """The stitched peel plus an aggregate xs cover: the blocked pairing.
+
+    ``300 xs 700`` is kinked inside the subject's support, so the aggregate
+    tier cannot transport through gross conditioning without the 2-D joint
+    and the gross column truncates there (fork B, ruled 2026-10-01).
+    """
+    return build('xpnl EX.PeelXS 1000 premium less agg EX.PeelXSE 1000 '
+                 'premium at 70% lr sev lognorm 100 cv 2 '
+                 'occurrence net of 100 xs 100 deposit 60 and 300 xs 200 '
+                 'deposit 40 poisson '
+                 'aggregate net of 300 xs 700 deposit 50 '
+                 'peel top-down')
+
+
+def test_waterfall_gross_affine_aggregate_serves_the_full_column(
+        peel_agg_affine):
+    """An affine aggregate transform reopens the target side.
+
+    The gross column is complete, foots down the walk, and the caption
+    carries no truncation rider.
+    """
+    _, walk, kw = exhibit_frames(peel_agg_affine, 'economic_waterfall')[0]
+    gross = walk['M01 div gross']
+    assert gross.notna().all()
+    footing = [s for s in walk.index[:-1] if not s.startswith('All')]
+    assert gross[footing].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
+    assert 'cannot see through' not in kw['caption']
+
+
+def test_waterfall_gross_truncates_at_a_nonlinear_aggregate_tier(
+        peel_agg_nonlinear):
+    """Fork B: exact where it claims, blank below a declared boundary.
+
+    The occurrence tier down through net-of-occurrence serves exact gross
+    cells; the aggregate cover and everything downstream (the closing row
+    included) are NaN, the CoC quotient propagates the NaN, and the caption
+    names the truncation. The net column is untouched.
+    """
+    import numpy as np
+    blocks = exhibit_frames(peel_agg_nonlinear, 'economic_waterfall')
+    _, walk, kw = blocks[0]
+    _, ev, _ = blocks[1]
+    gross = walk['M01 div gross']
+    occ_steps = [s for s in walk.index
+                 if s.startswith(('Gross', 'occ ', 'All occurrence'))]
+    agg_steps = [s for s in walk.index if s not in occ_steps]
+    assert agg_steps and gross[occ_steps].notna().all()
+    assert gross[agg_steps].isna().all()
+    assert ev['Div CoC gross'][agg_steps].isna().all()
+    assert np.isfinite(ev['Div CoC gross'][occ_steps]).all()
+    assert walk['M01 div net'].notna().all()
+    assert 'cannot see through' in kw['caption']
+
+
+def test_waterfall_gross_separates_layers_the_net_basis_collapses():
+    """The motivating finding ([Waterfall-Gross-Basis]), as an assertion.
+
+    A tower retaining a fixed cap per claim (severity in 750 xs 0, layers
+    250 xs 250 and 250 xs 500) makes the net-of-occurrence subject carry
+    claim-count information only, so every layer's conditional recovery is
+    the same multiple of its mean and, with premiums proportional to the
+    layer means, every layer's Div CoC net is one number. The gross basis
+    sees the large claims the net gives away and separates the layers.
+    """
+    base = ('xpnl EX.GSep 1000 premium less agg EX.GSepE 1000 premium at '
+            '70% lr 750 xs 0 sev lognorm 100 cv 2 '
+            'occurrence net of 250 xs 250 deposit {d1} and 250 xs 500 '
+            'deposit {d2} mixed gamma 0.175 peel bottom-up')
+    probe = build(base.format(d1=60, d2=30))
+    led = probe.economic_df
+    means = [float(led.loc[(s, 'Obligation', f'{s} recovery'), 'EX'])
+             for s in ('occ 250 xs 250', 'occ 250 xs 500')]
+    # premiums at a common loading, so the net collapse reaches the CoC
+    p = build(base.format(d1=f'{1.25 * means[0]:.17g}',
+                          d2=f'{1.25 * means[1]:.17g}'))
+    ev = p.evaluation_df
+    layers = [s for s in ev.index if s.startswith('occ ')]
+    assert len(layers) == 2
+    net = [ev['Div CoC net'][s] for s in layers]
+    gross = [ev['Div CoC gross'][s] for s in layers]
+    assert net[0] == pytest.approx(net[1], rel=1e-6)
+    assert abs(gross[0] - gross[1]) > 0.25 * abs(gross[0])
+
+
+def test_capital_ratio_nan_pass_through():
+    """A missing capital cell propagates: the quotient is NaN, no raise.
+
+    This is how fork B's truncation reaches ``Div CoC gross`` for free.
+    """
+    import numpy as np
+    from aggregate._pnl import _capital_ratio
+    assert np.isnan(_capital_ratio(5.0, np.nan))
+    assert np.isnan(_capital_ratio(np.nan, -10.0))
 
 
 # --- the pricing leaves ([Pricing-Exhibits]) --------------------------------

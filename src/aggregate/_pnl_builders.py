@@ -1253,6 +1253,7 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
                     shift=p_gross - expense_total, label=row_label)
                 palm_specs[row_label] = (
                     'claim', lambda x: x, -1.0, p_gross - expense_total)
+                gross_result_label = row_label
             else:
                 _lbl, pc, comm, recovery, _n = covers[gi - 1]
                 tier_tag, rec_fn, _ncf = cover_maps[gi - 1]
@@ -1353,24 +1354,112 @@ def _peel_stitched(agg, occ_steps, agg_steps, *, base_step, prem_key, loss_key, 
     pnl = PnL(name=name or agg.name, source=None, groups=groups,
               result_name='margin', tier_spans=tier_spans, label=label,
               stitched_rows=entries)
-    pnl._palm_ladder = _palm_scenario_ladder(
+    pnl._palm_ladder, pnl._palm_gross_ladder = _palm_scenario_ladder(
         agg, palm_specs, retained_fn=retained_fn,
         agg_transform=cover_maps[-1][2] if agg_rows else None,
         p_subject=subject, grand_gd=entries[grand_result_label][0],
-        grand_shift=grand_shift)
+        grand_shift=grand_shift,
+        gross_gd=entries[gross_result_label][0],
+        gross_shift=p_gross - expense_total)
     return pnl, 'stitched'
 
 
-def _palm_scenario_ladder(agg, palm_specs, *, retained_fn, agg_transform,
-                          p_subject, grand_gd, grand_shift):
-    """The build-time Palm scenario ladder of a stitched peel, or ``None``.
+def _affine_coefficients(xs, v, weight_density, rtol=1e-8):
+    """``(a, b)`` with ``v ~= a * xs + b`` on the effective support, or ``None``.
 
-    Computes ``{ledger row label: [E[row | grand result at its q-quantile]
-    per PERCENTILE_LADDER point]}`` for every plan row of a marginal-stitched
-    multi-layer occurrence peel, using the 1-D Palm conditional-mean identity
-    (:meth:`Aggregate.palm_kappa`); :attr:`PnL.economic_df` then serves the
-    scenario (``κ``) ladder where it previously fell back to marginal ``P``
-    headers ([Palm-Ledger]).
+    The gross-basis affine carve-out test ([Waterfall-Gross-Basis]): an
+    aggregate-tier row ``g(S_r)`` transports through gross conditioning only
+    by linearity of conditional expectation, ``E[g(S_r) | S_g] =
+    a E[S_r | S_g] + b``, which requires ``g`` affine wherever the retained
+    compound carries mass. The support mask uses the same machine-epsilon
+    relative floor as :func:`palm_conditional_mean`, so a kink falling where
+    the subject carries no mass (a quota-share limit beyond the grid's
+    support) cannot matter and does not fail the test; a kink inside the
+    support (an xs layer, a cap, a corridor) fails it macroscopically.
+
+    Parameters
+    ----------
+    xs : ndarray
+        The grid of subject values.
+    v : ndarray
+        The row's deterministic values ``g(xs)`` on that grid.
+    weight_density : ndarray
+        The subject's compound density on ``xs``, defining the support mask.
+    rtol : float, optional
+        Maximum residual of the least-squares line, relative to the value
+        scale, for the fit to count as exact. The grid vectors are computed
+        in closed form, so a genuinely affine ``g`` sits at machine
+        precision and any kink exceeds this by many orders.
+
+    Returns
+    -------
+    tuple of float or None
+        ``(a, b)`` when affine on the support; ``None`` otherwise.
+    """
+    v = np.asarray(v, dtype=float)
+    w = np.asarray(weight_density, dtype=float)
+    mask = w > np.finfo(float).eps * max(float(w.max()), 0.0)
+    x = np.asarray(xs, dtype=float)[mask]
+    y = v[mask]
+    if x.size == 0:
+        return None
+    if x.size == 1:
+        return (0.0, float(y[0]))
+    xm, ym = float(x.mean()), float(y.mean())
+    dx = x - xm
+    var = float((dx * dx).sum())
+    a = float((dx * (y - ym)).sum() / var) if var > 0 else 0.0
+    b = ym - a * xm
+    resid = float(np.abs(y - (a * x + b)).max())
+    scale = max(float(np.abs(y).max()), 1.0)
+    return (a, b) if resid <= rtol * scale else None
+
+
+def _assemble_ladder(palm_specs, cond, idx):
+    """Assemble ``{row label: [cell per anchor]}`` from conditional vectors.
+
+    The per-row walk shared by the net and gross Palm ladders
+    ([Waterfall-Gross-Basis]), factored out so the two cannot drift: a
+    ``const`` spec repeats its value, a ``delta`` spec subtracts two
+    finished rows, and a ``claim`` / ``agg`` spec reads its conditional-mean
+    vector at the anchor buckets ``idx``. A row whose vector is ``None``
+    (an aggregate-tier row blocked under gross conditioning) serves NaN,
+    which then propagates through any delta built on it.
+    """
+    ladder = {}
+    deltas = []
+    for label, spec in palm_specs.items():
+        if spec[0] == 'const':
+            ladder[label] = [float(spec[1])] * len(idx)
+        elif spec[0] == 'delta':
+            deltas.append((label, spec[1], spec[2]))
+        else:
+            _kind, _fn, sign, shift = spec
+            vec = cond.get(label)
+            if vec is None:
+                ladder[label] = [float('nan')] * len(idx)
+            else:
+                ladder[label] = [float(sign * vec[i] + shift) for i in idx]
+    for label, target, base_label in deltas:
+        ladder[label] = [t - b for t, b in
+                        zip(ladder[target], ladder[base_label])]
+    return ladder
+
+
+def _palm_scenario_ladder(agg, palm_specs, *, retained_fn, agg_transform,
+                          p_subject, grand_gd, grand_shift,
+                          gross_gd, gross_shift):
+    """The build-time Palm scenario ladders of a stitched peel.
+
+    Computes two ``{ledger row label: [cell per PERCENTILE_LADDER point]}``
+    ladders for the plan rows of a marginal-stitched multi-layer occurrence
+    peel, using the 1-D Palm conditional-mean identity
+    (:meth:`Aggregate.palm_kappa`): the **net** ladder,
+    ``E[row | grand result at its q-quantile]``, served by
+    :attr:`PnL.economic_df` where it previously fell back to marginal ``P``
+    headers ([Palm-Ledger]); and the **gross** ladder,
+    ``E[row | gross result at its q-quantile]``, the second capital basis of
+    the margin walk ([Waterfall-Gross-Basis]).
 
     Parameters
     ----------
@@ -1380,66 +1469,100 @@ def _palm_scenario_ladder(agg, palm_specs, *, retained_fn, agg_transform,
         Per plan-row dependence specs built by :func:`_peel_stitched`.
     retained_fn : callable
         The per-claim occurrence-retained map ``r(x) = x - occ_cum(x)``, the
-        Palm conditioning subject.
+        net ladder's Palm conditioning subject.
     agg_transform : callable or None
         The cumulative aggregate-cover net map ``T(u) = u - agg_cum(u)``
         when aggregate covers exist, else ``None`` (the grand result is then
         affine in the retained compound directly).
     p_subject : ndarray
         The retained compound density on ``agg.xs`` (the builder's
-        ``subject``), the stage-2 transport weight.
+        ``subject``): the net stage-2 transport weight, and the support
+        weight of the gross affine carve-out test.
     grand_gd : GridDistribution
-        The grand-result row's distribution (the ladder anchor).
+        The grand-result row's distribution (the net ladder anchor).
     grand_shift : float
         The grand result's constant: ``result = shift - S_final``, so the
+        net conditioning bucket at quantile ``q`` is ``shift - gd.q(q)``.
+    gross_gd : GridDistribution
+        The gross result row's distribution (the gross ladder anchor).
+    gross_shift : float
+        The gross result's constant: ``result = shift - S_g``, so the gross
         conditioning bucket at quantile ``q`` is ``shift - gd.q(q)``.
 
     Returns
     -------
-    dict or None
-        The ladder, or ``None`` when the build is ineligible: the engine
-        carries loss-sensitive features (``variable_terms`` /
+    tuple of (dict or None, dict or None)
+        ``(net, gross)``. Both ``None`` when the build is ineligible: the
+        engine carries loss-sensitive features (``variable_terms`` /
         ``reinstatement_terms``), or the frequency family has no
-        :meth:`Frequency.freq_pgf_prime` (all-or-nothing; no half-filled
-        ladders).
+        :meth:`Frequency.freq_pgf_prime`, or the grid is signed / windowed
+        (all-or-nothing; no half-filled ladders). When eligible, the net
+        ladder is total over the plan rows; the gross ladder is total too,
+        but an aggregate-tier row that is not affine on the subject's
+        support serves NaN cells, together with every row downstream of it
+        (the truncation ruled at plan review, fork B).
 
     Notes
     -----
-    Two stages, both 1-D (derivation: ``dev/plan-a362-pnl-punchups.md``).
-    **Stage 1** conditions every per-claim row on the retained compound
-    ``S_r`` by the Palm identity, one FFT per row. **Stage 2** transports
-    through the deterministic net map ``T``: conditioning on the final net
-    is a *coarsening* of conditioning on ``S_r``, so each cell is the
-    ``f_{S_r}``-weighted level-set average over ``T^{-1}(bucket)``,
-    implemented with the same linear rebucket scatter that built the
-    served final-net density, so the transport denominator *is* that
-    density and every column foots by construction. With no aggregate
-    covers stage 2 is the identity and the ladder reads the kappa vectors
-    directly, making the grand-result cell its own quantile exactly; under
-    a transport the grand-result cell is the level-set average of the true
-    (pre-scatter) net values, which agrees with the marginal quantile to
-    within one bucket of scatter.
+    **Net ladder**: two stages, both 1-D (derivation:
+    ``dev/plan-a362-pnl-punchups.md``). Stage 1 conditions every per-claim
+    row on the retained compound ``S_r`` by the Palm identity, one FFT per
+    row. Stage 2 transports through the deterministic net map ``T``:
+    conditioning on the final net is a *coarsening* of conditioning on
+    ``S_r``, so each cell is the ``f_{S_r}``-weighted level-set average over
+    ``T^{-1}(bucket)``, implemented with the same linear rebucket scatter
+    that built the served final-net density, so the transport denominator
+    *is* that density and every column foots by construction. With no
+    aggregate covers stage 2 is the identity and the ladder reads the kappa
+    vectors directly, making the grand-result cell its own quantile exactly;
+    under a transport the grand-result cell is the level-set average of the
+    true (pre-scatter) net values, which agrees with the marginal quantile
+    to within one bucket of scatter.
+
+    **Gross ladder**: the conditioning subject is the gross aggregate
+    ``S_g`` itself, a per-claim sum, so every per-claim row is exact 1-D
+    Palm under the identity conditioning (``palm_kappa(fn, None)``) and no
+    transport stage exists. An aggregate-tier row ``g(S_r)`` has neither
+    escape hatch under gross conditioning (it is not a per-claim sum, and
+    ``S_r`` is not a function of ``S_g``: the random claim count decouples
+    them), so ``E[g(S_r) | S_g]`` needs the joint law **except** when ``g``
+    is affine on the subject's support, where linearity gives
+    ``a E[S_r | S_g] + b`` with ``E[S_r | S_g]`` one further identity-
+    conditioned Palm pass (:func:`_affine_coefficients`). Non-affine
+    aggregate rows serve NaN (fork B).
     """
     from ._pnl import PERCENTILE_LADDER
     if getattr(agg, 'variable_terms', None) is not None \
             or getattr(agg, 'reinstatement_terms', None) is not None:
-        return None
+        return None, None
     xs = agg.xs
     f_sr = np.asarray(p_subject, dtype=float)
-    # stage 1: per-claim kappa vectors over the retained grid; a family
-    # without a pgf derivative (or a signed / windowed grid) degrades the
-    # whole ladder to marginal, never half of it
+    # stage 1: conditional-mean vectors for both subjects; a family without
+    # a pgf derivative (or a signed / windowed grid) degrades both ladders
+    # to marginal, never half of either
     try:
-        base = {}
+        base = {}          # net: conditioned on the retained compound S_r
+        gross_cond = {}    # gross: conditioned on the gross aggregate S_g
+        kappa_r = None     # E[S_r | S_g], computed once, on demand
         for label, spec in palm_specs.items():
             if spec[0] == 'claim':
                 kappa, _f = agg.palm_kappa(spec[1], retained_fn)
                 base[label] = kappa
+                gkappa, _f = agg.palm_kappa(spec[1], None)
+                gross_cond[label] = gkappa
             elif spec[0] == 'agg':
-                base[label] = np.asarray(spec[1](xs), dtype=float)
+                v = np.asarray(spec[1](xs), dtype=float)
+                base[label] = v
+                ab = _affine_coefficients(xs, v, f_sr)
+                if ab is None:
+                    gross_cond[label] = None     # blocked: fork B NaN
+                else:
+                    if kappa_r is None:
+                        kappa_r, _f = agg.palm_kappa(retained_fn, None)
+                    gross_cond[label] = ab[0] * kappa_r + ab[1]
     except NotImplementedError:
-        return None
-    # stage 2: transport through T where aggregate covers exist
+        return None, None
+    # net stage 2: transport through T where aggregate covers exist
     if agg_transform is not None:
         t_vals = np.asarray(agg_transform(xs), dtype=float)
         den = agg._rebucket_to_grid(t_vals, f_sr)
@@ -1454,26 +1577,15 @@ def _palm_scenario_ladder(agg, palm_specs, *, retained_fn, agg_transform,
             cond[label] = out
     else:
         cond = base
-    # anchors: the grand result is affine decreasing in the final net, so
-    # its q-quantile is the final-net bucket at ``shift - x_q``
+    # anchors: each anchor row is affine decreasing in its own subject, so
+    # its q-quantile is the subject bucket at ``shift - x_q``
     bs = float(agg.bs)
-    idx = [int(round((grand_shift - float(grand_gd.q(q))) / bs))
-           for q in PERCENTILE_LADDER]
-    ladder = {}
-    deltas = []
-    for label, spec in palm_specs.items():
-        if spec[0] == 'const':
-            ladder[label] = [float(spec[1])] * len(idx)
-        elif spec[0] == 'delta':
-            deltas.append((label, spec[1], spec[2]))
-        else:
-            _kind, _fn, sign, shift = spec
-            vec = cond[label]
-            ladder[label] = [float(sign * vec[i] + shift) for i in idx]
-    for label, target, base_label in deltas:
-        ladder[label] = [t - b for t, b in
-                        zip(ladder[target], ladder[base_label])]
-    return ladder
+    net_idx = [int(round((grand_shift - float(grand_gd.q(q))) / bs))
+               for q in PERCENTILE_LADDER]
+    gross_idx = [int(round((gross_shift - float(gross_gd.q(q))) / bs))
+                 for q in PERCENTILE_LADDER]
+    return (_assemble_ladder(palm_specs, cond, net_idx),
+            _assemble_ladder(palm_specs, gross_cond, gross_idx))
 
 
 def _peel_explanation(agg, pnl, direction, steps, route):

@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a384
+
+**[Waterfall-Gross-Basis] the margin walk serves a second, gross-anchored capital basis beside the net one.** `walk_df` renames `M01 diversified` to `M01 div net` and adds `M01 div gross`, the step's result conditional on the gross result landing at its own 1-in-100; `evaluation_df` renames `Div CoC` to `Div CoC net` and adds `Div CoC gross`. The gross column is exact on the per-atom route, exact on an eligible stitched peel for every per-claim row (with an affine aggregate transform carried by linearity), and truncates to NaN at a nonlinear aggregate tier and everything downstream; the waterfall captions name both bases and the truncation. Internals: `PnL._gross_scenario_ladder()`, `PnL._palm_gross_ladder`, and `_palm_scenario_ladder` now returns the `(net, gross)` pair.
+
+**Breaking, on a stable-tier class.** A caller indexing `walk_df` by `M01 diversified` or `evaluation_df` by `Div CoC` has to follow the renames. Sync of `tests/data/exhibit_snapshots.json` required.
+
 ## 1.0.0a383
 
 **[Panel-No-Title] an empty `Panel.title` means the panel has no heading, where `None` still inherits the document's.** The two were collapsed by a truthiness test, so an emitter asking for no heading got the document title back: the very line it was trying to drop. `plot_chartdoc` and the app's adapter both read `None` as "no title of its own, take the document's" and `''` as "no title, draw none"; an exchanged panel that declared none keeps none rather than falling back to naming the exchange.

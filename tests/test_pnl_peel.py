@@ -251,8 +251,8 @@ def test_palm_tier_subtotal_agrees_with_the_lumped_tier_walk():
     """
     peeled = build(f'{OCC2} peel top-down')
     lumped = build(OCC2)
-    palm_cell = peeled.walk_df['M01 diversified']['All occurrence']
-    joint_cell = lumped.walk_df['M01 diversified'].iloc[1]
+    palm_cell = peeled.walk_df['M01 div net']['All occurrence']
+    joint_cell = lumped.walk_df['M01 div net'].iloc[1]
     assert palm_cell == pytest.approx(joint_cell, rel=0.02)
 
 

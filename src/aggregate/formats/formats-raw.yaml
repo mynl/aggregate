@@ -72,8 +72,9 @@ columns:
   Margin: money        # the walk's first column (walk_df) spells the margin
                        # out, since it stands beside M01 rather than beside
                        # L, P and Q
-  'M01 standalone': money      # the walk's 1-in-100 margin, on its own and
-  'M01 diversified': money     # conditional on the whole book's 1-in-100
+  'M01 standalone': money      # the walk's 1-in-100 margin, on its own,
+  'M01 div net': money         # conditional on the whole book's 1-in-100,
+  'M01 div gross': money       # and conditional on the gross 1-in-100
   P: money
   Q: money
   a: money
@@ -136,7 +137,8 @@ columns:
   'SA CoC': ratio      # cost of capital on the standalone basis: a return
                        # on risk rows, a cost of relief on ceded rows, so it
                        # reads as ROE and coc do
-  'Div CoC': ratio     # the same quotient on the diversified basis
+  'Div CoC net': ratio     # the same quotient on the net diversified basis
+  'Div CoC gross': ratio   # and against the gross-anchored capital
 
   # --- missing from round 1
   Mean: money

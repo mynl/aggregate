@@ -978,6 +978,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         #: when not computed, and :attr:`economic_df` then falls back to the
         #: marginal ladder.
         self._palm_ladder = None
+        #: the gross-anchored twin ([Waterfall-Gross-Basis]): same shape,
+        #: conditioned on the gross result at its own quantiles, attached by
+        #: the builder beside :attr:`_palm_ladder`; aggregate-tier rows that
+        #: are not affine on the subject's support carry NaN cells (fork B
+        #: truncation). ``None`` when not computed.
+        self._palm_gross_ladder = None
         #: tower presentation: multi-group, or a forced single-group walk
         #: ([Decision-XPnL-Plain-Is-One-Step-Walk] -- ``force_tower=True``
         #: presents the one-group ledger as its single (Step, Side) block /
@@ -1889,6 +1895,34 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                         for mask, pw, pm in slices]
                 for label, row in self._rows.items()}
 
+    def _gross_scenario_ladder(self):
+        """The gross-anchored twin of :meth:`_scenario_ladder`.
+
+        Identical atom-slice arithmetic with the anchor swapped from the
+        grand result to the **first group's result**, the gross step in
+        every builder ([Waterfall-Gross-Basis]): for each ladder point
+        ``q``, the conditioning event is the gross result landing at its
+        own ``q``-quantile, and each cell is ``E[row | gross result ==
+        x_q]``. Exact for every row, nonlinear aggregate covers included,
+        because the atoms carry the joint. Columns foot by linearity of
+        conditional expectation, and the gross row's cell is its own
+        marginal quantile (``E[result | result = x] = x``). On a
+        non-monotone gross row the cell is the exact mean over the level
+        set, the same semantics :meth:`_scenario_ladder` documents.
+        Shared-atoms route only; computed on demand, like its twin.
+        """
+        gross = self._group_result_rows[0]
+        res_vals = gross.values
+        gd = gross.gd
+        slices = []
+        for q in PERCENTILE_LADDER:
+            mask = res_vals == float(gd.q(q))
+            pw = self._probs[mask]
+            slices.append((mask, pw, float(pw.sum())))
+        return {label: [float((row.values[mask] * pw).sum() / pm)
+                        for mask, pw, pm in slices]
+                for label, row in self._rows.items()}
+
     @property
     def stats_df(self):
         """The wrapped engine's canonical moment store, or an empty frame.
@@ -2327,6 +2361,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         kappa = f'κ{int(round(p * 100)):02d}'
         diversified_available = kappa in ledger.columns
         densities = self.density_df
+        # the gross-anchored basis ([Waterfall-Gross-Basis]): the per-atom
+        # twin where atoms are shared, the stitched gross Palm ladder where
+        # the builder computed one, else no gross column
+        q_index = PERCENTILE_LADDER.index(p)
+        if self._probs is not None:
+            gross_ladder = self._gross_scenario_ladder()
+        else:
+            gross_ladder = self._palm_gross_ladder
 
         walk, evaluation, index = [], [], []
         for step in ratios.index:
@@ -2348,9 +2390,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             else:
                 standalone = float(gd.q(1 - p)) if ceded else float(gd.q(p))
             divers = float(row[kappa]) if diversified_available else np.nan
+            divers_gross = (float(gross_ladder[label][q_index])
+                            if gross_ladder is not None else np.nan)
             r = ratios.loc[step]
             index.append(step)
-            walk.append([margin, standalone, divers])
+            walk.append([margin, standalone, divers, divers_gross])
             # one quotient per capital basis, on every row; the sign carries
             # the reading (risk rows: margin > 0, M01 < 0, a return on
             # capital; ceded rows: margin < 0, M01 > 0, a cost of relief)
@@ -2359,6 +2403,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 margin / sd if sd > 0 else np.nan,
                 _capital_ratio(margin, standalone),
                 _capital_ratio(margin, divers),
+                _capital_ratio(margin, divers_gross),
             ])
 
         idx = pd.Index(index, name='Step')
@@ -2369,11 +2414,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         m = f'M{100 // t:02d}'
         walk_df = pd.DataFrame(
             walk, index=idx,
-            columns=['Margin', f'{m} standalone', f'{m} diversified'])
+            columns=['Margin', f'{m} standalone', f'{m} div net',
+                     f'{m} div gross'])
         evaluation_df = pd.DataFrame(
             evaluation, index=idx,
             columns=['Premium spent', 'Margin spent', 'CR', 'MSD',
-                     'SA CoC', 'Div CoC'])
+                     'SA CoC', 'Div CoC net', 'Div CoC gross'])
         return walk_df, evaluation_df
 
     @property
@@ -2403,25 +2449,50 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 is the marker of which reading a row takes. Tail measures do
                 not add, so this column does **not** foot down the walk. A
                 tier subtotal containing any cover takes the ceded reading.
-            ``M01 diversified``
+            ``M01 div net``
                 The step's result conditional on the **whole book** landing at
-                its own 1-in-``t``, read off the ledger's kappa column, so this
-                one foots exactly. Blank on a ledger whose rows share no atoms
-                and have no Palm ladder, where no conditioning is possible.
+                its own 1-in-``t``, read off the ledger's kappa column, so
+                this one foots exactly: the decomposition of the capital the
+                firm actually holds. Blank on a ledger whose rows share no
+                atoms and have no Palm ladder, where no conditioning is
+                possible.
+            ``M01 div gross``
+                The step's result conditional on the **gross** result landing
+                at its own 1-in-``t`` ([Waterfall-Gross-Basis]): the program
+                read as a stress test, who pays in the gross 1-in-``t``
+                environment. A conditional-mean ladder like the net column,
+                so it foots down the walk where complete. Served where exact
+                and nowhere else: always on a shared-atoms ledger (the atoms
+                carry the joint); on an eligible stitched peel for every
+                per-claim row, with the aggregate tier and everything
+                downstream blank unless the aggregate transform is affine on
+                the subject's support (the gross basis cannot see through a
+                nonlinear aggregate transform without the 2-D joint). Blank
+                wherever the net column is blank.
 
             ``t`` is :data:`WATERFALL_RETURN_PERIOD`, and ``M01`` is the margin
             at the 1st percentile, which is the state ``t = 100`` names.
 
         Notes
         -----
-        The gap between the two 1-in-``t`` columns is the diversification
-        benefit, which is the reading the frame exists to support, and the
-        reason both are carried rather than one.
+        The gap between the standalone and div columns is the
+        diversification benefit, which is the reading the frame exists to
+        support. The two div columns differ only in which row anchors to its
+        own quantile, and each basis has the other's blind spot: the net
+        basis evaluates a cover in the states remaining *after* the program
+        worked, so a highly effective hedge removes its own states from the
+        net tail and looks weak against the residual tail; the gross basis
+        sees the underlying stress, but two covers responding to the same
+        gross state both look excellent even when jointly redundant. The
+        anchor symmetry marks the pair: on the Gross row the gross cell
+        coincides with that row's standalone ``M01``, and on the closing row
+        the net cell does.
 
         Nothing here is newly estimated. Every number is arithmetic over
         quantities the P&L has already computed: the margin off
-        :attr:`economic_df`, the diversified state off that frame's kappa
-        column, the standalone state off each result row's own
+        :attr:`economic_df`, the net state off that frame's kappa column,
+        the gross state off the gross-anchored ladder the same machinery
+        builds, the standalone state off each result row's own
         :class:`GridDistribution`.
 
         A single group P&L books one result, so the walk is one row and there
@@ -2464,19 +2535,34 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 right-tail standalone), so the quotient is again positive:
                 the cost of the layer per unit of the writer's standalone
                 capital.
-            ``Div CoC``
-                ``M / -M01 diversified`` on every row, the same quotient on
-                the diversified basis: a return on capital on risk rows, a
+            ``Div CoC net``
+                ``M / -M01 div net`` on every row, the same quotient on the
+                net diversified basis: a return on capital on risk rows, a
                 cost of relief on ceded rows (the margin given up per unit
-                of capital the cover hands back).
+                of capital the cover hands back). The right basis for
+                attribution and performance measurement of the in-force
+                program, since the column decomposes the capital the firm
+                actually holds.
+            ``Div CoC gross``
+                ``M / -M01 div gross``, the quotient against the
+                gross-anchored basis ([Waterfall-Gross-Basis]): the step's
+                performance in the gross 1-in-``t`` stress state, the right
+                basis for judging program design against the underlying
+                risk. NaN wherever the gross cell is blank, so a truncated
+                gross column truncates here too.
 
         Notes
         -----
         The sign convention carries the reading: gross and net rows have
-        margin > 0 and ``M01 < 0``; ceded rows the reverse, so both CoC
+        margin > 0 and ``M01 < 0``; ceded rows the reverse, so the CoC
         columns stay positive with one arithmetic and no routing. The
         reinsurance test is whether a ceded row's CoC comes in under the
-        return the risk-bearing rows earn.
+        return the risk-bearing rows earn. The two div bases can disagree
+        violently: when the net-of-occurrence subject carries claim-count
+        information only (a tower retaining a fixed cap per claim), every
+        occurrence layer's ``Div CoC net`` collapses to one number, while
+        the gross basis sees the large claims the net gives away and
+        differentiates the layers. Showing both is the point.
 
         See Also
         --------

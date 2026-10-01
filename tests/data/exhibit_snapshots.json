@@ -41419,120 +41419,31 @@
    "body": [
     {
      "cells": [
-      {
-       "rowspan": 5,
-       "text": "EX.Dice"
-      },
-      "ccoc",
-      "sell",
-      "r",
-      {
-       "raw": 0.30092592592592593,
-       "text": "0.30093"
-      },
+      "EX.Dice",
       {
        "raw": 0.23131672597864766,
        "text": "0.23132"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.00000"
-      },
-      "ok"
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "ph",
-      "sell",
-      "a",
-      {
-       "raw": 0.5731802494397704,
-       "text": "0.57318"
       },
       {
        "raw": 0.2713101379910062,
        "text": "0.27131"
       },
       {
-       "raw": 3.927326552854993e-08,
-       "text": "0.00000"
-      },
-      "ok"
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "wang",
-      "sell",
-      "lam",
-      {
-       "raw": 0.5199752032440235,
-       "text": "0.51998"
-      },
-      {
        "raw": 0.286886647573648,
        "text": "0.28689"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -3.977973506152921e-11,
-       "text": "-0.00000"
-      },
-      "ok"
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "dual",
-      "sell",
-      "b",
-      {
-       "raw": 1.854249817860955,
-       "text": "1.85425"
       },
       {
        "raw": 0.29929048694873905,
        "text": "0.29929"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.4416379201520613e-10,
-       "text": "-0.00000"
-      },
-      "ok"
-     ]
-    },
-    {
-     "break_depth": 1,
-     "cells": [
-      "tvar",
-      "sell",
-      "p",
-      {
        "raw": 0.3071001999699008,
-       "text": "0.30710"
-      },
-      {
-       "raw": 0.3071001999699008,
-       "text": "0.30710"
-      },
-      {
-       "raw": 6.211018398261103e-06,
-       "text": "0.00001"
-      },
-      "ok"
+       "text": "0.3071"
+      }
      ]
     }
    ],
-   "caption": "The breakeven stress, measured with assets of 17 behind it. gini_p is the family agnostic acceptability index, so it compares across families and, for a walk, down the steps: a layer whose figure sits above the net row over it is priced above the holder's own acceptability, and buying it lowers the net. The consideration is 12.00. A blank row is one of two opposite situations and the status column says which: a position that is unacceptable at any stress (its expected margin is not positive), or one that cannot lose and is therefore acceptable at every stress. Cherny and Madan (2009) is the reference.",
+   "caption": "The breakeven stress as one number per position and family: gini_p, the family agnostic acceptability index, measured with assets of 17 behind it. The consideration is 12.00. Read down a column to follow the walk (a layer whose figure sits above the net row over it is priced above the holder's own acceptability, and buying it lowers the net) and across a row to see whether the families agree. A blank cell is one of two opposite situations, a position unacceptable at any stress or one that cannot lose; the raw view's status column says which, beside each family's fitted parameter. Cherny and Madan (2009) is the reference.",
    "columns": [
     {
      "align": "l",
@@ -41546,44 +41457,54 @@
      "wrap": true
     },
     {
-     "align": "l",
-     "dtype": "object",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
      "key": "c1",
-     "level": 1,
      "name": [
-      "distortion"
+      "ccoc"
      ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c2",
-     "name": [
-      "role"
-     ],
-     "wrap": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c3",
-     "name": [
-      "param_name"
-     ],
-     "wrap": true
+     "raw": true
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
       "digits": 5,
-      "kind": "dec"
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "ph"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "wang"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
      },
      "key": "c4",
      "name": [
-      "param"
+      "dual"
      ],
      "raw": true
     },
@@ -41592,35 +41513,13 @@
      "dtype": "float",
      "format": {
       "digits": 5,
-      "kind": "dec"
+      "kind": "gen"
      },
      "key": "c5",
      "name": [
-      "gini_p"
+      "tvar"
      ],
      "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 5,
-      "kind": "dec"
-     },
-     "key": "c6",
-     "name": [
-      "error"
-     ],
-     "raw": true
-    },
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c7",
-     "name": [
-      "status"
-     ],
-     "wrap": true
     }
    ],
    "head": [
@@ -41629,31 +41528,25 @@
       "text": "Step"
      },
      {
-      "text": "distortion"
+      "text": "ccoc"
      },
      {
-      "text": "role"
+      "text": "ph"
      },
      {
-      "text": "param_name"
+      "text": "wang"
      },
      {
-      "text": "param"
+      "text": "dual"
      },
      {
-      "text": "gini_p"
-     },
-     {
-      "text": "error"
-     },
-     {
-      "text": "status"
+      "text": "tvar"
      }
     ]
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 2
+   "n_stub_levels": 1
   }
  ],
  "pricing.evaluate/raw/Evaluation": [

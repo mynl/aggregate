@@ -959,9 +959,10 @@ pricing_evaluate = _make_exhibit_function(
     'pricing.evaluate', 'Breakeven acceptability',
     """The Cherny and Madan breakeven panel. Source frame ``evaluation_df``.
 
-    Registered on :class:`~aggregate.results.EvaluationResult`. One block
-    under both perspectives; INSURER replaces the caption with the business
-    reading of ``gini_p`` and of the ``status`` column.
+    Registered on :class:`~aggregate.results.EvaluationResult`. RAW is the
+    tidy panel whole, parameters, errors and status included; INSURER pivots
+    it to the comparison, ``gini_p`` alone with positions down and families
+    across (``[Perspective-May-Restructure]``).
 
     Parameters
     ----------

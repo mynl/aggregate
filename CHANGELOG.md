@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a385
+
+**[Evaluate-Insurer-Pivot] the INSURER reading of `pricing.evaluate` is the gini_p comparison, positions down and families across.** The tidy panel served both perspectives whole, which is the honest raw shape and a poor comparison: `gini_p` repeats down a long column with the fitted parameter, the solver error and the status word between every pair a reader wants side by side. INSURER now serves `evaluation_df['gini_p'].unstack('distortion')`, one number per position and family, columns narrowed to the families actually evaluated in reporting order and rows put back in the panel's own step order, since `unstack` would alphabetize a walk's ledger. The block is named `gini_p`, formatted `.5g` uniformly, and its caption carries the anchor, the consideration, and the blank-cell reading, pointing at RAW for status and parameters. RAW is unchanged: the full panel, as the `[Exhibit-Perspective-Contract]` requires.
+
+Asked for from the `aggregate_api` Pricing / Evaluate pane (the app draws exhibits as published, so the simplification ships here and the app needs no change). Sync of `tests/data/exhibit_snapshots.json` required. Provisional tier (`aggregate.exhibits`), so the restructure needs no deprecation period.
+
 ## 1.0.0a384
 
 **[Waterfall-Gross-Basis] the margin walk serves a second, gross-anchored capital basis beside the net one.** `walk_df` renames `M01 diversified` to `M01 div net` and adds `M01 div gross`, the step's result conditional on the gross result landing at its own 1-in-100; `evaluation_df` renames `Div CoC` to `Div CoC net` and adds `Div CoC gross`. The gross column is exact on the per-atom route, exact on an eligible stitched peel for every per-claim row (with an affine aggregate transform carried by linearity), and truncates to NaN at a nonlinear aggregate tier and everything downstream; the waterfall captions name both bases and the truncation. Internals: `PnL._gross_scenario_ladder()`, `PnL._palm_gross_ladder`, and `_palm_scenario_ladder` now returns the `(net, gross)` pair.

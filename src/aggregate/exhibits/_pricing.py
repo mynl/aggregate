@@ -424,28 +424,47 @@ register_simple_exhibit(
 
 @pricing_evaluate.insurer.register(EvaluationResult)
 def _evaluate_insurer(result, blocks):
-    """What the panel means, over what it is.
+    """The acceptability panel pivoted to one number per position and family.
+
+    The business reading is the comparison, and the tidy panel is a poor
+    comparison: ``gini_p`` repeats down a long column while the working
+    columns (the fitted parameter, the solver error, the status word) stand
+    between every pair a reader wants side by side. INSURER therefore serves
+    ``evaluation_df['gini_p'].unstack('distortion')``, positions down and
+    families across, the same move the allocation leaf's stat slices make.
+    The panel itself, parameters and status included, is the RAW view.
+
+    Two reindexes, both load bearing. ``unstack`` materializes every family
+    the categorical dtype knows, so the columns narrow to ``result.names``,
+    the families actually evaluated, in reporting order. And ``unstack``
+    sorts the remaining index, which on a walk would alphabetize the ledger,
+    so the rows go back to the panel's own step order.
 
     Background: Cherny and Madan (2009), *New measures for performance
-    evaluation*. The caption names the three things a reader has to know to
-    use the table, and the third is the one people get wrong: a blank row is
-    two opposite situations and the ``status`` column is what tells them
-    apart.
+    evaluation*. The caption still carries the thing people get wrong: a
+    blank cell is two opposite situations, and the raw view's ``status``
+    column is what tells them apart.
     """
-    block_name, frame, kw = blocks[0]
+    _name, frame, kw = blocks[0]
+    pivot = frame['gini_p'].unstack('distortion')
+    pivot = pivot.reindex(
+        index=frame.index.get_level_values('Step').unique(),
+        columns=list(result.names))
     anchor = ('measured against the whole distribution'
               if result.a is None
               else f'measured with assets of {result.a:,.0f} behind it')
     premium = ('' if result.premium is None
                else f' The consideration is {result.premium:,.2f}.')
     caption = (
-        f'The breakeven stress, {anchor}. gini_p is the family agnostic '
-        f'acceptability index, so it compares across families and, for a '
-        f'walk, down the steps: a layer whose figure sits above the net row '
-        f'over it is priced above the holder\'s own acceptability, and buying '
-        f'it lowers the net.{premium} A blank row is one of two opposite '
-        f'situations and the status column says which: a position that is '
-        f'unacceptable at any stress (its expected margin is not positive), '
-        f'or one that cannot lose and is therefore acceptable at every '
-        f'stress. Cherny and Madan (2009) is the reference.')
-    return [(block_name, frame, dict(kw, caption=caption))]
+        f'The breakeven stress as one number per position and family: '
+        f'gini_p, the family agnostic acceptability index, {anchor}.'
+        f'{premium} Read down a column to follow the walk (a layer whose '
+        f'figure sits above the net row over it is priced above the '
+        f'holder\'s own acceptability, and buying it lowers the net) and '
+        f'across a row to see whether the families agree. A blank cell is '
+        f'one of two opposite situations, a position unacceptable at any '
+        f'stress or one that cannot lose; the raw view\'s status column '
+        f'says which, beside each family\'s fitted parameter. Cherny and '
+        f'Madan (2009) is the reference.')
+    return [('gini_p', pivot,
+             dict(kw, float_format='.5g', caption=caption))]

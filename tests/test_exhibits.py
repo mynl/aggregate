@@ -1671,19 +1671,52 @@ def test_the_two_leaves_answer_differently_on_one_cession(objects):
 
 
 def test_pricing_evaluate_serves_the_panel(objects):
+    """RAW is the tidy panel whole; INSURER pivots it to gini_p alone.
+
+    The pivot is ``evaluation_df['gini_p'].unstack('distortion')``: positions
+    down, the evaluated families across in reporting order, one uniform
+    format. The parameters, errors and the status word stay on RAW, which the
+    insurer caption points at.
+    """
     result = objects['Evaluation']
-    for perspective in (Perspective.RAW, Perspective.INSURER):
-        blocks = exhibit_frames(result, 'pricing.evaluate', perspective)
-        assert [b for b, _, _ in blocks] == ['evaluation_df']
-        pd.testing.assert_frame_equal(blocks[0][1], result.evaluation_df,
-                                      check_index_type=False, check_categorical=False)
-    _n, _f, kw = exhibit_frames(
+    raw = exhibit_frames(result, 'pricing.evaluate')
+    assert [b for b, _, _ in raw] == ['evaluation_df']
+    pd.testing.assert_frame_equal(raw[0][1], result.evaluation_df,
+                                  check_index_type=False, check_categorical=False)
+
+    name, pivot, kw = exhibit_frames(
         result, 'pricing.evaluate', Perspective.INSURER)[0]
+    assert name == 'gini_p'
+    assert list(pivot.columns) == list(result.names)
+    panel = result.evaluation_df
+    for step in pivot.index:
+        for family in pivot.columns:
+            assert pivot.loc[step, family] == pytest.approx(
+                panel.loc[(step, family), 'gini_p'], nan_ok=True)
+    assert kw['float_format'] == '.5g'
     # the insurer caption states the anchor, the premium, and what a blank
-    # row means, which is the thing readers get wrong
+    # cell means, which is the thing readers get wrong
     assert f'{result.a:,.0f}' in kw['caption']
     assert 'cannot lose' in kw['caption']
     assert 'Cherny and Madan' in kw['caption']
+
+
+def test_pricing_evaluate_insurer_pivot_keeps_walk_order(objects):
+    """``unstack`` sorts the remaining index; the ledger order must win.
+
+    A walk's steps are the ledger's own order, the gross deal before the
+    layer before the running net, and alphabetizing them would shuffle the
+    story a gini_p column is read down. The pivot reindexes the rows back to
+    the panel's appearance order, and the families likewise narrow to the
+    evaluated set rather than every category the dtype knows.
+    """
+    result = objects['Tower'].evaluate()
+    steps = list(result.evaluation_df.index.get_level_values('Step').unique())
+    assert len(steps) > 1, 'the fixture must actually walk'
+    _n, pivot, _kw = exhibit_frames(
+        result, 'pricing.evaluate', Perspective.INSURER)[0]
+    assert list(pivot.index) == steps
+    assert list(pivot.columns) == list(result.names)
 
 
 def test_a_pricing_exhibit_is_titled_after_its_source(objects):

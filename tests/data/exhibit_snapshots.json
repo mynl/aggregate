@@ -18097,25 +18097,16 @@
        "text": "147.65"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -180.42930991819503,
-       "text": "-180.43"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.0535395827040601,
-       "text": "-105.4%"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -4.6588516674879275,
-       "text": "-4.659"
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 618.4875456727982,
@@ -18124,7 +18115,7 @@
      ]
     }
    ],
-   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view. The impact row is a difference of two positions that ride different marginals, so it has no distribution of its own: its mean is exact by linearity and every spread cell is blank, because a difference of standard deviations is not the standard deviation of the difference.",
    "columns": [
     {
      "align": "l",
@@ -18861,34 +18852,25 @@
        "text": "147.65"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -402.95754387683826,
-       "text": "-402.96"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2.198689507653528,
-       "text": "-219.9%"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.7247832347970524,
-       "text": "-0.725"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "raw": 1860.0,
-       "text": "1,860.00"
+       "raw": null,
+       "text": "\u2014"
       }
      ]
     }
    ],
-   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. This ledger shares no atoms across its rows (a one sweep or stitched route), so the ladder is marginal under a plain P header: P01 is that row's own 1% quantile, no conditioning happened, and the column does not foot. Skew and the rest of the percentile ladder are on the raw view.",
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. This ledger shares no atoms across its rows (a one sweep or stitched route), so the ladder is marginal under a plain P header: P01 is that row's own 1% quantile, no conditioning happened, and the column does not foot. Skew and the rest of the percentile ladder are on the raw view. The impact row is a difference of two positions that ride different marginals, so it has no distribution of its own: its mean is exact by linearity and every spread cell is blank, because a difference of standard deviations is not the standard deviation of the difference.",
    "columns": [
     {
      "align": "l",

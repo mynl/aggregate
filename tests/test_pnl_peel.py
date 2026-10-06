@@ -934,3 +934,61 @@ def test_every_peeled_row_carries_a_distribution():
     for label, gd in dd.items():
         assert np.isfinite(gd.x).all(), label
         assert gd.p.sum() == pytest.approx(1.0, abs=1e-6), label
+
+
+# ----------------------------------------------------------------------
+# The impact row's delta statistics ([Delta-Row-Marked])
+#
+# A stitched tower's total impact is the grand result less the first step's,
+# and those two rows ride different marginals, so the difference has no
+# distribution without a joint. Every statistic on the row but the mean is a
+# difference of the two rows' statistics, which is how a negative standard
+# deviation used to reach the sheet with nothing on the line to say why. The
+# frames now carry the row in ``.attrs['delta_rows']``.
+# ----------------------------------------------------------------------
+def test_stitched_impact_row_is_marked_on_every_ledger_frame():
+    p = build(f'{TWO_EACH} peel top-down')
+    assert p._stitched
+    assert p.economic_df.attrs['delta_rows'] \
+        == (('All', 'Margin', 'Impact'),)
+    assert p.economic_marginal_df.attrs['delta_rows'] \
+        == (('All', 'Margin', 'Impact'),)
+    assert p.summary_df.attrs['delta_rows'] == (('All', 'Impact'),)
+
+
+def test_per_atom_impact_row_is_not_marked():
+    """With real atoms the impact row has its own law, so there is no delta."""
+    p = build(f'{ONE_EACH} peel top-down')
+    assert not p._stitched
+    for frame in (p.economic_df, p.economic_marginal_df, p.summary_df):
+        assert frame.attrs['delta_rows'] == ()
+
+
+def test_the_marked_row_is_the_one_carrying_an_impossible_spread():
+    """The mark names the row the reader needed warning about.
+
+    The assertion is the symptom, not the mechanism: the standard deviation on
+    that row is **negative**, which no standard deviation can be, because it is
+    ``net SD less gross SD`` on a book whose cession cut the spread.
+    """
+    p = build(f'{TWO_EACH} peel top-down')
+    (row,) = p.economic_df.attrs['delta_rows']
+    assert p.economic_df.loc[row, 'SD'] < 0
+
+
+def test_the_delta_rows_kappa_cells_stay_exact():
+    """Why the conditional cells are deliberately **not** covered by the mark.
+
+    Both rows behind a ``κ`` cell are conditioned on the same event, the grand
+    result landing at its own quantile, so by linearity of conditional
+    expectation the difference of the two conditional means is the conditional
+    mean of the difference. The cell is exact and foots down its column, and
+    blanking it would throw away a real number.
+    """
+    p = build(f'{TWO_EACH} peel top-down')
+    s = p.economic_df
+    for column in _kappa_columns(p):
+        impact = s.loc[('All', 'Margin', 'Impact'), column]
+        net = s.loc[('All', 'Margin', 'Net'), column]
+        gross = _step_result(s, 'Gross', column)
+        assert impact == pytest.approx(net - gross, rel=FOOTS_ACROSS)

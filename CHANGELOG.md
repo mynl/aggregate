@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a392
+
+**[Delta-Row-Marked] a stitched tower's impact row stops printing a negative standard deviation.** The total impact of a marginal-stitched walk is the grand result less the first step's, and those two rows ride different marginals, so their difference has no distribution without a joint. Every statistic on the row but the mean was therefore a difference of the two rows' statistics, shown with nothing on the line to say so. On a three layer occurrence tower with an aggregate program the row read `SD` of -180.43 and `CV` of -105.4%, values no standard deviation and no coefficient of variation can take, and it reached the reader through the `PnL / Ledger` leaf.
+
+`PnL.economic_df`, `PnL.economic_marginal_df` and `PnL.summary_df` now name those rows in `.attrs['delta_rows']`, so a presentation layer does not have to know the row classes. The `economic` exhibit blanks them under INSURER and the caption says why. The frames keep the raw values, this being presentation: RAW is still a passthrough, and a caller who wants the deltas reads the frame off the class and the mark beside it.
+
+**The conditional cells are deliberately not blanked.** A `kappa` cell on a delta row is the difference of two conditional means under the *same* conditioning event, so by linearity it is the conditional mean of the difference: exact, and it foots down its column like every other cell. A plain `P` cell is a difference of quantiles, which is not a quantile of anything, so on a marginal ladder the rung goes with the moments. `EX` stays on both ladders.
+
+Nothing is blanked on a route with real atoms, where the impact row has its own law. Sync of `tests/data/exhibit_snapshots.json` required: six cells on the two stitched fixtures, plus the two captions.
+
 ## 1.0.0a391
 
 **[Ledger-Skew] `Skew` goes back on the abbreviated insurer ledger, which is now five columns.** `LEDGER_MOMENTS` is `EX, SD, CV, Skew`, so the `economic` INSURER view reads level, spread, spread relative to level, the third moment, and the adverse tail state. The column came off at a305 on the ground that a third moment on every line is width the reader pays for and rarely spends. It is back because the ledger **inherited** it: the P&L's own summary card was the one presented frame that carried `Skew`, and [Overview-Engine] retired that card's leaf at a388, so leaving the column off would have put the third moment one perspective away on every sheet a reader actually sees. The a305 argument was about redundancy and the redundancy is gone. Sync of `tests/data/exhibit_snapshots.json` required.

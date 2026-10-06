@@ -303,6 +303,65 @@ def _ledger_columns(df, scenario):
     return [c for c in (*LEDGER_MOMENTS, tail) if c in df.columns]
 
 
+#: The moment columns a delta ledger row has no distribution behind
+#: ([Delta-Row-Marked]). ``EX`` is absent on purpose: the mean of a difference
+#: is the difference of the means, exact by linearity, so it is the one cell on
+#: such a row that means what it says.
+DELTA_BLANK_MOMENTS = ('SD', 'CV', 'Skew')
+
+
+def _blank_delta_cells(df, scenario):
+    """Blank the cells a per-statistic delta ledger row cannot support.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        A ledger sheet, carrying the rows to treat in ``.attrs['delta_rows']``
+        (:meth:`~aggregate._pnl.PnL._delta_row_entries`).
+    scenario : bool
+        Whether the sheet's ladder is the conditional (``κ``) one.
+
+    Returns
+    -------
+    pandas.DataFrame
+        A copy with those cells blank, or `df` unchanged when the sheet carries
+        no delta row, which is every route that keeps real atoms.
+
+    Notes
+    -----
+    The row this exists for is the stitched tower's total impact, the grand
+    result less the first step's. Those two rows ride different marginals, so
+    their difference has no distribution and every statistic on the row but the
+    mean is a difference of the two rows' statistics. Before the mark reached
+    the sheet a reader saw the consequence directly: a **negative standard
+    deviation**, with nothing on the line to say it was a delta of statistics.
+
+    Why the ladder treatment turns on `scenario`. A ``κ`` cell on a delta row is
+    the difference of two conditional means under the **same** conditioning
+    event, so by linearity it is the conditional mean of the difference: exact,
+    and it foots down its column like every other cell. It stays. A plain ``P``
+    cell is a difference of quantiles, which is not a quantile of anything
+    (:class:`~aggregate._pnl._DeltaGD` says so in as many words), so it goes.
+
+    RAW keeps the numbers, this being presentation code: a column slice or a
+    blanked cell is not a public frame, and a caller who wants the raw deltas
+    reads the frame off the class and the mark beside it.
+    """
+    rows = [r for r in df.attrs.get('delta_rows', ()) if r in df.index]
+    if not rows:
+        return df
+    cols = [c for c in df.columns
+            if c in DELTA_BLANK_MOMENTS
+            or (not scenario and str(c).startswith('P'))]
+    if not cols:
+        return df
+    out = df.copy()
+    out.loc[rows, cols] = float('nan')
+    # `.copy()` carries `.attrs` across, which is what a consumer downstream
+    # (a caption, a second treatment) needs to know the row is still a delta.
+    return out
+
+
 @economic.insurer.register(PnL)
 def _economic_insurer(obj, blocks):
     """The abbreviated ledger, with its footing rules and the kappa semantics
@@ -320,10 +379,17 @@ def _economic_insurer(obj, blocks):
     When the ledger has no shared atoms the header falls back to plain ``P``
     and no conditioning happened, which changes how the column reads entirely,
     so the caption says which regime is in force.
+
+    A stitched tower's impact row is treated by :func:`_blank_delta_cells`
+    ([Delta-Row-Marked]): its spread cells go blank rather than printing a
+    difference of statistics, which is how a negative standard deviation used
+    to reach this sheet.
     """
     block_name, df, kw = blocks[0]
     scenario = any(str(c).startswith('κ') for c in df.columns)
     df = df[_ledger_columns(df, scenario)]
+    deltas = bool(df.attrs.get('delta_rows'))
+    df = _blank_delta_cells(df, scenario)
     caption = (
         'The ledger in currency units: declared legs, side totals and '
         'results, in ledger order. Signed as booked, so every column adds '
@@ -345,6 +411,13 @@ def _economic_insurer(obj, blocks):
             'header: P01 is that row\'s own 1% quantile, no conditioning '
             'happened, and the column does not foot. Skew and the rest of the '
             'percentile ladder are on the raw view.')
+    if deltas:
+        caption += (
+            ' The impact row is a difference of two positions that ride '
+            'different marginals, so it has no distribution of its own: its '
+            'mean is exact by linearity and every spread cell is blank, '
+            'because a difference of standard deviations is not the standard '
+            'deviation of the difference.')
     return [(block_name, df,
              dict(kw, caption=caption, row_flags=_ledger_row_flags(obj, df)))]
 

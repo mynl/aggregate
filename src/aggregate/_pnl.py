@@ -1748,7 +1748,12 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame
             Flat index named ``'Side'`` (single group) or a ``(Step, Side)``
-            MultiIndex (tower); columns as above. The card's ``Side`` level
+            MultiIndex (tower); columns as above.
+            ``.attrs['delta_rows']`` carries ``('All', 'Impact')`` on a
+            **stitched** tower, where that row is a per-statistic delta and
+            only its ``EX`` is exact ([Delta-Row-Marked]); it is empty on every
+            route with real atoms, where the impact row has its own law. The
+            card's ``Side`` level
             merges the two :attr:`economic_df` levels: ``Net`` and ``Impact`` are
             ``Label`` values there, but on a fixed-shape card they are rows of
             their own, so both frames name the level the same way rather than
@@ -1767,6 +1772,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 {k: self._card_stat_row(r) for k, r in rows.items()},
                 orient='index', columns=_CARD_COLS)
             df.index.name = 'Side'
+            # a single-group card has no impact row, so nothing to mark
+            df.attrs['delta_rows'] = ()
             return df
         recs = []
         index = []
@@ -1815,9 +1822,18 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                                self._by_kind[('total_impact', None)])):
                 index.append(('All', view))
                 recs.append(self._card_stat_row(row))
-        return pd.DataFrame(
+        out = pd.DataFrame(
             recs, columns=_CARD_COLS,
             index=pd.MultiIndex.from_tuples(index, names=['Step', 'Side']))
+        # The card's one delta row ([Delta-Row-Marked]). Its index is not the
+        # ledger's, so the mark is formed from the row behind the cell rather
+        # than through `_delta_row_entries`, and every percentile on the card is
+        # marginal, so on a stitched tower all six non-mean cells are deltas of
+        # statistics.
+        impact = self._by_kind.get(('total_impact', None))
+        out.attrs['delta_rows'] = ((('All', 'Impact'),)
+                                   if isinstance(impact, _DeltaRow) else ())
+        return out
 
     def _side_index(self):
         """The row MultiIndex for :attr:`economic_df`, aligned with the ledger
@@ -2153,6 +2169,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         pandas.DataFrame
             MultiIndexed rows in ledger order; columns the metric names.
+            ``.attrs['delta_rows']`` names the rows whose ``SD`` / ``CV`` /
+            ``Skew`` are **deltas of statistics** rather than statistics
+            ([Delta-Row-Marked], :meth:`_delta_row_entries`): on this sheet
+            that is the stitched tower's impact row, and its ``κ`` cells are
+            not affected, being exact by linearity.
 
         See Also
         --------
@@ -2169,21 +2190,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                          list(row.moments) + palm[label]]
                         for label, row in self._rows.items()]
                 cols = _stat_names(scenario=True)
-                return pd.DataFrame(data, index=self._side_index(),
-                                    columns=cols)
-            # marginal ladder, plain ``P`` headers (the massive one-sweep
-            # route and the ineligible stitched towers -- the on-sheet
-            # signature of [Decision-Kappa-Shared-Source-Rule]).
-            data = [[_snap_noise(v) for v in row.stat_vector()]
-                    for row in self._rows.values()]
-            cols = _stat_names()
+            else:
+                # marginal ladder, plain ``P`` headers (the massive one-sweep
+                # route and the ineligible stitched towers -- the on-sheet
+                # signature of [Decision-Kappa-Shared-Source-Rule]).
+                data = [[_snap_noise(v) for v in row.stat_vector()]
+                        for row in self._rows.values()]
+                cols = _stat_names()
         else:
             ladder = self._scenario_ladder()
             data = [[_snap_noise(v) for v in
                      list(row.moments) + ladder[label]]
                     for label, row in self._rows.items()]
             cols = _stat_names(scenario=True)
-        return pd.DataFrame(data, index=self._side_index(), columns=cols)
+        out = pd.DataFrame(data, index=self._side_index(), columns=cols)
+        out.attrs['delta_rows'] = self._delta_row_entries(out.index)
+        return out
 
     @property
     def economic_marginal_df(self):
@@ -2208,6 +2230,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         pandas.DataFrame
             MultiIndexed rows in ledger order; columns
             ``EX / SD / CV / Skew`` then ``P01 ... P99``.
+            ``.attrs['delta_rows']`` names the rows carrying **deltas of
+            statistics** ([Delta-Row-Marked]). Here the mark covers the whole
+            row but ``EX``: this ladder is marginal, and a difference of
+            quantiles is not a quantile of anything.
 
         See Also
         --------
@@ -2215,8 +2241,63 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         """
         data = [[_snap_noise(v) for v in row.stat_vector()]
                 for row in self._rows.values()]
-        return pd.DataFrame(data, index=self._side_index(),
-                            columns=_stat_names())
+        out = pd.DataFrame(data, index=self._side_index(),
+                           columns=_stat_names())
+        out.attrs['delta_rows'] = self._delta_row_entries(out.index)
+        return out
+
+    # ------------------------------------------------------------------
+    # the rows that carry deltas of statistics ([Delta-Row-Marked])
+    # ------------------------------------------------------------------
+    def _delta_row_labels(self):
+        """Ledger row labels whose statistics are **deltas of statistics**.
+
+        A :class:`_DeltaRow` carries ``target - base`` cell by cell. The mean is
+        exact by linearity; ``SD``, ``CV``, ``Skew`` and every marginal quantile
+        are differences of the two rows' statistics rather than statistics of
+        the difference, because the two rows ride different marginals on the
+        stitched route and their difference has no distribution without a joint.
+
+        Returns
+        -------
+        frozenset of str
+            The plan labels, empty on every route that keeps real atoms (where
+            the impact row is an honest row with its own law).
+        """
+        return frozenset(label for label, row in self._rows.items()
+                         if isinstance(row, _DeltaRow))
+
+    def _delta_row_entries(self, index):
+        """The entries of a ledger-ordered `index` that sit on a delta row.
+
+        Parameters
+        ----------
+        index : pandas.Index
+            A ledger sheet's row index, in ledger order, one entry per row of
+            :attr:`_rows`.
+
+        Returns
+        -------
+        tuple
+            The index entries, for ``.attrs['delta_rows']``.
+
+        Notes
+        -----
+        ``.attrs['delta_rows']`` is the channel a presentation layer reads
+        ([Delta-Row-Marked]): a consumer should not have to know the row
+        classes, and before this the only on-sheet signal was the impossible
+        value itself, a negative standard deviation. Conditional (``κ``) cells
+        are deliberately **not** covered by the mark. Both rows there are
+        conditioned on the same event, so by linearity their difference is the
+        conditional mean of the difference, exact and footing: blanking it would
+        throw away a real number. See :func:`aggregate.exhibits._pnl` for the
+        treatment this drives.
+        """
+        deltas = self._delta_row_labels()
+        if not deltas:
+            return ()
+        return tuple(entry for entry, label in zip(index, self._rows)
+                     if label in deltas)
 
     # ------------------------------------------------------------------
     # raw materials for ratio exhibits ([PnL-Ratio-Frame])

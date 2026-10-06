@@ -1024,6 +1024,46 @@ def test_economic_insurer_is_abbreviated(tower, peel, peel_marginal):
     assert tower_df['κ01'].iloc[bottom] < 0 < tower_df['EX'].iloc[bottom]
 
 
+# --- the delta impact row ([Delta-Row-Marked]) ------------------------------
+
+def test_insurer_ledger_blanks_the_delta_spread_cells(peel):
+    """A stitched tower's impact row prints no spread, and says why.
+
+    The row is the grand result less the first step's, and those two ride
+    different marginals, so its ``SD`` / ``CV`` / ``Skew`` are differences of
+    statistics rather than statistics. Before the mark reached the sheet the
+    reader met the consequence head on, a negative standard deviation.
+    """
+    row = ('All', 'Margin', 'Impact')
+    assert peel.economic_df.loc[row, 'SD'] < 0, 'the symptom this treats'
+    _, df, kw = exhibit_frames(peel, 'economic', 'insurer')[0]
+    assert df.loc[row, ['SD', 'CV', 'Skew']].isna().all()
+    # the mean is exact by linearity, and so is the conditional cell: both
+    # rows behind it are conditioned on the same event, so their difference
+    # is the conditional mean of the difference
+    assert pd.notna(df.loc[row, 'EX']) and pd.notna(df.loc[row, 'κ01'])
+    assert 'difference of standard deviations' in kw['caption']
+
+
+def test_insurer_ledger_blanks_the_marginal_rung_too(peel_marginal):
+    """On a marginal ladder the one ladder rung goes with the moments.
+
+    A ``P`` cell on a delta row is a difference of quantiles, which is not a
+    quantile of anything, so unlike a ``κ`` cell it cannot stay.
+    """
+    row = ('All', 'Margin', 'Impact')
+    _, df, _ = exhibit_frames(peel_marginal, 'economic', 'insurer')[0]
+    assert df.loc[row, ['SD', 'CV', 'Skew', 'P01']].isna().all()
+    assert pd.notna(df.loc[row, 'EX'])
+
+
+def test_insurer_ledger_keeps_a_real_impact_row(tower):
+    """With shared atoms the impact row has its own law: nothing is blanked."""
+    _, df, kw = exhibit_frames(tower, 'economic', 'insurer')[0]
+    assert df.loc[('All', 'Margin', 'Impact')].notna().all()
+    assert 'difference of standard deviations' not in kw['caption']
+
+
 def test_economic_raw_keeps_the_whole_sheet(tower):
     """RAW is the escape hatch the abbreviation leans on: nothing is lost."""
     from aggregate._pnl import PERCENTILE_LADDER

@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a396
+
+**[Recipe-Detached] building a stored `pnl` / `xpnl` a second time in one session no longer raises `KeyError: 'consideration'`.** `Recipe.detached()` is the new form a recipe takes on its way out of the recipe base, and the four hand-out sites in `Underwriter` use it: it deep-copies the `spec`, which `dataclasses.replace` alone did not, so the recipe base and the caller no longer share one dict. Building a P&L destructures its spec, popping every P&L clause off so the remainder is a valid `Aggregate(**spec)` call, and while the dict was shared the first build stripped the stored library entry and every later build of that name failed. `consideration` is the only mandatory P&L key and so the only one popped without a default, which is why it was the one that announced itself; its optional siblings (expenses, ledger labels, reinstatements, retro, the variable rating features) were coming back silently absent. A long-lived kernel is where this bit, a Quarto render in particular, since Quarto holds one kernel across renders.
+
+**`INHERIT_PREMIUM` and `DERIVE_PREMIUM` now copy to themselves**, via a shared `parser._Sentinel` base defining `__copy__` and `__deepcopy__`. They are compared by identity in the consideration resolver, so a cloning `deepcopy` made `inherit premium` and `derive premium` fail with `TypeError: float() argument must be ... not '_DerivePremium'`. Latent before this version and reachable through `Underwriter._safe_lookup`, which already deep-copied specs on the reference path.
+
+New tests in `tests/test_recipe.py`: the detachment contract on the spec (the existing test covered only `.object`, the shallow half), sentinel copy identity, and a double build of one entry per kind, both premium forms included.
+
 ## 1.0.0a395
 
 **[Priority-Junior-Leg] `Portfolio.priority_kappa` and `Portfolio.priority_conditional`: the conditional ladder of the junior shortfall, and its exact law.** `priority_kappa(unit, assets)` returns `(kappa_junior, kappa_senior, p_total)` on `density_df['loss']`: how the portfolio's whole shortfall `(X - a)^+` splits between the subordinated unit, `min((X - a)^+, X_i)`, and the senior pool, `((X - a)^+ - X_i)^+`, conditional on the total. The two sum to `(x - a)^+` pointwise and are `NaN` where `p_total` is below machine epsilon. `priority_conditional(unit, totals, assets)` returns the whole conditional **law** of the junior shortfall, one `GridDistribution` per requested total, so its quantiles, TVaR and distortion price come free. Both take `assets` or `p=`, exactly one, and carry the same grid guards as `priority_df`. Kernels: `aggregate._portfolio_density.priority_conditional_mean` and `priority_conditional_law`.

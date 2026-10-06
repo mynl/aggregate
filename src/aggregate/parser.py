@@ -92,7 +92,30 @@ _FULL_LINE_COMMENT_RE = re.compile(r"^[ \t]*(?://|#)")
 #: A trailing comment, to end of line. Preprocess step 2, same pattern.
 _INLINE_COMMENT_RE = re.compile(r"(//|#)[^\n]*")
 
-class _InheritPremium:
+class _Sentinel:
+    """Base for the parse-time premium sentinels: a singleton that survives copying.
+
+    The subclasses below are compared by **identity** (``consideration is
+    DERIVE_PREMIUM``), and they are recorded on a parsed spec, which gets
+    copied: ``Recipe.detached`` deep-copies a spec on its way out of the recipe
+    base, and ``Underwriter._safe_lookup`` deep-copies one for the parser
+    callback. A default ``deepcopy`` would **clone** the sentinel, the identity
+    test would then fail, and the resolver would fall through to
+    ``float(consideration)`` and raise a ``TypeError`` naming the sentinel's
+    class. Copying therefore returns the singleton itself, the way ``None`` and
+    ``Ellipsis`` do.
+    """
+
+    __slots__ = ()
+
+    def __copy__(self):
+        return self
+
+    def __deepcopy__(self, memo):
+        return self
+
+
+class _InheritPremium(_Sentinel):
     """Sentinel for ``inherit premium``: copy the engine's technical premium.
 
     A ``pnl``/``xpnl`` premium head of ``inherit premium`` records this sentinel
@@ -111,7 +134,7 @@ class _InheritPremium:
 INHERIT_PREMIUM = _InheritPremium()
 
 
-class _DerivePremium:
+class _DerivePremium(_Sentinel):
     """Sentinel for ``derive premium``: the engine premium grossed up for expenses.
 
     A ``pnl``/``xpnl`` premium head of ``derive premium`` records this sentinel

@@ -2269,13 +2269,17 @@ class Underwriter(HelpMixin):
         """
         if not self._loaded:
             self.load()
-        # A copy is returned throughout: the caller must not be able to mutate
-        # the stored entry (and a fresh copy re-derives its doc / decl caches).
+        # A DETACHED copy is returned throughout: the caller must not be able
+        # to mutate the stored entry (and a fresh copy re-derives its doc /
+        # decl caches). ``Recipe.detached`` deep-copies the spec, which
+        # ``dataclasses.replace`` alone does not -- building a pnl / xpnl
+        # destructures its spec by popping, so a shared dict let the first
+        # build strip the stored entry and the second raise.
         if kind:
             # The store is keyed (kind, name), so a supplied kind is a direct
             # hit. This is the parser's path via _safe_lookup, so keep it O(1).
             try:
-                return replace(self._recipes[(kind, name)])
+                return self._recipes[(kind, name)].detached()
             except KeyError:
                 raise RecipeNotFound(
                     f'no recipe named {name!r} of kind {kind!r}',
@@ -2288,7 +2292,7 @@ class Underwriter(HelpMixin):
             raise KeyError(
                 f'{name!r} is ambiguous across kinds ({kinds}); pass kind= to '
                 f'choose. Shipped library names are unique across kinds.')
-        return replace(self._recipes[(hits[0], name)])
+        return self._recipes[(hits[0], name)].detached()
 
     @property
     def version(self):
@@ -2472,9 +2476,11 @@ class Underwriter(HelpMixin):
                             kind, name)
                 self.add_recipe(kind, name, spec, program_line, source=source,
                                 as_read=raw[i] if raw else '')
-                # Hand back a fresh copy: _build_work / build_many set .object
-                # on these, which must not leak into the stored recipe.
-                rv.append(replace(self._recipes[(kind, name)]))
+                # Hand back a detached copy: _build_work / build_many set
+                # .object on these, which must not leak into the stored
+                # recipe, and _build_work pops the pnl / xpnl clauses off the
+                # spec, which must not strip the stored one.
+                rv.append(self._recipes[(kind, name)].detached())
         return rv
 
     def _safe_lookup(self, buildinid):

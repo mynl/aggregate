@@ -29,7 +29,8 @@ downstream consumer reads.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from copy import deepcopy
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 __all__ = ['Recipe']
@@ -107,6 +108,38 @@ class Recipe:
     # Derived cache. init=False keeps it off __init__ and out of
     # dataclasses.replace(), which is what makes replace() re-derive.
     _decl: Any = field(default=None, init=False, repr=False, compare=False)
+
+    def detached(self):
+        """A copy sharing no mutable state with this recipe.
+
+        The form to hand out of the recipe base. :func:`dataclasses.replace`
+        alone is a **shallow** copy, so the new recipe carries the *same*
+        :attr:`spec` dict object, and a builder that destructures its spec
+        then reaches back into the stored entry.
+
+        Returns
+        -------
+        Recipe
+            A new recipe with a deep copy of :attr:`spec`. Every other field is
+            an immutable scalar or the built ``object``, which is shared
+            deliberately: the point is to detach the declaration, not to clone
+            an Aggregate.
+
+        Notes
+        -----
+        Building a ``pnl`` / ``xpnl`` destructures its spec: the parsed
+        declaration is one flat dict carrying both the P&L's own clauses and
+        the loss structure of the ``Aggregate`` it wraps, and
+        ``Underwriter._build_work`` pops the former off so the remainder is a
+        valid ``Aggregate(**spec)`` call. Popping is the right mechanic on a
+        private dict and the wrong one on a shared dict, so the invariant lives
+        here instead: **nothing handed out of the recipe base shares mutable
+        state with it.** Before ``1.0.0a396`` the stored dict was the one that
+        got stripped, and a second build of the same name raised
+        ``KeyError: 'consideration'`` (the one mandatory P&L key, hence the only
+        pop without a default, hence the only one that said so).
+        """
+        return replace(self, spec=deepcopy(self.spec))
 
     # ------------------------------------------------------------------
     # The DecL trailer, read straight off the spec

@@ -14,6 +14,7 @@ now ordinary asserts in ``tests/test_library_entries.py``.
 
 See ``aggregate.recipe`` and ``dev/plan-meta-data.md`` [Recipe-Library].
 """
+import copy
 import dataclasses
 
 import pytest
@@ -295,3 +296,99 @@ def test_the_frame_carries_both_and_sorts_alphabetically_still(lib):
     by_seq = df.sort_values('seq')
     assert by_seq.index[0] != df.index[0] or len(df) == 1
     assert (by_seq['as_read'].str.len() > 0).all()
+
+
+# ----------------------------------------------------------------------
+# Detachment: nothing handed out of the recipe base shares mutable state
+# ----------------------------------------------------------------------
+
+def test_lookup_hands_back_a_detached_spec(uw):
+    """The handed-back ``spec`` is a copy, not the stored dict.
+
+    The sibling test above pins ``.object``, the shallow half of the same
+    contract. This is the deep half, and it is the one that bit: building a
+    ``pnl`` / ``xpnl`` **destructures** its spec, popping every P&L clause off
+    so the remainder is a valid ``Aggregate(**spec)`` call, and while a
+    ``dataclasses.replace`` copy shared the stored dict that popping stripped
+    the library entry itself.
+    """
+    r = uw.recipe('AF.Tags.Spaces')
+    stored_keys = set(uw.recipe('AF.Tags.Spaces').spec)
+    assert r.spec is not uw.recipe('AF.Tags.Spaces').spec
+    r.spec.pop('sev_name', None)
+    r.spec['injected'] = 'not really a clause'
+    assert set(uw.recipe('AF.Tags.Spaces').spec) == stored_keys
+
+
+def test_detached_deep_copies_nested_spec_structure(lib):
+    """A nested unit spec is copied too, not just the top-level dict.
+
+    A ``port`` carries one spec per unit, so a shallow copy of the outer dict
+    would still expose the inner ones.
+    """
+    r = lib.recipe('Capstone.PnL')
+    other = lib.recipe('Capstone.PnL')
+    assert r.spec is not other.spec
+    for key, value in r.spec.items():
+        if isinstance(value, (dict, list)):
+            assert value is not other.spec[key], key
+
+
+def test_premium_sentinels_survive_a_deep_copy():
+    """``INHERIT_PREMIUM`` / ``DERIVE_PREMIUM`` copy to themselves.
+
+    They are compared by identity in the consideration resolver and they ride
+    on a parsed spec, which is now deep-copied on its way out of the recipe
+    base. A cloning ``deepcopy`` broke the identity test and the resolver fell
+    through to ``float(sentinel)``.
+    """
+    from aggregate.parser import DERIVE_PREMIUM, INHERIT_PREMIUM
+    for sentinel in (INHERIT_PREMIUM, DERIVE_PREMIUM):
+        assert copy.copy(sentinel) is sentinel
+        assert copy.deepcopy(sentinel) is sentinel
+        assert copy.deepcopy({'consideration': sentinel})['consideration'] is sentinel
+
+
+# One entry per kind, plus both premium sentinels, which are the forms whose
+# consideration is resolved after the engine is built.
+TWICE_BUILT = [
+    ('sev', 'Capstone.Sev'),
+    ('agg', 'Capstone.XOL'),
+    ('port', 'TwoLineBook'),
+    ('pnl', 'PnLClaims'),           # plain numeric consideration
+    ('pnl', 'PnLSimple'),           # inherit premium
+    ('xpnl', 'PnLInherit'),         # inherit premium, tower
+    ('xpnl', 'PnLDerive'),          # derive premium, tower
+    ('xpnl', 'Capstone.PnL'),       # the entry the bug was found on
+    ('distortion', 'PHDistortion'),
+]
+
+
+@pytest.mark.parametrize('kind,name', TWICE_BUILT,
+                         ids=[f'{k}-{n}' for k, n in TWICE_BUILT])
+def test_building_the_same_entry_twice_in_one_session(lib, kind, name):
+    """A second build of a stored entry must behave like the first.
+
+    The regression guard for the detachment contract, end to end. Until
+    ``1.0.0a396`` a second build of any ``pnl`` / ``xpnl`` raised
+    ``KeyError: 'consideration'``: the first build popped the P&L clauses off
+    the shared spec, and ``consideration`` is the only mandatory one, so it is
+    the only one popped without a default and the only one that announced
+    itself. Every optional sibling (expenses, ledger labels, reinstatements,
+    retro, the variable features) came back silently absent, which is why the
+    crash was worth keeping rather than defaulting away.
+
+    A live Jupyter kernel is where this bites: Quarto holds one across renders,
+    so the first render passed and the second failed.
+    """
+    assert lib.recipe(name).kind == kind
+    # The key SET, not the whole dict: a spec can carry numpy arrays (picks),
+    # which make `==` ambiguous, and it is the key set that popping destroys.
+    before = set(lib.recipe(name).spec)
+    first = lib.build(name)
+    second = lib.build(name)
+    assert type(first) is type(second)
+    # and the stored entry survived both builds unstripped
+    assert set(lib.recipe(name).spec) == before
+    if kind in ('pnl', 'xpnl'):
+        assert 'consideration' in before

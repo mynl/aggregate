@@ -346,21 +346,40 @@ def _economic_ratios_frames(obj):
     """The per block amounts and ratios, plus the itemized declared legs."""
     return [
         ('economic_ratios_df', obj.economic_ratios_df,
-         {'caption': 'Raw materials: the amounts each block contributes and '
-                     'the loss, expense and combined ratios they imply, in '
-                     'one frame to slice. Currency and ratio columns sit '
-                     'side by side here; the insurer view separates them.'}),
+         {'caption': 'Raw materials: the amounts each block contributes, the '
+                     'standard deviation of its result, and the loss, expense '
+                     'and combined ratios the amounts imply, in one frame to '
+                     'slice. Currency, a spread and ratio columns sit side by '
+                     'side here; the insurer view keeps the walk a reader '
+                     'reads across and moves the expected-ratio columns and '
+                     'the share columns off it.'}),
         ('legs_df', obj.legs_df,
          {'caption': 'The declared legs, one row each, as written into the '
                      'ledger.'}),
     ]
 
 
-#: The ratio frame splits into pure blocks under INSURER, per the reporting
-#: guideline that a column carries one unit: currency amounts, then the
-#: dimensionless ratios, then the itemized legs.
-_AMOUNT_COLS = ('P', 'L', 'E', 'M')
-_RATIO_COLS = ('LR', 'ER', 'CR', 'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
+#: The walk the INSURER view of ``economic_ratios`` serves, in reading order:
+#: what each block wrote, what it cost, what is left, how volatile that is, and
+#: the three plain ratios of those amounts ([PnL-Summary-One-Table], a389).
+#:
+#: **This reverses the reporting rule that a column carries one unit**, which is
+#: what split the view into an amounts block and a ratios block through a388.
+#: Reversed deliberately, and here in the treatment rather than worked around by
+#: whoever presents it: the thing an underwriter does with this table is read
+#: **across a row**, and the money and the ratio of that money belong beside
+#: each other when that is the motion. Two tables made the reader hold four
+#: numbers in their head to cross a single block. ``greater_tables`` resolves
+#: formats per column name, so nothing about the mixed block is hard to render.
+#:
+#: The columns left off are not deleted, they are on RAW. ``E_LR`` / ``E_ER`` /
+#: ``E_CR`` are means of ratios and answer a question nobody asks of the sheet
+#: that gets read every time, but they are the one thing that tells you a retro,
+#: a swing or a profit-commission cession is behaving as advertised, so the
+#: perspective toggle is exactly the right mechanism for them (author's ruling,
+#: 2026-10-06). ``P_share`` / ``M_share`` go with them; the walk reports both
+#: shares in its own first two columns.
+_SUMMARY_COLS = ('P', 'L', 'E', 'M', 'SD', 'LR', 'ER', 'CR')
 
 
 def _ratio_row_flags(obj, df):
@@ -382,49 +401,46 @@ def _ratio_row_flags(obj, df):
 
 @economic_ratios.insurer.register(PnL)
 def _economic_ratios_insurer(obj, blocks):
-    """Split amounts from ratios, so no column mixes two units.
+    """One block: the walk, amounts and the ratios of those amounts together.
 
-    The raw frame is deliberately mixed: it is raw materials, the frame to
-    slice and pivot. Presented, it wants the reporting rule applied, one unit
-    per column, which means two blocks rather than one wide one. The itemized
-    legs block stays on RAW (author's ruling, 2026-10-01): the insurer view is a
-    client-facing exhibit, and a third table by leg confused more than it
-    itemized.
+    The raw frame is deliberately mixed, being raw materials, the frame to slice
+    and pivot. Through a388 this view applied the reporting rule that a column
+    carries one unit and split it in two. [PnL-Summary-One-Table] reverses that
+    here, for the reason written out on :data:`_SUMMARY_COLS`: the table is read
+    across a row, so an amount and the ratio of that amount belong beside each
+    other.
+
+    The itemized legs block stays on RAW (author's ruling, 2026-10-01), as do the
+    ``E_`` columns and the two share columns (2026-10-06).
     """
     (ratios_name, ratios_df, ratios_kw), _legs = blocks
-    amounts = [c for c in _AMOUNT_COLS if c in ratios_df.columns]
-    ratios = [c for c in _RATIO_COLS if c in ratios_df.columns]
-    flags = _ratio_row_flags(obj, ratios_df)
-    out = []
-    if amounts:
-        out.append((
-            'amounts', ratios_df[amounts],
-            dict(ratios_kw, row_flags=flags, caption=(
-                'Premium, loss and expense per block, signed in the gross '
-                'direction so they add across blocks and the margin identity '
-                'M = P - L - E holds exactly. Loss absorbs cession recoveries '
-                'and any unclassified obligation leg; expense absorbs ceding '
-                'commission, a contra expense. A net of tier row is the '
-                'running position through that tier and sits outside the '
-                'sum, which is why it reads muted. The raw view itemizes '
-                'the declared legs.'))))
-    if ratios:
-        # no ratio_cols here: every one of these labels points at the `ratio`
-        # style in the format sheets, which stamps greater_tables' own ratio
-        # column tag as well as the reading ([Format-Sheets] decision 6)
-        out.append((
-            'ratios', ratios_df[ratios],
-            dict(ratios_kw, row_flags=flags,
-                 caption=(
-                'LR, ER and CR are ratios of means, the convention of a rate '
-                'filing, re-derived from each block\'s own amounts and never '
-                'averaged from the blocks below. The E_ columns are the same '
-                'three as means of ratios. The pairs agree identically when '
-                'premium is deterministic and part company exactly when it is '
-                'random and correlated with loss, which is what a retro, a '
-                'swing, a slide or a profit commission is. Share columns are '
-                'against the first (gross) block.'))))
-    return out
+    cols = [c for c in _SUMMARY_COLS if c in ratios_df.columns]
+    if not cols:
+        return []
+    # no ratio_cols here: LR, ER and CR each point at the `ratio` style in the
+    # format sheets, which stamps greater_tables' own ratio column tag as well
+    # as the reading ([Format-Sheets] decision 6), and the amounts beside them
+    # take `money` by the same route, so one mixed block formats itself
+    return [(
+        'walk', ratios_df[cols],
+        dict(ratios_kw, row_flags=_ratio_row_flags(obj, ratios_df), caption=(
+            'One row per block, read across: premium written, loss, expense, '
+            'the margin left, the standard deviation of that margin, and the '
+            'three ratios the amounts imply. P, L, E and M are signed in the '
+            'gross direction, so they add across blocks and the identity '
+            'M = P - L - E holds exactly; loss absorbs cession recoveries and '
+            'any unclassified obligation leg, and expense absorbs ceding '
+            'commission, a contra expense. SD is a marginal row property and '
+            'does not add. LR, ER and CR are ratios of means, the convention '
+            'of a rate filing, re-derived from each block\'s own amounts and '
+            'never averaged from the blocks below, so CR satisfies '
+            '1 - CR = M / P on every row. A net of tier row is the running '
+            'position through that tier and sits outside the sum, which is why '
+            'it reads muted. The raw view itemizes the declared legs and adds '
+            'the expected-ratio columns, which are the same three read as '
+            'means of ratios and part company with these exactly when premium '
+            'is random and correlated with loss, the signature of a retro, a '
+            'swing, a slide or a profit commission.')))]
 
 
 # --- the waterfall ([Exhibits-Waterfall]) -----------------------------------

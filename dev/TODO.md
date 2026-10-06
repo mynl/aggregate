@@ -557,6 +557,14 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[PnL-Summary-One-Table]** DONE (`1.0.0a389`), under the API repo's
+  `dev/plan-a194-pnl-exhibits.md`: `economic_ratios_df` gains `SD`, the
+  standard deviation of each block's result off the same ledger row the walk
+  reads for `MSD`, and the INSURER view becomes one block, `P L E M SD LR ER
+  CR`, read across a row. Reverses the reporting rule that a column carries one
+  unit, deliberately and in the treatment. The `E_` and share columns stay on
+  RAW with the itemized legs.
+
 - **[Overview-Engine]** DONE (`1.0.0a388`), under the API repo's
   `dev/plan-a194-pnl-exhibits.md`, the canonical plan for this bump and the
   three after it: the four generic exhibits on a `PnL` all describe the wrapped

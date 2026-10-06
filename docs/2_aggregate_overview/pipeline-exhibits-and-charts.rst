@@ -129,7 +129,7 @@ What is published
      - PnL
      - RAW 2: ``economic_ratios_df``, ``legs_df``
      - always
-     - **restructures into 2 blocks**: ``amounts`` (P, L, E, M) and ``ratios`` (LR, ER, CR, ``E_*``, shares), so no column mixes two units; the itemized ``legs`` block stays on RAW
+     - **one block**, ``walk``: P, L, E, M, SD, LR, ER, CR, read across a row. Deliberately mixes units, reversing the reporting rule, because the money and the ratio of that money belong beside each other when that is the reading. The ``E_*`` columns, the two shares and the itemized ``legs`` block stay on RAW
    * - ``economic_waterfall``
      - Economic waterfall
      - PnL

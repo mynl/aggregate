@@ -373,10 +373,9 @@ def test_a_perspective_may_restructure_the_block_list(tower):
                exhibit_frames(tower, 'economic_ratios', Perspective.INSURER)]
     assert raw == ['economic_ratios_df', 'legs_df']
     # the itemized legs stay on RAW since a387: the insurer view is the
-    # client-facing read, and a third table by leg confused more than it said
-    assert insurer == ['amounts', 'ratios']
-    # the point is non-parity of the lists, not of their lengths: since a387
-    # both happen to be two blocks, and they are still different blocks
+    # client-facing read, and a third table by leg confused more than it said.
+    # One block since a389 ([PnL-Summary-One-Table]), the walk read across.
+    assert insurer == ['walk']
     assert insurer != raw
 
 
@@ -1056,29 +1055,72 @@ def test_measure_formats_where_measures_are_columns(dice, tower):
             assert spec[measure] == expected[measure]
 
 
-def test_economic_ratios_insurer_splits_units(tower):
-    """One unit per column: amounts then ratios, per the reporting rule.
+def test_economic_ratios_insurer_is_one_walk(tower):
+    """[PnL-Summary-One-Table]: amounts and their ratios in one block.
 
-    The itemized legs block stays on RAW since a387; a net-of-tier row, when
-    present, is cumulative, so the M identity below is asserted per row,
-    which it satisfies either way.
+    This **reverses** the reporting rule that a column carries one unit, which
+    through a388 split this view into ``amounts`` and ``ratios``. The table is
+    read across a row, so the money and the ratio of that money belong beside
+    each other; two tables made the reader hold four numbers to cross one
+    block. A net-of-tier row, when present, is cumulative, so the M identity
+    below is asserted per row, which it satisfies either way.
     """
     blocks = exhibit_frames(tower, 'economic_ratios', 'insurer')
-    assert [b for b, _, _ in blocks] == ['amounts', 'ratios']
-    (_, amounts, amounts_kw), (_, ratios, ratios_kw) = blocks
-    assert set(amounts.columns) == {'P', 'L', 'E', 'M'}
-    assert set(ratios.columns).isdisjoint(amounts.columns)
-    # every ratio column points at the `ratio` style in the format sheets,
-    # which stamps greater_tables' own ratio tag, so the block declares no
-    # ratio_cols of its own ([Format-Sheets], a287)
-    assert 'ratio_cols' not in ratios_kw
-    doc = build_exhibit(tower, 'economic_ratios', 'insurer').ir_blocks[1]
-    assert {c.tag for c in doc.columns if c.role == 'data'} == {'ratio'}
+    assert [b for b, _, _ in blocks] == ['walk']
+    (_, walk, walk_kw), = blocks
+    assert list(walk.columns) == ['P', 'L', 'E', 'M', 'SD', 'LR', 'ER', 'CR']
+    # the E_ columns and the two shares stay on RAW; nothing is deleted
+    raw = exhibit_frames(tower, 'economic_ratios')[0][1]
+    assert {'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share'} <= set(raw.columns)
+    # a mixed block still formats itself: each label points at `money`,
+    # `ratio` or its own reading in the format sheets, so the block declares
+    # no ratio_cols of its own ([Format-Sheets], a287)
+    assert 'ratio_cols' not in walk_kw
+    doc = build_exhibit(tower, 'economic_ratios', 'insurer').ir_blocks[0]
+    # ``name`` is the column key tuple, one element on a flat header
+    tags = {c.name[-1]: c.tag for c in doc.columns if c.role == 'data'}
+    assert {tags[c] for c in ('LR', 'ER', 'CR')} == {'ratio'}
+    assert tags['P'] != 'ratio' and tags['SD'] != 'ratio'
     # M == P - L - E, the identity the caption claims
     import numpy as np
     np.testing.assert_allclose(
-        amounts['M'],
-        amounts['P'] - amounts['L'] - amounts['E'], atol=1e-9)
+        walk['M'], walk['P'] - walk['L'] - walk['E'], atol=1e-9)
+    # and 1 - CR == M / P, which the caption also claims
+    np.testing.assert_allclose(1 - walk['CR'], walk['M'] / walk['P'],
+                               atol=1e-12)
+
+
+def test_ratio_frame_sd_is_the_walk_denominator(tower):
+    """The ``SD`` column and the walk's ``MSD`` cannot disagree.
+
+    One source, which is the whole point of putting ``SD`` on the frame rather
+    than joining it in at presentation time: both read the block's own result
+    row in ``economic_df``.
+    """
+    ratios, walk, ev = tower.economic_ratios_df, tower.walk_df, \
+        tower.evaluation_df
+    implied = walk['Margin'] / ev['MSD']
+    assert ratios.loc[walk.index, 'SD'].to_numpy() == \
+        pytest.approx(implied.to_numpy(), rel=1e-12)
+
+
+def test_ratio_frame_sd_serves_a_plain_pnl(objects):
+    """A non-tower ledger books one result, and its SD is that row's.
+
+    The walk's own ``_step_result_rows`` keys on the ``Step`` index level,
+    which only a tower has, so taken literally it would leave every plain P&L
+    with a blank ``SD``: the leaf's commonest appearance. One block, one
+    result, paired directly.
+    """
+    pn = objects['PnL']
+    assert not pn._tower
+    ratios = pn.economic_ratios_df
+    assert len(ratios) == 1
+    sd = ratios['SD'].iloc[0]
+    assert sd > 0
+    # it is the ledger's own result row, read off the frame the walk reads
+    margin_rows = pn.economic_df.xs('Margin', level='Side')
+    assert sd == pytest.approx(float(margin_rows['SD'].iloc[-1]))
 
 
 # --- economic_waterfall ([Exhibits-Waterfall]) ------------------------------

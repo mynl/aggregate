@@ -27600,6 +27600,22 @@
       {
        "raw": 299.99379188155297,
        "text": "299.99"
+      },
+      {
+       "raw": 591.6134045211008,
+       "text": "591.61"
+      },
+      {
+       "raw": 0.700006208118447,
+       "text": "70.0%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.700006208118447,
+       "text": "70.0%"
       }
      ]
     },
@@ -27628,6 +27644,22 @@
       {
        "raw": 83.89265190491155,
        "text": "83.89"
+      },
+      {
+       "raw": 168.8038642728119,
+       "text": "168.80"
+      },
+      {
+       "raw": 3.097316297622789,
+       "text": "309.7%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 3.097316297622789,
+       "text": "309.7%"
       }
      ]
     },
@@ -27656,6 +27688,22 @@
       {
        "raw": 63.76031042534639,
        "text": "63.76"
+      },
+      {
+       "raw": 103.68800879739482,
+       "text": "103.69"
+      },
+      {
+       "raw": 2.06267184042244,
+       "text": "206.3%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 2.06267184042244,
+       "text": "206.3%"
       }
      ]
     },
@@ -27684,6 +27732,22 @@
       {
        "raw": 147.65296233025794,
        "text": "147.65"
+      },
+      {
+       "raw": 253.03058743176078,
+       "text": "253.03"
+      },
+      {
+       "raw": 2.4765296233025795,
+       "text": "247.7%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 2.4765296233025795,
+       "text": "247.7%"
       }
      ]
     },
@@ -27706,6 +27770,22 @@
       {
        "raw": 447.6467542118109,
        "text": "447.65"
+      },
+      {
+       "raw": 411.1840946029058,
+       "text": "411.18"
+      },
+      {
+       "raw": 0.5026147175424324,
+       "text": "50.3%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.5026147175424324,
+       "text": "50.3%"
       }
      ],
      "flags": [
@@ -27713,7 +27793,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -27781,6 +27861,62 @@
       "M"
      ],
      "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "LR"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "ER"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "CR"
+     ],
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -27799,347 +27935,9 @@
      },
      {
       "text": "M"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
-       "raw": 0.700006208118447,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.700006208118447,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.700006208118447,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.700006208118447,
-       "text": "70.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 300 xs 200",
-      {
-       "raw": 3.097316297622789,
-       "text": "309.7%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 3.097316297622789,
-       "text": "309.7%"
-      },
-      {
-       "raw": 3.097316297622789,
-       "text": "309.7%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 3.097316297622789,
-       "text": "309.7%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.04,
-       "text": "-4.0%"
-      },
-      {
-       "raw": 0.27964795997523517,
-       "text": "28.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 100 xs 100",
-      {
-       "raw": 2.06267184042244,
-       "text": "206.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.06267184042244,
-       "text": "206.3%"
-      },
-      {
-       "raw": 2.06267184042244,
-       "text": "206.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.06267184042244,
-       "text": "206.3%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.06,
-       "text": "-6.0%"
-      },
-      {
-       "raw": 0.21253876630394064,
-       "text": "21.3%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All occurrence",
-      {
-       "raw": 2.4765296233025795,
-       "text": "247.7%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.4765296233025795,
-       "text": "247.7%"
-      },
-      {
-       "raw": 2.4765296233025795,
-       "text": "247.7%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.4765296233025795,
-       "text": "247.7%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.1,
-       "text": "-10.0%"
-      },
-      {
-       "raw": 0.49218672627917576,
-       "text": "49.2%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 0.5026147175424324,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.5026147175424324,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.5026147175424324,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.5026147175424324,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.9,
-       "text": "90.0%"
-      },
-      {
-       "raw": 1.4921867262791757,
-       "text": "149.2%"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
      },
-     "key": "c1",
-     "name": [
-      "LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c2",
-     "name": [
-      "ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c3",
-     "name": [
-      "CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c4",
-     "name": [
-      "E_LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c5",
-     "name": [
-      "E_ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c6",
-     "name": [
-      "E_CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "P_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "M_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    }
-   ],
-   "head": [
-    [
      {
-      "text": "Step"
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -28149,21 +27947,6 @@
      },
      {
       "text": "CR"
-     },
-     {
-      "text": "E_LR"
-     },
-     {
-      "text": "E_ER"
-     },
-     {
-      "text": "E_CR"
-     },
-     {
-      "text": "P_share"
-     },
-     {
-      "text": "M_share"
      }
     ]
    ],
@@ -28193,6 +27976,22 @@
       {
        "raw": 299.993680729881,
        "text": "299.99"
+      },
+      {
+       "raw": 1181.0344463520967,
+       "text": "1,181.03"
+      },
+      {
+       "raw": 0.700006319270119,
+       "text": "70.0%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.700006319270119,
+       "text": "70.0%"
       }
      ]
     },
@@ -28221,6 +28020,22 @@
       {
        "raw": 83.89086651234096,
        "text": "83.89"
+      },
+      {
+       "raw": 247.43364715765637,
+       "text": "247.43"
+      },
+      {
+       "raw": 3.097271662808524,
+       "text": "309.7%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 3.097271662808524,
+       "text": "309.7%"
       }
      ]
     },
@@ -28249,6 +28064,22 @@
       {
        "raw": 63.755617932163844,
        "text": "63.76"
+      },
+      {
+       "raw": 208.3482212559716,
+       "text": "208.35"
+      },
+      {
+       "raw": 2.0625936322027307,
+       "text": "206.3%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 2.0625936322027307,
+       "text": "206.3%"
       }
      ]
     },
@@ -28277,6 +28108,22 @@
       {
        "raw": 147.6464844445048,
        "text": "147.65"
+      },
+      {
+       "raw": 441.35605302487187,
+       "text": "441.36"
+      },
+      {
+       "raw": 2.476464844445048,
+       "text": "247.6%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 2.476464844445048,
+       "text": "247.6%"
       }
      ]
     },
@@ -28299,6 +28146,22 @@
       {
        "raw": 447.6401651743858,
        "text": "447.64"
+      },
+      {
+       "raw": 778.0769024752584,
+       "text": "778.08"
+      },
+      {
+       "raw": 0.5026220386951269,
+       "text": "50.3%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.5026220386951269,
+       "text": "50.3%"
       }
      ],
      "flags": [
@@ -28306,7 +28169,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -28374,6 +28237,62 @@
       "M"
      ],
      "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "LR"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "ER"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "CR"
+     ],
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -28392,347 +28311,9 @@
      },
      {
       "text": "M"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
-       "raw": 0.700006319270119,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.700006319270119,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.700006319270119,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.700006319270119,
-       "text": "70.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 300 xs 200",
-      {
-       "raw": 3.097271662808524,
-       "text": "309.7%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 3.097271662808524,
-       "text": "309.7%"
-      },
-      {
-       "raw": 3.097271662808524,
-       "text": "309.7%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 3.097271662808524,
-       "text": "309.7%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.04,
-       "text": "-4.0%"
-      },
-      {
-       "raw": 0.2796421121546144,
-       "text": "28.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 100 xs 100",
-      {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
-      },
-      {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.06,
-       "text": "-6.0%"
-      },
-      {
-       "raw": 0.21252320307896883,
-       "text": "21.3%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All occurrence",
-      {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
-      },
-      {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.1,
-       "text": "-10.0%"
-      },
-      {
-       "raw": 0.4921653152335832,
-       "text": "49.2%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.9,
-       "text": "90.0%"
-      },
-      {
-       "raw": 1.4921653152335832,
-       "text": "149.2%"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
      },
-     "key": "c1",
-     "name": [
-      "LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c2",
-     "name": [
-      "ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c3",
-     "name": [
-      "CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c4",
-     "name": [
-      "E_LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c5",
-     "name": [
-      "E_ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c6",
-     "name": [
-      "E_CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "P_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "M_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    }
-   ],
-   "head": [
-    [
      {
-      "text": "Step"
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -28742,21 +28323,6 @@
      },
      {
       "text": "CR"
-     },
-     {
-      "text": "E_LR"
-     },
-     {
-      "text": "E_ER"
-     },
-     {
-      "text": "E_CR"
-     },
-     {
-      "text": "P_share"
-     },
-     {
-      "text": "M_share"
      }
     ]
    ],
@@ -28786,11 +28352,27 @@
       {
        "raw": 150.00000722020332,
        "text": "150.00"
+      },
+      {
+       "raw": 412.31045794601465,
+       "text": "412.31"
+      },
+      {
+       "raw": 0.8499999927797967,
+       "text": "85.0%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.8499999927797967,
+       "text": "85.0%"
       }
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -28858,6 +28440,62 @@
       "M"
      ],
      "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "LR"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "ER"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "CR"
+     ],
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -28876,183 +28514,9 @@
      },
      {
       "text": "M"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "EX.B",
-      {
-       "raw": 0.8499999927797967,
-       "text": "85.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.8499999927797967,
-       "text": "85.0%"
-      },
-      {
-       "raw": 0.8499999927797967,
-       "text": "85.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.8499999927797967,
-       "text": "85.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      }
-     ]
-    }
-   ],
-   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
      },
-     "key": "c1",
-     "name": [
-      "LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c2",
-     "name": [
-      "ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c3",
-     "name": [
-      "CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c4",
-     "name": [
-      "E_LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c5",
-     "name": [
-      "E_ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c6",
-     "name": [
-      "E_CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "P_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "M_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    }
-   ],
-   "head": [
-    [
      {
-      "text": "Step"
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -29062,21 +28526,6 @@
      },
      {
       "text": "CR"
-     },
-     {
-      "text": "E_LR"
-     },
-     {
-      "text": "E_ER"
-     },
-     {
-      "text": "E_CR"
-     },
-     {
-      "text": "P_share"
-     },
-     {
-      "text": "M_share"
      }
     ]
    ],
@@ -29106,6 +28555,22 @@
       {
        "raw": 299.99385505947566,
        "text": "299.99"
+      },
+      {
+       "raw": 593.2132248768913,
+       "text": "593.21"
+      },
+      {
+       "raw": 0.7000061449405244,
+       "text": "70.0%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.7000061449405244,
+       "text": "70.0%"
       }
      ]
     },
@@ -29137,6 +28602,22 @@
        ],
        "raw": -48.88690349308213,
        "text": "-48.89"
+      },
+      {
+       "raw": 140.82601881509245,
+       "text": "140.83"
+      },
+      {
+       "raw": 0.5111309650691787,
+       "text": "51.1%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.5111309650691787,
+       "text": "51.1%"
       }
      ]
     },
@@ -29159,6 +28640,22 @@
       {
        "raw": 251.10695156639355,
        "text": "251.11"
+      },
+      {
+       "raw": 497.96109583663775,
+       "text": "497.96"
+      },
+      {
+       "raw": 0.7209922760373406,
+       "text": "72.1%"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0%"
+      },
+      {
+       "raw": 0.7209922760373406,
+       "text": "72.1%"
       }
      ],
      "flags": [
@@ -29166,7 +28663,7 @@
      ]
     }
    ],
-   "caption": "Premium, loss and expense per block, signed in the gross direction so they add across blocks and the margin identity M = P - L - E holds exactly. Loss absorbs cession recoveries and any unclassified obligation leg; expense absorbs ceding commission, a contra expense. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -29234,6 +28731,62 @@
       "M"
      ],
      "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "LR"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c7",
+     "name": [
+      "ER"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c8",
+     "name": [
+      "CR"
+     ],
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -29252,268 +28805,9 @@
      },
      {
       "text": "M"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
-       "raw": 0.7000061449405244,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.7000061449405244,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.7000061449405244,
-       "text": "70.0%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.7000061449405244,
-       "text": "70.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      },
-      {
-       "raw": 1.0,
-       "text": "100.0%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 500 xs 500",
-      {
-       "raw": 0.5111309650691787,
-       "text": "51.1%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.5111309650691787,
-       "text": "51.1%"
-      },
-      {
-       "raw": 0.5111309650691787,
-       "text": "51.1%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.5111309650691787,
-       "text": "51.1%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.1,
-       "text": "-10.0%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.16295968290213808,
-       "text": "-16.3%"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 0.7209922760373406,
-       "text": "72.1%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.7209922760373406,
-       "text": "72.1%"
-      },
-      {
-       "raw": 0.7209922760373406,
-       "text": "72.1%"
-      },
-      {
-       "raw": 0.0,
-       "text": "0.0%"
-      },
-      {
-       "raw": 0.7209922760373406,
-       "text": "72.1%"
-      },
-      {
-       "raw": 0.9,
-       "text": "90.0%"
-      },
-      {
-       "raw": 0.837040317097862,
-       "text": "83.7%"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below. The E_ columns are the same three as means of ratios. The pairs agree identically when premium is deterministic and part company exactly when it is random and correlated with loss, which is what a retro, a swing, a slide or a profit commission is. Share columns are against the first (gross) block.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
      },
-     "key": "c1",
-     "name": [
-      "LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c2",
-     "name": [
-      "ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c3",
-     "name": [
-      "CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c4",
-     "name": [
-      "E_LR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c5",
-     "name": [
-      "E_ER"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c6",
-     "name": [
-      "E_CR"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "P_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "M_share"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    }
-   ],
-   "head": [
-    [
      {
-      "text": "Step"
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -29523,21 +28817,6 @@
      },
      {
       "text": "CR"
-     },
-     {
-      "text": "E_LR"
-     },
-     {
-      "text": "E_ER"
-     },
-     {
-      "text": "E_CR"
-     },
-     {
-      "text": "P_share"
-     },
-     {
-      "text": "M_share"
      }
     ]
    ],
@@ -29567,6 +28846,10 @@
       {
        "raw": 299.99379188155297,
        "text": "299.9938"
+      },
+      {
+       "raw": 591.6134045211008,
+       "text": "591.6134"
       },
       {
        "raw": 0.700006208118447,
@@ -29627,6 +28910,10 @@
       {
        "raw": 83.89265190491155,
        "text": "83.89265"
+      },
+      {
+       "raw": 168.8038642728119,
+       "text": "168.8039"
       },
       {
        "raw": 3.097316297622789,
@@ -29692,6 +28979,10 @@
        "text": "63.76031"
       },
       {
+       "raw": 103.68800879739482,
+       "text": "103.688"
+      },
+      {
        "raw": 2.06267184042244,
        "text": "206.3%"
       },
@@ -29755,6 +29046,10 @@
        "text": "147.653"
       },
       {
+       "raw": 253.03058743176078,
+       "text": "253.0306"
+      },
+      {
        "raw": 2.4765296233025795,
        "text": "247.7%"
       },
@@ -29812,6 +29107,10 @@
        "text": "447.6468"
       },
       {
+       "raw": 411.1840946029058,
+       "text": "411.1841"
+      },
+      {
        "raw": 0.5026147175424324,
        "text": "50.3%"
       },
@@ -29846,7 +29145,7 @@
      ]
     }
    ],
-   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
+   "caption": "Raw materials: the amounts each block contributes, the standard deviation of its result, and the loss, expense and combined ratios the amounts imply, in one frame to slice. Currency, a spread and ratio columns sit side by side here; the insurer view keeps the walk a reader reads across and moves the expected-ratio columns and the share columns off it.",
    "columns": [
     {
      "align": "l",
@@ -29919,10 +29218,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "LR"
      ],
@@ -29936,7 +29249,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "ER"
      ],
@@ -29950,7 +29263,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "CR"
      ],
@@ -29964,7 +29277,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c9",
      "name": [
       "E_LR"
      ],
@@ -29978,7 +29291,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c10",
      "name": [
       "E_ER"
      ],
@@ -29992,7 +29305,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c11",
      "name": [
       "E_CR"
      ],
@@ -30006,7 +29319,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c12",
      "name": [
       "P_share"
      ],
@@ -30020,7 +29333,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c13",
      "name": [
       "M_share"
      ],
@@ -30044,6 +29357,9 @@
      },
      {
       "text": "M"
+     },
+     {
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -30328,6 +29644,10 @@
        "text": "299.9937"
       },
       {
+       "raw": 1181.0344463520967,
+       "text": "1,181.034"
+      },
+      {
        "raw": 0.700006319270119,
        "text": "70.0%"
       },
@@ -30386,6 +29706,10 @@
       {
        "raw": 83.89086651234096,
        "text": "83.89087"
+      },
+      {
+       "raw": 247.43364715765637,
+       "text": "247.4336"
       },
       {
        "raw": 3.097271662808524,
@@ -30451,6 +29775,10 @@
        "text": "63.75562"
       },
       {
+       "raw": 208.3482212559716,
+       "text": "208.3482"
+      },
+      {
        "raw": 2.0625936322027307,
        "text": "206.3%"
       },
@@ -30514,6 +29842,10 @@
        "text": "147.6465"
       },
       {
+       "raw": 441.35605302487187,
+       "text": "441.3561"
+      },
+      {
        "raw": 2.476464844445048,
        "text": "247.6%"
       },
@@ -30571,6 +29903,10 @@
        "text": "447.6402"
       },
       {
+       "raw": 778.0769024752584,
+       "text": "778.0769"
+      },
+      {
        "raw": 0.5026220386951269,
        "text": "50.3%"
       },
@@ -30605,7 +29941,7 @@
      ]
     }
    ],
-   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
+   "caption": "Raw materials: the amounts each block contributes, the standard deviation of its result, and the loss, expense and combined ratios the amounts imply, in one frame to slice. Currency, a spread and ratio columns sit side by side here; the insurer view keeps the walk a reader reads across and moves the expected-ratio columns and the share columns off it.",
    "columns": [
     {
      "align": "l",
@@ -30678,10 +30014,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "LR"
      ],
@@ -30695,7 +30045,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "ER"
      ],
@@ -30709,7 +30059,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "CR"
      ],
@@ -30723,7 +30073,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c9",
      "name": [
       "E_LR"
      ],
@@ -30737,7 +30087,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c10",
      "name": [
       "E_ER"
      ],
@@ -30751,7 +30101,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c11",
      "name": [
       "E_CR"
      ],
@@ -30765,7 +30115,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c12",
      "name": [
       "P_share"
      ],
@@ -30779,7 +30129,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c13",
      "name": [
       "M_share"
      ],
@@ -30803,6 +30153,9 @@
      },
      {
       "text": "M"
+     },
+     {
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -31087,6 +30440,10 @@
        "text": "150"
       },
       {
+       "raw": 412.31045794601465,
+       "text": "412.3105"
+      },
+      {
        "raw": 0.8499999927797967,
        "text": "85.0%"
       },
@@ -31121,7 +30478,7 @@
      ]
     }
    ],
-   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
+   "caption": "Raw materials: the amounts each block contributes, the standard deviation of its result, and the loss, expense and combined ratios the amounts imply, in one frame to slice. Currency, a spread and ratio columns sit side by side here; the insurer view keeps the walk a reader reads across and moves the expected-ratio columns and the share columns off it.",
    "columns": [
     {
      "align": "l",
@@ -31194,10 +30551,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "LR"
      ],
@@ -31211,7 +30582,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "ER"
      ],
@@ -31225,7 +30596,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "CR"
      ],
@@ -31239,7 +30610,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c9",
      "name": [
       "E_LR"
      ],
@@ -31253,7 +30624,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c10",
      "name": [
       "E_ER"
      ],
@@ -31267,7 +30638,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c11",
      "name": [
       "E_CR"
      ],
@@ -31281,7 +30652,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c12",
      "name": [
       "P_share"
      ],
@@ -31295,7 +30666,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c13",
      "name": [
       "M_share"
      ],
@@ -31319,6 +30690,9 @@
      },
      {
       "text": "M"
+     },
+     {
+      "text": "SD"
      },
      {
       "text": "LR"
@@ -31525,6 +30899,10 @@
        "text": "299.9939"
       },
       {
+       "raw": 593.2132248768913,
+       "text": "593.2132"
+      },
+      {
        "raw": 0.7000061449405244,
        "text": "70.0%"
       },
@@ -31588,6 +30966,10 @@
        "text": "-48.8869"
       },
       {
+       "raw": 140.82601881509245,
+       "text": "140.826"
+      },
+      {
        "raw": 0.5111309650691787,
        "text": "51.1%"
       },
@@ -31648,6 +31030,10 @@
        "text": "251.107"
       },
       {
+       "raw": 497.96109583663775,
+       "text": "497.9611"
+      },
+      {
        "raw": 0.7209922760373406,
        "text": "72.1%"
       },
@@ -31682,7 +31068,7 @@
      ]
     }
    ],
-   "caption": "Raw materials: the amounts each block contributes and the loss, expense and combined ratios they imply, in one frame to slice. Currency and ratio columns sit side by side here; the insurer view separates them.",
+   "caption": "Raw materials: the amounts each block contributes, the standard deviation of its result, and the loss, expense and combined ratios the amounts imply, in one frame to slice. Currency, a spread and ratio columns sit side by side here; the insurer view keeps the walk a reader reads across and moves the expected-ratio columns and the share columns off it.",
    "columns": [
     {
      "align": "l",
@@ -31755,10 +31141,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "LR"
      ],
@@ -31772,7 +31172,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "ER"
      ],
@@ -31786,7 +31186,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c7",
+     "key": "c8",
      "name": [
       "CR"
      ],
@@ -31800,7 +31200,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c9",
      "name": [
       "E_LR"
      ],
@@ -31814,7 +31214,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c9",
+     "key": "c10",
      "name": [
       "E_ER"
      ],
@@ -31828,7 +31228,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c10",
+     "key": "c11",
      "name": [
       "E_CR"
      ],
@@ -31842,7 +31242,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c11",
+     "key": "c12",
      "name": [
       "P_share"
      ],
@@ -31856,7 +31256,7 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c12",
+     "key": "c13",
      "name": [
       "M_share"
      ],
@@ -31880,6 +31280,9 @@
      },
      {
       "text": "M"
+     },
+     {
+      "text": "SD"
      },
      {
       "text": "LR"

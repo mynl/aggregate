@@ -797,12 +797,18 @@ _RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
                  'expense': 'E', 'commission': 'E'}
 
 #: Fixed column order of :attr:`PnL.economic_ratios_df`: the amounts, the block's signed
-#: result, the three ratios of means, their three mean-of-ratio twins, then the
-#: two shares of the gross block. ``L``, ``M``, ``P`` and ``LR`` keep the
+#: result and that result's standard deviation, the three ratios of means, their
+#: three mean-of-ratio twins, then the two shares of the gross block. ``L``,
+#: ``M``, ``P`` and ``LR`` keep the
 #: :data:`aggregate.pentagon.PENTAGON_STATS` spelling so a P&L ratio frame
 #: concatenates and diffs against a pricing frame; ``E`` / ``ER`` / ``CR``
 #: extend it, and ``Q`` / ``a`` / ``PQ`` / ``ROE`` have no meaning on a ledger.
-_RATIO_COLS = ('P', 'L', 'E', 'M', 'LR', 'ER', 'CR',
+#:
+#: ``SD`` sits beside ``M`` rather than being joined in by whoever presents the
+#: frame ([PnL-Summary-One-Table], a389). It is read off the same ledger row the
+#: walk reads for its ``Margin`` and ``MSD``, so the two cannot come from
+#: different sources and disagree.
+_RATIO_COLS = ('P', 'L', 'E', 'M', 'SD', 'LR', 'ER', 'CR',
                'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
 #: Return period the margin walk evaluates capital at, for :attr:`PnL.walk_df`
@@ -1701,7 +1707,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         quantiles never add). The footing sheet is :attr:`economic_df`, whose
         scenario columns condition on the grand result and foot exactly. The
         card is currency only: ratios live in :attr:`economic_ratios_df`, their own
-        table, per the reporting rule that a column carries one unit.
+        table. That was once the reporting rule that a column carries one unit;
+        [PnL-Summary-One-Table] reversed the rule for the presented ratio frame,
+        on the ground that a walk is read across a row, but it is still true of
+        this card, whose rows are sides rather than blocks and which has no
+        ratio to put beside anything.
 
         Returns
         -------
@@ -2303,6 +2313,20 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                 itemized commission.
             ``M``
                 The block's signed result.
+            ``SD``
+                The standard deviation of that result, read off the block's own
+                result row in :attr:`economic_df`, which is the row the walk
+                reads for its ``Margin`` and its ``MSD`` denominator. On the
+                frame rather than joined in by a presentation layer, so the two
+                cannot disagree ([PnL-Summary-One-Table]). With premium and
+                expense fixed on a block the result is the loss shifted, so this
+                is equally that block's loss standard deviation.
+
+                A **marginal** row property: standard deviations do not add, so
+                unlike the amounts beside it this column does not foot. ``NaN``
+                on a block that books no result row of its own, which is the
+                declining rule the presentation code follows throughout, never a
+                guess.
             ``LR``, ``ER``, ``CR``
                 ``L / P``, ``E / P`` and ``(L + E) / P``: **ratios of means**,
                 the convention of ``pricing_df`` and of a rate filing.
@@ -2339,13 +2363,15 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         recs, index = [], []
         first = None
         pairs = (('LR', 'E_LR'), ('ER', 'E_ER'), ('CR', 'E_CR'))
+        sds = self._block_result_sd()
         for label, gis in self._blocks():
             a, v, m, fixed_p = self._block_amounts(gis)
             p, ell, e = a['P'], a['L'], a['E']
             if first is None:
                 first = (p, m)
             live = abs(p) > VALIDATION_NOISE
-            row = {'P': p, 'L': ell, 'E': e, 'M': m}
+            row = {'P': p, 'L': ell, 'E': e, 'M': m,
+                   'SD': sds.get(label, float('nan'))}
             for name, num in (('LR', ell), ('ER', e), ('CR', ell + e)):
                 # ``or 0.0`` normalizes the signed zero a zero numerator over a
                 # negative (cession) premium would otherwise leave on the sheet
@@ -2393,6 +2419,42 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             lo, hi = payload
             return any(g.role == 'buy' for g in self._group_specs[lo:hi])
         return False
+
+    def _block_result_sd(self):
+        """``{block label: SD}``, off each block's own result row in the ledger.
+
+        The standard deviation of a block's result, for the ``SD`` column of
+        :attr:`economic_ratios_df` ([PnL-Summary-One-Table]). Read off
+        :attr:`economic_df` rather than recomputed, so this column and the
+        walk's ``MSD`` denominator are the same number by construction.
+
+        With premium and expense fixed on a block, the result is the loss
+        shifted, so this is also that block's loss standard deviation. It is a
+        **marginal** row property: standard deviations do not add, so the column
+        does not foot down the frame.
+
+        Notes
+        -----
+        A block with no result row of its own is simply absent from the
+        mapping, and the caller reports ``NaN`` rather than a guess, the
+        declining rule the rest of the presentation code follows. That is not
+        hypothetical: :meth:`_step_result_rows` reads the ``Step`` level of the
+        ledger index, which only a tower has, so on a non-tower ledger it keys
+        its one result row by the ``Side`` instead. A non-tower has exactly one
+        block and exactly one result, so they are paired directly here rather
+        than teaching the walk's own helper about a ledger shape the walk never
+        sees.
+        """
+        ledger = self.economic_df
+        rows = self._step_result_rows()
+        if not self._tower:
+            blocks = self._blocks()
+            if len(blocks) == 1 and len(rows) == 1:
+                (pos, _label, _ceded), = rows.values()
+                return {blocks[0][0]: float(ledger.iloc[pos]['SD'])}
+            return {}
+        return {step: float(ledger.iloc[pos]['SD'])
+                for step, (pos, _label, _ceded) in rows.items()}
 
     def _step_result_rows(self):
         """Map each walk step to its own result row: ``{step: (position, label, ceded)}``.

@@ -20,6 +20,20 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a393
+
+**[PnL-Pentagon] `PnL.pentagon_df(t=None)`: the ledger read as a pentagon, at any solvency level.** Loss, technical premium, margin, capital and assets, with the ratios between them, one row per block that books a result of its own and in ledger order, then a `Ceded` row that is the whole cession taken together. Columns are `L | E | P | P_tech | M | a | Q | LR | TLR | ER | CR | PQ | CoC | SD | CV`. Written premium and technical premium are both carried: the pentagon's own `P` is the technical one, `L + M`, while the number a reader quotes is the written one, and the ratios follow each.
+
+Nothing here is newly estimated, the claim `waterfall_df` makes and this repeats. Every amount comes off `economic_ratios_df`, the capital off a quantile of a result the ledger already carries, and every ratio is one division between them. The pentagon closes by arithmetic rather than through `Pentagon.solve`, which recovers capital from assets and so would run the derivation backwards.
+
+**The capital is on one basis, by the author's ruling of 2026-10-06**: the marginal quantile of each block's own result at the chosen level, two-sided by role exactly as `Capital standalone` is, with the cession the difference. That is what makes **any** `t > 1` available, where the conditional bases of `waterfall_df` are confined to the rungs of `PERCENTILE_LADDER` and so to 1-in-100. The level is the method's only argument and rides in `.attrs['return_period']`, never in a column name. The two frames agree where their anchors coincide: `Q` equals `Capital standalone` on every row, which is also `Capital gross` on the `Gross` row and `Capital net` on the closing row.
+
+**The capital amounts are notional**, as on the walk: nothing in the ledger is truncated at them, no default is modeled and no premium is reduced for the possibility of insolvency.
+
+Two readings the frame makes visible. The `Ceded` row's `SD` and `CV` are the one pair no subtraction can form, a standard deviation not being additive, so they are read off the ledger's own total impact row: genuine where the atoms carry the joint, `NaN` on a marginal-stitched ledger where that row is a per-statistic delta (a392). And released capital is **not** monotone in the level, because a bounded program exhausted in the far tail releases less at a remoter standard: on the two-tier test peel the cession releases 956 at 1-in-100 and 908 at 1-in-2000, so the margin given up per unit released rises.
+
+A single-group P&L books one result, so the frame is one row and there is no cession to difference. `_block_result_rows` is the pairing that makes that work, re-keying the walk's helper to the ratio frame's index; the walk itself still declines on that shape, having nothing to walk. `_block_result_sd` now reads the same pairing instead of repeating it.
+
 ## 1.0.0a392
 
 **[Delta-Row-Marked] a stitched tower's impact row stops printing a negative standard deviation.** The total impact of a marginal-stitched walk is the grand result less the first step's, and those two rows ride different marginals, so their difference has no distribution without a joint. Every statistic on the row but the mean was therefore a difference of the two rows' statistics, shown with nothing on the line to say so. On a three layer occurrence tower with an aggregate program the row read `SD` of -180.43 and `CV` of -105.4%, values no standard deviation and no coefficient of variation can take, and it reached the reader through the `PnL / Ledger` leaf.

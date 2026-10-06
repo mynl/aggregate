@@ -834,6 +834,28 @@ _WATERFALL_COLS = ('Premium spent', 'Margin spent', 'CR', 'Margin', 'MSD',
 #: ends with this column and the capital bases begin after it.
 _WATERFALL_SPLIT = 'MSD'
 
+#: Fixed column order of :meth:`PnL.pentagon_df` ([PnL-Pentagon]). The five
+#: amounts of the pentagon itself (``L``, ``P_tech``, ``M``, ``Q``, ``a``) with
+#: the two the ledger adds either side of them (written premium ``P`` and the
+#: expense ``E`` that separates it from the technical premium), then the ratios
+#: between them, then the spread.
+#:
+#: Written premium and technical premium are **both** carried, deliberately. The
+#: pentagon's ``P`` is the technical one, ``L + M``, which is the premium the
+#: five amounts close on; the number a reader quotes is the written one. Two
+#: ratios follow each: ``LR`` and ``PQ`` are against written premium, ``TLR``
+#: against technical.
+#:
+#: No return period appears in a name, for the reason :data:`_WATERFALL_COLS`
+#: records: the level rides in ``.attrs['return_period']``.
+_PENTAGON_COLS = ('L', 'E', 'P', 'P_tech', 'M', 'a', 'Q',
+                  'LR', 'TLR', 'ER', 'CR', 'PQ', 'CoC', 'SD', 'CV')
+
+#: The :meth:`PnL.pentagon_df` row that is not a ledger step: the whole cession
+#: taken together, gross less net on every amount. The figure the frame exists
+#: for draws this row against ``'Gross'`` and the closing ``'All'``.
+PENTAGON_CEDED_STEP = 'Ceded'
+
 #: Return period the margin walk evaluates capital at, for
 #: :attr:`PnL.waterfall_df`. A business choice, not a law, and deliberately a
 #: constant rather than a keyword: one place to change it (author, 2026-08-05,
@@ -858,6 +880,24 @@ WATERFALL_RETURN_PERIOD = 100
 _RESULT_KINDS = ('group_result', 'tier_result', 'net_result', 'grand_result')
 
 
+def _safe_ratio(numerator, denominator):
+    """``numerator / denominator``, declining rather than raising.
+
+    Returns
+    -------
+    float
+        The quotient, or ``NaN`` where either input is missing or where the
+        denominator vanishes to within :data:`VALIDATION_NOISE`, which is the
+        one case with genuinely no denominator. The declining rule the rest of
+        the frame code follows: a blank, never a guess and never an infinity.
+    """
+    if not (np.isfinite(numerator) and np.isfinite(denominator)):
+        return np.nan
+    if abs(denominator) <= VALIDATION_NOISE:
+        return np.nan
+    return numerator / denominator
+
+
 def _capital_ratio(margin, capital):
     """``M / Q``: margin over capital, the cost of capital on that basis.
 
@@ -876,11 +916,7 @@ def _capital_ratio(margin, capital):
     within :data:`VALIDATION_NOISE`, which is the one case with genuinely no
     denominator.
     """
-    if not (np.isfinite(margin) and np.isfinite(capital)):
-        return np.nan
-    if abs(capital) <= VALIDATION_NOISE:
-        return np.nan
-    return margin / capital
+    return _safe_ratio(margin, capital)
 
 
 #: Default ``Side`` level names for the :attr:`PnL.economic_df` row MultiIndex,
@@ -2558,15 +2594,37 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         sees.
         """
         ledger = self.economic_df
+        return {block: float(ledger.iloc[pos]['SD'])
+                for block, (pos, _label, _ceded)
+                in self._block_result_rows().items()}
+
+    def _block_result_rows(self):
+        """Map each :attr:`economic_ratios_df` block to its own result row.
+
+        Returns
+        -------
+        dict
+            ``{block label: (position, plan label, ceded)}``, the shape
+            :meth:`_step_result_rows` returns, re-keyed to the ratio frame's
+            index. Empty where no pairing is possible.
+
+        Notes
+        -----
+        On a tower this **is** :meth:`_step_result_rows`: a block is a step and
+        the ledger index carries a ``Step`` level to key it by. A non-tower has
+        no such level, so that helper keys its one result row by the ``Side``
+        instead, and the two indexes do not meet. A non-tower has exactly one
+        block and exactly one result, so they are paired directly here rather
+        than teaching the walk's own helper about a ledger shape it never sees.
+        """
         rows = self._step_result_rows()
-        if not self._tower:
-            blocks = self._blocks()
-            if len(blocks) == 1 and len(rows) == 1:
-                (pos, _label, _ceded), = rows.values()
-                return {blocks[0][0]: float(ledger.iloc[pos]['SD'])}
-            return {}
-        return {step: float(ledger.iloc[pos]['SD'])
-                for step, (pos, _label, _ceded) in rows.items()}
+        if self._tower:
+            return rows
+        blocks = self._blocks()
+        if len(blocks) == 1 and len(rows) == 1:
+            (entry,) = rows.values()
+            return {blocks[0][0]: entry}
+        return {}
 
     def _step_result_rows(self):
         """Map each walk step to its own result row: ``{step: (position, label, ceded)}``.
@@ -2805,6 +2863,207 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         economic_ratios_df : the per block amounts and ratios it draws on.
         """
         return self._waterfall_frames()
+
+    def pentagon_df(self, t=None):
+        """The pentagon amounts and ratios per block, at a chosen solvency level.
+
+        The ledger read as a pentagon ([PnL-Pentagon]): loss, technical premium,
+        margin, capital and assets, with the ratios between them. One row per
+        block that books a result of its own, in ledger order, so the first row
+        is the gross book and the last is the closing net position; then one row
+        the ledger has no step for, :data:`PENTAGON_CEDED_STEP`, the whole
+        cession taken together.
+
+        **Nothing here is newly estimated**, the claim :attr:`waterfall_df`
+        makes and this repeats. Every amount comes off
+        :attr:`economic_ratios_df`, the capital off a quantile of a result the
+        ledger already carries, and every ratio is one division between them.
+
+        Parameters
+        ----------
+        t : float, optional
+            Return period the capital is struck at, so the solvency standard is
+            the 1-in-``t`` state. Defaults to :data:`WATERFALL_RETURN_PERIOD`.
+            Any ``t > 1`` is available: the capital here is a **marginal**
+            quantile of each block's own result, read straight off its
+            :class:`GridDistribution`, and so is not confined to the rungs of
+            :data:`PERCENTILE_LADDER` the way the conditional capital bases of
+            :attr:`waterfall_df` are.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Indexed by ``'Step'``, carrying the return period in
+            ``.attrs['return_period']``, with columns
+
+            ``L``, ``E``, ``P``
+                Loss, expense and **written** premium, straight off
+                :attr:`economic_ratios_df` and signed in the gross direction,
+                so they add across the step rows.
+            ``P_tech``
+                Technical premium, ``P - E``. This is the pentagon's own ``P``,
+                the premium the five amounts close on.
+            ``M``
+                The block's signed result, which is ``P_tech - L``.
+            ``a``
+                Assets, ``P_tech + Q``.
+            ``Q``
+                The capital the 1-in-``t`` state calls for: the negated result
+                in that state, read off the block's own result row. **Two-sided
+                by role**, exactly as ``Capital standalone`` is
+                ([Writer-Standalone]): a risk-bearing block reads its own left
+                tail, the state that calls for capital, so the column is
+                positive; a ceded block reads its own **right** tail, the state
+                in which the cover pays most, so it is negative, capital
+                released. The ``Ceded`` row is the exception, below.
+            ``LR``, ``ER``, ``CR``
+                ``L / P``, ``E / P`` and ``(L + E) / P``, against written
+                premium, repeated off :attr:`economic_ratios_df`.
+            ``TLR``
+                ``L / P_tech``, the **technical** loss ratio, which is the
+                pentagon's own ``LR``.
+            ``PQ``
+                ``P / Q``, written premium to capital, the leverage.
+            ``CoC``
+                ``M / Q``, the cost of capital, carrying its sign the way
+                :func:`_capital_ratio` documents: a return on a risk-bearing
+                row, a price paid per unit released on a ceded one.
+            ``SD``
+                The standard deviation of that block's result, off
+                :attr:`economic_ratios_df`. With premium and expense fixed the
+                result is the loss shifted, so it is equally the block's loss
+                standard deviation.
+            ``CV``
+                ``SD / L``, the loss's coefficient of variation. It takes the
+                sign of ``L``, so a cession, whose loss is a recovery and reads
+                negative, reads a negative ``CV``: the signed convention of the
+                ledger it is read from, not a spread that has gone wrong.
+
+        Notes
+        -----
+        **The capital is notional.** Nothing in the ledger is truncated at these
+        amounts. No default is modeled, no recovery is limited by them, and no
+        premium is reduced for the possibility of insolvency. They are what the
+        solvency standard calls for at the stated level, read off a quantile. A
+        reader who takes them for a balance sheet will read ``CoC`` as a
+        realized return, and it is not that.
+
+        **The ``Ceded`` row is a difference, not a position.** Every amount on
+        it, ``Q`` included, is the closing row less the gross row, which is what
+        makes the figure this frame feeds work: a node's area is the gross
+        amount and the cession is the part left over. So its ``Q`` is capital
+        released and its ``CoC`` is margin given up per unit released. It does
+        not agree with the ceded step rows summed, nor with its own quantile,
+        and it is not meant to: tail measures do not add.
+
+        Its ``SD`` and ``CV`` are the one pair no subtraction can form, a
+        standard deviation not being additive, so they are read off the ledger's
+        own total impact row. On a route with real atoms that row has a law and
+        the pair is genuine. On a marginal-stitched ledger it does not, the
+        cession and the gross book riding different marginals, and the pair is
+        ``NaN`` rather than a difference of standard deviations
+        ([Delta-Row-Marked]).
+
+        **Capital on one basis, by the author's ruling of 2026-10-06**: the
+        marginal quantile of each block's own result at the one threshold, with
+        the cession the difference. That is not the conditional capital
+        :attr:`waterfall_df` decomposes, and the two agree where their anchors
+        coincide: ``Q`` on the gross row is that frame's ``Capital standalone``
+        there, as is ``Q`` on the closing row, which is also its ``Capital
+        net``. Everywhere else the two frames answer different questions, and
+        this one is the question a solvency level asks.
+
+        A single-group P&L books one result, so the frame is one row and there
+        is no cession to difference.
+
+        See Also
+        --------
+        economic_ratios_df : the amounts and the written-premium ratios.
+        waterfall_df : the same walk on the three conditional capital bases.
+        """
+        t = WATERFALL_RETURN_PERIOD if t is None else float(t)
+        if not t > 1:
+            raise ValueError(
+                f'pentagon_df needs a return period above 1, not {t!r}: the '
+                'capital is the result in the 1-in-t state, and t <= 1 names '
+                'no state.')
+        p = 1.0 / t
+        ratios = self.economic_ratios_df
+        steps = self._block_result_rows()
+        recs, index = [], []
+        for step in ratios.index:
+            if step not in steps:
+                continue
+            _pos, label, ceded = steps[step]
+            row = self._rows.get(label)
+            gd = None if row is None else row.gd
+            if gd is None:
+                q = np.nan
+            else:
+                # the two-sided reading of [Writer-Standalone]: a cover is read
+                # in the state it pays most, which is its own right tail
+                q = -float(gd.q(1 - p)) if ceded else -float(gd.q(p))
+            index.append(step)
+            recs.append(self._pentagon_row(ratios.loc[step], q))
+        if len(index) > 1:
+            q_col = _PENTAGON_COLS.index('Q')
+            gross, net = ratios.loc[index[0]], ratios.loc[index[-1]]
+            # the cession's own law where one exists, NaN where the ledger's
+            # impact row is a per-statistic delta ([Delta-Row-Marked])
+            impact = self._by_kind.get(('total_impact', None))
+            sd = (np.nan if impact is None or isinstance(impact, _DeltaRow)
+                  else float(impact.moments[1]))
+            index.append(PENTAGON_CEDED_STEP)
+            recs.append(self._pentagon_row(
+                net - gross, recs[-1][q_col] - recs[0][q_col], sd=sd))
+        out = pd.DataFrame(recs, index=pd.Index(index, name='Step'),
+                           columns=list(_PENTAGON_COLS))
+        out.attrs['return_period'] = t
+        return out
+
+    @staticmethod
+    def _pentagon_row(amounts, q, sd=None):
+        """One :meth:`pentagon_df` row, from a block's amounts and its capital.
+
+        Parameters
+        ----------
+        amounts : pandas.Series
+            An :attr:`economic_ratios_df` row, or a difference of two, supplying
+            ``P``, ``L``, ``E``, ``M`` and ``SD``.
+        q : float
+            The block's capital, already signed as capital.
+        sd : float, optional
+            Standard deviation to use in place of `amounts`' own, which is what
+            the ``Ceded`` row needs: differencing two rows differences their
+            standard deviations, and that is not a standard deviation.
+
+        Returns
+        -------
+        list of float
+            The row in :data:`_PENTAGON_COLS` order.
+
+        Notes
+        -----
+        The pentagon closes here rather than through
+        :meth:`~aggregate.pentagon.Pentagon.solve`, which is the same arithmetic
+        from the other end: it recovers ``Q`` from assets, and assets are what
+        this derives from ``Q``. Routing a quantile through it to get the
+        quantile back would also put its ``ratios()`` consistency assertion,
+        exact to ``1e-14``, between the ledger's own ``M`` and ``P_tech - L``,
+        two numbers that agree mathematically and need not agree in the last
+        bit.
+        """
+        ell, e, prem = (float(amounts['L']), float(amounts['E']),
+                        float(amounts['P']))
+        m = float(amounts['M'])
+        if sd is None:
+            sd = float(amounts['SD'])
+        p_tech = prem - e
+        return [ell, e, prem, p_tech, m, p_tech + q, q,
+                _safe_ratio(ell, prem), _safe_ratio(ell, p_tech),
+                _safe_ratio(e, prem), _safe_ratio(ell + e, prem),
+                _safe_ratio(prem, q), _capital_ratio(m, q),
+                sd, _safe_ratio(sd, ell)]
 
     @property
     def legs_df(self):

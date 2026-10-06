@@ -20,6 +20,7 @@ import logging
 import numpy as np
 import pandas as pd
 
+from ._grid_distribution import GridDistribution
 from ._validation import VALIDATION_NOISE
 from .utilities import ft, ift
 
@@ -448,3 +449,190 @@ def junior_recovery(port, unit, state=None):
     buf = np.zeros(m_buf)
     buf[:n_out] = port.density_df[f'lev_{unit}'].to_numpy()
     return np.real(ift(ft(buf, 0) * nots[unit], 0))[:n_out]
+
+
+def priority_conditional_mean(port, unit, assets, state=None):
+    r"""The conditional-mean ladder of the junior and senior shortfalls.
+
+    ``E[D_junior | X = x]`` and ``E[D_senior | X = x]`` on the output grid,
+    where ``D_junior = min((X - a)^+, X_i)`` is the part of the portfolio's
+    whole shortfall the subordinated unit absorbs and
+    ``D_senior = ((X - a)^+ - X_i)^+`` is what is left for the senior pool.
+    The junior tranche absorbs the default first, up to its own size.
+
+    Parameters
+    ----------
+    port : Portfolio
+        An updated portfolio; see :func:`priority_state` for the guards.
+    unit : str
+        The subordinated unit.
+    assets : float
+        The asset level ``a``, the size of the estate.
+    state : tuple, optional
+        A ``(nots, m_buf)`` pair from :func:`priority_state`.
+
+    Returns
+    -------
+    kappa_junior : ndarray
+        ``E[D_junior | X = x]`` at ``x = density_df['loss']``; ``NaN`` where
+        ``p_total`` is below machine epsilon, the same cut ``add_exa`` applies
+        to ``exeqa`` (which zeroes the row rather than blanking it).
+    kappa_senior : ndarray
+        ``E[D_senior | X = x]``, the same ``NaN`` mask.
+    p_total : ndarray
+        The portfolio density on that grid, so a caller can weight the ladder
+        or locate quantiles of the conditioning total.
+
+    Notes
+    -----
+    :meth:`Aggregate.palm_kappa` cannot do this, and the reason is structural
+    rather than a missing case. The Palm identity needs the target to decompose
+    claim by claim, ``D = sum_j c(X_j)`` for a deterministic per-claim ``c``;
+    the shortfall is a nonlinear function of an **aggregate**, so there is no
+    such ``c`` and nothing for the identity to grip. That holds whether the two
+    books run separate event streams, in which case Palm does not apply at all,
+    or share one (the ``clash`` model), where Palm gives the first-order split
+    ``E[X_i | X = t]`` exactly and then stalls.
+
+    Independence supplies an exact one-dimensional route instead. For ``x > a``,
+    writing ``c = x - a`` and splitting on whether the senior pool has already
+    exhausted the estate,
+
+    .. math::
+
+        \mathsf{P}[D_{\text{junior}} \mathbf 1\{X = x\}]
+          = \sum_{u \le c} u\, p_i(u)\, p_{-i}(x - u)
+          + c \sum_{u > c} p_i(u)\, p_{-i}(x - u),
+
+    and ``u > c`` is exactly ``x - u < a``, the senior pool falling short of the
+    estate. So splitting ``p_{-i}`` at the asset level into ``p_{-i}^{<a}`` and
+    ``p_{-i}^{>=a}`` turns the pair of sums into two convolutions,
+
+    .. math::
+
+        \mathsf{P}[D_{\text{junior}} \mathbf 1\{X = x\}]
+          = \big((u p_i) * p_{-i}^{\ge a}\big)(x)
+          + (x - a)\,\big(p_i * p_{-i}^{<a}\big)(x),
+
+    exact on the whole grid at once, with the senior ladder free by
+    subtraction: ``kappa_senior = (x - a)^+ - kappa_junior`` pointwise, since
+    the two shortfalls sum to the portfolio's.
+
+    Integrating the junior ladder against ``p_total`` recovers
+    ``E[X_i] - ex_junior_i(a)``, which is the cheapest check on it, and is what
+    :func:`junior_recovery` computes independently. Measured agreement on a
+    two-unit lognormal book at ``bs=1, log2=18``, ``a = q(0.99)``: four parts
+    in ``1e6`` for the larger unit and four in ``1e5`` for the smaller. The
+    residual is the blanked far tail, where the conditional mean is a ratio of
+    two numbers below machine epsilon but its product with ``p_total`` is not,
+    so a reader integrating the ladder by hand should expect it.
+    """
+    if unit not in port.unit_names:
+        raise ValueError(f'{unit} is not a unit of {port.name}: '
+                         f'{port.unit_names}')
+    nots, m_buf = state if state is not None else priority_state(
+        port, caller='priority_kappa')
+    df = port.density_df
+    n_out = len(df)
+    loss = df['loss'].to_numpy()
+    p_total = df['p_total'].to_numpy()
+    agg = next(a for a in port.agg_list if a.name == unit)
+
+    # Split the senior pool at the asset level. The index is physical here
+    # (zero origin, guarded above), so bucket j_a holds loss a.
+    j_a = int(round(float(assets) / port.bs))
+    p_nots = np.real(ift(nots[unit], 0))
+    below = np.zeros(m_buf)
+    at_or_above = np.zeros(m_buf)
+    below[:j_a] = p_nots[:j_a]
+    at_or_above[j_a:] = p_nots[j_a:]
+
+    # First-moment density of the junior unit, in the same buffer convention.
+    first_moment = np.zeros(m_buf)
+    first_moment[:n_out] = agg.xs * agg.agg_density
+
+    excess = np.maximum(loss - float(assets), 0.0)
+    num = (np.real(ift(ft(first_moment, 0) * ft(at_or_above, 0), 0))[:n_out]
+           + excess * np.real(
+               ift(agg.ftagg_density * ft(below, 0), 0))[:n_out])
+    num[excess <= 0] = 0.0
+    with np.errstate(divide='ignore', invalid='ignore'):
+        kappa_junior = num / p_total
+    kappa_junior[p_total < np.finfo(float).eps] = np.nan
+    kappa_senior = excess - kappa_junior
+    return kappa_junior, kappa_senior, p_total
+
+
+def priority_conditional_law(port, unit, assets, totals):
+    r"""The exact law of the junior shortfall given the total, row by row.
+
+    For each ``t`` in ``totals``, the conditional distribution of
+    ``D_junior = min((t - a)^+, X_i)`` given ``X = t``: not just its mean, and
+    with no two-dimensional transform anywhere.
+
+    Parameters
+    ----------
+    port : Portfolio
+        An updated portfolio; see :func:`priority_state` for the guards.
+    unit : str
+        The subordinated unit.
+    assets : float
+        The asset level ``a``.
+    totals : array_like
+        Portfolio totals ``t`` to condition on, snapped to the grid.
+
+    Returns
+    -------
+    list of GridDistribution
+        One per requested ``t``, in the order given, named
+        ``'{unit} junior shortfall | X = {t}'`` and carrying the portfolio's
+        ``bs``. A row whose ``p_total`` is at or below the validation noise
+        floor yields an empty (all-zero) distribution rather than a normalized
+        one: there is no conditioning event to speak of there.
+
+    Notes
+    -----
+    Independence makes the conditional law of ``X_i`` given ``X = t`` a single
+    slice, ``p_i(u) p_{-i}(t - u) / p_total(t)``, so one row costs ``O(n)`` on
+    the model grid with no joint to build. The shortfall is the deterministic
+    image ``u -> min((t - a)^+, u)`` of that slice, which caps the mass at and
+    above ``(t - a)^+`` into the single atom there.
+
+    This is the computational payoff of ``Portfolio`` independence. A couple of
+    hundred rows across the tail give an exact cloud on the full model grid,
+    where a shared-event book has to accept whatever a budgeted joint can
+    afford.
+    """
+    if unit not in port.unit_names:
+        raise ValueError(f'{unit} is not a unit of {port.name}: '
+                         f'{port.unit_names}')
+    nots, _ = priority_state(port, caller='priority_conditional')
+    df = port.density_df
+    n_out = len(df)
+    p_total = df['p_total'].to_numpy()
+    bs = port.bs
+    agg = next(a for a in port.agg_list if a.name == unit)
+    p_i = np.asarray(agg.agg_density, dtype=float)
+    p_nots = np.real(ift(nots[unit], 0))
+    j_a = int(round(float(assets) / bs))
+
+    out = []
+    for t_in in np.atleast_1d(np.asarray(totals, dtype=float)):
+        jt = int(round(float(t_in) / bs))
+        if not 0 <= jt < n_out:
+            raise ValueError(f'total {t_in} is off the grid of {port.name}')
+        # conditional law of X_i given X = t: one slice, p_i(u) p_{-i}(t - u)
+        joint = p_i[:jt + 1] * p_nots[jt::-1]
+        denom = float(p_total[jt])
+        mass = (joint / denom if denom > VALIDATION_NOISE
+                else np.zeros_like(joint))
+        # push forward through u -> min((t - a)^+, u); the cap is an atom
+        # collecting every u at or above it. j_cap <= jt always, since a >= 0.
+        j_cap = max(jt - j_a, 0)
+        shortfall = np.zeros(j_cap + 1)
+        shortfall[:j_cap] = mass[:j_cap]
+        shortfall[j_cap] = mass[j_cap:].sum()
+        out.append(GridDistribution(
+            np.arange(j_cap + 1, dtype=float) * bs, shortfall, bs=bs,
+            name=f'{unit} junior shortfall | X = {jt * bs:g}'))
+    return out

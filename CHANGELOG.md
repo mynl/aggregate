@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a395
+
+**[Priority-Junior-Leg] `Portfolio.priority_kappa` and `Portfolio.priority_conditional`: the conditional ladder of the junior shortfall, and its exact law.** `priority_kappa(unit, assets)` returns `(kappa_junior, kappa_senior, p_total)` on `density_df['loss']`: how the portfolio's whole shortfall `(X - a)^+` splits between the subordinated unit, `min((X - a)^+, X_i)`, and the senior pool, `((X - a)^+ - X_i)^+`, conditional on the total. The two sum to `(x - a)^+` pointwise and are `NaN` where `p_total` is below machine epsilon. `priority_conditional(unit, totals, assets)` returns the whole conditional **law** of the junior shortfall, one `GridDistribution` per requested total, so its quantiles, TVaR and distortion price come free. Both take `assets` or `p=`, exactly one, and carry the same grid guards as `priority_df`. Kernels: `aggregate._portfolio_density.priority_conditional_mean` and `priority_conditional_law`.
+
+Both are exact and one-dimensional, and neither forms a joint: the ladder is two convolutions on the whole grid at once, the law one `O(n)` slice per row. `Aggregate.palm_kappa` cannot reach either, because the shortfall is a nonlinear function of an aggregate and so does not decompose claim by claim; the `See Also` says so. Integrating the ladder against `p_total` recovers the junior shortfall `priority_epd_df` reports to a few parts in `1e5`, the residual being the blanked far tail. New tests in `tests/test_priority.py`, 31 cases in all.
+
 ## 1.0.0a394
 
 **[Priority-Junior-Leg] `Portfolio.priority_df` and `Portfolio.priority_epd_df`: the junior leg of the priority ladder returns.** The second-priority expected recovery `E[min(X_i, (a - X_{-i})^+)]` that 0.30.1 carried as `e2pri_{unit}` is back as `ex_junior_{unit}`, alongside the two legs `add_exa` already writes, under uniform names: `ex_senior_{unit}` (alias of `lev_{unit}`), `ex_equal_{unit}` (alias of `exa_{unit}`), `ex_junior_{unit}`, and `ex_total`. `priority_epd_df(assets)` or `priority_epd_df(p=...)` reads that frame at one asset level into rows `(unit, rule)` by `mean | recovery | shortfall | epd`, with a `total` group. `priority_df` is cached and invalidated by `update`; the kernels are `aggregate._portfolio_density.priority_state` and `junior_recovery`.

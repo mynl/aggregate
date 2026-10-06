@@ -2106,6 +2106,103 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         out.attrs['assets'] = float(pdf.index[ja])
         return out
 
+    def priority_kappa(self, unit, assets=None, *, p=None):
+        r"""The conditional-mean ladder of the junior and senior shortfalls.
+
+        Where :meth:`priority_epd_df` reports what the subordination costs on
+        average, this says where in the total it costs it: how the portfolio's
+        whole shortfall ``(X - a)^+`` splits between the junior unit and the
+        senior pool, as a function of the total ``X = x``.
+
+        Parameters
+        ----------
+        unit : str
+            The subordinated unit.
+        assets : float, optional
+            The asset level ``a``, the size of the estate.
+        p : float, optional
+            Alternatively a probability level; ``a = q(p)``. Give exactly one
+            of ``assets`` or ``p``.
+
+        Returns
+        -------
+        kappa_junior : ndarray
+            ``E[min((X - a)^+, X_i) | X = x]`` at ``x = density_df['loss']``;
+            ``NaN`` where ``p_total`` is below machine epsilon.
+        kappa_senior : ndarray
+            ``E[((X - a)^+ - X_i)^+ | X = x]``, the same ``NaN`` mask. The two
+            sum to ``(x - a)^+`` pointwise, since the junior tranche absorbs
+            the default first, up to its own size.
+        p_total : ndarray
+            The portfolio density on that grid, for weighting the ladder or
+            locating quantiles of the conditioning total.
+
+        See Also
+        --------
+        Aggregate.palm_kappa : the shared-event conditional-mean ladder, which
+            cannot reach this target. The shortfall is a nonlinear function of
+            an *aggregate*, so it does not decompose claim by claim and the
+            Palm identity has nothing to grip. Independence supplies an exact
+            one-dimensional route instead, two convolutions on the whole grid
+            at once; the derivation is in
+            :func:`aggregate._portfolio_density.priority_conditional_mean`.
+
+        Notes
+        -----
+        Integrating the junior ladder against ``p_total`` recovers
+        ``E[X_i] − ex_junior_i(a)``, the shortfall :meth:`priority_epd_df`
+        reports, computed there by an independent route, to a few parts in
+        ``1e5`` or better. The residual is the blanked far tail, where the
+        conditional mean divides two numbers below machine epsilon but their
+        quotient times ``p_total`` is still material.
+        """
+        a = self._priority_assets(assets, p, 'priority_kappa')
+        return _density.priority_conditional_mean(self, unit, a)
+
+    def priority_conditional(self, unit, totals, assets=None, *, p=None):
+        r"""The exact law of the junior shortfall given the total, row by row.
+
+        Not just the conditional mean :meth:`priority_kappa` gives: the whole
+        conditional distribution of the subordinated unit's shortfall, one
+        distribution per requested total, exact on the model grid.
+
+        Parameters
+        ----------
+        unit : str
+            The subordinated unit.
+        totals : array_like
+            Portfolio totals ``t`` to condition on, snapped to the grid.
+        assets : float, optional
+            The asset level ``a``, the size of the estate.
+        p : float, optional
+            Alternatively a probability level; ``a = q(p)``. Give exactly one
+            of ``assets`` or ``p``.
+
+        Returns
+        -------
+        list of GridDistribution
+            One per requested ``t``, in the order given. A row whose
+            ``p_total`` is at or below the validation noise floor comes back
+            all-zero rather than normalized: there is no conditioning event to
+            speak of there.
+
+        Notes
+        -----
+        Independence makes the conditional law of ``X_i`` given ``X = t`` a
+        single slice, ``p_i(u) p_{-i}(t − u) / p_total(t)``, so a row costs
+        ``O(n)`` and no joint is formed. The shortfall is its deterministic
+        image ``u -> min((t − a)^+, u)``, which caps the mass at and above
+        ``(t − a)^+`` into the atom there. A couple of hundred rows across the
+        tail therefore give an exact cloud on the full model grid, where a
+        shared-event book has to accept whatever a budgeted joint can afford.
+
+        Each row is a :class:`~aggregate.GridDistribution`, so the usual
+        accessors (``q``, ``tvar``, ``mean``, ``lev``) and distortion pricing
+        of the shortfall come free.
+        """
+        a = self._priority_assets(assets, p, 'priority_conditional')
+        return _density.priority_conditional_law(self, unit, a, totals)
+
     @property
     def spec(self):
         """

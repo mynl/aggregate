@@ -285,3 +285,162 @@ def test_stale_frame_raises():
     port.density_df['p_total'] = port.density_df['p_total'] * 1.001
     with pytest.raises(ValueError, match='do not reproduce'):
         port.priority_df
+
+
+# ---------------------------------------------------------------------------
+# The conditional-mean ladder
+# ---------------------------------------------------------------------------
+
+def test_kappa_legs_sum_to_the_shortfall(two_unit):
+    """``kappa_junior + kappa_senior == (x - a)^+`` pointwise: the junior
+    tranche absorbs the default first, up to its own size, and the senior pool
+    takes the rest."""
+    a = float(two_unit.q(0.99))
+    loss = two_unit.density_df['loss'].to_numpy()
+    excess = np.maximum(loss - a, 0.0)
+    for unit in two_unit.unit_names:
+        junior, senior, _ = two_unit.priority_kappa(unit, a)
+        live = ~np.isnan(junior)
+        assert np.abs(junior[live] + senior[live] - excess[live]).max() == 0.0
+
+
+def test_kappa_junior_is_bounded_by_both_sides(two_unit):
+    """``0 <= kappa_junior <= (x - a)^+``: the junior unit cannot absorb more
+    than the whole shortfall, nor less than none of it."""
+    a = float(two_unit.q(0.99))
+    loss = two_unit.density_df['loss'].to_numpy()
+    excess = np.maximum(loss - a, 0.0)
+    for unit in two_unit.unit_names:
+        junior, _, _ = two_unit.priority_kappa(unit, a)
+        live = ~np.isnan(junior)
+        assert junior[live].min() >= 0.0, unit
+        assert (excess[live] - junior[live]).min() >= -1e-9, unit
+
+
+def test_kappa_integrates_to_the_junior_shortfall(two_unit):
+    """``sum_x kappa_junior(x) p_total(x) == E[X_i] - ex_junior_i(a)``.
+
+    The two sides are computed by genuinely different routes, the ladder's two
+    convolutions against ``junior_recovery``'s one, so this is the acceptance
+    check on the derivation rather than a round trip."""
+    a = float(two_unit.q(0.99))
+    epd = two_unit.priority_epd_df(a)
+    for unit in two_unit.unit_names:
+        junior, _, p_total = two_unit.priority_kappa(unit, a)
+        live = ~np.isnan(junior)
+        got = float((junior[live] * p_total[live]).sum())
+        want = float(epd.loc[(unit, 'junior'), 'shortfall'])
+        assert got == pytest.approx(want, rel=1e-4), unit
+
+
+def test_kappa_is_zero_below_the_asset_level(two_unit):
+    """No shortfall while the estate covers the total."""
+    a = float(two_unit.q(0.99))
+    loss = two_unit.density_df['loss'].to_numpy()
+    junior, senior, _ = two_unit.priority_kappa('Assumed', a)
+    inside = loss <= a
+    assert np.nanmax(np.abs(junior[inside])) == 0.0
+    assert np.nanmax(np.abs(senior[inside])) == 0.0
+
+
+def test_kappa_hand_computed(hand):
+    """The ladder on the discrete book at ``a = 1``, by hand. ``X_A`` in
+    ``{0, 1}`` and ``X_B`` in ``{0, 2}``, so conditioning on the total pins the
+    pair down: ``T = 2`` means ``(0, 2)`` and ``T = 3`` means ``(1, 2)``. With
+    ``B`` junior its shortfall is ``min(T - 1, X_B)``, so 1 at ``T = 2`` and 2
+    at ``T = 3``; with ``A`` junior it is ``min(T - 1, X_A)``, so 0 at ``T = 2``
+    and 1 at ``T = 3``."""
+    junior_b, senior_b, _ = hand.priority_kappa('B', 1.0)
+    assert junior_b[2] == pytest.approx(1.0, abs=1e-12)
+    assert junior_b[3] == pytest.approx(2.0, abs=1e-12)
+    assert senior_b[2] == pytest.approx(0.0, abs=1e-12)
+    assert senior_b[3] == pytest.approx(0.0, abs=1e-12)
+    junior_a, senior_a, _ = hand.priority_kappa('A', 1.0)
+    assert junior_a[2] == pytest.approx(0.0, abs=1e-12)
+    assert junior_a[3] == pytest.approx(1.0, abs=1e-12)
+    assert senior_a[2] == pytest.approx(1.0, abs=1e-12)
+    assert senior_a[3] == pytest.approx(1.0, abs=1e-12)
+
+
+def test_kappa_guards(two_unit):
+    with pytest.raises(ValueError, match='exactly one'):
+        two_unit.priority_kappa('Direct')
+    with pytest.raises(ValueError, match='is not a unit of'):
+        two_unit.priority_kappa('NoSuchUnit', 7000.0)
+
+
+# ---------------------------------------------------------------------------
+# The exact conditional law
+# ---------------------------------------------------------------------------
+
+def test_conditional_law_means_match_the_ladder(two_unit):
+    """The conditional law comes from direct slices of the joint and the ladder
+    from two convolutions, so their agreement checks both."""
+    a = float(two_unit.q(0.99))
+    bs = two_unit.bs
+    totals = [a, a + 1000, a + 5000, 2 * a]
+    for unit in two_unit.unit_names:
+        junior, _, _ = two_unit.priority_kappa(unit, a)
+        laws = two_unit.priority_conditional(unit, totals, a)
+        assert len(laws) == len(totals)
+        for t, law in zip(totals, laws):
+            jt = int(round(t / bs))
+            assert float(law.mean()) == pytest.approx(
+                float(junior[jt]), rel=1e-7, abs=1e-9), (unit, t)
+
+
+def test_conditional_law_is_a_probability(two_unit):
+    a = float(two_unit.q(0.99))
+    for law in two_unit.priority_conditional('Assumed', [a, a + 2000], a):
+        assert float(law.pmf(law.x[0])) >= 0.0
+        assert law.cdf(law.x[-1]) == pytest.approx(1.0, abs=1e-8)
+
+
+def test_conditional_law_below_assets_is_a_point_mass_at_zero(two_unit):
+    """Nothing is short while the estate covers the total, so the law is
+    degenerate and its support is the single bucket 0."""
+    a = float(two_unit.q(0.99))
+    law = two_unit.priority_conditional('Assumed', [a - 1000], a)[0]
+    assert len(law.x) == 1
+    assert law.x[0] == 0.0
+    assert float(law.mean()) == pytest.approx(0.0, abs=1e-12)
+
+
+def test_conditional_law_support_is_the_shortfall(two_unit):
+    """The support tops out at ``(t - a)^+``, the whole shortfall, because that
+    is where the cap puts its atom."""
+    a = float(two_unit.q(0.99))
+    t = a + 3000
+    law = two_unit.priority_conditional('Direct', [t], a)[0]
+    assert law.x[-1] == pytest.approx(t - a, abs=two_unit.bs)
+    assert float(law.pmf(law.x[-1])) > 0.0
+
+
+def test_conditional_law_hand_computed(hand):
+    """On the discrete book at ``a = 1``, conditioning pins the pair down, so
+    each law is degenerate: ``B`` junior is short 1 at ``T = 2`` and 2 at
+    ``T = 3``."""
+    laws = hand.priority_conditional('B', [2.0, 3.0], 1.0)
+    at_two, at_three = laws
+    assert float(at_two.mean()) == pytest.approx(1.0, abs=1e-12)
+    assert float(at_two.pmf(1.0)) == pytest.approx(1.0, abs=1e-12)
+    assert float(at_three.mean()) == pytest.approx(2.0, abs=1e-12)
+    assert float(at_three.pmf(2.0)) == pytest.approx(1.0, abs=1e-12)
+
+
+def test_conditional_law_guards(two_unit):
+    a = float(two_unit.q(0.99))
+    with pytest.raises(ValueError, match='exactly one'):
+        two_unit.priority_conditional('Direct', [a])
+    with pytest.raises(ValueError, match='is not a unit of'):
+        two_unit.priority_conditional('NoSuchUnit', [a], a)
+    with pytest.raises(ValueError, match='off the grid'):
+        two_unit.priority_conditional('Direct', [1e12], a)
+
+
+def test_conditional_ladder_raises_on_a_signed_book():
+    port = build(SIGNED)
+    with pytest.raises(NotImplementedError, match='zero-based'):
+        port.priority_kappa('A', 0.0)
+    with pytest.raises(NotImplementedError, match='zero-based'):
+        port.priority_conditional('A', [10.0], 0.0)

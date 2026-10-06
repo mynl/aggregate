@@ -811,16 +811,45 @@ _RATIO_BUCKET = {'premium': 'P', 'loss': 'L', 'recovery': 'L',
 _RATIO_COLS = ('P', 'L', 'E', 'M', 'SD', 'LR', 'ER', 'CR',
                'E_LR', 'E_ER', 'E_CR', 'P_share', 'M_share')
 
-#: Return period the margin walk evaluates capital at, for :attr:`PnL.walk_df`
-#: and :attr:`PnL.evaluation_df`. A business choice, not a law, and
-#: deliberately a constant rather than a keyword: one place to change it
-#: (author, 2026-08-05, declining to build a configurable capital-level
-#: framework). It sat in the exhibit layer until ``1.0.0a253`` and moved here
-#: with the two frames it describes.
+#: Fixed column order of :attr:`PnL.waterfall_df` ([Waterfall-Capital]). Two
+#: questions, in reading order. **The walk**, what each step spends and what it
+#: earns: the two shares of the gross block, the combined ratio, the margin and
+#: its multiple of its own standard deviation. Then **the capital**, three bases
+#: each beside its own cost of capital, which is the comparison the frame exists
+#: to support and which previously required reading across two tables.
+#:
+#: The presented exhibit splits after ``MSD``, so the split is by **question**
+#: rather than by unit. ``Margin ratio``, which the retired ``evaluation_df``
+#: carried, is gone: it is ``1 - CR`` and sits beside ``CR``.
+#:
+#: No return period appears in a name. ``M01`` hard-coded 1-in-100 into a
+#: header, so a parametrized level would have churned both format sheets on
+#: every level; the level rides in the caption, the block heading and
+#: ``.attrs['return_period']`` instead. See :data:`WATERFALL_RETURN_PERIOD`.
+_WATERFALL_COLS = ('Premium spent', 'Margin spent', 'CR', 'Margin', 'MSD',
+                   'Capital standalone', 'Capital net', 'Capital gross',
+                   'CoC standalone', 'CoC net', 'CoC gross')
+
+#: Where :data:`_WATERFALL_COLS` divides into the exhibit's two blocks: the walk
+#: ends with this column and the capital bases begin after it.
+_WATERFALL_SPLIT = 'MSD'
+
+#: Return period the margin walk evaluates capital at, for
+#: :attr:`PnL.waterfall_df`. A business choice, not a law, and deliberately a
+#: constant rather than a keyword: one place to change it (author, 2026-08-05,
+#: declining to build a configurable capital-level framework). It sat in the
+#: exhibit layer until ``1.0.0a253`` and moved here with the frames it
+#: describes.
+#:
+#: Since [Waterfall-Capital] the level is **out of the column names**: they read
+#: ``Capital net`` rather than ``M01 div net``, and the level rides in the
+#: caption, in the block heading and in the frame's ``.attrs['return_period']``.
+#: A frame whose column names moved with the parameter would churn the format
+#: sheets on every level, and the sheets are keyed by column name.
 WATERFALL_RETURN_PERIOD = 100
 
-#: Ledger row kinds the walk reports. A step's own results, plus the
-#: net-of-tier position ([Ledger-Net-Of-Tier], carried since a387): the
+#: Ledger row kinds :attr:`PnL.waterfall_df` reports. A step's own results, plus
+#: the net-of-tier position ([Ledger-Net-Of-Tier], carried since a387): the
 #: running position through a tier is the one cumulative row worth a line of
 #: its own, the book as it stands once that tier's program has worked, and
 #: the ledger and summary card both carry it. Plain running nets stay
@@ -829,24 +858,26 @@ WATERFALL_RETURN_PERIOD = 100
 _RESULT_KINDS = ('group_result', 'tier_result', 'net_result', 'grand_result')
 
 
-def _capital_ratio(margin, bad_outcome):
-    """``M / -M_100``: margin over the capital that state calls for, or releases.
+def _capital_ratio(margin, capital):
+    """``M / Q``: margin over capital, the cost of capital on that basis.
 
-    ``bad_outcome`` is the margin in the 1-in-100 state. On a risk-bearing row
-    it is negative, so ``-bad_outcome`` is the capital you would have to inject
-    and the ratio reads as a return on it. On a ceded row it is positive, so
-    ``-bad_outcome`` is negative: the cover **releases** capital, and the ratio
-    reads as the price paid per unit released. Both are the same arithmetic;
-    the caller separates them into two columns, because a high number is good
-    on the first reading and bad on the second.
+    Margin over capital, on every row, with no sign routing and nothing to
+    explain. Until [Waterfall-Capital] the caller passed the margin **in** the
+    adverse state and this function negated it, which put a double negative in
+    the middle of the arithmetic; the frames now carry capital as capital
+    (see :meth:`PnL._waterfall_frames`) and the quotient is the plain one.
 
-    ``NaN`` where either input is missing, or where the capital is zero to
+    The sign still carries the reading, because capital does: a risk-bearing
+    row holds capital, so both inputs are positive and the ratio is a return
+    earned on it, while a ceded row **releases** capital, so both flip and the
+    same quotient reads as the price paid per unit released.
+
+    ``NaN`` where either input is missing, or where the capital vanishes to
     within :data:`VALIDATION_NOISE`, which is the one case with genuinely no
     denominator.
     """
-    if not (np.isfinite(margin) and np.isfinite(bad_outcome)):
+    if not (np.isfinite(margin) and np.isfinite(capital)):
         return np.nan
-    capital = -bad_outcome
     if abs(capital) <= VALIDATION_NOISE:
         return np.nan
     return margin / capital
@@ -2479,11 +2510,20 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return out
 
     def _waterfall_frames(self):
-        """Build :attr:`walk_df` and :attr:`evaluation_df` in one pass.
+        """Build :attr:`waterfall_df`: one pass down the ledger's result rows.
 
-        The two frames read the same rows and differ only in what they report
-        of them, so they are computed together and split at the end rather
-        than walking the ledger twice.
+        One frame since [Waterfall-Capital]. It was two, ``walk_df`` in currency
+        and ``evaluation_df`` as ratios, computed together here and split at the
+        end; they were development ephemera and the merged frame supersedes them
+        (author's ruling, 2026-10-06).
+
+        The capital columns are **signed as capital**, which is the other half of
+        that ruling: ``-M01``, so a risk-bearing row reads the capital it holds
+        and a ceded row reads a negative number, the capital the cover releases.
+        That is the quantity a reader wants, it removes the double negative from
+        :func:`_capital_ratio`, and it takes the return period out of the column
+        names, which is what lets the level become a parameter without churning
+        the format sheets.
         """
         ledger, ratios = self.economic_df, self.economic_ratios_df
         steps = self._step_result_rows()
@@ -2499,7 +2539,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         else:
             gross_ladder = self._palm_gross_ladder
 
-        walk, evaluation, index = [], [], []
+        recs, index = [], []
         for step in ratios.index:
             if step not in steps:
                 continue
@@ -2530,193 +2570,160 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                            if gross_ladder is not None else None)
             divers_gross = (float(gross_cells[q_index])
                             if gross_cells is not None else np.nan)
+            # Capital, not the margin in the adverse state: the negation is
+            # applied once, here, so every consumer downstream reads a
+            # quantity rather than its reflection ([Waterfall-Capital]).
+            # A risk-bearing row holds capital and reads positive; a ceded row
+            # releases it and reads negative, which is the correct statement
+            # about a cover and the sign the CoC columns inherit.
+            q_standalone, q_net, q_gross = (-standalone, -divers,
+                                            -divers_gross)
             r = ratios.loc[step]
             cr = float(r['CR'])
             index.append(step)
-            walk.append([margin, standalone, divers, divers_gross])
-            # one quotient per capital basis, on every row; the sign carries
-            # the reading (risk rows: margin > 0, M01 < 0, a return on
-            # capital; ceded rows: margin < 0, M01 > 0, a cost of relief)
-            evaluation.append([
-                float(r['P_share']), float(r['M_share']), cr, 1.0 - cr,
+            recs.append([
+                float(r['P_share']), float(r['M_share']), cr, margin,
                 margin / sd if sd > 0 else np.nan,
-                _capital_ratio(margin, standalone),
-                _capital_ratio(margin, divers),
-                _capital_ratio(margin, divers_gross),
+                q_standalone, q_net, q_gross,
+                _capital_ratio(margin, q_standalone),
+                _capital_ratio(margin, q_net),
+                _capital_ratio(margin, q_gross),
             ])
 
         idx = pd.Index(index, name='Step')
-        t = WATERFALL_RETURN_PERIOD
-        # derived from the constant rather than written in, so the heading and
-        # the state it names cannot drift apart. 'M01' at t=100, reading as
-        # "M at the 1st percentile", the way the format sheet's P01 does
-        m = f'M{100 // t:02d}'
-        walk_df = pd.DataFrame(
-            walk, index=idx,
-            columns=['Margin', f'{m} standalone', f'{m} div net',
-                     f'{m} div gross'])
-        evaluation_df = pd.DataFrame(
-            evaluation, index=idx,
-            columns=['Premium spent', 'Margin spent', 'CR', 'Margin ratio',
-                     'MSD', 'SA CoC', 'Div CoC net', 'Div CoC gross'])
-        return walk_df, evaluation_df
+        out = pd.DataFrame(recs, index=idx, columns=list(_WATERFALL_COLS))
+        # The level the capital columns are struck at, which left the column
+        # names at [Waterfall-Capital] and has to ride somewhere a consumer can
+        # read it. The caption and the block heading are the other two places.
+        out.attrs['return_period'] = WATERFALL_RETURN_PERIOD
+        return out
 
     @property
-    def walk_df(self):
-        """The margin walk in currency: gross, each cession, the closing net.
+    def waterfall_df(self):
+        """The margin walk and the capital behind it: gross, each cession, net.
 
-        One row per step that books a result of its own, in ledger order, so
-        the last row is the net position. The net-of-tier position rides along
-        where the ledger carries one (``Net of occurrence``, since a387): the
-        book as it stands once that tier's program has worked, the one
-        cumulative row the ledger and the summary card also carry. It
-        duplicates the rows above it by construction, so the div columns foot
-        down the walk only over the non-cumulative steps. Plain running nets
-        stay excluded: the walk already accumulates by being read down.
+        One row per step that books a result of its own, in ledger order, so the
+        last row is the net position. The net-of-tier position rides along where
+        the ledger carries one (``Net of occurrence``, since a387): the book as
+        it stands once that tier's program has worked, the one cumulative row
+        the ledger and the summary card also carry. It duplicates the rows above
+        it by construction, so the footing columns foot down the walk only over
+        the non-cumulative steps. Plain running nets stay excluded, the walk
+        already accumulating by being read down.
+
+        Replaces ``walk_df`` and ``evaluation_df`` at [Waterfall-Capital]. Those
+        were a split by unit, currency in one frame and ratios in the other, and
+        the split cost the reader the comparison the frame exists for: a capital
+        basis and its own cost of capital sat in different tables. The merge is
+        also a rename and a sign change on six columns; see **Notes**.
 
         Returns
         -------
         pandas.DataFrame
-            Indexed by ``'Step'``, with columns
-
-            ``Margin``
-                The step's own signed result, its expected value.
-            ``M01 standalone``
-                The step's result in its own 1-in-``t`` state, read off that
-                step's :class:`GridDistribution`, **two-sided by role**
-                ([Writer-Standalone]): a risk-bearing step reads its own left
-                tail, the state that calls for capital; a ceded step reads
-                its own **right** tail, the writer's 1-in-``t``, the state in
-                which the cover pays most, positive almost always: the
-                capital the writer of that cover would hold. The sign flip
-                is the marker of which reading a row takes. Tail measures do
-                not add, so this column does **not** foot down the walk. A
-                tier subtotal containing any cover takes the ceded reading.
-            ``M01 div net``
-                The step's result conditional on the **whole book** landing at
-                its own 1-in-``t``, read off the ledger's kappa column, so
-                this one foots exactly: the decomposition of the capital the
-                firm actually holds. Blank on a ledger whose rows share no
-                atoms and have no Palm ladder, where no conditioning is
-                possible.
-            ``M01 div gross``
-                The step's result conditional on the **gross** result landing
-                at its own 1-in-``t`` ([Waterfall-Gross-Basis]): the program
-                read as a stress test, who pays in the gross 1-in-``t``
-                environment. A conditional-mean ladder like the net column,
-                so it foots down the walk where complete. Served where exact
-                and nowhere else: always on a shared-atoms ledger (the atoms
-                carry the joint); on an eligible stitched peel for every
-                per-claim row, with the aggregate tier and everything
-                downstream blank unless the aggregate transform is affine on
-                the subject's support (the gross basis cannot see through a
-                nonlinear aggregate transform without the 2-D joint). Blank
-                wherever the net column is blank.
-
-            ``t`` is :data:`WATERFALL_RETURN_PERIOD`, and ``M01`` is the margin
-            at the 1st percentile, which is the state ``t = 100`` names.
-
-        Notes
-        -----
-        The gap between the standalone and div columns is the
-        diversification benefit, which is the reading the frame exists to
-        support. The two div columns differ only in which row anchors to its
-        own quantile, and each basis has the other's blind spot: the net
-        basis evaluates a cover in the states remaining *after* the program
-        worked, so a highly effective hedge removes its own states from the
-        net tail and looks weak against the residual tail; the gross basis
-        sees the underlying stress, but two covers responding to the same
-        gross state both look excellent even when jointly redundant. The
-        anchor symmetry marks the pair: on the Gross row the gross cell
-        coincides with that row's standalone ``M01``, and on the closing row
-        the net cell does.
-
-        Nothing here is newly estimated. Every number is arithmetic over
-        quantities the P&L has already computed: the margin off
-        :attr:`economic_df`, the net state off that frame's kappa column,
-        the gross state off the gross-anchored ladder the same machinery
-        builds, the standalone state off each result row's own
-        :class:`GridDistribution`.
-
-        A single group P&L books one result, so the walk is one row and there
-        is nothing to walk. The ``economic_waterfall`` exhibit reports itself
-        unavailable in that case rather than drawing it.
-
-        See Also
-        --------
-        evaluation_df : the same walk read as ratios.
-        economic_df : the ledger the walk is taken from.
-        """
-        return self._waterfall_frames()[0]
-
-    @property
-    def evaluation_df(self):
-        """The margin walk read as ratios: what each step spends and returns.
-
-        The companion to :attr:`walk_df`, over the same rows in the same
-        order.
-
-        Returns
-        -------
-        pandas.DataFrame
-            Indexed by ``'Step'``, with columns
+            Indexed by ``'Step'``, carrying the return period the capital is
+            struck at in ``.attrs['return_period']``, with columns
 
             ``Premium spent``, ``Margin spent``
                 The step's premium and margin against the **gross** block's,
                 which is the first block in every builder.
             ``CR``
-                The step's combined ratio, ``(L + E) / P``.
-            ``Margin ratio``
-                ``1 - CR``, the margin per unit of premium: the same fact as
-                ``CR`` read from the earning side, beside it because that is
-                how a rubric is scanned.
+                The step's combined ratio, ``(L + E) / P``. The margin ratio is
+                ``1 - CR`` and is not carried as a column of its own.
+            ``Margin``
+                The step's own signed result, its expected value.
             ``MSD``
-                Margin over its own standard deviation (margin to standard
-                deviation, a multiple).
-            ``SA CoC``
-                ``M / -M01 standalone`` on every row: the cost of capital on
-                the standalone basis. On a risk row both inputs carry their
-                natural signs (margin > 0, ``M01 < 0``) and the ratio is the
-                return earned on the capital the step calls for alone; on a
-                ceded row both flip (margin < 0, ``M01 > 0``, the writer's
-                right-tail standalone), so the quotient is again positive:
-                the cost of the layer per unit of the writer's standalone
-                capital.
-            ``Div CoC net``
-                ``M / -M01 div net`` on every row, the same quotient on the
-                net diversified basis: a return on capital on risk rows, a
-                cost of relief on ceded rows (the margin given up per unit
-                of capital the cover hands back). The right basis for
-                attribution and performance measurement of the in-force
-                program, since the column decomposes the capital the firm
-                actually holds.
-            ``Div CoC gross``
-                ``M / -M01 div gross``, the quotient against the
-                gross-anchored basis ([Waterfall-Gross-Basis]): the step's
-                performance in the gross 1-in-``t`` stress state, the right
-                basis for judging program design against the underlying
-                risk. NaN wherever the gross cell is blank, so a truncated
-                gross column truncates here too.
+                Margin over its own standard deviation, a multiple. The
+                denominator is :attr:`economic_ratios_df`'s ``SD`` column, the
+                same number off the same ledger row.
+            ``Capital standalone``
+                The capital the step would hold **alone**: the negated result in
+                its own 1-in-``t`` state, read off that step's
+                :class:`GridDistribution` and **two-sided by role**
+                ([Writer-Standalone]). A risk-bearing step reads its own left
+                tail, the state that calls for capital, so the column is
+                positive. A ceded step reads its own **right** tail, the
+                writer's 1-in-``t``, the state in which the cover pays most, so
+                the column is negative: capital **released**, which is what a
+                cover does. The sign is the marker of which reading a row takes.
+                Tail measures do not add, so this column does **not** foot. A
+                tier subtotal containing any cover takes the ceded reading.
+            ``Capital net``
+                The capital the step accounts for within the capital the **firm
+                actually holds**: the negated result conditional on the whole
+                book landing at its own 1-in-``t``, read off the ledger's kappa
+                column, so this one foots exactly. Blank on a ledger whose rows
+                share no atoms and have no Palm ladder, where no conditioning is
+                possible.
+            ``Capital gross``
+                The same against the **gross** result's own 1-in-``t``
+                ([Waterfall-Gross-Basis]): the program read as a stress test,
+                who pays in the gross 1-in-``t`` environment. A conditional-mean
+                ladder like the net column, so it foots where complete. Served
+                where exact and nowhere else: always on a shared-atoms ledger
+                (the atoms carry the joint); on an eligible stitched peel for
+                every per-claim row, with the aggregate tier and everything
+                downstream blank unless the aggregate transform is affine on the
+                subject's support, the gross basis being unable to see through a
+                nonlinear aggregate transform without the 2-D joint. Blank
+                wherever the net column is blank.
+            ``CoC standalone``, ``CoC net``, ``CoC gross``
+                ``Margin`` over the capital column beside each, on every row and
+                with no routing. A **return** on the risk-bearing rows, where
+                both inputs are positive; a **cost of relief** on the ceded
+                rows, where both are negative, reading as the margin given up
+                per unit of capital the cover hands back. ``CoC net`` is the
+                basis for attribution and performance measurement of the
+                in-force program, since its denominator decomposes the capital
+                the firm actually holds; ``CoC gross`` is the basis for judging
+                program design against the underlying risk. Each is ``NaN``
+                wherever its capital column is blank or vanishes.
+
+            ``t`` is ``.attrs['return_period']``, which is
+            :data:`WATERFALL_RETURN_PERIOD`.
 
         Notes
         -----
-        The sign convention carries the reading: gross and net rows have
-        margin > 0 and ``M01 < 0``; ceded rows the reverse, so the CoC
-        columns stay positive with one arithmetic and no routing. The
-        reinsurance test is whether a ceded row's CoC comes in under the
-        return the risk-bearing rows earn. The two div bases can disagree
-        violently: when the net-of-occurrence subject carries claim-count
-        information only (a tower retaining a fixed cap per claim), every
-        occurrence layer's ``Div CoC net`` collapses to one number, while
-        the gross basis sees the large claims the net gives away and
-        differentiates the layers. Showing both is the point.
+        **These capital amounts are notional.** Nothing in the ledger is
+        truncated at them, no default is modeled, and no loss is limited by
+        them. They are the capital the 1-in-``t`` state calls for, read off a
+        quantile. A reader who takes them for a balance sheet will read the CoC
+        columns as a realized return, and they are not that.
+
+        The gap between the standalone and the two conditional columns is the
+        diversification benefit, which is the reading the frame exists to
+        support. The two conditional columns differ only in which row anchors to
+        its own quantile, and each basis has the other's blind spot. The net
+        basis evaluates a cover in the states remaining *after* the program
+        worked, so a highly effective hedge removes its own states from the net
+        tail and looks weak against the residual. The gross basis sees the
+        underlying stress, but two covers responding to the same gross state
+        both look excellent even when jointly redundant. The anchor symmetry
+        marks the pair: on the ``Gross`` row the gross cell coincides with that
+        row's standalone capital, and on the closing row the net cell does.
+
+        The two bases can disagree violently, and showing both is the point.
+        When the net-of-occurrence subject carries claim-count information only
+        (a tower retaining a fixed cap per claim), every occurrence layer's
+        ``CoC net`` collapses to one number, while the gross basis sees the large
+        claims the net gives away and differentiates the layers.
+
+        Nothing here is newly estimated. Every number is arithmetic over
+        quantities the P&L has already computed: the margin and its standard
+        deviation off :attr:`economic_df`, the net state off that frame's kappa
+        column, the gross state off the gross-anchored ladder the same machinery
+        builds, the standalone state off each result row's own
+        :class:`GridDistribution`.
+
+        A single group P&L books one result, so the walk is one row and there is
+        nothing to walk. The ``economic_waterfall`` exhibit reports itself
+        unavailable in that case rather than drawing it.
 
         See Also
         --------
-        walk_df : the same walk in currency.
-        economic_ratios_df : the per block ratios these are drawn from.
+        economic_df : the ledger the walk is taken from.
+        economic_ratios_df : the per block amounts and ratios it draws on.
         """
-        return self._waterfall_frames()[1]
+        return self._waterfall_frames()
 
     @property
     def legs_df(self):

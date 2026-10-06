@@ -829,23 +829,29 @@ economic_waterfall = _make_exhibit_function(
     'economic_waterfall', 'Economic waterfall',
     """The margin walk: gross, through what each layer cedes, to net.
 
-    Two blocks. **walk** carries the currency amounts, the margin at each
-    step and its 1-in-100 outcome on both bases. **evaluation** carries the
-    dimensionless readings: how much of the gross premium and gross margin
-    each step spends, the combined ratio, margin over its own standard
-    deviation, and margin over required capital on each basis.
+    Source frame ``PnL.waterfall_df``. RAW passes it through whole; INSURER
+    splits it into two blocks after ``MSD``, **by question rather than by
+    unit** ([Waterfall-Capital]). **walk** is what each step spends and earns:
+    the two shares of the gross block, the combined ratio, the margin, and the
+    margin over its own standard deviation. **capital** is three capital bases,
+    each beside its own cost of capital, which is the comparison the frame
+    exists to support and which previously meant reading across two tables.
 
-    The point of the exhibit is the pair of 1-in-100 columns. The
-    **diversified** basis is the margin conditional on the whole book landing
-    at its own 1-in-100, so it **foots down the walk exactly**; the
+    The point of the exhibit is the three capital columns. The **net** basis is
+    the capital conditional on the whole book landing at its own 1-in-100, so it
+    **foots down the walk exactly**, and the **gross** basis conditions on the
+    gross result instead, reading the program as a stress test. The
     **standalone** basis is each step's own 1-in-100, and tail measures do not
-    add, so it does not. The gap between them is the diversification benefit,
-    per layer, made visible.
+    add, so it does not foot. The gap between standalone and the other two is
+    the diversification benefit, per layer, made visible.
 
-    Available only on a P&L with a tower: a single group ledger has one
-    margin row and no walk to draw. RAW and INSURER serve the same table,
-    because here the exhibit *is* the translation; there is no underlying
-    frame to pass through.
+    Capital is signed as capital, so a cession reads negative: capital
+    released. **The amounts are notional.** Nothing in the ledger is truncated
+    at them and no loss is limited by them; they are what the 1-in-100 state
+    calls for, read off a quantile.
+
+    Available only on a P&L with a tower: a single group ledger has one margin
+    row and no walk to draw.
 
     Parameters
     ----------

@@ -53,7 +53,7 @@ The end-to-end data flow::
         v
     summary_df / economic_df        the card and the footing sheet
     economic_ratios_df / legs_df    raw materials for ratio exhibits
-    walk_df / evaluation_df         the margin walk, in currency and as ratios
+    waterfall_df                    the margin walk and the capital behind it
     tail_df                         the closing margin's ladder (a payoff)
     density_df / validation_df      per-row GDs; rebucketing audit
     engine_*_df                     the wrapped book's frames, delegated
@@ -318,8 +318,7 @@ Object                      Shape         Role
 ``economic_df``             DataFrame     the sheet: every ledger row, kappa or P ladder, foots
 ``economic_ratios_df``      DataFrame     amounts and ratios per block: raw materials, not a card
 ``legs_df``                 DataFrame     one row per declared leg, the only place ``kind`` surfaces
-``walk_df``                 DataFrame     the margin walk in currency, at EV and in the 1-in-100 state
-``evaluation_df``           DataFrame     the same walk as ratios: shares, combined, return on capital
+``waterfall_df``            DataFrame     the margin walk, then three capital bases and the cost of each
 ``tail_df``                 DataFrame     the closing margin's return period ladder, read as a payoff
 ``density_df``              OrderedDict   ``{row label: GridDistribution}``, no shared axis
 ``validation_df``           DataFrame     Est-against-EX audit of every ``bs > 0`` leg

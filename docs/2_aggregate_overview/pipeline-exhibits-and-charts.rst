@@ -56,7 +56,7 @@ Exhibits
 Exhibits defined
 ~~~~~~~~~~~~~~~~~~~
 
-An exhibit is a titled envelope over one or more **blocks**, each block one frame rendered as a greater_tables ``TableDoc`` with its caption, formats and row flags. Most exhibits carry one block. A few carry two or three, because the thing being reported is genuinely more than one table: reinsurance is a layering store and a stage summary, and a P&L ratio view separates amounts from ratios so that no column mixes two units.
+An exhibit is a titled envelope over one or more **blocks**, each block one frame rendered as a greater_tables ``TableDoc`` with its caption, formats and row flags. Most exhibits carry one block. A few carry two or three, because the thing being reported is genuinely more than one table: reinsurance is a layering store and a stage summary, and the P&L waterfall is a walk and the capital behind it.
 
 The placement test for what belongs here: if deleting the web app would destroy knowledge an actuary would want in a notebook, that knowledge belongs in the library. A caption saying what a frame is, emphasis on the rows that failed a validation gate, and the decision to drop raw noncentral moments from a business view are all knowledge, not decoration.
 
@@ -133,9 +133,9 @@ What is published
    * - ``economic_waterfall``
      - Economic waterfall
      - PnL
-     - 2: ``walk_df``, ``evaluation_df``
+     - 1: ``waterfall_df``
      - multi-step walk (``_tower``)
-     - none
+     - **splits into 2 blocks** after ``MSD``, by question rather than by unit: ``walk`` (what each step spends and earns) and ``capital`` (three capital bases, each beside its own cost of capital); captions, ledger row flags
    * - ``economic_tail``
      - Economic return periods
      - PnL

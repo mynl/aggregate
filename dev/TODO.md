@@ -557,6 +557,17 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Waterfall-Capital]** DONE (`1.0.0a390`), under the API repo's
+  `dev/plan-a194-pnl-exhibits.md`: `walk_df` and `evaluation_df` merge into
+  `waterfall_df`, the three `M01` columns become `Capital standalone` / `net` /
+  `gross` carrying `-M01`, and the three CoC columns rename with their values
+  unchanged. The return period leaves the column names and rides in
+  `.attrs['return_period']`, which is what lets the level become a parameter
+  without churning the format sheets. `_capital_ratio` loses its double
+  negative. The exhibit serves the frame whole under RAW and splits it after
+  `MSD` under INSURER, by question rather than by unit. Both captions say the
+  capital is notional.
+
 - **[PnL-Summary-One-Table]** DONE (`1.0.0a389`), under the API repo's
   `dev/plan-a194-pnl-exhibits.md`: `economic_ratios_df` gains `SD`, the
   standard deviation of each block's result off the same ledger row the walk

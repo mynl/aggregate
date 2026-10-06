@@ -39,9 +39,13 @@ across the two. Both halves are swept in ``tests/test_exhibits.py``.
 The invariant is also a forcing function, which is its real value: it says what
 a new exhibit owes. A RAW block with no frame behind it means the **frame** is
 what is missing, and this package is not the place to invent one. The
-``economic_waterfall`` blocks were the last exception and were promoted to
-:attr:`~aggregate.PnL.walk_df` and :attr:`~aggregate.PnL.evaluation_df` at
-``1.0.0a253`` rather than exempted.
+``economic_waterfall`` blocks were the last exception and were promoted to a
+public frame at ``1.0.0a253`` rather than exempted; at ``1.0.0a390`` the two
+frames that promotion created merged into
+:attr:`~aggregate.PnL.waterfall_df`, so RAW serves one block and the two-block
+reading became the INSURER restructure it always should have been. Both halves
+are worth the note: the invariant caught the second case too, when the merged
+exhibit was first written to serve its two blocks under both perspectives.
 
 **Dependencies point inward.** This package imports from the core; the core
 never imports it, so nothing here touches an existing class and nothing here

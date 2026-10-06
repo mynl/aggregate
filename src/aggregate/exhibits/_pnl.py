@@ -20,7 +20,8 @@ import numpy as np
 import pandas as pd
 
 from .._pnl import (
-    PERCENTILE_LADDER, PnL, WATERFALL_RETURN_PERIOD, _kappa_label, _pct_label,
+    PERCENTILE_LADDER, PnL, WATERFALL_RETURN_PERIOD, _WATERFALL_SPLIT,
+    _kappa_label, _pct_label,
 )
 from ._core import (
     economic, economic_ratios, economic_tail, economic_waterfall, reins, stats,
@@ -447,21 +448,43 @@ def _economic_ratios_insurer(obj, blocks):
 
 @economic_waterfall.register(PnL)
 def _economic_waterfall_frames(obj):
-    """Serve the two walk frames the P&L publishes, with their captions.
+    """The merged walk, whole: one frame, one block.
 
-    The arithmetic moved onto :attr:`PnL.walk_df` and
-    :attr:`PnL.evaluation_df` at ``1.0.0a253``: a RAW block is exactly one
-    public frame, and this exhibit was the one place left where the exhibit
-    layer invented the frame it served.
+    The arithmetic moved onto the class at ``1.0.0a253``, a RAW block being
+    exactly one public frame and this exhibit having been the one place left
+    where the exhibit layer invented what it served. [Waterfall-Capital] merged
+    the two frames it published into :attr:`PnL.waterfall_df`, so RAW is now an
+    ordinary passthrough and the two-block reading is the INSURER restructure it
+    always should have been.
     """
-    walk_df, evaluation_df = obj.walk_df, obj.evaluation_df
-    idx = walk_df.index
-    t = WATERFALL_RETURN_PERIOD
-    # the walk's own heading for the 1-in-t state, derived the same way the
-    # frame derives it, so the caption and the columns cannot drift apart
-    m = f'M{100 // t:02d}'
-    net_available = not walk_df[f'{m} div net'].isna().all()
-    gross_col = walk_df[f'{m} div gross']
+    return [('waterfall_df', obj.waterfall_df, {'caption': (
+        'The margin walk and the capital behind it, one row per step that '
+        'books a result: what each step spends, what it earns, the capital it '
+        'calls for on three bases and what that capital costs on each. '
+        'Capital is signed as capital, so a cession reads negative: capital '
+        'released. The level it is struck at is in the frame\'s '
+        'return_period attribute. Those amounts are notional, with nothing in '
+        'the ledger truncated at them. The insurer view splits this into the '
+        'walk and the capital bases and says how to read each.')})]
+
+
+@economic_waterfall.insurer.register(PnL)
+def _economic_waterfall_insurer(obj, blocks):
+    """Two blocks, split after ``MSD``, each with its reading.
+
+    **The split is by question rather than by unit**, which is the point of
+    [Waterfall-Capital]. The first block is the walk: what each step spends and
+    what it earns. The second is three capital bases, each beside its own cost
+    of capital, which is the comparison the frame exists to support and which
+    through a389 meant reading across two tables. Splitting one frame into
+    several blocks is exactly the liberty ``[Perspective-May-Restructure]``
+    grants this perspective and no other.
+    """
+    _name, df, kw = blocks[0]
+    idx = df.index
+    t = df.attrs.get('return_period', WATERFALL_RETURN_PERIOD)
+    net_available = not df['Capital net'].isna().all()
+    gross_col = df['Capital gross']
     gross_available = not gross_col.isna().all()
     gross_truncated = gross_available and gross_col.isna().any()
 
@@ -472,60 +495,70 @@ def _economic_waterfall_frames(obj):
     total_row = {i: ('muted',) for i, step in enumerate(idx) if step in nets}
     if len(idx) > 1:
         total_row[len(idx) - 1] = ('total',)
+
+    split = list(df.columns).index(_WATERFALL_SPLIT) + 1
+    walk_cols, capital_cols = df.columns[:split], df.columns[split:]
+
     walk_caption = (
-        f'The margin walk in currency: gross, what each layer cedes, and the '
-        f'closing net. Margin is the expected result and {m} is the result in '
-        f'the 1-in-{t} state. The div columns are one conditioning each and '
-        f'answer different questions: div net conditions on the whole book '
-        f'landing at its own 1-in-{t}, the return on the capital the firm '
-        f'actually holds, while div gross conditions on the gross result '
-        f'landing at its own 1-in-{t}, the program\'s performance in the '
-        f'gross stress state. Each is a ladder of conditional means and '
-        f'foots down the walk where complete. The standalone column is '
-        f'two-sided by role: a risk '
-        f'bearing step reads its own left tail, the state that calls for '
-        f'capital, while a ceded step reads its own right tail, the '
-        f'writer\'s 1-in-{t}, the state in which the cover pays most and '
-        f'the capital the writer of that cover would hold, so the cell is '
-        f'positive there and the sign flip marks which reading a row takes. '
-        f'Tail measures do not add, so standalone does not foot, and its '
-        f'gap against the div columns is the diversification benefit. A '
-        f'muted net of tier row is the running position through that tier, '
-        f'the book once that tier\'s program has worked; it restates the '
-        f'rows above it, so the footing runs over the unmuted steps alone.')
+        'The margin walk: gross, what each layer cedes, and the closing net. '
+        'Premium spent and Margin spent are the step against the gross block, '
+        'CR is its combined ratio and the margin per unit of premium is 1 less '
+        'CR, Margin is the expected result, and MSD is that margin over its '
+        'own standard deviation, a multiple. A muted net of tier row is the '
+        'running position through that tier, the book once that tier\'s '
+        'program has worked; it restates the rows above it, so the footing '
+        'runs over the unmuted steps alone. The capital each step calls for, '
+        'and what that capital costs, are in the table below.')
+    capital_caption = (
+        f'Three capital bases for the same walk, each beside its own cost of '
+        f'capital, all struck at the 1-in-{t} state. Capital is the negated '
+        f'result in that state, so a risk-bearing row reads the capital it '
+        f'holds and a ceded row reads a negative number: the capital the cover '
+        f'releases, which is what a cover does. The CoC columns are margin '
+        f'over the capital beside them, on every row, so they read as a return '
+        f'where capital is held and as the price paid per unit released where '
+        f'it is given back, with no change of arithmetic. The reinsurance test '
+        f'is whether a ceded row\'s CoC comes in under the return the '
+        f'risk-bearing rows earn. Standalone is each step\'s own 1-in-{t}, '
+        f'two-sided by role: a risk-bearing step reads its own adverse tail, a '
+        f'ceded step the writer\'s, the state in which the cover pays most. '
+        f'Tail measures do not add, so standalone does not foot, and its gap '
+        f'against the other two is the diversification benefit. Net conditions '
+        f'on the whole book landing at its own 1-in-{t}, which decomposes the '
+        f'capital the firm actually holds and is the basis for attribution; '
+        f'gross conditions on the gross result landing at its own, which reads '
+        f'the program as a stress test. Both are ladders of conditional means '
+        f'and foot down the walk where complete. These capital amounts are '
+        f'NOTIONAL: nothing in the ledger is truncated at them, no default is '
+        f'modeled and no loss is limited by them. They are the capital the '
+        f'state calls for, read off a quantile.')
     if not net_available and not gross_available:
-        walk_caption += (
-            ' Both div columns are blank here: this ledger shares no '
+        capital_caption += (
+            ' Both conditional columns are blank here: this ledger shares no '
             'atoms across its rows and carries no Palm ladder, so no '
             'conditioning was possible.')
     elif gross_truncated:
-        walk_caption += (
-            ' The div gross column ends at the aggregate tier: the gross '
-            'basis cannot see through a nonlinear aggregate transform, so '
-            'the aggregate cover and everything downstream of it are blank '
-            'and the column foots only over the sub-ledger it serves.')
-    evaluation_caption = (
-        f'The same walk read as ratios: the rubric for the program. Margin '
-        f'ratio is 1 less CR, the margin per unit of premium. MSD is '
-        f'margin over its own standard deviation, a multiple. The CoC '
-        f'columns are one quotient, M over the negated {m}, on the '
-        f'standalone, net diversified and gross diversified capital bases: '
-        f'net reads as the return on held capital, gross as the step\'s '
-        f'performance in the gross stress state. The sign convention '
-        f'carries the reading: gross and net rows have margin above zero '
-        f'and {m} below, so the ratio is the return earned on the capital '
-        f'that state calls for; a ceded row has both reversed (margin '
-        f'below zero, the writer\'s right-tail {m} above), so the same '
-        f'arithmetic reads as a cost, the margin given up per unit of '
-        f'capital. The reinsurance test is whether a ceded row\'s CoC '
-        f'comes in under the return the risk-bearing rows earn.')
+        capital_caption += (
+            ' The gross column ends at the aggregate tier: the gross basis '
+            'cannot see through a nonlinear aggregate transform, so the '
+            'aggregate cover and everything downstream of it are blank and '
+            'the column foots only over the sub-ledger it serves.')
 
+    # `walk` and `capital`, not `capital at 1-in-100`: block names are
+    # identifiers, in snake case like every other one, and the level in a name
+    # is what [Waterfall-Capital] just took out of the columns. The plan's third
+    # home for it, a visible block heading, does not exist; a consumer draws the
+    # table and its caption, so the level rides in the caption and in
+    # `.attrs['return_period']`.
+    #
+    # No ratio_cols on either block: 'Premium spent', 'Margin spent', 'CR' and
+    # the three CoC columns each point at the `ratio` style in the format
+    # sheets, which stamps greater_tables' own tag wherever they appear.
     return [
-        ('walk_df', walk_df, dict(caption=walk_caption, row_flags=total_row)),
-        # 'Premium spent', 'Margin spent' and 'CR' carry the `ratio` style in
-        # the format sheets, which tags them as ratios wherever they appear
-        ('evaluation_df', evaluation_df,
-         dict(caption=evaluation_caption, row_flags=total_row)),
+        ('walk', df[walk_cols],
+         dict(kw, caption=walk_caption, row_flags=total_row)),
+        ('capital', df[capital_cols],
+         dict(kw, caption=capital_caption, row_flags=total_row)),
     ]
 
 

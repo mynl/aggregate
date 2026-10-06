@@ -268,7 +268,7 @@ appendix but not exampled.
    "``reins_density_df`` removes its FFT fuzz, so reins calibration works", "a250", "Under the hood", "—"
    "a sized P&L premium is rounded to a number someone would write down", "a251", "Under the hood", "—"
    "``load_chart_doc``: a served chart document has a way home", "a252", "Served documents", "``doc``"
-   "a RAW block is exactly one public frame; ``walk_df`` / ``evaluation_df``", "a253", "P&L / Served documents", "``tower``"
+   "a RAW block is exactly one public frame; the waterfall frames are promoted", "a253", "P&L / Served documents", "``tower``"
    "``bs_window_df`` publishes ``W`` and ``coverage``", "a254", "Grids, buckets & windows", "``simple``"
    "``sharpen``, the twelfth exhibit: the grid probe says what it scored", "a255", "Served documents", "``simple``"
    "the INSURER layering analysis turns over, layers down the rows", "a256", "Served documents", "``reins``"
@@ -2910,33 +2910,61 @@ helper the other two use, so relabeling in the ``[labels]`` section of the confi
 moves all three together. ``PnL.info`` gains the matching row in the same
 position.
 
-The margin waterfall: ``walk_df`` and ``evaluation_df`` (a253)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The margin waterfall: ``waterfall_df`` (a253, merged a390)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Two frames read the same walk, one in currency and one as ratios. ``walk_df``
-carries one row per step that books a result of its own, in ledger order, so the
-last row is the net position:
-
-.. ipython:: python
-
-    qd(tower.walk_df)
-
-The two 1-in-100 columns are the point of the frame. ``standalone`` reads each
-step in **its own** adverse state, so it does not foot down the walk, tail
-measures not being additive; ``diversified`` reads each step conditional on the
-**whole book** landing at its 1-in-100, off the ledger's kappa column, so that
-one foots exactly. The gap between them is the diversification benefit.
+One frame, one row per step that books a result of its own, in ledger order, so
+the last row is the net position:
 
 .. ipython:: python
 
-    qd(tower.evaluation_df)
+    qd(tower.waterfall_df)
 
-``evaluation_df`` is the same rows as ratios: premium and margin spent against
-the gross block, the combined ratio, margin over its own standard deviation, and
-margin over the capital each of the two adverse readings would call for. Nothing
-here is newly estimated; every number is arithmetic over quantities the P&L has
-already computed. A single-group P&L books one result, so the walk is one row and
-there is nothing to walk.
+It reads in two halves. The first is the walk: premium and margin spent against
+the gross block, the combined ratio (the margin per unit of premium being
+``1 - CR``), the margin itself, and ``MSD``, the margin over its own standard
+deviation. The second is **three capital bases, each beside its own cost of
+capital**, which is the comparison the frame exists to support.
+
+``Capital standalone`` reads each step in **its own** adverse state, so it does
+not foot down the walk, tail measures not being additive. ``Capital net`` reads
+each step conditional on the **whole book** landing at its 1-in-100, off the
+ledger's kappa column, so that one foots exactly, and ``Capital gross``
+conditions on the gross result instead, reading the program as a stress test.
+The gap between standalone and the other two is the diversification benefit.
+
+Capital is signed as **capital**: a risk-bearing row reads what it holds and a
+cession reads a negative number, the capital the cover releases, which is the
+honest statement about a cover. Each ``CoC`` column is the margin over the
+capital beside it, on every row and with no routing, so it reads as a return
+where capital is held and as the price paid per unit released where it is handed
+back.
+
+**Those capital amounts are notional.** Nothing in the ledger is truncated at
+them, no default is modeled and no loss is limited by them: they are what the
+1-in-100 state calls for, read off a quantile. A reader who takes them for a
+balance sheet will read the ``CoC`` columns as a realized return, and they are
+not that.
+
+Nothing here is newly estimated; every number is arithmetic over quantities the
+P&L has already computed. A single-group P&L books one result, so the walk is
+one row and there is nothing to walk.
+
+The ``economic_waterfall`` exhibit serves the frame whole under RAW and splits
+it after ``MSD`` under INSURER, into a ``walk`` block and a ``capital`` block.
+The split is **by question rather than by unit**, which is the point: a capital
+basis and its own cost of capital belong in one table.
+
+**Breaking, stable tier (a390).** ``waterfall_df`` replaces ``walk_df`` and
+``evaluation_df``, which were development ephemera. Six columns renamed and
+three changed sign: ``M01 standalone`` / ``M01 div net`` / ``M01 div gross``
+became ``Capital standalone`` / ``Capital net`` / ``Capital gross`` and carry
+``-M01``; ``SA CoC`` / ``Div CoC net`` / ``Div CoC gross`` became
+``CoC standalone`` / ``CoC net`` / ``CoC gross``, unchanged in value. The
+``Margin ratio`` column is gone, being ``1 - CR`` beside ``CR``. The return
+period left the column names so that the level can become a parameter without
+churning the format sheets, and rides in
+``waterfall_df.attrs['return_period']`` and in the exhibit's captions.
 
 Ceding commission is a contra expense (a304)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

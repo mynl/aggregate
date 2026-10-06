@@ -1097,9 +1097,8 @@ def test_ratio_frame_sd_is_the_walk_denominator(tower):
     than joining it in at presentation time: both read the block's own result
     row in ``economic_df``.
     """
-    ratios, walk, ev = tower.economic_ratios_df, tower.walk_df, \
-        tower.evaluation_df
-    implied = walk['Margin'] / ev['MSD']
+    ratios, walk = tower.economic_ratios_df, tower.waterfall_df
+    implied = walk['Margin'] / walk['MSD']
     assert ratios.loc[walk.index, 'SD'].to_numpy() == \
         pytest.approx(implied.to_numpy(), rel=1e-12)
 
@@ -1150,40 +1149,64 @@ def test_waterfall_needs_a_tower(objects, tower):
     assert 'economic_waterfall' in [n for n, _ in available_exhibits(tower)]
 
 
-def test_waterfall_two_blocks_pure_units(tower):
-    blocks = exhibit_frames(tower, 'economic_waterfall')
-    assert [b for b, _, _ in blocks] == ['walk_df', 'evaluation_df']
-    walk, evaluation = blocks[0][1], blocks[1][1]
-    assert walk.index.name == 'Step' and evaluation.index.name == 'Step'
-    assert list(walk.index) == list(evaluation.index)
-    # walk is currency, evaluation is dimensionless: no column in both
-    assert set(walk.columns).isdisjoint(evaluation.columns)
+def test_waterfall_raw_is_one_frame_insurer_splits_by_question(tower):
+    """[Waterfall-Capital]: one frame raw, two blocks under insurer.
+
+    The split is after ``MSD`` and it is **by question rather than by unit**,
+    which is the point of the merge: the walk is what each step spends and
+    earns, and the capital block is three bases each beside its own cost of
+    capital, the comparison that previously meant reading across two tables.
+    The blocks therefore mix units deliberately, so the old disjointness
+    assertion is gone on purpose.
+    """
+    raw = exhibit_frames(tower, 'economic_waterfall')
+    assert [b for b, _, _ in raw] == ['waterfall_df']
+    insurer = exhibit_frames(tower, 'economic_waterfall', 'insurer')
+    assert [b for b, _, _ in insurer] == ['walk', 'capital']
+    walk, capital = insurer[0][1], insurer[1][1]
+    assert list(walk.columns) == ['Premium spent', 'Margin spent', 'CR',
+                                 'Margin', 'MSD']
+    assert list(capital.columns) == ['Capital standalone', 'Capital net',
+                                     'Capital gross', 'CoC standalone',
+                                     'CoC net', 'CoC gross']
+    # the two blocks partition the frame, in order, losing nothing
+    assert list(walk.columns) + list(capital.columns) \
+        == list(raw[0][1].columns)
+    assert walk.index.name == 'Step' and capital.index.name == 'Step'
+    assert list(walk.index) == list(capital.index)
+    # the return period left the column names and rides here instead
+    assert raw[0][1].attrs['return_period'] == 100
+    assert '1-in-100' in insurer[1][2]['caption']
+    # and the caption says the amounts are not a balance sheet
+    assert 'NOTIONAL' in insurer[1][2]['caption']
 
 
-def test_waterfall_serves_the_frames_the_pnl_publishes(tower):
-    """[Waterfall-Frames-Are-Owed]: the blocks are frames, not inventions.
+def test_waterfall_serves_the_frame_the_pnl_publishes(tower):
+    """[Waterfall-Frames-Are-Owed]: the block is a frame, not an invention.
 
-    Until a253 this exhibit computed its two tables in the exhibit layer and
-    no public frame stood behind them, which is the one thing the RAW
-    invariant forbids.
+    Until a253 this exhibit computed its tables in the exhibit layer and no
+    public frame stood behind them, which is the one thing the RAW invariant
+    forbids. The invariant caught this exhibit a second time at a390, when the
+    merged version was first written to serve its two blocks under both
+    perspectives: a column slice is not a public frame either.
     """
     blocks = exhibit_frames(tower, 'economic_waterfall')
     for name, served, _kw in blocks:
         pd.testing.assert_frame_equal(served, getattr(tower, name))
 
 
-def test_waterfall_diversified_foots_and_standalone_does_not(tower):
+def test_waterfall_conditional_bases_foot_and_standalone_does_not(tower):
     """The thesis of the exhibit, stated as an assertion.
 
     Conditioning on the whole book's 1-in-100 makes the column a set of
     conditional means, which add; each step's own 1-in-100 is a quantile,
     and quantiles do not add. Showing both side by side is the point.
     """
-    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    div = walk['M01 div net']
-    sa = walk['M01 standalone']
+    walk = tower.waterfall_df
+    net = walk['Capital net']
+    sa = walk['Capital standalone']
     # the steps before the closing row sum to the closing row, exactly
-    assert div.iloc[:-1].sum() == pytest.approx(div.iloc[-1], rel=1e-9)
+    assert net.iloc[:-1].sum() == pytest.approx(net.iloc[-1], rel=1e-9)
     # standalone is a quantile (two-sided by role since a365) and does not
     # foot: the pre-close cells do not sum to the closing cell
     assert sa.iloc[:-1].sum() != pytest.approx(sa.iloc[-1], rel=1e-6)
@@ -1192,73 +1215,74 @@ def test_waterfall_diversified_foots_and_standalone_does_not(tower):
         walk['Margin'].iloc[-1], rel=1e-9)
     # the gross basis is the same ladder arithmetic under the other anchor,
     # so it foots the same way ([Waterfall-Gross-Basis])
-    gross = walk['M01 div gross']
+    gross = walk['Capital gross']
     assert gross.iloc[:-1].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
 
 
 def test_waterfall_capital_ratio_definition(tower):
-    """``M / -M01``: one quotient per basis, on every row, since a365.
+    """``M / Q``: one quotient per basis, on every row, and no negation.
 
     The a361 role routing (``Cost of relief`` beside ``M / M01
-    diversified``) reverted: the sign convention carries the reading, so
-    each basis is a single column and the identity holds on risk and ceded
-    rows alike.
+    diversified``) reverted at a365: the sign convention carries the reading,
+    so each basis is a single column and the identity holds on risk and ceded
+    rows alike. At a390 the capital columns carry capital rather than the
+    margin in the adverse state, so the quotient lost its minus sign and the
+    identity reads as plainly as it is meant to.
     """
-    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
+    walk = tower.waterfall_df
     for step in walk.index:
         margin = walk['Margin'][step]
-        assert ev['SA CoC'][step] == pytest.approx(
-            margin / -walk['M01 standalone'][step])
-        assert ev['Div CoC net'][step] == pytest.approx(
-            margin / -walk['M01 div net'][step])
-        assert ev['Div CoC gross'][step] == pytest.approx(
-            margin / -walk['M01 div gross'][step])
+        for basis in ('standalone', 'net', 'gross'):
+            assert walk[f'CoC {basis}'][step] == pytest.approx(
+                margin / walk[f'Capital {basis}'][step])
 
 
 def test_waterfall_sign_convention_by_role(tower):
-    """[Writer-Standalone]: the sign flip is the marker of a row's role.
+    """[Writer-Standalone] and [Waterfall-Capital]: the sign marks the role.
 
-    A ceded row has margin < 0 and both M01 cells > 0 (the standalone is the
-    writer's right-tail 1-in-100, the diversified is the capital the cover
-    releases), so both CoC quotients are finite and positive: costs of
-    relief. A risk-bearing row is the mirror image (margin > 0, both M01
-    < 0, both CoC the return on capital). This supersedes the a361 blanks.
+    A ceded row has margin < 0 and all three capital cells < 0: it does not
+    hold capital, it **releases** it, and negative capital released is the
+    honest statement. The standalone cell is the writer's right-tail 1-in-100
+    negated, the two conditional cells the capital the cover hands back. Both
+    inputs being negative, every CoC quotient is finite and positive: a cost of
+    relief. A risk-bearing row is the mirror image, margin > 0 and capital > 0,
+    with the CoC reading as a return on capital. The sign flipped at a390,
+    when the columns became capital rather than the margin in the adverse
+    state; the CoC values did not move.
     """
     import numpy as np
-    _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    _, ev, _ = exhibit_frames(tower, 'economic_waterfall')[1]
+    walk = tower.waterfall_df
     ceded_steps = [s for s in walk.index
                    if tower._step_result_rows()[s][2]]
     risk_steps = [s for s in walk.index if s not in ceded_steps]
     assert ceded_steps and len(risk_steps) >= 2
     for step in ceded_steps:
         assert walk['Margin'][step] < 0
-        assert walk['M01 standalone'][step] > 0
-        assert walk['M01 div net'][step] > 0
-        assert walk['M01 div gross'][step] > 0
-        assert np.isfinite(ev['SA CoC'][step]) and ev['SA CoC'][step] > 0
-        assert np.isfinite(ev['Div CoC net'][step])
-        assert ev['Div CoC net'][step] > 0
-        assert np.isfinite(ev['Div CoC gross'][step])
-        assert ev['Div CoC gross'][step] > 0
+        for basis in ('standalone', 'net', 'gross'):
+            assert walk[f'Capital {basis}'][step] < 0
+            coc = walk[f'CoC {basis}'][step]
+            assert np.isfinite(coc) and coc > 0
     for step in risk_steps:
-        assert walk['M01 standalone'][step] < 0
-        assert walk['M01 div net'][step] < 0
-        assert walk['M01 div gross'][step] < 0
-        assert np.isfinite(ev['SA CoC'][step])
-        assert np.isfinite(ev['Div CoC net'][step])
-        assert np.isfinite(ev['Div CoC gross'][step])
+        assert walk['Margin'][step] > 0
+        for basis in ('standalone', 'net', 'gross'):
+            assert walk[f'Capital {basis}'][step] > 0
+            assert np.isfinite(walk[f'CoC {basis}'][step])
 
 
 def test_waterfall_capstone_acceptance():
     """The a365 acceptance table on the author's capstone program.
 
-    Div CoC carries the a361 acceptance numbers in one column (the role
-    routing reverted); the SA CoC ceded cells are the new writer-side
-    right-tail numbers, first computed 2026-09-29 (XOL 1800 / 4800, QS
+    ``CoC net`` carries the a361 acceptance numbers in one column (the role
+    routing reverted); the ``CoC standalone`` ceded cells are the writer-side
+    right-tail numbers first computed 2026-09-29 (XOL 1800 / 4800, QS
     776.25 / 5036.25; the QS cells agree across bases because a quota share
     of the whole book is comonotone with it).
+
+    **Every CoC figure below is byte-for-byte what a389 printed.**
+    [Waterfall-Capital] renamed six columns and flipped the sign of three, and
+    this test is where that claim is checked: the capital cells are the
+    negatives of the old ``M01`` cells and the quotients did not move, because
+    the negation moved out of :func:`_capital_ratio` and into the column.
     """
     p = build(
         'xpnl Acc.Capstone derive premium less '
@@ -1272,23 +1296,24 @@ def test_waterfall_capstone_acceptance():
         'mixed gamma 0.125 '
         'aggregate net of 75% po inf xs 0 rate 1 cede 0.275 as QS '
         'less 0.25 premium expenses as "G&A" peel bottom-up')
-    ev = p.evaluation_df
+    w = p.waterfall_df
     # the walk carries the net-of-occurrence position since a387 (third row);
     # the a365 numbers stand unchanged around it
-    assert list(ev.index) == ['Gross', 'XOL layer', 'Net of occurrence',
-                              'QS', 'All']
-    got = [round(v, 4) for v in ev['Div CoC net']]
+    assert list(w.index) == ['Gross', 'XOL layer', 'Net of occurrence',
+                             'QS', 'All']
+    got = [round(v, 4) for v in w['CoC net']]
     assert got == [0.2332, 1.3955, 0.0333, 0.1541, -0.2136]
-    assert round(ev['MSD']['Gross'], 3) == 0.451
-    got_sa = [round(v, 4) for v in ev['SA CoC']]
+    assert round(w['MSD']['Gross'], 3) == 0.451
+    got_sa = [round(v, 4) for v in w['CoC standalone']]
     assert got_sa == [0.199, 0.375, 0.0333, 0.1541, -0.2136]
-    # Margin ratio is 1 - CR, rung by rung
-    import numpy as np
-    np.testing.assert_allclose(ev['Margin ratio'], 1 - ev['CR'], atol=1e-12)
-    walk = p.walk_df
-    assert walk['M01 standalone']['XOL layer'] == pytest.approx(4800.0)
-    assert walk['M01 standalone']['QS'] == pytest.approx(5036.25)
-    assert walk['M01 standalone']['Net of occurrence'] == pytest.approx(-7500.0)
+    # the capital cells are the negated M01 cells a389 printed
+    assert w['Capital standalone']['XOL layer'] == pytest.approx(-4800.0)
+    assert w['Capital standalone']['QS'] == pytest.approx(-5036.25)
+    assert w['Capital standalone']['Net of occurrence'] == \
+        pytest.approx(7500.0)
+    # `Margin ratio` is gone from the merged frame: it is 1 - CR and sits
+    # beside CR, so the reader does the subtraction the column was doing
+    assert 'Margin ratio' not in w.columns
 
 
 def test_waterfall_closing_row_standalone_equals_diversified(tower):
@@ -1299,8 +1324,8 @@ def test_waterfall_closing_row_standalone_equals_diversified(tower):
     number, exactly.
     """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    assert walk['M01 standalone'].iloc[-1] == pytest.approx(
-        walk['M01 div net'].iloc[-1], rel=1e-9)
+    assert walk['Capital standalone'].iloc[-1] == pytest.approx(
+        walk['Capital net'].iloc[-1], rel=1e-9)
 
 
 def test_waterfall_gross_row_standalone_equals_div_gross(tower):
@@ -1308,11 +1333,11 @@ def test_waterfall_gross_row_standalone_equals_div_gross(tower):
 
     On the Gross row the gross basis anchors to that row's own quantile:
     ``E[gross result | gross result = x] = x``, so the cell coincides with
-    the row's standalone M01 exactly on the per-atom route.
+    the row's standalone capital exactly on the per-atom route.
     """
     _, walk, _ = exhibit_frames(tower, 'economic_waterfall')[0]
-    assert walk['M01 standalone'].iloc[0] == pytest.approx(
-        walk['M01 div gross'].iloc[0], rel=1e-9)
+    assert walk['Capital standalone'].iloc[0] == pytest.approx(
+        walk['Capital gross'].iloc[0], rel=1e-9)
 
 
 def test_waterfall_blanks_diversified_on_ineligible_ladder(peel_marginal):
@@ -1320,15 +1345,20 @@ def test_waterfall_blanks_diversified_on_ineligible_ladder(peel_marginal):
 
     The ineligible fixture is a stitched peel under a logarithmic frequency:
     ``freq_pgf_prime`` raises, the Palm ladder is not computed, the ledger
-    keeps plain ``P`` headers and the walk's diversified column blanks, with
+    keeps plain ``P`` headers and the walk's conditional columns blank, with
     the caption rider naming the blank. (Ruled 2026-09-29: the plan's
     original swing fixture cannot serve here, since a swing walk is per-atom
     and carries a populated kappa ladder.)
+
+    The rider is on the **capital** block since a390, that being the block
+    those columns now live in.
     """
-    _, walk, kw = exhibit_frames(peel_marginal, 'economic_waterfall')[0]
-    assert walk['M01 div net'].isna().all()
-    assert walk['M01 div gross'].isna().all()
-    assert walk['M01 standalone'].notna().any()
+    walk = peel_marginal.waterfall_df
+    assert walk['Capital net'].isna().all()
+    assert walk['Capital gross'].isna().all()
+    assert walk['Capital standalone'].notna().any()
+    _, _, kw = exhibit_frames(peel_marginal, 'economic_waterfall',
+                              'insurer')[1]
     assert 'blank here' in kw['caption']
     assert 'P01' in peel_marginal.economic_df.columns
 
@@ -1341,7 +1371,7 @@ def test_waterfall_peel_diversified_populates_and_foots(peel):
     from the footing sum), and the caption carries no blank rider.
     """
     _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
-    div = walk['M01 div net']
+    div = walk['Capital net']
     assert div.notna().all()
     assert 'blank here' not in kw['caption']
     footing = [s for s in walk.index[:-1] if not s.startswith('All')]
@@ -1357,17 +1387,17 @@ def test_waterfall_gross_populates_and_foots_on_the_stitched_peel(peel):
     Every row of an occurrence-only peel is a per-claim sum, so the gross
     ladder is exact 1-D Palm under the identity conditioning and the full
     column serves. It foots down the walk, and on the Gross row the cell
-    agrees with the row's own standalone M01 to within one bucket (the
+    agrees with the row's own standalone capital to within one bucket (the
     anchor rounds the quantile to the grid).
     """
     _, walk, kw = exhibit_frames(peel, 'economic_waterfall')[0]
-    gross = walk['M01 div gross']
+    gross = walk['Capital gross']
     assert gross.notna().all()
     assert 'blank here' not in kw['caption']
     footing = [s for s in walk.index[:-1] if not s.startswith('All')]
     assert gross[footing].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
-    assert walk['M01 div gross'].iloc[0] == pytest.approx(
-        walk['M01 standalone'].iloc[0], abs=float(peel.engine.bs))
+    assert walk['Capital gross'].iloc[0] == pytest.approx(
+        walk['Capital standalone'].iloc[0], abs=float(peel.engine.bs))
 
 
 def test_swing_walk_keeps_its_kappa_ladder():
@@ -1383,7 +1413,7 @@ def test_swing_walk_keeps_its_kappa_ladder():
               'min 500 max 3000')
     assert p._probs is not None
     assert 'κ01' in p.economic_df.columns
-    assert p.walk_df['M01 div net'].notna().all()
+    assert p.waterfall_df['Capital net'].notna().all()
 
 
 def test_waterfall_includes_tier_subtotals(peel):
@@ -1434,13 +1464,15 @@ def test_waterfall_gross_affine_aggregate_serves_the_full_column(
     The gross column is complete, foots down the walk, and the caption
     carries no truncation rider.
     """
-    _, walk, kw = exhibit_frames(peel_agg_affine, 'economic_waterfall')[0]
-    gross = walk['M01 div gross']
+    walk = peel_agg_affine.waterfall_df
+    gross = walk['Capital gross']
     assert gross.notna().all()
     # subtotal and net-of-tier rows restate steps already in the sum
     footing = [s for s in walk.index[:-1]
                if not s.startswith(('All', 'Net of'))]
     assert gross[footing].sum() == pytest.approx(gross.iloc[-1], rel=1e-9)
+    _, _, kw = exhibit_frames(peel_agg_affine, 'economic_waterfall',
+                              'insurer')[1]
     assert 'cannot see through' not in kw['caption']
 
 
@@ -1454,19 +1486,19 @@ def test_waterfall_gross_truncates_at_a_nonlinear_aggregate_tier(
     names the truncation. The net column is untouched.
     """
     import numpy as np
-    blocks = exhibit_frames(peel_agg_nonlinear, 'economic_waterfall')
-    _, walk, kw = blocks[0]
-    _, ev, _ = blocks[1]
-    gross = walk['M01 div gross']
+    walk = peel_agg_nonlinear.waterfall_df
+    gross = walk['Capital gross']
     occ_steps = [s for s in walk.index
                  if s.startswith(('Gross', 'occ ', 'All occurrence',
                                   'Net of occurrence'))]
     agg_steps = [s for s in walk.index if s not in occ_steps]
     assert agg_steps and gross[occ_steps].notna().all()
     assert gross[agg_steps].isna().all()
-    assert ev['Div CoC gross'][agg_steps].isna().all()
-    assert np.isfinite(ev['Div CoC gross'][occ_steps]).all()
-    assert walk['M01 div net'].notna().all()
+    assert walk['CoC gross'][agg_steps].isna().all()
+    assert np.isfinite(walk['CoC gross'][occ_steps]).all()
+    assert walk['Capital net'].notna().all()
+    _, _, kw = exhibit_frames(peel_agg_nonlinear, 'economic_waterfall',
+                              'insurer')[1]
     assert 'cannot see through' in kw['caption']
 
 
@@ -1477,7 +1509,7 @@ def test_waterfall_gross_separates_layers_the_net_basis_collapses():
     250 xs 250 and 250 xs 500) makes the net-of-occurrence subject carry
     claim-count information only, so every layer's conditional recovery is
     the same multiple of its mean and, with premiums proportional to the
-    layer means, every layer's Div CoC net is one number. The gross basis
+    layer means, every layer's CoC net is one number. The gross basis
     sees the large claims the net gives away and separates the layers.
     """
     base = ('xpnl EX.GSep 1000 premium less agg EX.GSepE 1000 premium at '
@@ -1491,11 +1523,11 @@ def test_waterfall_gross_separates_layers_the_net_basis_collapses():
     # premiums at a common loading, so the net collapse reaches the CoC
     p = build(base.format(d1=f'{1.25 * means[0]:.17g}',
                           d2=f'{1.25 * means[1]:.17g}'))
-    ev = p.evaluation_df
-    layers = [s for s in ev.index if s.startswith('occ ')]
+    w = p.waterfall_df
+    layers = [s for s in w.index if s.startswith('occ ')]
     assert len(layers) == 2
-    net = [ev['Div CoC net'][s] for s in layers]
-    gross = [ev['Div CoC gross'][s] for s in layers]
+    net = [w['CoC net'][s] for s in layers]
+    gross = [w['CoC gross'][s] for s in layers]
     assert net[0] == pytest.approx(net[1], rel=1e-6)
     assert abs(gross[0] - gross[1]) > 0.25 * abs(gross[0])
 
@@ -1503,12 +1535,17 @@ def test_waterfall_gross_separates_layers_the_net_basis_collapses():
 def test_capital_ratio_nan_pass_through():
     """A missing capital cell propagates: the quotient is NaN, no raise.
 
-    This is how fork B's truncation reaches ``Div CoC gross`` for free.
+    This is how fork B's truncation reaches ``CoC gross`` for free.
     """
     import numpy as np
     from aggregate._pnl import _capital_ratio
     assert np.isnan(_capital_ratio(5.0, np.nan))
-    assert np.isnan(_capital_ratio(np.nan, -10.0))
+    assert np.isnan(_capital_ratio(np.nan, 10.0))
+    # a vanishing denominator is the one case with genuinely no answer
+    assert np.isnan(_capital_ratio(5.0, 0.0))
+    # and the quotient is now the plain one, no negation ([Waterfall-Capital])
+    assert _capital_ratio(5.0, 20.0) == pytest.approx(0.25)
+    assert _capital_ratio(-5.0, -20.0) == pytest.approx(0.25)
 
 
 # --- the pricing leaves ([Pricing-Exhibits]) --------------------------------

@@ -36688,232 +36688,6 @@
      "cells": [
       "Gross",
       {
-       "raw": 299.99379188155297,
-       "text": "299.99"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1820.0,
-       "text": "-1,820.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1754.48754567279,
-       "text": "-1,754.49"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1820.000000000004,
-       "text": "-1,820.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 300 xs 200",
-      {
-       "raw": 83.89265190491155,
-       "text": "83.89"
-      },
-      {
-       "raw": 620.0,
-       "text": "620.00"
-      },
-      {
-       "raw": 426.0027994395041,
-       "text": "426.00"
-      },
-      {
-       "raw": 509.88650714921505,
-       "text": "509.89"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 100 xs 100",
-      {
-       "raw": 63.76031042534639,
-       "text": "63.76"
-      },
-      {
-       "raw": 360.0,
-       "text": "360.00"
-      },
-      {
-       "raw": 192.48474623329446,
-       "text": "192.48"
-      },
-      {
-       "raw": 240.31206467187792,
-       "text": "240.31"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All occurrence",
-      {
-       "raw": 147.65296233038313,
-       "text": "147.65"
-      },
-      {
-       "raw": 940.0,
-       "text": "940.00"
-      },
-      {
-       "raw": 618.4875456727981,
-       "text": "618.49"
-      },
-      {
-       "raw": 750.1985718210933,
-       "text": "750.20"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 447.6467541234374,
-       "text": "447.65"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1136.0,
-       "text": "-1,136.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1135.9999999999918,
-       "text": "-1,136.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1069.8014281789106,
-       "text": "-1,069.80"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c1",
-     "name": [
-      "Margin"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "M01 standalone"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "M01 div net"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "M01 div gross"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Margin"
-     },
-     {
-      "text": "M01 standalone"
-     },
-     {
-      "text": "M01 div net"
-     },
-     {
-      "text": "M01 div gross"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
        "raw": 1.0,
        "text": "100.0%"
       },
@@ -36926,24 +36700,12 @@
        "text": "70.0%"
       },
       {
-       "raw": 0.29999379188155295,
-       "text": "30.0%"
+       "raw": 299.99379188155297,
+       "text": "299.99"
       },
       {
        "raw": 0.5070774083024571,
        "text": "0.507"
-      },
-      {
-       "raw": 0.16483175378107306,
-       "text": "16.5%"
-      },
-      {
-       "raw": 0.17098656107388605,
-       "text": "17.1%"
-      },
-      {
-       "raw": 0.16483175378107268,
-       "text": "16.5%"
       }
      ]
     },
@@ -36967,36 +36729,12 @@
        "text": "309.7%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2.097316297622789,
-       "text": "-209.7%"
+       "raw": 83.89265190491155,
+       "text": "83.89"
       },
       {
        "raw": 0.4969830060840827,
        "text": "0.497"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.1353107288788896,
-       "text": "-13.5%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.19692981364275047,
-       "text": "-19.7%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.16453201002308715,
-       "text": "-16.5%"
       }
      ]
     },
@@ -37020,36 +36758,12 @@
        "text": "206.3%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.06267184042244,
-       "text": "-106.3%"
+       "raw": 63.76031042534639,
+       "text": "63.76"
       },
       {
        "raw": 0.614924629808769,
        "text": "0.615"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.17711197340373996,
-       "text": "-17.7%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.331248640077006,
-       "text": "-33.1%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.26532296875067307,
-       "text": "-26.5%"
       }
      ]
     },
@@ -37073,36 +36787,12 @@
        "text": "247.7%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.4765296233025795,
-       "text": "-147.7%"
+       "raw": 147.65296233038313,
+       "text": "147.65"
       },
       {
        "raw": 0.5835379976351804,
        "text": "0.584"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.15707761950040758,
-       "text": "-15.7%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.23873231298419192,
-       "text": "-23.9%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -0.1968185062948844,
-       "text": "-19.7%"
       }
      ]
     },
@@ -37123,24 +36813,12 @@
        "text": "50.3%"
       },
       {
-       "raw": 0.49738528245756763,
-       "text": "49.7%"
+       "raw": 447.6467541234374,
+       "text": "447.65"
       },
       {
        "raw": 1.0886772129543212,
        "text": "1.089"
-      },
-      {
-       "raw": 0.3940552413058428,
-       "text": "39.4%"
-      },
-      {
-       "raw": 0.3940552413058456,
-       "text": "39.4%"
-      },
-      {
-       "raw": 0.4184391068587863,
-       "text": "41.8%"
       }
      ],
      "flags": [
@@ -37148,7 +36826,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, CR is its combined ratio and the margin per unit of premium is 1 less CR, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. The capital each step calls for, and what that capital costs, are in the table below.",
    "columns": [
     {
      "align": "l",
@@ -37207,15 +36885,15 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "Margin ratio"
+      "Margin"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
@@ -37229,48 +36907,6 @@
       "MSD"
      ],
      "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c6",
-     "name": [
-      "SA CoC"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Div CoC net"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "Div CoC gross"
-     ],
-     "raw": true,
-     "tag": "ratio"
     }
    ],
    "head": [
@@ -37288,19 +36924,346 @@
       "text": "CR"
      },
      {
-      "text": "Margin ratio"
+      "text": "Margin"
      },
      {
       "text": "MSD"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      {
+       "raw": 1820.0,
+       "text": "1,820.00"
+      },
+      {
+       "raw": 1754.48754567279,
+       "text": "1,754.49"
+      },
+      {
+       "raw": 1820.000000000004,
+       "text": "1,820.00"
+      },
+      {
+       "raw": 0.16483175378107306,
+       "text": "16.5%"
+      },
+      {
+       "raw": 0.17098656107388605,
+       "text": "17.1%"
+      },
+      {
+       "raw": 0.16483175378107268,
+       "text": "16.5%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -620.0,
+       "text": "-620.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -426.0027994395041,
+       "text": "-426.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -509.88650714921505,
+       "text": "-509.89"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1353107288788896,
+       "text": "-13.5%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.19692981364275047,
+       "text": "-19.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.16453201002308715,
+       "text": "-16.5%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -360.0,
+       "text": "-360.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -192.48474623329446,
+       "text": "-192.48"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -240.31206467187792,
+       "text": "-240.31"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.17711197340373996,
+       "text": "-17.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.331248640077006,
+       "text": "-33.1%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.26532296875067307,
+       "text": "-26.5%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -940.0,
+       "text": "-940.00"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -618.4875456727981,
+       "text": "-618.49"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -750.1985718210933,
+       "text": "-750.20"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.15707761950040758,
+       "text": "-15.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.23873231298419192,
+       "text": "-23.9%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1968185062948844,
+       "text": "-19.7%"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      {
+       "raw": 1136.0,
+       "text": "1,136.00"
+      },
+      {
+       "raw": 1135.9999999999918,
+       "text": "1,136.00"
+      },
+      {
+       "raw": 1069.8014281789106,
+       "text": "1,069.80"
+      },
+      {
+       "raw": 0.3940552413058428,
+       "text": "39.4%"
+      },
+      {
+       "raw": 0.3940552413058456,
+       "text": "39.4%"
+      },
+      {
+       "raw": 0.4184391068587863,
+       "text": "41.8%"
+      }
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "Three capital bases for the same walk, each beside its own cost of capital, all struck at the 1-in-100 state. Capital is the negated result in that state, so a risk-bearing row reads the capital it holds and a ceded row reads a negative number: the capital the cover releases, which is what a cover does. The CoC columns are margin over the capital beside them, on every row, so they read as a return where capital is held and as the price paid per unit released where it is given back, with no change of arithmetic. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn. Standalone is each step's own 1-in-100, two-sided by role: a risk-bearing step reads its own adverse tail, a ceded step the writer's, the state in which the cover pays most. Tail measures do not add, so standalone does not foot, and its gap against the other two is the diversification benefit. Net conditions on the whole book landing at its own 1-in-100, which decomposes the capital the firm actually holds and is the basis for attribution; gross conditions on the gross result landing at its own, which reads the program as a stress test. Both are ladders of conditional means and foot down the walk where complete. These capital amounts are NOTIONAL: nothing in the ledger is truncated at them, no default is modeled and no loss is limited by them. They are the capital the state calls for, read off a quantile.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Capital standalone"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "Capital net"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "Capital gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c4",
+     "name": [
+      "CoC standalone"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "CoC net"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CoC gross"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
      },
      {
-      "text": "SA CoC"
+      "text": "Capital standalone"
      },
      {
-      "text": "Div CoC net"
+      "text": "Capital net"
      },
      {
-      "text": "Div CoC gross"
+      "text": "Capital gross"
+     },
+     {
+      "text": "CoC standalone"
+     },
+     {
+      "text": "CoC net"
+     },
+     {
+      "text": "CoC gross"
      }
     ]
    ],
@@ -37316,220 +37279,6 @@
      "cells": [
       "Gross",
       {
-       "raw": 299.993680729881,
-       "text": "299.99"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -4755.0,
-       "text": "-4,755.00"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 300 xs 200",
-      {
-       "raw": 83.89086651234096,
-       "text": "83.89"
-      },
-      {
-       "raw": 1115.0,
-       "text": "1,115.00"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 100 xs 100",
-      {
-       "raw": 63.755617932163844,
-       "text": "63.76"
-      },
-      {
-       "raw": 940.0,
-       "text": "940.00"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All occurrence",
-      {
-       "raw": 147.64648444442403,
-       "text": "147.65"
-      },
-      {
-       "raw": 2000.0,
-       "text": "2,000.00"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 447.64016512017713,
-       "text": "447.64"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2895.0,
-       "text": "-2,895.00"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. Both div columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c1",
-     "name": [
-      "Margin"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "M01 standalone"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "M01 div net"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "M01 div gross"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Margin"
-     },
-     {
-      "text": "M01 standalone"
-     },
-     {
-      "text": "M01 div net"
-     },
-     {
-      "text": "M01 div gross"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
        "raw": 1.0,
        "text": "100.0%"
       },
@@ -37542,24 +37291,12 @@
        "text": "70.0%"
       },
       {
-       "raw": 0.299993680729881,
-       "text": "30.0%"
+       "raw": 299.993680729881,
+       "text": "299.99"
       },
       {
        "raw": 0.25400925574735117,
        "text": "0.254"
-      },
-      {
-       "raw": 0.06309015367610536,
-       "text": "6.3%"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
       }
      ]
     },
@@ -37583,15 +37320,261 @@
        "text": "309.7%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2.097271662808524,
-       "text": "-209.7%"
+       "raw": 83.89086651234096,
+       "text": "83.89"
       },
       {
        "raw": 0.3390438910634031,
        "text": "0.339"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 100 xs 100",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.06,
+       "text": "-6.0%"
+      },
+      {
+       "raw": 0.21252320307896883,
+       "text": "21.3%"
+      },
+      {
+       "raw": 2.0625936322027307,
+       "text": "206.3%"
+      },
+      {
+       "raw": 63.755617932163844,
+       "text": "63.76"
+      },
+      {
+       "raw": 0.3060050983292784,
+       "text": "0.306"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All occurrence",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.1,
+       "text": "-10.0%"
+      },
+      {
+       "raw": 0.4921653152335832,
+       "text": "49.2%"
+      },
+      {
+       "raw": 2.476464844445048,
+       "text": "247.6%"
+      },
+      {
+       "raw": 147.64648444442403,
+       "text": "147.65"
+      },
+      {
+       "raw": 0.33452919345393833,
+       "text": "0.335"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "All",
+      {
+       "raw": 0.9,
+       "text": "90.0%"
+      },
+      {
+       "raw": 1.4921653152335832,
+       "text": "149.2%"
+      },
+      {
+       "raw": 0.5026220386951269,
+       "text": "50.3%"
+      },
+      {
+       "raw": 447.64016512017713,
+       "text": "447.64"
+      },
+      {
+       "raw": 0.5753160949722593,
+       "text": "0.575"
+      }
+     ],
+     "flags": [
+      "total"
+     ]
+    }
+   ],
+   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, CR is its combined ratio and the margin per unit of premium is 1 less CR, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. The capital each step calls for, and what that capital costs, are in the table below.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "Step"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c1",
+     "name": [
+      "Premium spent"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c2",
+     "name": [
+      "Margin spent"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CR"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Margin"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "MSD"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "Step"
+     },
+     {
+      "text": "Premium spent"
+     },
+     {
+      "text": "Margin spent"
+     },
+     {
+      "text": "CR"
+     },
+     {
+      "text": "Margin"
+     },
+     {
+      "text": "MSD"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  },
+  {
+   "body": [
+    {
+     "cells": [
+      "Gross",
+      {
+       "raw": 4755.0,
+       "text": "4,755.00"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.06309015367610536,
+       "text": "6.3%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "occ 300 xs 200",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1115.0,
+       "text": "-1,115.00"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "flags": [
@@ -37618,27 +37601,16 @@
        "flags": [
         "neg"
        ],
-       "raw": -0.06,
-       "text": "-6.0%"
+       "raw": -940.0,
+       "text": "-940.00"
       },
       {
-       "raw": 0.21252320307896883,
-       "text": "21.3%"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.0625936322027307,
-       "text": "-106.3%"
-      },
-      {
-       "raw": 0.3060050983292784,
-       "text": "0.306"
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "flags": [
@@ -37665,27 +37637,16 @@
        "flags": [
         "neg"
        ],
-       "raw": -0.1,
-       "text": "-10.0%"
+       "raw": -2000.0,
+       "text": "-2,000.00"
       },
       {
-       "raw": 0.4921653152335832,
-       "text": "49.2%"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.476464844445048,
-       "text": "-147.6%"
-      },
-      {
-       "raw": 0.33452919345393833,
-       "text": "0.335"
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "flags": [
@@ -37709,24 +37670,16 @@
      "cells": [
       "All",
       {
-       "raw": 0.9,
-       "text": "90.0%"
+       "raw": 2895.0,
+       "text": "2,895.00"
       },
       {
-       "raw": 1.4921653152335832,
-       "text": "149.2%"
+       "raw": null,
+       "text": "\u2014"
       },
       {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
-      },
-      {
-       "raw": 0.4973779613048731,
-       "text": "49.7%"
-      },
-      {
-       "raw": 0.5753160949722593,
-       "text": "0.575"
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 0.1546252729257952,
@@ -37746,7 +37699,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "Three capital bases for the same walk, each beside its own cost of capital, all struck at the 1-in-100 state. Capital is the negated result in that state, so a risk-bearing row reads the capital it holds and a ceded row reads a negative number: the capital the cover releases, which is what a cover does. The CoC columns are margin over the capital beside them, on every row, so they read as a return where capital is held and as the price paid per unit released where it is given back, with no change of arithmetic. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn. Standalone is each step's own 1-in-100, two-sided by role: a risk-bearing step reads its own adverse tail, a ceded step the writer's, the state in which the cover pays most. Tail measures do not add, so standalone does not foot, and its gap against the other two is the diversification benefit. Net conditions on the whole book landing at its own 1-in-100, which decomposes the capital the firm actually holds and is the basis for attribution; gross conditions on the gross result landing at its own, which reads the program as a stress test. Both are ladders of conditional means and foot down the walk where complete. These capital amounts are NOTIONAL: nothing in the ledger is truncated at them, no default is modeled and no loss is limited by them. They are the capital the state calls for, read off a quantile. Both conditional columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
    "columns": [
     {
      "align": "l",
@@ -37763,43 +37716,43 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c1",
      "name": [
-      "Premium spent"
+      "Capital standalone"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c2",
      "name": [
-      "Margin spent"
+      "Capital net"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Capital gross"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
@@ -37810,7 +37763,7 @@
      },
      "key": "c4",
      "name": [
-      "Margin ratio"
+      "CoC standalone"
      ],
      "raw": true,
      "tag": "ratio"
@@ -37819,14 +37772,15 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 3,
-      "kind": "dec"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c5",
      "name": [
-      "MSD"
+      "CoC net"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
     },
     {
      "align": "r",
@@ -37837,35 +37791,7 @@
      },
      "key": "c6",
      "name": [
-      "SA CoC"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Div CoC net"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "Div CoC gross"
+      "CoC gross"
      ],
      "raw": true,
      "tag": "ratio"
@@ -37877,28 +37803,22 @@
       "text": "Step"
      },
      {
-      "text": "Premium spent"
+      "text": "Capital standalone"
      },
      {
-      "text": "Margin spent"
+      "text": "Capital net"
      },
      {
-      "text": "CR"
+      "text": "Capital gross"
      },
      {
-      "text": "Margin ratio"
+      "text": "CoC standalone"
      },
      {
-      "text": "MSD"
+      "text": "CoC net"
      },
      {
-      "text": "SA CoC"
-     },
-     {
-      "text": "Div CoC net"
-     },
-     {
-      "text": "Div CoC gross"
+      "text": "CoC gross"
      }
     ]
    ],
@@ -37908,191 +37828,6 @@
   }
  ],
  "economic_waterfall/insurer/Tower": [
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
-       "raw": 299.9938550594756,
-       "text": "299.99"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1840.0,
-       "text": "-1,840.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1802.9863176788754,
-       "text": "-1,802.99"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1840.0,
-       "text": "-1,840.00"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 500 xs 500",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -48.88690349308212,
-       "text": "-48.89"
-      },
-      {
-       "raw": 420.0,
-       "text": "420.00"
-      },
-      {
-       "raw": 422.98631767887554,
-       "text": "422.99"
-      },
-      {
-       "raw": 483.3663847499806,
-       "text": "483.37"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 251.10695156639355,
-       "text": "251.11"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1380.0,
-       "text": "-1,380.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1380.0,
-       "text": "-1,380.00"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1356.6336152500196,
-       "text": "-1,356.63"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c1",
-     "name": [
-      "Margin"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c2",
-     "name": [
-      "M01 standalone"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c3",
-     "name": [
-      "M01 div net"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 2,
-      "group": true,
-      "kind": "dec"
-     },
-     "key": "c4",
-     "name": [
-      "M01 div gross"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Margin"
-     },
-     {
-      "text": "M01 standalone"
-     },
-     {
-      "text": "M01 div net"
-     },
-     {
-      "text": "M01 div gross"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
   {
    "body": [
     {
@@ -38111,24 +37846,12 @@
        "text": "70.0%"
       },
       {
-       "raw": 0.2999938550594756,
-       "text": "30.0%"
+       "raw": 299.9938550594756,
+       "text": "299.99"
       },
       {
        "raw": 0.5057099917516722,
        "text": "0.506"
-      },
-      {
-       "raw": 0.1630401386192802,
-       "text": "16.3%"
-      },
-      {
-       "raw": 0.16638720555887582,
-       "text": "16.6%"
-      },
-      {
-       "raw": 0.1630401386192802,
-       "text": "16.3%"
       }
      ]
     },
@@ -38155,8 +37878,11 @@
        "text": "51.1%"
       },
       {
-       "raw": 0.48886903493082134,
-       "text": "48.9%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -48.88690349308212,
+       "text": "-48.89"
       },
       {
        "flags": [
@@ -38164,18 +37890,6 @@
        ],
        "raw": -0.347143971720678,
        "text": "-0.347"
-      },
-      {
-       "raw": 0.11639738926924315,
-       "text": "11.6%"
-      },
-      {
-       "raw": 0.1155756142689142,
-       "text": "11.6%"
-      },
-      {
-       "raw": 0.10113840150131392,
-       "text": "10.1%"
       }
      ]
     },
@@ -38196,24 +37910,12 @@
        "text": "72.1%"
       },
       {
-       "raw": 0.2790077239626594,
-       "text": "27.9%"
+       "raw": 251.10695156639355,
+       "text": "251.11"
       },
       {
        "raw": 0.5042702204366026,
        "text": "0.504"
-      },
-      {
-       "raw": 0.18196155910608228,
-       "text": "18.2%"
-      },
-      {
-       "raw": 0.18196155910608228,
-       "text": "18.2%"
-      },
-      {
-       "raw": 0.18509562843178998,
-       "text": "18.5%"
       }
      ],
      "flags": [
@@ -38221,7 +37923,7 @@
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, CR is its combined ratio and the margin per unit of premium is 1 less CR, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. The capital each step calls for, and what that capital costs, are in the table below.",
    "columns": [
     {
      "align": "l",
@@ -38280,15 +37982,15 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c4",
      "name": [
-      "Margin ratio"
+      "Margin"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
@@ -38302,48 +38004,6 @@
       "MSD"
      ],
      "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c6",
-     "name": [
-      "SA CoC"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c7",
-     "name": [
-      "Div CoC net"
-     ],
-     "raw": true,
-     "tag": "ratio"
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 1,
-      "kind": "pct"
-     },
-     "key": "c8",
-     "name": [
-      "Div CoC gross"
-     ],
-     "raw": true,
-     "tag": "ratio"
     }
    ],
    "head": [
@@ -38361,123 +38021,84 @@
       "text": "CR"
      },
      {
-      "text": "Margin ratio"
+      "text": "Margin"
      },
      {
       "text": "MSD"
-     },
-     {
-      "text": "SA CoC"
-     },
-     {
-      "text": "Div CoC net"
-     },
-     {
-      "text": "Div CoC gross"
      }
     ]
    ],
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
-  }
- ],
- "economic_waterfall/raw/Peel": [
+  },
   {
    "body": [
     {
      "cells": [
       "Gross",
       {
-       "raw": 299.99379188155297,
-       "text": "299.9938"
+       "raw": 1840.0,
+       "text": "1,840.00"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1820.0,
-       "text": "-1,820"
+       "raw": 1802.9863176788754,
+       "text": "1,802.99"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1754.48754567279,
-       "text": "-1,754.488"
+       "raw": 1840.0,
+       "text": "1,840.00"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1820.000000000004,
-       "text": "-1,820"
+       "raw": 0.1630401386192802,
+       "text": "16.3%"
+      },
+      {
+       "raw": 0.16638720555887582,
+       "text": "16.6%"
+      },
+      {
+       "raw": 0.1630401386192802,
+       "text": "16.3%"
       }
      ]
     },
     {
      "break_depth": 0,
      "cells": [
-      "occ 300 xs 200",
+      "occ 500 xs 500",
       {
-       "raw": 83.89265190491155,
-       "text": "83.89265"
+       "flags": [
+        "neg"
+       ],
+       "raw": -420.0,
+       "text": "-420.00"
       },
       {
-       "raw": 620.0,
-       "text": "620"
+       "flags": [
+        "neg"
+       ],
+       "raw": -422.98631767887554,
+       "text": "-422.99"
       },
       {
-       "raw": 426.0027994395041,
-       "text": "426.0028"
+       "flags": [
+        "neg"
+       ],
+       "raw": -483.3663847499806,
+       "text": "-483.37"
       },
       {
-       "raw": 509.88650714921505,
-       "text": "509.8865"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 100 xs 100",
-      {
-       "raw": 63.76031042534639,
-       "text": "63.76031"
+       "raw": 0.11639738926924315,
+       "text": "11.6%"
       },
       {
-       "raw": 360.0,
-       "text": "360"
+       "raw": 0.1155756142689142,
+       "text": "11.6%"
       },
       {
-       "raw": 192.48474623329446,
-       "text": "192.4847"
-      },
-      {
-       "raw": 240.31206467187792,
-       "text": "240.3121"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All occurrence",
-      {
-       "raw": 147.65296233038313,
-       "text": "147.653"
-      },
-      {
-       "raw": 940.0,
-       "text": "940"
-      },
-      {
-       "raw": 618.4875456727981,
-       "text": "618.4875"
-      },
-      {
-       "raw": 750.1985718210933,
-       "text": "750.1986"
+       "raw": 0.10113840150131392,
+       "text": "10.1%"
       }
      ]
     },
@@ -38486,29 +38107,28 @@
      "cells": [
       "All",
       {
-       "raw": 447.6467541234374,
-       "text": "447.6468"
+       "raw": 1380.0,
+       "text": "1,380.00"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1136.0,
-       "text": "-1,136"
+       "raw": 1380.0,
+       "text": "1,380.00"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1135.9999999999918,
-       "text": "-1,136"
+       "raw": 1356.6336152500196,
+       "text": "1,356.63"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1069.8014281789106,
-       "text": "-1,069.801"
+       "raw": 0.18196155910608228,
+       "text": "18.2%"
+      },
+      {
+       "raw": 0.18196155910608228,
+       "text": "18.2%"
+      },
+      {
+       "raw": 0.18509562843178998,
+       "text": "18.5%"
       }
      ],
      "flags": [
@@ -38516,7 +38136,7 @@
      ]
     }
    ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
+   "caption": "Three capital bases for the same walk, each beside its own cost of capital, all struck at the 1-in-100 state. Capital is the negated result in that state, so a risk-bearing row reads the capital it holds and a ceded row reads a negative number: the capital the cover releases, which is what a cover does. The CoC columns are margin over the capital beside them, on every row, so they read as a return where capital is held and as the price paid per unit released where it is given back, with no change of arithmetic. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn. Standalone is each step's own 1-in-100, two-sided by role: a risk-bearing step reads its own adverse tail, a ceded step the writer's, the state in which the cover pays most. Tail measures do not add, so standalone does not foot, and its gap against the other two is the diversification benefit. Net conditions on the whole book landing at its own 1-in-100, which decomposes the capital the firm actually holds and is the basis for attribution; gross conditions on the gross result landing at its own, which reads the program as a stress test. Both are ladders of conditional means and foot down the walk where complete. These capital amounts are NOTIONAL: nothing in the ledger is truncated at them, no default is modeled and no loss is limited by them. They are the capital the state calls for, read off a quantile.",
    "columns": [
     {
      "align": "l",
@@ -38533,13 +38153,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 7,
+      "digits": 2,
       "group": true,
-      "kind": "gen"
+      "kind": "dec"
      },
      "key": "c1",
      "name": [
-      "Margin"
+      "Capital standalone"
      ],
      "raw": true
     },
@@ -38547,13 +38167,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 7,
+      "digits": 2,
       "group": true,
-      "kind": "gen"
+      "kind": "dec"
      },
      "key": "c2",
      "name": [
-      "M01 standalone"
+      "Capital net"
      ],
      "raw": true
     },
@@ -38561,13 +38181,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 7,
+      "digits": 2,
       "group": true,
-      "kind": "gen"
+      "kind": "dec"
      },
      "key": "c3",
      "name": [
-      "M01 div net"
+      "Capital gross"
      ],
      "raw": true
     },
@@ -38575,15 +38195,43 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
+      "digits": 1,
+      "kind": "pct"
      },
      "key": "c4",
      "name": [
-      "M01 div gross"
+      "CoC standalone"
      ],
-     "raw": true
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "CoC net"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c6",
+     "name": [
+      "CoC gross"
+     ],
+     "raw": true,
+     "tag": "ratio"
     }
    ],
    "head": [
@@ -38592,23 +38240,31 @@
       "text": "Step"
      },
      {
-      "text": "Margin"
+      "text": "Capital standalone"
      },
      {
-      "text": "M01 standalone"
+      "text": "Capital net"
      },
      {
-      "text": "M01 div net"
+      "text": "Capital gross"
      },
      {
-      "text": "M01 div gross"
+      "text": "CoC standalone"
+     },
+     {
+      "text": "CoC net"
+     },
+     {
+      "text": "CoC gross"
      }
     ]
    ],
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 1
-  },
+  }
+ ],
+ "economic_waterfall/raw/Peel": [
   {
    "body": [
     {
@@ -38627,12 +38283,24 @@
        "text": "70.0%"
       },
       {
-       "raw": 0.29999379188155295,
-       "text": "30.0%"
+       "raw": 299.99379188155297,
+       "text": "299.9938"
       },
       {
        "raw": 0.5070774083024571,
        "text": "0.507"
+      },
+      {
+       "raw": 1820.0,
+       "text": "1,820"
+      },
+      {
+       "raw": 1754.48754567279,
+       "text": "1,754.488"
+      },
+      {
+       "raw": 1820.000000000004,
+       "text": "1,820"
       },
       {
        "raw": 0.16483175378107306,
@@ -38668,15 +38336,33 @@
        "text": "309.7%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2.097316297622789,
-       "text": "-209.7%"
+       "raw": 83.89265190491155,
+       "text": "83.89265"
       },
       {
        "raw": 0.4969830060840827,
        "text": "0.497"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -620.0,
+       "text": "-620"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -426.0027994395041,
+       "text": "-426.0028"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -509.88650714921505,
+       "text": "-509.8865"
       },
       {
        "flags": [
@@ -38721,15 +38407,33 @@
        "text": "206.3%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.06267184042244,
-       "text": "-106.3%"
+       "raw": 63.76031042534639,
+       "text": "63.76031"
       },
       {
        "raw": 0.614924629808769,
        "text": "0.615"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -360.0,
+       "text": "-360"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -192.48474623329446,
+       "text": "-192.4847"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -240.31206467187792,
+       "text": "-240.3121"
       },
       {
        "flags": [
@@ -38774,15 +38478,33 @@
        "text": "247.7%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.4765296233025795,
-       "text": "-147.7%"
+       "raw": 147.65296233038313,
+       "text": "147.653"
       },
       {
        "raw": 0.5835379976351804,
        "text": "0.584"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -940.0,
+       "text": "-940"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -618.4875456727981,
+       "text": "-618.4875"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -750.1985718210933,
+       "text": "-750.1986"
       },
       {
        "flags": [
@@ -38824,12 +38546,24 @@
        "text": "50.3%"
       },
       {
-       "raw": 0.49738528245756763,
-       "text": "49.7%"
+       "raw": 447.6467541234374,
+       "text": "447.6468"
       },
       {
        "raw": 1.0886772129543212,
        "text": "1.089"
+      },
+      {
+       "raw": 1136.0,
+       "text": "1,136"
+      },
+      {
+       "raw": 1135.9999999999918,
+       "text": "1,136"
+      },
+      {
+       "raw": 1069.8014281789106,
+       "text": "1,069.801"
       },
       {
        "raw": 0.3940552413058428,
@@ -38843,13 +38577,10 @@
        "raw": 0.4184391068587863,
        "text": "41.8%"
       }
-     ],
-     "flags": [
-      "total"
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The margin walk and the capital behind it, one row per step that books a result: what each step spends, what it earns, the capital it calls for on three bases and what that capital costs on each. Capital is signed as capital, so a cession reads negative: capital released. The level it is struck at is in the frame's return_period attribute. Those amounts are notional, with nothing in the ledger truncated at them. The insurer view splits this into the walk and the capital bases and says how to read each.",
    "columns": [
     {
      "align": "l",
@@ -38908,15 +38639,15 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c4",
      "name": [
-      "Margin ratio"
+      "Margin"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
@@ -38935,26 +38666,54 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c6",
      "name": [
-      "SA CoC"
+      "Capital standalone"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c7",
      "name": [
-      "Div CoC net"
+      "Capital net"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c8",
+     "name": [
+      "Capital gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "CoC standalone"
      ],
      "raw": true,
      "tag": "ratio"
@@ -38966,9 +38725,23 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
-      "Div CoC gross"
+      "CoC net"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "CoC gross"
      ],
      "raw": true,
      "tag": "ratio"
@@ -38989,19 +38762,28 @@
       "text": "CR"
      },
      {
-      "text": "Margin ratio"
+      "text": "Margin"
      },
      {
       "text": "MSD"
      },
      {
-      "text": "SA CoC"
+      "text": "Capital standalone"
      },
      {
-      "text": "Div CoC net"
+      "text": "Capital net"
      },
      {
-      "text": "Div CoC gross"
+      "text": "Capital gross"
+     },
+     {
+      "text": "CoC standalone"
+     },
+     {
+      "text": "CoC net"
+     },
+     {
+      "text": "CoC gross"
      }
     ]
    ],
@@ -39011,220 +38793,6 @@
   }
  ],
  "economic_waterfall/raw/PeelMarginal": [
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
-       "raw": 299.993680729881,
-       "text": "299.9937"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -4755.0,
-       "text": "-4,755"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 300 xs 200",
-      {
-       "raw": 83.89086651234096,
-       "text": "83.89087"
-      },
-      {
-       "raw": 1115.0,
-       "text": "1,115"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 100 xs 100",
-      {
-       "raw": 63.755617932163844,
-       "text": "63.75562"
-      },
-      {
-       "raw": 940.0,
-       "text": "940"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All occurrence",
-      {
-       "raw": 147.64648444442403,
-       "text": "147.6465"
-      },
-      {
-       "raw": 2000.0,
-       "text": "2,000"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 447.64016512017713,
-       "text": "447.6402"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2895.0,
-       "text": "-2,895"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      },
-      {
-       "raw": null,
-       "text": "\u2014"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. Both div columns are blank here: this ledger shares no atoms across its rows and carries no Palm ladder, so no conditioning was possible.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c1",
-     "name": [
-      "Margin"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c2",
-     "name": [
-      "M01 standalone"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c3",
-     "name": [
-      "M01 div net"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c4",
-     "name": [
-      "M01 div gross"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Margin"
-     },
-     {
-      "text": "M01 standalone"
-     },
-     {
-      "text": "M01 div net"
-     },
-     {
-      "text": "M01 div gross"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
   {
    "body": [
     {
@@ -39243,12 +38811,24 @@
        "text": "70.0%"
       },
       {
-       "raw": 0.299993680729881,
-       "text": "30.0%"
+       "raw": 299.993680729881,
+       "text": "299.9937"
       },
       {
        "raw": 0.25400925574735117,
        "text": "0.254"
+      },
+      {
+       "raw": 4755.0,
+       "text": "4,755"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 0.06309015367610536,
@@ -39284,15 +38864,27 @@
        "text": "309.7%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -2.097271662808524,
-       "text": "-209.7%"
+       "raw": 83.89086651234096,
+       "text": "83.89087"
       },
       {
        "raw": 0.3390438910634031,
        "text": "0.339"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -1115.0,
+       "text": "-1,115"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "flags": [
@@ -39331,15 +38923,27 @@
        "text": "206.3%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.0625936322027307,
-       "text": "-106.3%"
+       "raw": 63.755617932163844,
+       "text": "63.75562"
       },
       {
        "raw": 0.3060050983292784,
        "text": "0.306"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -940.0,
+       "text": "-940"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "flags": [
@@ -39378,15 +38982,27 @@
        "text": "247.6%"
       },
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1.476464844445048,
-       "text": "-147.6%"
+       "raw": 147.64648444442403,
+       "text": "147.6465"
       },
       {
        "raw": 0.33452919345393833,
        "text": "0.335"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -2000.0,
+       "text": "-2,000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "flags": [
@@ -39422,12 +39038,24 @@
        "text": "50.3%"
       },
       {
-       "raw": 0.4973779613048731,
-       "text": "49.7%"
+       "raw": 447.64016512017713,
+       "text": "447.6402"
       },
       {
        "raw": 0.5753160949722593,
        "text": "0.575"
+      },
+      {
+       "raw": 2895.0,
+       "text": "2,895"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 0.1546252729257952,
@@ -39441,13 +39069,10 @@
        "raw": null,
        "text": "\u2014"
       }
-     ],
-     "flags": [
-      "total"
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The margin walk and the capital behind it, one row per step that books a result: what each step spends, what it earns, the capital it calls for on three bases and what that capital costs on each. Capital is signed as capital, so a cession reads negative: capital released. The level it is struck at is in the frame's return_period attribute. Those amounts are notional, with nothing in the ledger truncated at them. The insurer view splits this into the walk and the capital bases and says how to read each.",
    "columns": [
     {
      "align": "l",
@@ -39506,15 +39131,15 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c4",
      "name": [
-      "Margin ratio"
+      "Margin"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
@@ -39533,26 +39158,54 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c6",
      "name": [
-      "SA CoC"
+      "Capital standalone"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c7",
      "name": [
-      "Div CoC net"
+      "Capital net"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c8",
+     "name": [
+      "Capital gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "CoC standalone"
      ],
      "raw": true,
      "tag": "ratio"
@@ -39564,9 +39217,23 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
-      "Div CoC gross"
+      "CoC net"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "CoC gross"
      ],
      "raw": true,
      "tag": "ratio"
@@ -39587,19 +39254,28 @@
       "text": "CR"
      },
      {
-      "text": "Margin ratio"
+      "text": "Margin"
      },
      {
       "text": "MSD"
      },
      {
-      "text": "SA CoC"
+      "text": "Capital standalone"
      },
      {
-      "text": "Div CoC net"
+      "text": "Capital net"
      },
      {
-      "text": "Div CoC gross"
+      "text": "Capital gross"
+     },
+     {
+      "text": "CoC standalone"
+     },
+     {
+      "text": "CoC net"
+     },
+     {
+      "text": "CoC gross"
      }
     ]
    ],
@@ -39609,191 +39285,6 @@
   }
  ],
  "economic_waterfall/raw/Tower": [
-  {
-   "body": [
-    {
-     "cells": [
-      "Gross",
-      {
-       "raw": 299.9938550594756,
-       "text": "299.9939"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1840.0,
-       "text": "-1,840"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1802.9863176788754,
-       "text": "-1,802.986"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1840.0,
-       "text": "-1,840"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "occ 500 xs 500",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -48.88690349308212,
-       "text": "-48.8869"
-      },
-      {
-       "raw": 420.0,
-       "text": "420"
-      },
-      {
-       "raw": 422.98631767887554,
-       "text": "422.9863"
-      },
-      {
-       "raw": 483.3663847499806,
-       "text": "483.3664"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "All",
-      {
-       "raw": 251.10695156639355,
-       "text": "251.107"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1380.0,
-       "text": "-1,380"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1380.0,
-       "text": "-1,380"
-      },
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -1356.6336152500196,
-       "text": "-1,356.634"
-      }
-     ],
-     "flags": [
-      "total"
-     ]
-    }
-   ],
-   "caption": "The margin walk in currency: gross, what each layer cedes, and the closing net. Margin is the expected result and M01 is the result in the 1-in-100 state. The div columns are one conditioning each and answer different questions: div net conditions on the whole book landing at its own 1-in-100, the return on the capital the firm actually holds, while div gross conditions on the gross result landing at its own 1-in-100, the program's performance in the gross stress state. Each is a ladder of conditional means and foots down the walk where complete. The standalone column is two-sided by role: a risk bearing step reads its own left tail, the state that calls for capital, while a ceded step reads its own right tail, the writer's 1-in-100, the state in which the cover pays most and the capital the writer of that cover would hold, so the cell is positive there and the sign flip marks which reading a row takes. Tail measures do not add, so standalone does not foot, and its gap against the div columns is the diversification benefit. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone.",
-   "columns": [
-    {
-     "align": "l",
-     "dtype": "string",
-     "key": "c0",
-     "level": 0,
-     "name": [
-      "Step"
-     ],
-     "role": "stub",
-     "wrap": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c1",
-     "name": [
-      "Margin"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c2",
-     "name": [
-      "M01 standalone"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c3",
-     "name": [
-      "M01 div net"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
-     "key": "c4",
-     "name": [
-      "M01 div gross"
-     ],
-     "raw": true
-    }
-   ],
-   "head": [
-    [
-     {
-      "text": "Step"
-     },
-     {
-      "text": "Margin"
-     },
-     {
-      "text": "M01 standalone"
-     },
-     {
-      "text": "M01 div net"
-     },
-     {
-      "text": "M01 div gross"
-     }
-    ]
-   ],
-   "ir_version": 1,
-   "n_head_levels": 1,
-   "n_stub_levels": 1
-  },
   {
    "body": [
     {
@@ -39812,12 +39303,24 @@
        "text": "70.0%"
       },
       {
-       "raw": 0.2999938550594756,
-       "text": "30.0%"
+       "raw": 299.9938550594756,
+       "text": "299.9939"
       },
       {
        "raw": 0.5057099917516722,
        "text": "0.506"
+      },
+      {
+       "raw": 1840.0,
+       "text": "1,840"
+      },
+      {
+       "raw": 1802.9863176788754,
+       "text": "1,802.986"
+      },
+      {
+       "raw": 1840.0,
+       "text": "1,840"
       },
       {
        "raw": 0.1630401386192802,
@@ -39856,8 +39359,11 @@
        "text": "51.1%"
       },
       {
-       "raw": 0.48886903493082134,
-       "text": "48.9%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -48.88690349308212,
+       "text": "-48.8869"
       },
       {
        "flags": [
@@ -39865,6 +39371,27 @@
        ],
        "raw": -0.347143971720678,
        "text": "-0.347"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -420.0,
+       "text": "-420"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -422.98631767887554,
+       "text": "-422.9863"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -483.3663847499806,
+       "text": "-483.3664"
       },
       {
        "raw": 0.11639738926924315,
@@ -39897,12 +39424,24 @@
        "text": "72.1%"
       },
       {
-       "raw": 0.2790077239626594,
-       "text": "27.9%"
+       "raw": 251.10695156639355,
+       "text": "251.107"
       },
       {
        "raw": 0.5042702204366026,
        "text": "0.504"
+      },
+      {
+       "raw": 1380.0,
+       "text": "1,380"
+      },
+      {
+       "raw": 1380.0,
+       "text": "1,380"
+      },
+      {
+       "raw": 1356.6336152500196,
+       "text": "1,356.634"
       },
       {
        "raw": 0.18196155910608228,
@@ -39916,13 +39455,10 @@
        "raw": 0.18509562843178998,
        "text": "18.5%"
       }
-     ],
-     "flags": [
-      "total"
      ]
     }
    ],
-   "caption": "The same walk read as ratios: the rubric for the program. Margin ratio is 1 less CR, the margin per unit of premium. MSD is margin over its own standard deviation, a multiple. The CoC columns are one quotient, M over the negated M01, on the standalone, net diversified and gross diversified capital bases: net reads as the return on held capital, gross as the step's performance in the gross stress state. The sign convention carries the reading: gross and net rows have margin above zero and M01 below, so the ratio is the return earned on the capital that state calls for; a ceded row has both reversed (margin below zero, the writer's right-tail M01 above), so the same arithmetic reads as a cost, the margin given up per unit of capital. The reinsurance test is whether a ceded row's CoC comes in under the return the risk-bearing rows earn.",
+   "caption": "The margin walk and the capital behind it, one row per step that books a result: what each step spends, what it earns, the capital it calls for on three bases and what that capital costs on each. Capital is signed as capital, so a cession reads negative: capital released. The level it is struck at is in the frame's return_period attribute. Those amounts are notional, with nothing in the ledger truncated at them. The insurer view splits this into the walk and the capital bases and says how to read each.",
    "columns": [
     {
      "align": "l",
@@ -39981,15 +39517,15 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c4",
      "name": [
-      "Margin ratio"
+      "Margin"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
@@ -40008,26 +39544,54 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c6",
      "name": [
-      "SA CoC"
+      "Capital standalone"
      ],
-     "raw": true,
-     "tag": "ratio"
+     "raw": true
     },
     {
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 1,
-      "kind": "pct"
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
      },
      "key": "c7",
      "name": [
-      "Div CoC net"
+      "Capital net"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c8",
+     "name": [
+      "Capital gross"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c9",
+     "name": [
+      "CoC standalone"
      ],
      "raw": true,
      "tag": "ratio"
@@ -40039,9 +39603,23 @@
       "digits": 1,
       "kind": "pct"
      },
-     "key": "c8",
+     "key": "c10",
      "name": [
-      "Div CoC gross"
+      "CoC net"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c11",
+     "name": [
+      "CoC gross"
      ],
      "raw": true,
      "tag": "ratio"
@@ -40062,19 +39640,28 @@
       "text": "CR"
      },
      {
-      "text": "Margin ratio"
+      "text": "Margin"
      },
      {
       "text": "MSD"
      },
      {
-      "text": "SA CoC"
+      "text": "Capital standalone"
      },
      {
-      "text": "Div CoC net"
+      "text": "Capital net"
      },
      {
-      "text": "Div CoC gross"
+      "text": "Capital gross"
+     },
+     {
+      "text": "CoC standalone"
+     },
+     {
+      "text": "CoC net"
+     },
+     {
+      "text": "CoC gross"
      }
     ]
    ],

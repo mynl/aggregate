@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a390
+
+**[Waterfall-Capital] `walk_df` and `evaluation_df` merge into `waterfall_df`; six columns rename and three flip sign to read as capital.** The two frames were a split by unit, currency in one and ratios in the other, and the split cost the reader the comparison the frame exists for: a capital basis and its own cost of capital sat in different tables. They were development ephemera and the merged frame supersedes them (author's ruling, 2026-10-06). Column order is `Premium spent | Margin spent | CR | Margin | MSD | Capital standalone | Capital net | Capital gross | CoC standalone | CoC net | CoC gross`. `Margin ratio` is dropped: it is `1 - CR` and sits beside `CR`.
+
+The three capital columns carry `-M01`, so they are **capital rather than the margin in the adverse state**. A risk-bearing row reads the capital it holds and a ceded row reads a negative number, the capital the cover releases, which is the honest statement about a cover. Three things follow at once, which is why the rename is worth a break. The return period leaves the column names, so a parametrized level will not churn the format sheets, which are keyed by column name; the level rides in `waterfall_df.attrs['return_period']` and in the exhibit captions instead. The sign becomes the thing you read. And `_capital_ratio` loses its double negative, becoming margin over capital on every row with nothing to explain, with the CoC values unchanged to the last figure.
+
+**The capital amounts are notional**, and both exhibit captions now say so: nothing in the ledger is truncated at them, no default is modeled and no loss is limited by them. They are what the 1-in-100 state calls for, read off a quantile.
+
+The `economic_waterfall` exhibit serves the merged frame whole under RAW and splits it after `MSD` under INSURER, into a `walk` block and a `capital` block. **The split is by question rather than by unit**, which is the point of the change. RAW being a passthrough is new and was forced by the RAW invariant: a column slice is not a public frame, so the two-block reading became the INSURER restructure it always should have been. Sync of `tests/data/exhibit_snapshots.json` required.
+
+**Breaking, on a stable-tier class.** `PnL.walk_df` and `PnL.evaluation_df` are **removed**. A caller reads `PnL.waterfall_df` and follows the renames: `M01 standalone` / `M01 div net` / `M01 div gross` to `Capital standalone` / `Capital net` / `Capital gross`, negating; `SA CoC` / `Div CoC net` / `Div CoC gross` to `CoC standalone` / `CoC net` / `CoC gross`, unchanged; and `Margin ratio` to `1 - CR`. `PnL.evaluate()` still returns an `EvaluationResult` whose `.evaluation_df` is the pricing panel, a different frame that never moved; retiring the P&L property removes a real collision between the two names.
+
 ## 1.0.0a389
 
 **[PnL-Summary-One-Table] `economic_ratios_df` gains `SD`, and its INSURER view becomes one block read across a row.** The new column is the standard deviation of each block's result, read off that block's own result row in `economic_df`, which is the row the walk reads for its `Margin` and for the denominator of its `MSD`. On the frame rather than joined in by whoever presents it, so the walk's `MSD` and this `SD` cannot come from two sources and disagree. With premium and expense fixed on a block the result is the loss shifted, so it is equally that block's loss standard deviation. A marginal row property, so unlike the amounts beside it the column does not foot, and it reads `NaN` on a block that books no result row of its own. Column order is now `P L E M SD LR ER CR E_LR E_ER E_CR P_share M_share`.

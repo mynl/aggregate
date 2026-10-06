@@ -69,12 +69,15 @@ columns:
   # --- the pentagon octet (L, P, M, a, Q, lr, pq, coc) and its neighbours
   L: money
   M: money
-  Margin: money        # the walk's first column (walk_df) spells the margin
-                       # out, since it stands beside M01 rather than beside
-                       # L, P and Q
-  'M01 standalone': money      # the walk's 1-in-100 margin, on its own,
-  'M01 div net': money         # conditional on the whole book's 1-in-100,
-  'M01 div gross': money       # and conditional on the gross 1-in-100
+  Margin: money        # the waterfall spells the margin out, since it stands
+                       # beside the capital columns rather than beside L, P
+                       # and Q
+  # The three capital bases on the waterfall, all amounts. No return period in
+  # a key: the level is a parameter and these names must not move with it
+  # ([Waterfall-Capital]). Signed as capital, so a ceded row reads negative.
+  'Capital standalone': money  # the step's own adverse state, two-sided by role
+  'Capital net': money         # conditional on the whole book's adverse state
+  'Capital gross': money       # and conditional on the gross one
   P: money
   Q: money
   a: money
@@ -122,7 +125,7 @@ columns:
   xsVaR: money
   'VaR/Mean': '.3f'    # leverage, a multiple, read to the same places as PQ
 
-  # --- P&L ratios (economic_ratios_df) and the waterfall (evaluation_df)
+  # --- P&L ratios (economic_ratios_df) and the waterfall (waterfall_df)
   ER: ratio
   CR: ratio
   E_LR: ratio          # the E_ columns are means of ratios, against the
@@ -132,15 +135,14 @@ columns:
   M_share: ratio
   'Premium spent': ratio
   'Margin spent': ratio
-  'Margin ratio': ratio    # 1 - CR, the margin per unit of premium, beside
-                           # CR on evaluation_df (the walk's Margin is money)
+  # 'Margin ratio' was here until [Waterfall-Capital] retired the column: it is
+  # 1 - CR and sits beside CR, so the merged waterfall does not carry it.
   MSD: '.3f'           # margin to standard deviation, a multiple, read to
                        # the same places as PQ and VaR/Mean
-  'SA CoC': ratio      # cost of capital on the standalone basis: a return
-                       # on risk rows, a cost of relief on ceded rows, so it
-                       # reads as ROE and coc do
-  'Div CoC net': ratio     # the same quotient on the net diversified basis
-  'Div CoC gross': ratio   # and against the gross-anchored capital
+  'CoC standalone': ratio  # cost of capital, one per basis: margin over the
+  'CoC net': ratio         # capital column beside it, a return where capital
+  'CoC gross': ratio       # is held and a price where it is released, so all
+                           # three read as ROE and coc do
 
   # --- missing from round 1
   Mean: money

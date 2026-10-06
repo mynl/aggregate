@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a391
+
+**[Ledger-Skew] `Skew` goes back on the abbreviated insurer ledger, which is now five columns.** `LEDGER_MOMENTS` is `EX, SD, CV, Skew`, so the `economic` INSURER view reads level, spread, spread relative to level, the third moment, and the adverse tail state. The column came off at a305 on the ground that a third moment on every line is width the reader pays for and rarely spends. It is back because the ledger **inherited** it: the P&L's own summary card was the one presented frame that carried `Skew`, and [Overview-Engine] retired that card's leaf at a388, so leaving the column off would have put the third moment one perspective away on every sheet a reader actually sees. The a305 argument was about redundancy and the redundancy is gone. Sync of `tests/data/exhibit_snapshots.json` required.
+
 ## 1.0.0a390
 
 **[Waterfall-Capital] `walk_df` and `evaluation_df` merge into `waterfall_df`; six columns rename and three flip sign to read as capital.** The two frames were a split by unit, currency in one and ratios in the other, and the split cost the reader the comparison the frame exists for: a capital basis and its own cost of capital sat in different tables. They were development ephemera and the merged frame supersedes them (author's ruling, 2026-10-06). Column order is `Premium spent | Margin spent | CR | Margin | MSD | Capital standalone | Capital net | Capital gross | CoC standalone | CoC net | CoC gross`. `Margin ratio` is dropped: it is `1 - CR` and sits beside `CR`.

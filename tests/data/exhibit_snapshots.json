@@ -17531,6 +17531,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 1000.0,
        "text": "1,000.00"
       }
@@ -17563,6 +17567,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -4.220517818401878,
+       "text": "-4.221"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -2754.48754567279,
        "text": "-2,754.49"
       }
@@ -17584,6 +17595,13 @@
       {
        "raw": 1.9720854915380666,
        "text": "197.2%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.220517818401878,
+       "text": "-4.221"
       },
       {
        "flags": [
@@ -17622,6 +17640,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -17646,6 +17668,10 @@
       {
        "raw": 1.362501017432172,
        "text": "136.3%"
+      },
+      {
+       "raw": 1.5608284928095806,
+       "text": "1.561"
       },
       {
        "raw": 466.0027994395041,
@@ -17674,6 +17700,10 @@
        "text": "201.2%"
       },
       {
+       "raw": 1.5608284928095806,
+       "text": "1.561"
+      },
+      {
        "raw": 426.0027994395041,
        "text": "426.00"
       }
@@ -17697,6 +17727,13 @@
       {
        "raw": 1.2257615986269286,
        "text": "122.6%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -6.43018398671446,
+       "text": "-6.430"
       },
       {
        "flags": [
@@ -17735,6 +17772,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -17759,6 +17800,10 @@
       {
        "raw": 0.8378130956607497,
        "text": "83.8%"
+      },
+      {
+       "raw": 0.90011253034749,
+       "text": "0.900"
       },
       {
        "raw": 252.48474623329446,
@@ -17787,6 +17832,10 @@
        "text": "162.6%"
       },
       {
+       "raw": 0.90011253034749,
+       "text": "0.900"
+      },
+      {
        "raw": 192.48474623329446,
        "text": "192.48"
       }
@@ -17810,6 +17859,13 @@
       {
        "raw": 0.9185459088340064,
        "text": "91.9%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.879369485889805,
+       "text": "-8.879"
       },
       {
        "flags": [
@@ -17848,6 +17904,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -17874,6 +17934,10 @@
        "text": "102.2%"
       },
       {
+       "raw": 1.2824726527036039,
+       "text": "1.282"
+      },
+      {
        "raw": 718.4875456727981,
        "text": "718.49"
       }
@@ -17895,6 +17959,10 @@
       {
        "raw": 1.7136844627985746,
        "text": "171.4%"
+      },
+      {
+       "raw": 1.2824726527036039,
+       "text": "1.282"
       },
       {
        "raw": 618.4875456727981,
@@ -17925,6 +17993,10 @@
       {
        "raw": 0.0,
        "text": "0.0%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 900.0,
@@ -17962,6 +18034,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -8.879369485889805,
+       "text": "-8.879"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -2035.9999999999918,
        "text": "-2,036.00"
       }
@@ -17989,6 +18068,13 @@
       {
        "raw": 0.9185459088340064,
        "text": "91.9%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.879369485889805,
+       "text": "-8.879"
       },
       {
        "flags": [
@@ -18025,13 +18111,20 @@
        "text": "-105.4%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.6588516674879275,
+       "text": "-4.659"
+      },
+      {
        "raw": 618.4875456727982,
        "text": "618.49"
       }
      ]
     }
    ],
-   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD and CV are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
    "columns": [
     {
      "align": "l",
@@ -18112,11 +18205,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 2,
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "\u03ba01"
      ],
@@ -18142,6 +18248,9 @@
      },
      {
       "text": "CV"
+     },
+     {
+      "text": "Skew"
      },
      {
       "text": "\u03ba01"
@@ -18177,6 +18286,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 1000.0,
        "text": "1,000.00"
       }
@@ -18209,6 +18322,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -4.027735448097866,
+       "text": "-4.028"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -5755.0,
        "text": "-5,755.00"
       }
@@ -18230,6 +18350,13 @@
       {
        "raw": 3.9368644148725203,
        "text": "393.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.027735448097866,
+       "text": "-4.028"
       },
       {
        "flags": [
@@ -18268,6 +18395,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -18292,6 +18423,10 @@
       {
        "raw": 1.9971903831426436,
        "text": "199.7%"
+      },
+      {
+       "raw": 3.520972809988485,
+       "text": "3.521"
       },
       {
        "raw": 0.0,
@@ -18320,6 +18455,10 @@
        "text": "294.9%"
       },
       {
+       "raw": 3.520972809988485,
+       "text": "3.521"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -18346,6 +18485,13 @@
       {
        "raw": 2.510968638379053,
        "text": "251.1%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.269837840630111,
+       "text": "-4.270"
       },
       {
        "flags": [
@@ -18384,6 +18530,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -18408,6 +18558,10 @@
       {
        "raw": 1.683545561302735,
        "text": "168.4%"
+      },
+      {
+       "raw": 3.614171562287901,
+       "text": "3.614"
       },
       {
        "raw": 0.0,
@@ -18436,6 +18590,10 @@
        "text": "326.8%"
       },
       {
+       "raw": 3.614171562287901,
+       "text": "3.614"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -18462,6 +18620,13 @@
       {
        "raw": 1.7381749072189925,
        "text": "173.8%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.752518682894919,
+       "text": "-4.753"
       },
       {
        "flags": [
@@ -18500,6 +18665,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -18526,6 +18695,10 @@
        "text": "178.2%"
       },
       {
+       "raw": 3.581085513007592,
+       "text": "3.581"
+      },
+      {
        "raw": 0.0,
        "text": "0.00"
       }
@@ -18547,6 +18720,10 @@
       {
        "raw": 2.9892757330839377,
        "text": "298.9%"
+      },
+      {
+       "raw": 3.581085513007592,
+       "text": "3.581"
       },
       {
        "flags": [
@@ -18580,6 +18757,10 @@
       {
        "raw": 0.0,
        "text": "0.0%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 900.0,
@@ -18617,6 +18798,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -4.752518682894919,
+       "text": "-4.753"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -3795.0,
        "text": "-3,795.00"
       }
@@ -18644,6 +18832,13 @@
       {
        "raw": 1.7381749072189925,
        "text": "173.8%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.752518682894919,
+       "text": "-4.753"
       },
       {
        "flags": [
@@ -18680,13 +18875,20 @@
        "text": "-219.9%"
       },
       {
+       "flags": [
+        "neg"
+       ],
+       "raw": -0.7247832347970524,
+       "text": "-0.725"
+      },
+      {
        "raw": 1860.0,
        "text": "1,860.00"
       }
      ]
     }
    ],
-   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD and CV are marginal row properties. This ledger shares no atoms across its rows (a one sweep or stitched route), so the ladder is marginal under a plain P header: P01 is that row's own 1% quantile, no conditioning happened, and the column does not foot. Skew and the rest of the percentile ladder are on the raw view.",
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. This ledger shares no atoms across its rows (a one sweep or stitched route), so the ladder is marginal under a plain P header: P01 is that row's own 1% quantile, no conditioning happened, and the column does not foot. Skew and the rest of the percentile ladder are on the raw view.",
    "columns": [
     {
      "align": "l",
@@ -18767,11 +18969,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 2,
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "P01"
      ],
@@ -18797,6 +19012,9 @@
      },
      {
       "text": "CV"
+     },
+     {
+      "text": "Skew"
      },
      {
       "text": "P01"
@@ -18826,6 +19044,10 @@
       {
        "raw": 0.0,
        "text": "0.0%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 1000.0,
@@ -18860,6 +19082,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -0.9701090705921197,
+       "text": "-0.970"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -2080.0,
        "text": "-2,080.00"
       }
@@ -18886,6 +19115,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -0.9701090705921217,
+       "text": "-0.970"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -1080.0,
        "text": "-1,080.00"
       }
@@ -18895,7 +19131,7 @@
      ]
     }
    ],
-   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD and CV are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
    "columns": [
     {
      "align": "l",
@@ -18965,11 +19201,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "Skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 2,
       "group": true,
       "kind": "dec"
      },
-     "key": "c5",
+     "key": "c6",
      "name": [
       "\u03ba01"
      ],
@@ -18992,6 +19241,9 @@
      },
      {
       "text": "CV"
+     },
+     {
+      "text": "Skew"
      },
      {
       "text": "\u03ba01"
@@ -19027,6 +19279,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 1000.0000000000003,
        "text": "1,000.00"
       }
@@ -19059,6 +19315,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -4.177785476516747,
+       "text": "-4.178"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -2802.9863176788754,
        "text": "-2,802.99"
       }
@@ -19080,6 +19343,13 @@
       {
        "raw": 1.9774179199746715,
        "text": "197.7%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.177785476516746,
+       "text": "-4.178"
       },
       {
        "flags": [
@@ -19118,6 +19388,10 @@
        "text": "0.0%"
       },
       {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "flags": [
         "neg"
        ],
@@ -19142,6 +19416,10 @@
       {
        "raw": 2.755184648146536,
        "text": "275.5%"
+      },
+      {
+       "raw": 3.1365518101500927,
+       "text": "3.137"
       },
       {
        "raw": 522.9863176788755,
@@ -19176,6 +19454,10 @@
        "text": "-288.1%"
       },
       {
+       "raw": 3.1365518101500927,
+       "text": "3.137"
+      },
+      {
        "raw": 422.98631767887554,
        "text": "422.99"
       }
@@ -19199,6 +19481,13 @@
       {
        "raw": 1.983063761199678,
        "text": "198.3%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.97752865354882,
+       "text": "-4.978"
       },
       {
        "flags": [
@@ -19232,6 +19521,10 @@
       {
        "raw": 0.0,
        "text": "0.0%"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 900.0000000000001,
@@ -19269,6 +19562,13 @@
        "flags": [
         "neg"
        ],
+       "raw": -4.977528653548813,
+       "text": "-4.978"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
        "raw": -2280.0000000000005,
        "text": "-2,280.00"
       }
@@ -19296,6 +19596,13 @@
       {
        "raw": 1.983063761199678,
        "text": "198.3%"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.97752865354882,
+       "text": "-4.978"
       },
       {
        "flags": [
@@ -19332,13 +19639,17 @@
        "text": "-288.1%"
       },
       {
+       "raw": 3.1365518101500927,
+       "text": "3.137"
+      },
+      {
        "raw": 422.98631767887554,
        "text": "422.99"
       }
      ]
     }
    ],
-   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD and CV are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
+   "caption": "The ledger in currency units: declared legs, side totals and results, in ledger order. Signed as booked, so every column adds down the sheet. EX, SD, CV and Skew are marginal row properties. The kappa column holds scenario states, not per row quantiles: kappa-01 is the state in which the grand result lands at its 1% quantile, and each cell is the conditional mean of that row in that state, so the column foots exactly. Direction is uniform in the outcome, so kappa-01 is the adverse state (payoff convention, left tail bad) and a loss sensitive premium correctly reads high there. Skew and the rest of the percentile ladder are on the raw view.",
    "columns": [
     {
      "align": "l",
@@ -19419,11 +19730,24 @@
      "align": "r",
      "dtype": "float",
      "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
       "digits": 2,
       "group": true,
       "kind": "dec"
      },
-     "key": "c6",
+     "key": "c7",
      "name": [
       "\u03ba01"
      ],
@@ -19449,6 +19773,9 @@
      },
      {
       "text": "CV"
+     },
+     {
+      "text": "Skew"
      },
      {
       "text": "\u03ba01"

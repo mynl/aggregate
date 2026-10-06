@@ -271,10 +271,17 @@ def _ledger_row_flags(obj, df):
 
 
 #: The moment columns the abbreviated insurer ledger keeps
-#: ([Ledger-Insurer-Abbreviated]). ``Skew`` comes off: the reading a ledger
-#: is scanned for is level, spread and one tail, and a third moment on every
-#: line is width the reader pays for and rarely spends.
-LEDGER_MOMENTS = ('EX', 'SD', 'CV')
+#: ([Ledger-Insurer-Abbreviated]). Level, spread, spread relative to level, and
+#: the third moment.
+#:
+#: ``Skew`` came off at a305, on the ground that a third moment on every line is
+#: width the reader pays for and rarely spends. It is back at a391 because the
+#: ledger **inherited** it: the P&L's own summary card was the one presented
+#: frame that carried ``Skew``, and [Overview-Engine] retired that card's leaf,
+#: so dropping the column here would have put the third moment one perspective
+#: away on every sheet a reader sees. The a305 reasoning was about redundancy
+#: and the redundancy is gone.
+LEDGER_MOMENTS = ('EX', 'SD', 'CV', 'Skew')
 
 #: The single ladder point the abbreviated insurer ledger keeps: the **first**
 #: rung, which is the adverse one. P&Ls are in payoff sign convention, left
@@ -302,10 +309,10 @@ def _economic_insurer(obj, blocks):
     said aloud.
 
     RAW is the whole sheet, every moment and the full percentile ladder.
-    INSURER is the reading version ([Ledger-Insurer-Abbreviated]): ``EX``,
-    ``SD``, ``CV`` and the adverse tail state, four columns wide, because
-    thirteen columns of ladder is a frame to slice rather than a sheet to
-    read, and the app has the RAW toggle for that.
+    INSURER is the reading version ([Ledger-Insurer-Abbreviated]): the four
+    moments of :data:`LEDGER_MOMENTS` and the adverse tail state, five columns
+    wide, because thirteen columns of ladder is a frame to slice rather than a
+    sheet to read, and the app has the RAW toggle for that.
 
     The one thing a reader must not get wrong about the tail column is what it
     means: it is a **scenario state**, not a per row quantile, so it foots down
@@ -320,7 +327,7 @@ def _economic_insurer(obj, blocks):
     caption = (
         'The ledger in currency units: declared legs, side totals and '
         'results, in ledger order. Signed as booked, so every column adds '
-        'down the sheet. EX, SD and CV are marginal row properties.')
+        'down the sheet. EX, SD, CV and Skew are marginal row properties.')
     if scenario:
         caption += (
             ' The kappa column holds scenario states, not per row quantiles: '

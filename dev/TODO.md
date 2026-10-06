@@ -557,6 +557,12 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Ledger-Skew]** DONE (`1.0.0a391`), under the API repo's
+  `dev/plan-a194-pnl-exhibits.md`: `LEDGER_MOMENTS` gains `Skew`, so the
+  abbreviated insurer ledger is five columns. The column came off at a305 as
+  redundant against the P&L summary card; [Overview-Engine] retired that card's
+  leaf, so the ledger inherits it.
+
 - **[Waterfall-Capital]** DONE (`1.0.0a390`), under the API repo's
   `dev/plan-a194-pnl-exhibits.md`: `walk_df` and `evaluation_df` merge into
   `waterfall_df`, the three `M01` columns become `Capital standalone` / `net` /

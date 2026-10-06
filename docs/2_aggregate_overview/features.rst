@@ -3370,7 +3370,7 @@ a ``RAW`` block is exactly one public frame, named on the object, served in the
 frame's own orientation with no split and no dropped rows. ``INSURER`` is the
 only perspective that may restructure, which is how the reinsurance layering
 analysis turns over to read layers down the rows, and how the Economics ledger
-narrows to level, spread, spread relative to level, and one tail.
+narrows to level, spread, spread relative to level, the third moment, and one tail.
 
 A served block carries its numbers as well as its formatted strings (a246), so a
 body cell arrives as ``{'text': '17.50', 'raw': 17.5000001}`` and a consumer can

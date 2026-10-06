@@ -993,7 +993,7 @@ def test_economic_insurer_caption_states_the_ladder_regime(tower):
 # --- the abbreviated insurer ledger ([Ledger-Insurer-Abbreviated]) ----------
 
 def test_economic_insurer_is_abbreviated(tower, peel, peel_marginal):
-    """Four columns: the two moments, the CV, and the **adverse** tail state.
+    """Five columns: the four moments and the **adverse** tail state.
 
     The tail rung is the bottom of the ladder, not the top. A P&L is in
     payoff sign convention, left tail bad, so ``κ01`` is the state a reader
@@ -1002,13 +1002,18 @@ def test_economic_insurer_is_abbreviated(tower, peel, peel_marginal):
     the bad. ``peel`` is stitched but Palm-eligible, so since a363 it takes
     the ``κ01`` rung too; ``peel_marginal`` (no pgf derivative) takes the
     same rung under the plain ``P`` header of a marginal ladder.
+
+    ``Skew`` came off at a305 and went back on at a391: the P&L's summary card
+    was the one presented frame carrying it, and [Overview-Engine] retired that
+    card's leaf, so the ledger inherits the column rather than leave the third
+    moment one perspective away on every sheet a reader sees.
     """
     _, tower_df, _ = exhibit_frames(tower, 'economic', 'insurer')[0]
-    assert list(tower_df.columns) == ['EX', 'SD', 'CV', 'κ01']
+    assert list(tower_df.columns) == ['EX', 'SD', 'CV', 'Skew', 'κ01']
     _, peel_df, _ = exhibit_frames(peel, 'economic', 'insurer')[0]
-    assert list(peel_df.columns) == ['EX', 'SD', 'CV', 'κ01']
+    assert list(peel_df.columns) == ['EX', 'SD', 'CV', 'Skew', 'κ01']
     _, marg_df, _ = exhibit_frames(peel_marginal, 'economic', 'insurer')[0]
-    assert list(marg_df.columns) == ['EX', 'SD', 'CV', 'P01']
+    assert list(marg_df.columns) == ['EX', 'SD', 'CV', 'Skew', 'P01']
     # the adverse state really is the adverse one: the bottom line, the row
     # the ledger plan flags ``total``, loses in it rather than making its
     # mean. Read off the flag rather than off ``iloc[-1]``: the last row of a

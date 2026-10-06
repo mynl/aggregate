@@ -123,7 +123,7 @@ What is published
      - PnL
      - 1: ``economic_df``
      - always
-     - **abbreviates to 4 columns**, ``EX``, ``SD``, ``CV`` and the adverse tail state (``κ01``, or ``P01`` on a marginal ladder); caption switches on whether the ladder is a kappa scenario or a marginal ``P`` ladder, ledger row flags, measure formats
+     - **abbreviates to 5 columns**, ``EX``, ``SD``, ``CV``, ``Skew`` and the adverse tail state (``κ01``, or ``P01`` on a marginal ladder); caption switches on whether the ladder is a kappa scenario or a marginal ``P`` ladder, ledger row flags, measure formats
    * - ``economic_ratios``
      - Economic ratios
      - PnL

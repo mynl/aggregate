@@ -90,7 +90,8 @@ from ._core import (
     Perspective, RAW_MOMENT_MEASURES,
     available_exhibits, build_exhibit, exhibit_frames, register_exhibit,
     register_simple_exhibit,
-    dependency, economic, economic_ratios, economic_waterfall, reins, stats,
+    dependency, economic, economic_ratios, economic_tail, economic_waterfall,
+    reins, stats,
     summary, tail, validation,
     pricing_allocate, pricing_calibrate, pricing_evaluate,
     pricing_stand_alone,
@@ -117,7 +118,8 @@ __all__ = [
     'FormatSheet', 'format_sheet', 'reload_format_sheets', 'sheet_paths',
     'CAPITAL_ANCHOR_PERIODS', 'RAW_MOMENT_MEASURES',
     'summary', 'tail', 'stats', 'validation', 'reins',
-    'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
+    'economic', 'economic_ratios', 'economic_waterfall', 'economic_tail',
+    'dependency',
     'bs_window', 'sharpen', 'tail_behavior', 'approximation', 'ruin',
     'pricing_calibrate', 'pricing_stand_alone', 'pricing_allocate',
     'pricing_evaluate',
@@ -155,11 +157,10 @@ register_simple_exhibit(
             'values. Frequency percentiles are blank by design, because '
             'frequency enters through its PGF and no count distribution is '
             'ever materialized.')
-register_simple_exhibit(
-    'summary', 'Summary', 'summary_df', [PnL],
-    caption='The ledger in three rows: what was received (Consideration), '
-            'what is owed (Obligation) and what is left (Margin), each with '
-            'its moments and key percentiles.')
+# PnL ``summary`` looks through to the wrapped engine's card since
+# [Overview-Engine]: the generic exhibit names describe the book, the
+# ``economic`` family describes the ledger. Its frames function lives with the
+# other PnL treatments in ``exhibits._pnl`` (``_summary_frames``).
 register_simple_exhibit(
     'summary', 'Summary', 'summary_df', [Distortion],
     caption='Moments of the distortion g and of its dual, each against its '
@@ -216,12 +217,11 @@ register_simple_exhibit(
     caption='Return period ladder read off the realized grid: VaR (the '
             'quoted number), TVaR (the priced number), excess VaR over the '
             'mean (the capital), and VaR to mean leverage.')
-register_simple_exhibit(
-    'tail', 'Return periods', 'tail_df', [PnL],
-    caption='Return period ladder over the closing margin, in payoff '
-            'orientation: the adverse tail is the low one, so the ladder '
-            'walks into the losses. VaR is the quoted number, TVaR the '
-            'priced one, excess VaR over the mean the capital.')
+# PnL ``tail`` looks through to the wrapped engine's ladder since
+# [Overview-Engine], for the same reason ``summary`` does; the closing
+# margin's own ladder is the ``economic_tail`` exhibit, whose payoff
+# orientation is a different reading of a different distribution. Frames
+# function in ``exhibits._pnl`` (``_tail_frames``).
 # ``economic`` RAW is no longer a one-line passthrough: since
 # [Ledger-Both-Ladders] it serves the scenario sheet and the marginal sheet
 # side by side, so its frames function lives with the other PnL treatments

@@ -1,10 +1,19 @@
 """Exhibit treatments for :class:`~aggregate._pnl.PnL`.
 
-The accounting family: ``economic`` (the ledger sheet) and
-``economic_ratios``, plus the ``stats`` override that explains an absent
-engine. Since [PnL-Economic-Frames] a P&L's ``stats_df`` is its engine's
-moment store, so ``stats`` is the ordinary treatment rather than a special
-case; the ledger has its own exhibit under its own name.
+Two families, and [Overview-Engine] is the ruling that keeps them apart. The
+**generic** exhibit names (``summary``, ``tail``, ``stats``, ``validation``)
+describe the wrapped **book**: each serves an ``engine_*`` frame, so a reader
+moving between them reads one object throughout. The **accounting** family
+(``economic``, ``economic_ratios``, ``economic_waterfall``, ``economic_tail``)
+describes the **ledger**, which is the P&L's own story.
+
+Before that ruling the generic names were mixed: ``stats`` and ``validation``
+already looked through to the engine while ``summary`` and ``tail`` served the
+ledger card and the closing margin's ladder, so one group of leaves described
+two different distributions. The ledger card (``PnL.summary_df``) keeps its
+name, ``qd`` and its notebook repr and simply no longer answers to an exhibit;
+the closing margin's ladder moved to ``economic_tail``, where its payoff
+orientation sits beside the rest of the ledger's readings.
 """
 
 import numpy as np
@@ -14,8 +23,9 @@ from .._pnl import (
     PERCENTILE_LADDER, PnL, WATERFALL_RETURN_PERIOD, _kappa_label, _pct_label,
 )
 from ._core import (
-    economic, economic_ratios, economic_waterfall, reins, stats, validation,
-    _reins_frames, _stats_insurer_moment_store,
+    economic, economic_ratios, economic_tail, economic_waterfall, reins, stats,
+    summary, tail, validation,
+    _reins_frames, _stats_insurer_moment_store, _summary_flags, _tail_flags,
 )
 
 #: Ledger row kind to greater_tables row flag ([Exhibits-Economic-Insurer]).
@@ -34,6 +44,109 @@ LEDGER_ROW_FLAGS = {
     'running_net': ('muted',),
     'net_result': ('muted',),
 }
+
+
+# --- the generic family: the wrapped book ([Overview-Engine]) ---------------
+
+#: Said once, on every block that describes the wrapped book rather than the
+#: ledger. A reader arriving from a P&L has the ledger in mind and these
+#: frames are not about it, so without the sentence the two readings are
+#: indistinguishable on the page and they differ by the whole program.
+#:
+#: The second clause is the one that earns its keep. The engine reports the
+#: distribution **its own grid realizes**, so a book declaring ``net of``
+#: reports net and one declaring ``ceded to`` reports the cession; neither is
+#: the ledger's ``Gross`` row, which is the unreinsured subject. Naming the
+#: engine's view as gross would be wrong on exactly the programs a P&L exists
+#: to describe.
+_ENGINE_RIDER = (' Figures for the wrapped book as its own grid realizes it, '
+                 'so a book that declares a program reports that program\'s '
+                 'view and the ledger\'s Gross row is the unreinsured '
+                 'reading. The accounting exhibits are where the P&L reads '
+                 'itself.')
+
+#: Served in place of an engine frame on a hand-built kernel P&L. The same
+#: treatment :func:`_stats_insurer_pnl` gives the absent moment store: an
+#: empty frame with a caption saying what happened beats a blank table with
+#: no explanation, and beats a predicate in the class-agnostic registry,
+#: which gates per exhibit name and so cannot gray one class alone.
+_NO_ENGINE = ('This P&L was built from grids rather than from a declared '
+              'book, so it carries no stochastic engine and there is no book '
+              'to describe. Its own readings are the economic exhibits.')
+
+
+@summary.register(PnL)
+def _summary_frames(obj):
+    """The wrapped book's headline card ([Overview-Engine]).
+
+    Serves :attr:`PnL.engine_summary_df`, exactly as
+    :func:`_validation_frames` serves ``engine_validation_df``: the RAW
+    invariant wants one public frame per block, so the delegation lives on
+    the class and this function only names it.
+    """
+    df = obj.engine_summary_df
+    if df.empty:
+        return [('engine_summary_df', df, {'caption': _NO_ENGINE})]
+    return [('engine_summary_df', df, {'caption': (
+        'Headline moments and key percentiles for the book this P&L is a '
+        'ledger over, by component: count risk (Freq), single claim severity '
+        '(Sev) and total loss (Agg), one block per unit on a portfolio. '
+        'Percentiles are exact grid values. Frequency percentiles are blank '
+        'by design, because frequency enters through its PGF and no count '
+        'distribution is ever materialized.' + _ENGINE_RIDER)})]
+
+
+@summary.insurer.register(PnL)
+def _summary_insurer_pnl(obj, blocks):
+    """The same card with the business caption and the Agg row flags."""
+    block_name, df, kw = blocks[0]
+    if df.empty:
+        return [(block_name, df, dict(kw, caption=_NO_ENGINE))]
+    caption = ('Moments and key percentiles of the wrapped book by component '
+               '(Freq, Sev, Agg). Percentiles are exact grid values. '
+               'Frequency percentiles are blank by design: frequency enters '
+               'through its PGF and no count distribution is materialized.'
+               + _ENGINE_RIDER)
+    return [(block_name, df,
+             dict(kw, caption=caption, row_flags=_summary_flags(df)))]
+
+
+@tail.register(PnL)
+def _tail_frames(obj):
+    """The wrapped book's return period ladder ([Overview-Engine]).
+
+    Serves :attr:`PnL.engine_tail_df`, which is a **loss** distribution in
+    loss orientation. The closing margin's ladder is a payoff and is the
+    ``economic_tail`` exhibit; the two differ in which tail is the adverse
+    one, so they are deliberately not the same leaf.
+    """
+    df = obj.engine_tail_df
+    if df.empty:
+        return [('engine_tail_df', df, {'caption': _NO_ENGINE})]
+    return [('engine_tail_df', df, {'caption': (
+        'Return period ladder for the book this P&L is a ledger over, read '
+        'off the realized grid: VaR (the quoted number), TVaR (the priced '
+        'number), excess VaR over the mean (the capital), and VaR to mean '
+        'leverage. A loss distribution, so the adverse tail is the high one; '
+        'the closing margin is a payoff and reads off the other half of the '
+        'ladder, under the economic exhibits.' + _ENGINE_RIDER)})]
+
+
+@tail.insurer.register(PnL)
+def _tail_insurer_pnl(obj, blocks):
+    """The same ladder with the capital anchors emphasized."""
+    block_name, df, kw = blocks[0]
+    if df.empty:
+        return [(block_name, df, dict(kw, caption=_NO_ENGINE))]
+    caption = ('Return period ladder for the wrapped book: VaR (the quoted '
+               'number), TVaR (the priced number), excess VaR over the mean '
+               '(capital), and VaR to mean leverage, exact from the FFT '
+               'grid. A loss distribution, so the adverse tail is the high '
+               'one, and the 1 in 200 (99.5%, Solvency II) and 1 in 250 '
+               '(99.6%, US capital adequacy) anchors are emphasized.'
+               + _ENGINE_RIDER)
+    return [(block_name, df,
+             dict(kw, caption=caption, row_flags=_tail_flags(df)))]
 
 
 @stats.insurer.register(PnL)
@@ -398,3 +511,63 @@ def _economic_waterfall_frames(obj):
         ('evaluation_df', evaluation_df,
          dict(caption=evaluation_caption, row_flags=total_row)),
     ]
+
+
+# --- the closing margin's ladder ([Overview-Engine]) ------------------------
+
+#: Return period ladder column the INSURER reading of ``economic_tail`` drops.
+#: ``GridDistribution.tvar`` is the upper tail measure ``E[X | X > VaR(p)]`` at
+#: every ``p``, with no orientation flip. A P&L is a payoff, read off the lower
+#: half of the ladder, so on exactly the rungs this exhibit exists for the
+#: column averages almost the whole distribution and sits near the mean: it
+#: pairs a downside ``VaR`` with the other side's conditional mean. The
+#: matching lower measure ``E[X | X <= VaR(p)]`` is not computed today, so the
+#: column comes off the sheet that gets read and stays on RAW until it is
+#: (author's ruling, 2026-10-06). See the warning on
+#: :meth:`PnL.tail_periods_df`, which records the same defect on
+#: ``Aggregate.tail_df`` and ``Portfolio.tail_df``.
+_PAYOFF_TVAR = 'TVaR'
+
+
+@economic_tail.register(PnL)
+def _economic_tail_frames(obj):
+    """The closing margin's return period ladder, whole."""
+    return [('tail_df', obj.tail_df, {'caption': (
+        'Return period ladder over the closing margin, in payoff '
+        'orientation: the adverse tail is the low one, so the ladder walks '
+        'into the losses and the 1 in 200 year is the rung that goes '
+        '200-to-1 against you. VaR is the quoted number, excess VaR over the '
+        'mean the capital that rung calls for, and VaR to mean the leverage. '
+        'Read the TVaR column with care: it is the measure above each rung, '
+        'not below, so on a payoff it pairs a downside VaR with the other '
+        'side\'s conditional mean. The insurer view drops it for that '
+        'reason.')})]
+
+
+@economic_tail.insurer.register(PnL)
+def _economic_tail_insurer(obj, blocks):
+    """The same ladder without ``TVaR``, and with the capital anchors flagged.
+
+    The one INSURER restructure here is a dropped column, on the same
+    reasoning that abbreviates the ledger ([Ledger-Insurer-Abbreviated]): a
+    reading sheet carries what is read, and what is misleading on this
+    orientation stays one perspective away rather than on the page. See
+    :data:`_PAYOFF_TVAR`.
+    """
+    block_name, df, kw = blocks[0]
+    df = df[[c for c in df.columns if c != _PAYOFF_TVAR]]
+    caption = (
+        'Return period ladder over the closing margin. A payoff, so the '
+        'adverse tail is the LOW one: the 1 in 200 year is the rung that '
+        'goes 200-to-1 against you, and the ladder walks into the losses as '
+        'you read up. VaR is the quoted result at that rung, excess VaR its '
+        'shortfall against expectation (negative on the downside, which is '
+        'the capital the state calls for), and VaR to mean the leverage, '
+        'blank near break-even where the ratio has no content. The 1 in 200 '
+        '(99.5%, Solvency II) and 1 in 250 (99.6%, US capital adequacy) '
+        'anchors are emphasized on both sides of the ladder. TVaR is on the '
+        'raw view only: the library computes the measure above a rung, which '
+        'on a payoff is the wrong side, so it would read as a tail average '
+        'and sit near the mean.')
+    return [(block_name, df,
+             dict(kw, caption=caption, row_flags=_tail_flags(df)))]

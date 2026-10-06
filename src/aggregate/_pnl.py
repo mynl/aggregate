@@ -1980,6 +1980,57 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return engine.validation_df
 
     @property
+    def engine_summary_df(self):
+        """The wrapped engine's headline card, or an empty frame.
+
+        Delegates exactly as :attr:`engine_validation_df` does
+        ([Overview-Engine]): the moments and key percentiles of the **book**
+        are the engine's story, and a P&L is a ledger over a book. The P&L's
+        own :attr:`summary_df` is a different frame, the three-row ledger
+        card, and keeps its name, its place in ``qd`` and its notebook repr.
+
+        Which of the two the ``summary`` exhibit serves is what
+        [Overview-Engine] settles: the generic exhibit names mean the
+        engine's frames on a P&L, uniformly, so one group of leaves describes
+        a book and the other describes a ledger.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``self.engine.summary_df`` when a stochastic engine is attached;
+            an **empty** frame on a hand-built kernel P&L, which carries no
+            engine.
+        """
+        engine = self.engine
+        if engine is None:
+            return pd.DataFrame()
+        return engine.summary_df
+
+    @property
+    def engine_tail_df(self):
+        """The wrapped engine's return period ladder, or an empty frame.
+
+        Delegates as :attr:`engine_summary_df` does ([Overview-Engine]). The
+        orientation is the **engine's**: a loss distribution read off its
+        upper tail, where ``TVaR`` is the conditional mean a reader expects.
+        The P&L's own :attr:`tail_df` is the closing margin's ladder, a
+        payoff read off its lower half, and the two must not be confused.
+        See :meth:`tail_periods_df` for why the ``TVaR`` column does not
+        carry across.
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``self.engine.tail_df`` when a stochastic engine is attached; an
+            **empty** frame on a hand-built kernel P&L, which carries no
+            engine.
+        """
+        engine = self.engine
+        if engine is None:
+            return pd.DataFrame()
+        return engine.tail_df
+
+    @property
     def reins_stats_df(self):
         """The wrapped engine's reinsurance layering store, or an empty frame.
 

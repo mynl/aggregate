@@ -91,15 +91,15 @@ What is published
    * - ``summary``
      - Summary
      - Aggregate, Portfolio, PnL, Distortion, BivariateAggregate
-     - 1: ``summary_df``
+     - 1: ``summary_df``, or ``engine_summary_df`` on a PnL
      - always
-     - Aggregate, Portfolio: caption, total and subtotal row flags, measure formats
+     - Aggregate, Portfolio, PnL: caption, total and subtotal row flags, measure formats
    * - ``tail``
      - Return periods
-     - Aggregate, Portfolio
-     - 1: ``tail_df``
+     - Aggregate, Portfolio, PnL
+     - 1: ``tail_df``, or ``engine_tail_df`` on a PnL
      - updated
-     - both: caption, 1-in-200 and 1-in-250 row emphasis
+     - all three: caption, 1-in-200 and 1-in-250 row emphasis
    * - ``stats``
      - Statistics
      - Aggregate, Portfolio, PnL, Distortion, BivariateAggregate
@@ -129,13 +129,19 @@ What is published
      - PnL
      - RAW 2: ``economic_ratios_df``, ``legs_df``
      - always
-     - **restructures into 3 blocks**: ``amounts`` (P, L, E, M), ``ratios`` (LR, ER, CR, ``E_*``, shares), ``legs``, so no column mixes two units
+     - **restructures into 2 blocks**: ``amounts`` (P, L, E, M) and ``ratios`` (LR, ER, CR, ``E_*``, shares), so no column mixes two units; the itemized ``legs`` block stays on RAW
    * - ``economic_waterfall``
      - Economic waterfall
      - PnL
      - 2: ``walk_df``, ``evaluation_df``
      - multi-step walk (``_tower``)
      - none
+   * - ``economic_tail``
+     - Economic return periods
+     - PnL
+     - 1: ``tail_df``
+     - updated
+     - **drops** ``TVaR``, which is the upper-tail measure and so reads wrong on a payoff; caption, 1-in-200 and 1-in-250 row emphasis
    * - ``dependency``
      - Dependency
      - BivariateAggregate
@@ -206,7 +212,7 @@ Aggregate
 Portfolio
     The same, per unit plus the total.
 PnL
-    ``summary``, ``stats``, ``validation``, ``economic``, ``economic_ratios``, plus ``economic_waterfall`` on a walk.
+    ``summary``, ``tail``, ``stats``, ``validation``, ``economic``, ``economic_ratios``, ``economic_tail``, plus ``reins`` when the wrapped book cedes and ``economic_waterfall`` on a walk. Read the two families apart, which is ``[Overview-Engine]``: the first four describe the wrapped **book**, each serving an ``engine_*`` frame, and the ``economic`` family describes the **ledger**. That is why there are two tail leaves. The book's is a loss distribution, adverse tail high; the ledger's is the closing margin, a payoff, adverse tail low.
 BivariateAggregate
     ``summary``, ``stats``, ``validation``, ``dependency``, ``bs_window``.
 Distortion

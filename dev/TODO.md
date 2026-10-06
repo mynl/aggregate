@@ -557,6 +557,18 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Overview-Engine]** DONE (`1.0.0a388`), under the API repo's
+  `dev/plan-a194-pnl-exhibits.md`, the canonical plan for this bump and the
+  three after it: the four generic exhibits on a `PnL` all describe the wrapped
+  book, `summary` and `tail` joining `stats` and `validation` by way of two new
+  delegating frames, `engine_summary_df` and `engine_tail_df`. The closing
+  margin's ladder becomes its own exhibit, `economic_tail`, whose INSURER view
+  drops `TVaR` because the library computes the measure above a rung and a
+  payoff is read below it. `PnL.summary_df` keeps its name and loses its leaf.
+  **Owed:** the lower tail measure `E[X | X <= VaR(p)]` on `GridDistribution`,
+  after which `economic_tail` can serve all four columns and the warning on
+  `PnL.tail_periods_df` comes off.
+
 - **[Series-Groups]** DONE (`1.0.0a382`): `ChartSeries.group` names the family a
   series is one of, and `MARK_ROLES` gains `'base'`. `plot_chartdoc` gives one
   color family per group with shade and marker varying inside it, washes the

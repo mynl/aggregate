@@ -65,7 +65,8 @@ __all__ = [
     'Perspective', 'Exhibit', 'EXHIBITS',
     'available_exhibits', 'exhibit_frames', 'build_exhibit',
     'summary', 'tail', 'stats', 'validation', 'reins',
-    'economic', 'economic_ratios', 'economic_waterfall', 'dependency',
+    'economic', 'economic_ratios', 'economic_waterfall', 'economic_tail',
+    'dependency',
     'pricing_calibrate', 'pricing_stand_alone', 'pricing_allocate',
     'pricing_evaluate', 'register_simple_exhibit',
 ]
@@ -672,11 +673,13 @@ summary = _make_exhibit_function(
     """At a glance risk view: moments and key percentiles.
 
     Source frame ``summary_df``, registered for all five first class
-    classes. RAW is the frame passed through; on Aggregate and Portfolio
-    INSURER adds the business caption and total / subtotal row flags, while
-    PnL, Distortion and BivariateAggregate serve the raw frame under both
-    perspectives (no override registered; the PnL card framing is the
-    [Exhibits-PnL-Translation] phase, behind its author gate).
+    classes, except on PnL where it is ``engine_summary_df``: the generic
+    exhibit names describe the wrapped **book** since [Overview-Engine], and
+    the ledger's own card stays on :attr:`~aggregate.PnL.summary_df` with no
+    leaf of its own. RAW is the frame passed through; on Aggregate, Portfolio
+    and PnL INSURER adds the business caption and total / subtotal row flags,
+    while Distortion and BivariateAggregate serve the raw frame under both
+    perspectives (no override registered).
 
     Parameters
     ----------
@@ -693,7 +696,10 @@ tail = _make_exhibit_function(
     'tail', 'Return periods',
     """Return period / exceedance exhibit (VaR, TVaR, xsVaR, leverage).
 
-    Source frame ``tail_df``; available only after ``update`` (the ladder
+    Source frame ``tail_df``, or ``engine_tail_df`` on a PnL, where the
+    generic names describe the wrapped book ([Overview-Engine]); the closing
+    margin's own ladder is the ``economic_tail`` exhibit, a payoff read off
+    the other half of the ladder. Available only after ``update`` (the ladder
     reads the realized grid). INSURER emphasizes the 1 in 200 and 1 in 250
     capital anchor rows and flags the portfolio total block.
 
@@ -852,6 +858,40 @@ economic_waterfall = _make_exhibit_function(
     Exhibit
     """)
 
+economic_tail = _make_exhibit_function(
+    'economic_tail', 'Economic return periods',
+    """The closing margin's return period ladder. Source frame ``PnL.tail_df``.
+
+    The accounting family's tail leaf, and a different reading from the
+    generic ``tail``, which describes the wrapped book ([Overview-Engine]).
+    This one is a **payoff**: the adverse outcome is a rare *small* result, so
+    the ladder is read off its lower half and the 1 in 200 year is the rung at
+    ``P = 1/200``.
+
+    RAW passes the frame through whole. INSURER drops ``TVaR``, which is the
+    one column a payoff orientation breaks:
+    :meth:`~aggregate.GridDistribution.tvar` is the upper tail measure
+    ``E[X | X > VaR(P)]`` at every ``P`` with no orientation flip, so on the
+    rungs this exhibit exists for it averages almost the whole distribution
+    and sits near the mean. It pairs a downside ``VaR`` with the other side's
+    conditional mean, which is not the pairing a scanning reader assumes. The
+    matching lower measure ``E[X | X <= VaR(P)]`` is not computed today;
+    until it is, the column stays one perspective away rather than on the
+    sheet that gets read (author's ruling, 2026-10-06). The defect is older
+    than this exhibit and equally affects ``Aggregate.tail_df`` and
+    ``Portfolio.tail_df`` on any payoff object.
+
+    Parameters
+    ----------
+    obj : object
+        A ``PnL``.
+    perspective : Perspective or str, default Perspective.RAW
+
+    Returns
+    -------
+    Exhibit
+    """)
+
 dependency = _make_exhibit_function(
     'dependency', 'Dependency',
     """Bivariate dependency exhibit: ``dependency_df`` and ``axis_support_df``.
@@ -987,6 +1027,7 @@ EXHIBITS = {
     'economic': (economic, _perspectives_always),
     'economic_ratios': (economic_ratios, _perspectives_always),
     'economic_waterfall': (economic_waterfall, _perspectives_tower),
+    'economic_tail': (economic_tail, _perspectives_updated),
     'dependency': (dependency, _perspectives_updated),
     # Keyed on result objects, not on a built object: a successful call is
     # what produces one, so there is no partially available state to gate on.

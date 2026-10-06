@@ -75,7 +75,8 @@ PROGRAMS = {
                      'deposit 40 logarithmic peel top-down'),
 }
 _WALK_EXHIBITS = ['summary', 'tail', 'stats', 'validation', 'reins',
-                  'economic', 'economic_ratios', 'economic_waterfall']
+                  'economic', 'economic_ratios', 'economic_waterfall',
+                  'economic_tail']
 AGG_PROGRAM = PROGRAMS['Aggregate']
 PORT_PROGRAM = PROGRAMS['Portfolio']
 
@@ -88,7 +89,7 @@ EXPECTED_EXHIBITS = {
     'BivariateAggregate': ['summary', 'stats', 'validation', 'dependency',
                            'bs_window'],
     'PnL': ['summary', 'tail', 'stats', 'validation', 'economic',
-            'economic_ratios'],
+            'economic_ratios', 'economic_tail'],
     'Distortion': ['summary', 'stats', 'validation'],
     'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins',
                        *_DIAG],
@@ -612,14 +613,73 @@ def test_pnl_validation_serves_the_engine_frame(objects):
     assert pn.validation_df.empty
 
 
-def test_pnl_tail_serves_the_margin_ladder(objects):
-    """The tail exhibit lights for a P&L, over the closing margin."""
+def test_pnl_generic_exhibits_look_through_to_the_engine(objects):
+    """[Overview-Engine]: the generic names describe the wrapped book.
+
+    All four of them, which is the point of the ruling: ``stats`` and
+    ``validation`` already did, and ``summary`` and ``tail`` joining them is
+    what makes the group one object's story rather than two.
+    """
     pn = objects['PnL']
-    blocks = exhibit_frames(pn, 'tail')
+    for name, attr in (('summary', 'engine_summary_df'),
+                       ('tail', 'engine_tail_df'),
+                       ('validation', 'engine_validation_df')):
+        blocks = exhibit_frames(pn, name)
+        assert blocks[0][0] == attr, name
+        pd.testing.assert_frame_equal(blocks[0][1], getattr(pn, attr))
+    # the engine's ladder is a loss distribution: adverse tail high, and the
+    # TVaR it carries is the conditional mean a reader expects
+    tail_caption = exhibit_frames(pn, 'tail')[0][2]['caption']
+    assert 'adverse tail is the high one' in tail_caption
+
+
+def test_pnl_economic_tail_serves_the_margin_ladder(objects):
+    """The closing margin's ladder, under the accounting family's name."""
+    pn = objects['PnL']
+    blocks = exhibit_frames(pn, 'economic_tail')
     assert [n for n, _, _ in blocks] == ['tail_df']
     pd.testing.assert_frame_equal(blocks[0][1], pn.tail_df)
     # payoff orientation: the caption says the adverse tail is the low one
     assert 'adverse tail is the low one' in blocks[0][2]['caption']
+
+
+def test_economic_tail_insurer_drops_tvar(objects):
+    """The one column a payoff orientation breaks comes off the reading sheet.
+
+    ``GridDistribution.tvar`` is the measure *above* each rung, so on the low
+    rungs this exhibit exists for it averages almost the whole distribution.
+    RAW keeps it, since a RAW block is the frame; INSURER drops it rather than
+    print a number that reads as a tail average and sits near the mean.
+    """
+    pn = objects['PnL']
+    _, raw, _ = exhibit_frames(pn, 'economic_tail')[0]
+    _, ins, kw = exhibit_frames(pn, 'economic_tail', 'insurer')[0]
+    assert 'TVaR' in raw.columns
+    assert list(ins.columns) == ['T', 'VaR', 'xsVaR', 'VaR/Mean']
+    assert 'TVaR is on the raw view only' in kw['caption']
+    # the capital anchors are emphasized, on both sides of the ladder
+    assert any('emphasis' in f for f in kw['row_flags'].values())
+
+
+def test_the_two_tail_exhibits_are_different_readings(objects):
+    """One object, two ladders, and they must not be confused.
+
+    The engine's is a loss distribution read off its upper tail; the ledger's
+    is the closing margin, a payoff read off its lower half. The same rung
+    means opposite things, which is why [Overview-Engine] gave them separate
+    names rather than one leaf that changes meaning with the object.
+    """
+    pn = objects['PnL']
+    _, engine, _ = exhibit_frames(pn, 'tail')[0]
+    _, margin, _ = exhibit_frames(pn, 'economic_tail')[0]
+    assert list(engine.index) == list(margin.index)
+    # Same rungs, opposite ends. A loss is never negative, so every engine
+    # VaR is at or above zero and the low rungs are its benign end; the
+    # margin is a payoff, so its low rungs run deeply negative and are the
+    # adverse end. That sign split is the whole reason for two leaves.
+    assert (engine['VaR'] >= 0).all()
+    assert margin['VaR'].iloc[0] < 0.0
+    assert margin['VaR'].is_monotonic_increasing
 
 
 def test_validation_insurer_pass_frames_no_emphasis(objects):
@@ -1802,12 +1862,18 @@ def test_captions_are_per_class_where_the_frame_differs(objects):
     """One frame does not have one description across five classes.
 
     ``summary_df`` is count risk / severity / total loss on an Aggregate and
-    the three ledger rows on a PnL. A caption true of both would say nothing.
+    moments of g on a Distortion. A caption true of both would say nothing.
+
+    A P&L serves the *engine's* card here since [Overview-Engine], so the two
+    frames no longer differ in shape and the caption still must: the rider
+    saying whose figures these are, and that the ledger's Gross row is a
+    different number, is what an Aggregate's caption has no reason to carry.
     """
     caption_of = lambda kind: exhibit_frames(
         objects[kind], 'summary')[0][2]['caption']
     assert 'count risk' in caption_of('Aggregate')
-    assert 'Consideration' in caption_of('PnL')
+    assert 'ledger over' in caption_of('PnL')
+    assert 'Gross row is the unreinsured' in caption_of('PnL')
     assert 'distortion' in caption_of('Distortion')
     assert len({caption_of(k) for k in
                 ('Aggregate', 'PnL', 'Distortion', 'BivariateAggregate')}) == 4

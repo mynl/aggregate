@@ -3325,11 +3325,16 @@ Ask an object what it can show, then ask for one:
     ex = exhibits.build_exhibit(simple, 'summary', 'insurer')
     sorted(ex.to_payload())
 
-The twelve registered exhibits are ``summary``, ``tail``, ``stats``,
-``validation``, ``reins``, ``economic``, ``economic_ratios``,
-``economic_waterfall``, ``dependency``, ``bs_window``, ``tail_behavior`` and
-``sharpen``, each declared once and dispatched on type, so a class that gains a
-frame gains the exhibit by registering rather than by editing a switch.
+The registered exhibits are ``summary``, ``tail``, ``stats``, ``validation``,
+``reins``, ``economic``, ``economic_ratios``, ``economic_waterfall``,
+``economic_tail``, ``dependency``, ``bs_window``, ``sharpen``,
+``tail_behavior``, ``approximation``, ``ruin``, and the four pricing receipts
+``pricing.calibrate``, ``pricing.stand_alone``, ``pricing.allocate`` and
+``pricing.evaluate``. Each is declared once and dispatched on type, so a class
+that gains a frame gains the exhibit by registering rather than by editing a
+switch. ``available_exhibits(obj)`` is the live answer; the list here is a
+reading of it rather than a second declaration, which is why no count is
+written down.
 
 A **perspective** is who is reading. ``RAW`` is the library's own reading and
 ``INSURER`` the business one, and the invariant that keeps them honest is a253's:

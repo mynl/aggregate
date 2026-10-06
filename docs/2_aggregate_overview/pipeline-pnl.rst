@@ -54,7 +54,9 @@ The end-to-end data flow::
     summary_df / economic_df        the card and the footing sheet
     economic_ratios_df / legs_df    raw materials for ratio exhibits
     walk_df / evaluation_df         the margin walk, in currency and as ratios
+    tail_df                         the closing margin's ladder (a payoff)
     density_df / validation_df      per-row GDs; rebucketing audit
+    engine_*_df                     the wrapped book's frames, delegated
     evaluate()                      Cherny-Madan breakeven panel
 
 Two faces answer two questions, and they are the same object built two ways. ``pnl`` answers "what is my position?": the consolidated net-in to net-out view, always one group, always the flat three-row card. Ceded economics are netted out and not shown, because a reinsured aggregate's default output is its net. ``xpnl`` answers "how did I get there?": the walk, gross, then each cover, then ``All``. It is a plain multi-group :class:`PnL` carrying the exploded ``(Step, Side)`` card and ``(Step, Side, Label)`` stats sheet. It is a way of building, not a new type.
@@ -307,7 +309,7 @@ The shared-source rule: scenario columns exist exactly when the ledger shares on
 The reporting surface
 ---------------------
 
-Nine objects plus the evaluation panel, on :class:`PnL`:
+The ledger's own objects plus the evaluation panel, on :class:`PnL`:
 
 ==========================  ============  ==================================================================
 Object                      Shape         Role
@@ -318,11 +320,28 @@ Object                      Shape         Role
 ``legs_df``                 DataFrame     one row per declared leg, the only place ``kind`` surfaces
 ``walk_df``                 DataFrame     the margin walk in currency, at EV and in the 1-in-100 state
 ``evaluation_df``           DataFrame     the same walk as ratios: shares, combined, return on capital
+``tail_df``                 DataFrame     the closing margin's return period ladder, read as a payoff
 ``density_df``              OrderedDict   ``{row label: GridDistribution}``, no shared axis
 ``validation_df``           DataFrame     Est-against-EX audit of every ``bs > 0`` leg
 ``info``                    str           fixed-layout summary, one row per line, ``n/a`` where absent
 ``evaluate()``              DataFrame     Cherny-Madan breakeven acceptability panel
 ==========================  ============  ==================================================================
+
+Four more delegate to the wrapped book rather than describing the ledger, and
+are named for it: ``stats_df``, ``engine_summary_df``, ``engine_tail_df`` and
+``engine_validation_df``. Each is its engine's frame of that name, or an empty
+frame on a hand-built kernel P&L, which carries no engine. They are what the
+generic exhibits serve (``[Overview-Engine]``), so the ``summary`` and ``tail``
+leaves describe the book while the ``economic`` family describes the ledger.
+``stats_df`` carries the engine's name rather than an ``engine_`` prefix
+because every first class citizen owes a moment store under that name, and a
+ledger over a book has no other candidate.
+
+Note that ``tail_df`` and ``engine_tail_df`` are different readings of
+different distributions, not two views of one. The ledger's closing margin is a
+**payoff**, so its adverse tail is the low one; the book is a **loss**, so its
+adverse tail is the high one. The same rung means opposite things, which is why
+the exhibits keep them on separate leaves.
 
 ``summary_df``, the card
 ~~~~~~~~~~~~~~~~~~~~~~~~

@@ -96,6 +96,31 @@ Every cumulative column is a direct sum that carries the origin, for example :ma
 
 On a signed (P&L) grid the equal-priority share :math:`\kappa / x` is not a recovery share, so the share-based columns are left ``NaN`` rather than divided through zero. The conditional means, ``lev_*``, and the total columns remain valid on any signed window.
 
+The priority ladder
+~~~~~~~~~~~~~~~~~~~
+
+``lev_i`` and ``exa_i`` are two of the three recoveries a unit can be granted out of an estate of :math:`a`, and which one applies is a question about where a receivership schedule ranks its claim. In a number of US receivership schedules a ceding company's reinsurance recoverable ranks **below** the direct policyholder's, so a book that writes direct insurance and assumes reinsurance has a senior creditor and a junior one in the same estate. :attr:`priority_df` carries all three legs under uniform names, ``ex_senior_i`` (the alias of ``lev_i``), ``ex_equal_i`` (the alias of ``exa_i``), the new ``ex_junior_i``, and ``ex_total``:
+
+.. math::
+
+    \mathrm{ex\_senior}_i(a) &= \mathsf E[X_i \wedge a] \\
+    \mathrm{ex\_equal}_i(a)  &= \mathsf E[X_i \min(1, a/X)] \\
+    \mathrm{ex\_junior}_i(a) &= \mathsf E[\min(X_i, (a - X_{-i})^+)].
+
+The junior leg is one more convolution on state the combine already holds. Because :math:`\mathrm{lev}_i(0) = 0` kills every term in which the senior pool has already exhausted the estate,
+
+.. math::
+
+    \mathsf E[\min(X_i, (a - X_{-i})^+)] = \sum_y \mathrm{lev}_i(a - y)\, p_{-i}(y),
+
+so one transform of the ``lev`` column against the leave-one-out transform :math:`\mathrm{ft}(p_{-i})` gives the whole curve in :math:`a` at once. Nothing is threaded through ``update`` and no severity FFT is recomputed: each unit's ``ftagg_density`` persists on the object, so the ladder is available on any already-built portfolio. :attr:`priority_df` is cached and invalidated on ``update``.
+
+:meth:`priority_epd_df` reads that frame at one asset level, given either as ``assets`` or as a probability ``p``, into rows ``(unit, rule)`` by ``mean``, ``recovery``, ``shortfall`` and ``epd``, Butsic's expected policyholder deficit ratio :cite:p:`Butsic1994`. Four facts the table makes visible. All three rules distribute :math:`\min(X, a)`, so at fixed assets subordination is a pure redistribution, zero sum in expected recovery, and the ``total`` group is the same on all three rows. The senior leg does not see the junior book at all, since :math:`\min(X_i, a)` does not involve :math:`X_{-i}`, so writing an assumed book behind a senior direct book costs the direct policyholder nothing at fixed assets while the premium it brings raises :math:`a`. The redistribution between the two is asymmetric, and the asymmetry is relative size. And ``epd`` is monotone in rank, senior at most equal at most junior, for every unit.
+
+Two cautions. ``ex_senior_i`` reads "unit :math:`i` senior to everything else pooled" and ``ex_junior_i`` reads "unit :math:`i` junior to everything else pooled", so both are two-tier readings of a book of any size: on three or more units the senior and junior columns are different hypotheticals and do **not** sum to ``ex_total``, while the equal columns do. And the senior leg is a limited expected value, which is unforgiving about severity discretization, so ``mean`` reports the *represented* mean and should be read against the declared mean before the ratios are trusted.
+
+All three legs need the default zero-based, non-negative grid, since an asset level and a receivership waterfall do not mean the same thing on a signed P&L grid, and ``padding >= 1``; both raise :class:`NotImplementedError` otherwise. They also assume the units are independent, which is how a :class:`Portfolio` combines them, and a ``density_df`` that is not the independent combine of the units' current densities raises rather than answering against the wrong senior pool. Two books sharing cat events are the ``clash`` form of :mod:`aggregate.bivariate`, where the junior recovery is a genuine two-dimensional pushforward and none of this applies.
+
 .. _portfolio pricing:
 
 Distortions and pricing

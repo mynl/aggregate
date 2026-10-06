@@ -294,6 +294,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_describe = None
         self._approximation_df = None
         self._approximation_density_df = None
+        self._priority_df = None
         self.sev_calc = ''
         self._remove_fuzz = 0
         self.discretization_calc = ''
@@ -1948,6 +1949,163 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_describe = pd.concat(blocks, keys=keys, names=['unit'])
         return self._reins_describe
 
+    # ----- the priority ladder: senior / equal / junior ------------------
+
+    def _priority_assets(self, assets, p, caller):
+        """Resolve the asset level from ``assets`` or ``p``, exactly one given."""
+        if (assets is None) == (p is None):
+            raise ValueError(
+                f'{caller}: give exactly one of assets or p')
+        return float(self.q(p)) if assets is None else float(assets)
+
+    @property
+    def priority_df(self):
+        r"""The whole priority ladder: senior, equal and junior expected recovery.
+
+        One frame carrying the three recoveries a unit can be granted out of an
+        estate of ``a``, under the three rules a receivership schedule can
+        place it on, so the ladder reads in one place and the footing checks
+        are one-liners. Index ``loss``, read as the asset level ``a``; columns
+        per unit
+
+        ======================= ==============================================
+        ``ex_senior_{unit}``    ``E[X_i ∧ a]``, alias of ``lev_{unit}``
+        ``ex_equal_{unit}``     ``E[X_i · min(1, a/X)]``, alias of ``exa_{unit}``
+        ``ex_junior_{unit}``    ``E[min(X_i, (a − X_{-i})^+)]``, new here
+        ======================= ==============================================
+
+        plus ``ex_total``, the estate itself, ``E[X ∧ a]`` (alias of
+        ``lev_total``).
+
+        Returns
+        -------
+        pandas.DataFrame
+            ``3 · len(unit_names) + 1`` columns on the ``density_df`` index.
+
+        Raises
+        ------
+        NotImplementedError
+            On a signed or windowed grid, or with ``padding == 0``.
+        ValueError
+            If the frame on this object is not the independent combine of the
+            units' current densities. See
+            :func:`aggregate._portfolio_density.priority_state`.
+
+        Notes
+        -----
+        A reporting view in the spirit of :attr:`reins_density_df`: it
+        duplicates values, not logic. The senior and equal legs are aliases of
+        columns :func:`aggregate._portfolio_density.add_exa` owns, renamed here
+        only so the ladder carries uniform names; the junior leg is the one
+        computation, and
+        :func:`aggregate._portfolio_density.junior_recovery` owns it.
+
+        **Two tiers, not k.** ``ex_senior_{unit}`` reads "unit ``i`` senior to
+        everything else pooled" and ``ex_junior_{unit}`` reads "unit ``i``
+        junior to everything else pooled". Both are two-tier readings of a
+        k-unit book, so on a book of three or more units the senior columns do
+        **not** sum to ``ex_total``: each is a different hypothetical. The
+        equal columns do sum to it, and on a two-unit book
+        ``ex_senior_i + ex_junior_j = ex_total`` exactly. The sequential
+        k-tier schedule ``min(X_j, (a − Σ_{i<j} X_i)^+)``, which a real estate
+        with administrative expenses, policyholder claims, general creditors
+        and surplus notes would need, is a genuine generalization and is not
+        provided.
+
+        Equal priority here is incurred-amount pro rata,
+        ``E[X_i · min(1, a/X)]``, the modeling convention; an actual
+        receivership pro-rates allowed claims with their own timing and
+        discounting.
+
+        Cached, and invalidated by :meth:`update`.
+        """
+        if self._priority_df is not None:
+            return self._priority_df
+        state = _density.priority_state(self, caller='priority_df')
+        df = self.density_df
+        cols = {}
+        for unit in self.unit_names:
+            cols[f'ex_senior_{unit}'] = df[f'lev_{unit}'].to_numpy()
+            cols[f'ex_equal_{unit}'] = df[f'exa_{unit}'].to_numpy()
+            cols[f'ex_junior_{unit}'] = _density.junior_recovery(
+                self, unit, state=state)
+        cols['ex_total'] = df['lev_total'].to_numpy()
+        self._priority_df = pd.DataFrame(cols, index=df.index)
+        return self._priority_df
+
+    def priority_epd_df(self, assets=None, *, p=None):
+        r"""Expected policyholder deficit by unit and priority rule.
+
+        The headline reading of :attr:`priority_df` at one asset level: what
+        each unit is owed, what it recovers, what it loses, and the loss as a
+        fraction of what it was owed (Butsic's expected policyholder deficit
+        ratio), under each of the three priority rules.
+
+        Parameters
+        ----------
+        assets : float, optional
+            The asset level ``a``, the size of the estate.
+        p : float, optional
+            Alternatively a probability level; ``a = q(p)``. Give exactly one
+            of ``assets`` or ``p``.
+
+        Returns
+        -------
+        pandas.DataFrame
+            Rows ``MultiIndex (unit, rule)`` with ``rule`` in
+            ``{senior, equal, junior}``, one group per unit plus a ``total``
+            group; columns ``mean`` (``E[X_i]``, the represented mean),
+            ``recovery``, ``shortfall`` and ``epd``. The asset level actually
+            used, snapped to the grid, is on ``.attrs['assets']``.
+
+        Notes
+        -----
+        The ``total`` group repeats across the three rules because the pot is
+        rule-invariant: all three rules distribute ``min(X, a)``, so at fixed
+        assets subordination is a pure redistribution, zero sum in expected
+        recovery. Only the ``equal`` rows sum to the total, for the two-tier
+        reason given in :attr:`priority_df`.
+
+        ``epd`` is monotone in rank, ``senior <= equal <= junior``, for every
+        unit. The senior leg does not see the junior book at all, since
+        ``min(X_i, a)`` does not involve ``X_{-i}``: writing an assumed book
+        behind a senior direct book costs the direct policyholder nothing at
+        fixed assets, and the premium it brings raises ``a``. The
+        redistribution between the two is asymmetric, and the asymmetry is
+        relative size: moving the larger unit up the ladder gains it far more
+        than it costs the smaller one.
+
+        ``mean`` is the **represented** mean off ``e_{unit}``, not the declared
+        mean, so a book whose severity discretization has lost mass shows it
+        here rather than hiding it inside the ratio. The senior leg is a
+        limited expected value and is unforgiving about that discretization;
+        read ``mean`` against the declared mean before reading the ratios.
+
+        Where an inverse is wanted (what assets restore a junior creditor to
+        its equal-priority deficit?), root-find on the :attr:`priority_df`
+        curve with :func:`scipy.optimize.brentq`.
+        """
+        a = self._priority_assets(assets, p, 'priority_epd_df')
+        pdf = self.priority_df
+        ja = int(pdf.index.get_indexer([a], method='nearest')[0])
+        row = pdf.iloc[ja]
+        df = self.density_df
+        rows, idx = [], []
+        for unit in list(self.unit_names) + ['total']:
+            mean = float(df[f'e_{unit}'].iloc[0])
+            for rule in ('senior', 'equal', 'junior'):
+                rec = (float(row['ex_total']) if unit == 'total'
+                       else float(row[f'ex_{rule}_{unit}']))
+                rows.append([mean, rec, mean - rec,
+                             (mean - rec) / mean if mean else np.nan])
+                idx.append((unit, rule))
+        out = pd.DataFrame(
+            rows,
+            index=pd.MultiIndex.from_tuples(idx, names=['unit', 'rule']),
+            columns=['mean', 'recovery', 'shortfall', 'epd'])
+        out.attrs['assets'] = float(pdf.index[ja])
+        return out
+
     @property
     def spec(self):
         """
@@ -2495,6 +2653,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._reins_describe = None
         self._approximation_df = None
         self._approximation_density_df = None
+        self._priority_df = None
 
         # Per-unit state for the kappa construction in ``add_exa``: the
         # unit's native grid / pmf plus the padded FT of its pmf. Captured

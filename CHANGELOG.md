@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a394
+
+**[Priority-Junior-Leg] `Portfolio.priority_df` and `Portfolio.priority_epd_df`: the junior leg of the priority ladder returns.** The second-priority expected recovery `E[min(X_i, (a - X_{-i})^+)]` that 0.30.1 carried as `e2pri_{unit}` is back as `ex_junior_{unit}`, alongside the two legs `add_exa` already writes, under uniform names: `ex_senior_{unit}` (alias of `lev_{unit}`), `ex_equal_{unit}` (alias of `exa_{unit}`), `ex_junior_{unit}`, and `ex_total`. `priority_epd_df(assets)` or `priority_epd_df(p=...)` reads that frame at one asset level into rows `(unit, rule)` by `mean | recovery | shortfall | epd`, with a `total` group. `priority_df` is cached and invalidated by `update`; the kernels are `aggregate._portfolio_density.priority_state` and `junior_recovery`.
+
+No flag and no `update` keyword: each unit's `ftagg_density` persists after `update`, so the junior leg is computable on an already-built portfolio at the cost of one transform of the `lev` column per unit. `density_df` is unchanged, and none of the old `analysis_priority` / `priority_capital_df` / `epd_2_assets` / `eta-mu` surface returns. All three legs require the default zero-based, non-negative grid and `padding >= 1`, and raise `NotImplementedError` otherwise; a `density_df` that is not the independent combine of the units' current densities raises `ValueError` rather than answering against the wrong senior pool. On a book of three or more units the senior and junior columns are two-tier readings and do not sum to `ex_total`; the equal columns do. New tests in `tests/test_priority.py`.
+
 ## 1.0.0a393
 
 **[PnL-Pentagon] `PnL.pentagon_df(t=None)`: the ledger read as a pentagon, at any solvency level.** Loss, technical premium, margin, capital and assets, with the ratios between them, one row per block that books a result of its own and in ledger order, then a `Ceded` row that is the whole cession taken together. Columns are `L | E | P | P_tech | M | a | Q | LR | TLR | ER | CR | PQ | CoC | SD | CV`. Written premium and technical premium are both carried: the pentagon's own `P` is the technical one, `L + M`, while the number a reader quotes is the written one, and the ratios follow each.

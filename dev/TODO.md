@@ -557,6 +557,21 @@
 > each module page and `versionadded:: 1.0` on the public objects), and the
 > `CHANGELOG.md` preamble.
 
+- **[Priority-Junior-Leg]** DONE (`1.0.0a394` to `1.0.0a395`),
+  `dev/done/plan-a394-priority-junior-leg.md`: the second-priority expected
+  recovery 0.30.1 carried as `e2pri_{unit}` returns as `ex_junior_{unit}`, with
+  the senior and equal legs renamed beside it on `Portfolio.priority_df`, and
+  `priority_epd_df` / `priority_kappa` / `priority_conditional` reading it.
+  **Still not provided, and deliberately:** the sequential k-tier schedule
+  `min(X_j, (a − Σ_{i<j} X_i)^+)` that a real estate with administrative
+  expenses, policyholder claims, general creditors and surplus notes would
+  need. Both new legs are two-tier readings of a k-unit book. That is a genuine
+  generalization and wants its own plan. Also out of scope and noted in the
+  docstrings: the `clash` case, where the two books share cat events and the
+  junior recovery is a two-dimensional pushforward on
+  `BivariateDistribution`, which is the `[Portfolio-Shared-Mixing-Dependence]`
+  story above.
+
 - **[Ledger-Skew]** DONE (`1.0.0a391`), under the API repo's
   `dev/plan-a194-pnl-exhibits.md`: `LEDGER_MOMENTS` gains `Skew`, so the
   abbreviated insurer ledger is five columns. The column came off at a305 as

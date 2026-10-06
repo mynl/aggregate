@@ -298,3 +298,153 @@ def add_exa(port, df, unit_state):
         df[metric + 'sum'] = df.filter(regex=metric + '[^η]').sum(axis=1)
 
     return df
+
+
+# ---------------------------------------------------------------------------
+# The priority ladder: senior / equal / junior expected recoveries
+# ---------------------------------------------------------------------------
+
+
+def priority_state(port, caller='priority ladder'):
+    r"""Leave-one-out transforms for the priority ladder, with the guards.
+
+    The junior leg of the ladder needs ``ft(p_{-i})``, the transform of the
+    pooled "everything except unit ``i``" density, which is exactly what
+    :func:`_ft_nots` builds for the kappa numerator. It is reconstructible
+    **after** ``update`` because each unit's ``Aggregate.ftagg_density``
+    persists on the object, so nothing has to be threaded through ``update``
+    and no FFT of a severity is recomputed.
+
+    Parameters
+    ----------
+    port : Portfolio
+        An updated portfolio on the default zero-based, non-negative grid.
+    caller : str, default 'priority ladder'
+        Name used in the error messages.
+
+    Returns
+    -------
+    nots : dict[str, ndarray]
+        ``nots[i] = ft(p_{-i})`` in the physical-zero FFT buffer convention.
+    m_buf : int
+        Length of that buffer, ``len(density_df) << padding``.
+
+    Raises
+    ------
+    ValueError
+        If the portfolio has not been updated, or if the per-unit transforms
+        do not reproduce ``density_df['p_total']``. The second case means the
+        frame on the object is not the independent combine of the units'
+        current densities (a swapped or sample-based frame, or a unit updated
+        on its own since the combine), and every column here would be read
+        against the wrong senior pool.
+    NotImplementedError
+        On a signed or windowed grid, or with ``padding == 0``.
+
+    Notes
+    -----
+    Asset levels and a receivership waterfall do not mean the same thing on a
+    signed P&L grid, where "recovery" has no sign convention to read, and on a
+    windowed book ``lev_{unit}`` is evaluated off the unit's own origin rather
+    than the shared one. Both raise rather than return quiet nonsense, the
+    same gate :meth:`Aggregate.palm_kappa` applies.
+
+    ``padding >= 1`` is required so the senior pool's density occupies a buffer
+    at least twice the output grid. The convolution is then read only on the
+    first ``n_out`` entries, where a wrapped contribution would have to come
+    from senior-pool mass above the top of the grid: the same far-tail
+    aliasing the combine itself accepts, and it is what the reproduction check
+    above measures.
+    """
+    if port.density_df is None:
+        raise ValueError(
+            f'{port.name}: update() before {caller} -- no density_df is present')
+    if port._signed() or port._combine_x_min is not None:
+        raise NotImplementedError(
+            f'{caller} requires the default zero-based, non-negative '
+            'grid (no signed severity, no output window)')
+    if port.padding < 1:
+        raise NotImplementedError(
+            f'{caller} requires padding >= 1; the portfolio was updated '
+            f'with padding={port.padding}')
+    ft_all, nots = _ft_nots(
+        {a.name: a.ftagg_density for a in port.agg_list})
+    p_total = np.real(ift(ft_all, port.padding))
+    err = float(np.abs(p_total - port.density_df['p_total'].to_numpy()).max())
+    if err > VALIDATION_NOISE:
+        raise ValueError(
+            f'{port.name}: the units\' transforms do not reproduce '
+            f'density_df p_total (max error {err:.3e} > {VALIDATION_NOISE:.0e}); '
+            f'{caller} needs the independent combine of the current unit '
+            'densities')
+    return nots, 2 * (len(ft_all) - 1)
+
+
+def junior_recovery(port, unit, state=None):
+    r"""``E[min(X_i, (a - X_{-i})^+)]`` as a function of assets ``a``.
+
+    The **junior** (subordinated) leg of the priority ladder: what unit
+    ``unit`` recovers from an estate of ``a`` when every other unit's claim
+    ranks ahead of it. The senior leg ``E[X_i ∧ a]`` is ``lev_{unit}`` and
+    the equal-priority leg ``E[X_i · min(1, a/X)]`` is ``exa_{unit}``, both
+    written by :func:`add_exa`; this is the third.
+
+    Parameters
+    ----------
+    port : Portfolio
+        An updated portfolio; see :func:`priority_state` for the guards.
+    unit : str
+        Unit name, one of ``port.unit_names``.
+    state : tuple, optional
+        A ``(nots, m_buf)`` pair from :func:`priority_state`, to amortize the
+        leave-one-out transforms across a loop over units. Built here when
+        omitted.
+
+    Returns
+    -------
+    ndarray
+        The recovery curve on ``port.density_df['loss']``, read as the asset
+        level ``a``.
+
+    Notes
+    -----
+    For independent units the junior recovery is a single convolution,
+
+    .. math::
+
+        \mathsf{P}\min(X_i, (a - X_{-i})^+)
+          = \sum_y \mathrm{lev}_i(a - y)\, p_{-i}(y),
+
+    because :math:`\mathrm{lev}_i(0) = 0` kills every term with
+    :math:`y > a`. One transform of the ``lev`` column against the
+    leave-one-out transform therefore gives the **whole curve in** ``a`` at
+    once, on state already in memory.
+
+    The three legs distribute the same pot: pointwise
+
+    .. math::
+
+        \min(X_i, (a - X_{-i})^+) = \min(X_i + X_{-i}, a) - \min(X_{-i}, a),
+
+    so on a two-unit book ``lev_i(a) + ex_junior_j(a) = lev_total(a)`` exactly,
+    and at fixed assets subordination is a pure redistribution, zero sum in
+    expected recovery. The convolution is computed directly rather than as that
+    difference, which cancels catastrophically when the junior unit is small
+    against the senior pool.
+
+    Expected policyholder deficit is monotone in rank, senior <= equal <=
+    junior, for every unit; that is the cheapest acceptance test.
+
+    Assumes the units are independent, which they are by construction for a
+    ``Portfolio``. Two books sharing cat events are the ``clash`` form of
+    :mod:`aggregate.bivariate`, where the junior recovery is a genuine
+    two-dimensional pushforward and nothing here applies.
+    """
+    if unit not in port.unit_names:
+        raise ValueError(f'{unit} is not a unit of {port.name}: '
+                         f'{port.unit_names}')
+    nots, m_buf = state if state is not None else priority_state(port)
+    n_out = len(port.density_df)
+    buf = np.zeros(m_buf)
+    buf[:n_out] = port.density_df[f'lev_{unit}'].to_numpy()
+    return np.real(ift(ft(buf, 0) * nots[unit], 0))[:n_out]

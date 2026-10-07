@@ -1,7 +1,8 @@
 ---
 name: execute-plan
 description: Review a dev plan and, if it is sound, execute it end to end with
-  house hygiene: phase by phase against the testmon loop, the tier 3 gate, one
+  house hygiene: phase by phase against the narrowed edit loop, the tier 3 gate,
+  one
   version bump commit per phase, execution notes recording every divergence,
   dev/TODO.md, dev-files.md, and the finished plan retired to dev/done/. If the
   plan is not sound, stop and ask in one batch rather than guess. Use when asked
@@ -147,8 +148,8 @@ divergence is a good outcome. An unrecorded one is the failure.
 
 - **Phase by phase, in the plan's order. One phase, one bump, one commit.**
   Never batch two phases into one commit, and never defer a bump to the end.
-- **The edit loop is tier 1** from `test-tiers`, the testmon invocation with all
-  its load-bearing flags. Do not run the full suite inside the loop.
+- **The edit loop is tier 1** from `test-tiers`, a selection narrowed by hand to
+  the files or cases in scope. Do not run the full suite inside the loop.
 - **Write the tests the plan asks for.** Any new DecL program used in a pytest
   case is appended to `src/aggregate/agg/decl-testers.agg` under the matching
   section, and it must round-trip.

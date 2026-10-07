@@ -110,9 +110,11 @@ Here is the full DecL Grammar and a `grammar railroad diagram <_static/diagram.x
 Test Suite Programs
 ===================
 
-The test suite (``aggregate/agg/_test_suite.agg``) is exercised by the pytest
-suite — each line of the file becomes its own parametrized test case (parse
-check + SLY-snapshot shape check). Run::
+The parser corpus (``aggregate/agg/_test_suite.agg``) is exercised by the
+pytest suite: each line of the file becomes its own parametrized test case, one
+asserting it parses and one checking the resulting spec against a captured
+snapshot. The snapshot is regenerated from the current Lark parser, so it is a
+change detector rather than a correctness oracle. Run::
 
     uv run pytest
 
@@ -128,7 +130,7 @@ To only parse the file from Python::
     assert filename.exists()
 
     build.logger_level(30)
-    df = build.interpreter_file(filename=filename)
+    df = build.interpret_file(filename=filename)
 
     df.query('error != 0')
 

@@ -247,7 +247,7 @@ xpnl Capstone.Capped
   less
     agg Capstone.CappedQS agg.Capstone.XOL
       aggregate net of
-        75% po 20000 xs 0 rate 1 cede 0.30 as "Capped QS"
+        75% po 20000 xs 0 rate 100% cede 30.0% as "Capped QS"
   less
     25% premium expenses as "G&A"
   peel top-down

@@ -7,38 +7,69 @@
 # aggregate: working with actuarial compound distributions
 
 ## Purpose
-`aggregate` builds approximations to compound (aggregate) probability distributions quickly and accurately.
-It can be used to solve insurance, risk management, and actuarial problems using realistic models that reflect
-underlying frequency and severity. It delivers the speed and accuracy of parametric distributions to situations
-that usually require simulation, making it as easy to work with an aggregate (compound) probability distribution
-as the lognormal. `aggregate` includes an expressive language called DecL to describe aggregate distributions
-and is implemented in Python under an open source BSD-license.
+`aggregate` builds essentially exact compound (aggregate) probability
+distributions quickly and accurately. It can be used to solve insurance, risk
+management, and actuarial problems using realistic models that reflect
+underlying frequency and severity. It delivers the speed and accuracy of
+parametric distributions to situations that usually require simulation, making
+it as easy to work with an aggregate (compound) probability distribution as the
+lognormal. `aggregate` includes an expressive language called DecL to describe
+aggregate distributions and is implemented in Python under an open source
+BSD-license.
 
 ## Version 1.0
-Version 1.0 represents a substantial extension over the prior 0.30.1 release. It was written in collaboration with Claude Code. Version 1.0 adds:
+Version 1.0 represents a substantial extension over the prior 0.30.1 release. It
+was written in collaboration with Claude Code and adds:
 
-* The ability to model positive and negative amounts, opening the way for a specific PnL profit-and-loss class.
-* Automated generation of incremental gross–ceded–net views across multi-layer occurrence and aggregate programs.
-* The FFT calculations are now managed in a window that need not include the origin, providing more efficient discretization.
-* Bivariate distributions, including bivariate severity, clash, ceded–net, gross-cede, and gross–net models.
-* All standard reinsurance variable features: swings, slides, profit commissions, reinstatements, and loss corridors, as well as loss-sensitive retro rating used in large accounts.
+* The ability to model positive and negative amounts, opening the way for a PnL
+  profit-and-loss class supporting price quoting and evaluation.
+* Automated generation of incremental gross–ceded–net views across multi-layer
+  occurrence and aggregate programs.
+* FFT calculations performed in a support window that need not include the
+  origin, providing more efficient discretization.
+* Bivariate distributions, including bivariate severity, clash, ceded–net,
+  gross-cede, and gross–net models.
+* Standard reinsurance variable features: swings, slides, profit commissions,
+  reinstatements, and loss corridors, as well as loss-sensitive retro rating
+  used in large accounts.
 
 ## Aggregate White Paper
 
-[Aggregate: fast, accurate, and flexible approximation of compound probability distributions](https://www.cambridge.org/core/journals/annals-of-actuarial-science/article/aggregate-fast-accurate-and-flexible-approximation-of-compound-probability-distributions/1BF9A534D944D983B1D780C60885F065) describes the `Aggregate` class within `aggregate`. This paper has been published in the peer reviewed journal [Annals of Actuarial Science](https://www.cambridge.org/core/journals/annals-of-actuarial-science)'s Actuarial Software series.
-The paper describes the purpose, implementation, and use `Aggregate`, showing how it can be used to create and manipulate compound frequency-severity distributions.
+[Aggregate: fast, accurate, and flexible approximation of compound probability
+distributions](https://www.cambridge.org/core/journals/annals-of-actuarial-science/article/aggregate-fast-accurate-and-flexible-approximation-of-compound-probability-distributions/1BF9A534D944D983B1D780C60885F065)
+describes the `Aggregate` class within `aggregate`. This paper has been
+published in the peer reviewed journal [Annals of Actuarial
+Science](https://www.cambridge.org/core/journals/annals-of-actuarial-science)'s
+Actuarial Software series. The paper describes the purpose, implementation, and
+use `Aggregate`, showing how it can be used to create and manipulate compound
+frequency-severity distributions.
 
 ## Changelog
 
-See [CHANGELOG.md](https://github.com/mynl/aggregate/blob/master/CHANGELOG.md) for the full version history.
+See [CHANGELOG.md](https://github.com/mynl/aggregate/blob/master/CHANGELOG.md)
+for the full version history.
 
 ## API stability
 
-Almost everything is **stable**. `Aggregate`, `Portfolio`, `PnL`, `Severity`, `Frequency`, `Distortion`, `BivariateAggregate`, `Underwriter`, `build`, `qd` and the DecL grammar carry the usual promise: from 1.0 onward a documented name keeps its meaning, and a breaking change waits for a major release after a deprecation period.
+Almost everything is **stable**. `Aggregate`, `Portfolio`, `PnL`, `Severity`,
+`Frequency`, `Distortion`, `BivariateAggregate`, `Underwriter`, `build`, `qd`
+and the DecL grammar carry the usual promise: from 1.0 onward a documented name
+keeps its meaning, and a breaking change waits for a major release after a
+deprecation period.
 
-Two modules are **provisional**, in the sense of [PEP 411](https://peps.python.org/pep-0411/): `aggregate.charts` and `aggregate.exhibits`. They are not part of the 1.0 API contract and may change in a minor release with no deprecation period. They are additive side projects to the release, they import from the core and the core does not import them, so nothing in them can reach the stable surface. They are public on purpose: use them and report what does not fit, which is how a provisional module graduates to stable.
+Two modules are **provisional**, in the sense of [PEP
+411](https://peps.python.org/pep-0411/): `aggregate.charts` and
+`aggregate.exhibits`. They are not part of the 1.0 API contract and may change
+in a minor release with no deprecation period. They are additive side projects
+to the release, they import from the core and the core does not import them, so
+nothing in them can reach the stable surface. They are public on purpose: use
+them and report what does not fit, which is how a provisional module graduates
+to stable.
 
-The full statement, including exactly what "provisional" covers in each, is in the [API Stability](https://aggregate.readthedocs.io/en/latest/3_reference/3_x_API_Stability.html) page of the documentation.
+The full statement, including exactly what "provisional" covers in each, is in
+the [API
+Stability](https://aggregate.readthedocs.io/en/latest/3_reference/3_x_API_Stability.html)
+page of the documentation.
 
 ## Documentation
 
@@ -96,9 +127,14 @@ pip install aggregate
 
 ## Getting started
 
-To get started, import `build`. It provides easy access to all functionality. The function `qd` is a quick display helper, printing germane information.
+To get started, import `build`. It provides easy access to all functionality.
+The function `qd` is a quick display helper, printing germane information.
 
-Here is a model of the sum of three dice rolls. Running `qd(a)` prints the mean, SD, CV, skewness, and 1st, 50th and 99th percentiles for the frequency, severity, and aggregate components. Common statistical functions like the cdf and quantile function are built-in. The whole probability distribution is available in `a.density_df`.
+Here is a model of the sum of three dice rolls. Running `qd(a)` prints the mean,
+SD, CV, skewness, and 1st, 50th and 99th percentiles for the frequency,
+severity, and aggregate components. Common statistical functions like the cdf
+and quantile function are built-in. The whole probability distribution is
+available in `a.density_df`.
 
     from aggregate import build, qd
     a = build('agg Dice dfreq [3] dsev [1:6]')
@@ -140,7 +176,8 @@ See the documentation for more examples.
 
 ## In JupyterLab: the `%%agg` cell magic
 
-In a notebook the DecL does not have to live inside a Python string. Load the magic once per kernel:
+In a notebook the DecL does not have to live inside a Python string. Load the
+magic once per kernel:
 
     %load_ext aggregate.magics
 
@@ -149,7 +186,10 @@ and write the program as the cell:
     %%agg
     agg Dice dfreq [3] dsev [1:6]
 
-which is exactly `a = build('agg Dice dfreq [3] dsev [1:6]')` followed by `qd(a)`, with two conveniences: the program is not in quotes, so your editor still highlights it as DecL, and the object is bound to its declared name as well as to `a`, giving both `a` and `Dice`.
+which is exactly `a = build('agg Dice dfreq [3] dsev [1:6]')` followed by
+`qd(a)`, with two conveniences: the program is not in quotes, so your editor
+still highlights it as DecL, and the object is bound to its declared name as
+well as to `a`, giving both `a` and `Dice`.
 
 Full descriptions are in the [documentation](https://aggregate.readthedocs.io/en/latest/).
 
@@ -165,6 +205,16 @@ The pytest suite lives in `tests/`:
     uv run pytest                             # fast suite (multi-minute cases deselected)
     uv run pytest -m "slow or not slow"       # everything, including the slow bivariate cases
     uv run pytest tests/test_decl_parser.py   # one file; add -k "pattern" to filter by name
+
+## Pricing Insurance Risk Examples
+`aggregate` was used to create all of the examples, figures, and tables in
+[Pricing Insurance
+Risk](https://onlinelibrary.wiley.com/doi/book/10.1002/9781119756538). Those
+exhibits can still be re-created using version 0.30.1 (the
+[Baseline](https://github.com/mynl/aggregate/releases/tag/Version-0.30.1)
+release). However, much of the needed functionality was removed in version 1.0,
+because it was not core to the go-forward purpose of the package: it compared recommended
+(spectral) methods with (not recommended) legacy methods. The [blog post](https://blog.mynl.com/posts/publications/2022-01-20-Pricing-Insurance-Risk-Book/cases-creating.html) describes how to create PIR exhibits for a custom portfolio, again using the Baseline release.
 
 ## License
 

@@ -2,7 +2,7 @@
 
 ``tests/test_agg_libraries.py`` checks that each entry **parses** and that the
 file's filing conventions hold. This module checks that each entry **builds**,
-which is what ``[Agg-Library-Build-Check]`` in ``dev/TODO.md`` asked for: an
+which is what ``[Agg-Library-Build-Check]`` in ``dev/done/TODO-2026-10-07.md`` asked for: an
 entry could parse cleanly and still produce garbage moments with no test signal
 at all.
 

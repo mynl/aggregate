@@ -1,8 +1,9 @@
 ---
 name: test-tiers
-description: Run the aggregate test suite correctly. Three tiers (a testmon edit
-  loop, the full fast suite, everything including slow), the load-bearing flags
-  each tier needs, and the two environment traps that make a green run a lie.
+description: Run the aggregate test suite correctly. Three tiers (a narrowed
+  edit loop, the full fast suite, everything including slow), the load-bearing
+  flags each tier needs, and the two environment traps that make a green run a
+  lie.
   Use when running tests, checking whether an edit broke anything, gating a
   version bump, choosing a pytest invocation, or when a run behaves oddly:
   selects nothing, selects everything, or a package that was installed has
@@ -12,14 +13,12 @@ argument-hint: [tier | path | -k expr]
 
 # Running the aggregate suite
 
-**The suite is not bloated. Measure before proposing a trim.** As of `1.0.0a161`
-it was 2,562 fast cases in about 105 seconds, roughly 41 ms per test on
-FFT/numpy bound work. The three parametrized corpus files (`test_decl_parser`,
-`test_decl_unparser`, `test_grammar_sync`) are 37% of the case count and only
-about 29% of wall clock. If the suite *feels* slow, the cause is almost always
-running the whole thing inside the edit loop, which is what this skill exists to
-prevent. Re-measure with `uv run pytest -m 'slow or not slow' --durations=40`
-before proposing a cull.
+**The suite is not bloated. Measure before proposing a trim.** As of `1.0.0a396`
+it is 5,413 fast cases in about 70 seconds, roughly 13 ms per test on FFT/numpy
+bound work. The case count has more than doubled since a161 while wall clock
+fell, so the whole fast suite is now a reasonable thing to run. If it *feels*
+slow, measure first: `uv run pytest -m 'slow or not slow' --durations=40` before
+proposing a cull.
 
 ## Two environment traps, check these first
 
@@ -63,36 +62,20 @@ Use the first tier that covers the change.
 
 ### Tier 1, the edit loop
 
+Narrow the selection by hand to the tests the edit can plausibly touch:
+
 ```
-UV_PROJECT_ENVIRONMENT=.venv uv run pytest -n0 --dist no --testmon-forceselect
+UV_PROJECT_ENVIRONMENT=.venv uv run pytest tests/test_pnl.py
 ```
 
-`pytest-testmon` records which tests execute which source lines and reruns only
-those an edit touched. Measured here: a three file scope went from 10.9 s to
-0.16 s when nothing changed, and a real edit to `src/aggregate/recipe.py`
-selected 6 tests of 55 in 0.71 s. The first run builds the map, which costs one
-full run. Every run after that is near instant.
+One file, or one case with `::test_name`. Also `-k "pnl and not engine"` to
+select by expression, `--lf` to rerun last failures, `--ff` for failures first,
+`-x` to stop at the first. There is no setup and nothing to keep in sync, and if
+the selection misses something the full fast suite behind it is under 90 s.
 
-**Every flag is load-bearing. This is not `--testmon` alone.**
-
-- **`--testmon-forceselect`, not `--testmon`.** `addopts` carries
-  `-m 'not slow'`, and testmon *silently* downgrades to `--testmon-noselect`
-  (reorder, deselect nothing) whenever `-m`, `-k`, `--lf` or `::test_name` is in
-  play. Plain `--testmon` therefore looks like it works, writing `.testmondata`
-  and printing no warning, while running every test.
-  `--testmon-forceselect` intersects the impact set with the selectors, which is
-  what is actually wanted.
-- **`-n0 --dist no`.** testmon traces coverage in process and xdist breaks it.
-  Both flags are needed to override `-n auto --dist loadgroup` in `addopts`.
-  `-p no:xdist` does **not** work, it makes those `addopts` unparseable. Losing
-  parallelism costs nothing when the point is running six tests.
-- **A comment only edit correctly selects nothing.** testmon hashes executable
-  blocks, not file mtimes. That is right, not a failure. Do not chase it.
-- The database is `.testmondata` (gitignored). Delete it to force a rebuild.
-
-No-setup fallbacks when testmon is not worth it: `pytest tests/test_pnl.py`
-(one file, or `::test_name`), `-k "pnl and not engine"`, `--lf` to rerun last
-failures, `--ff` for failures first, `-x` to stop at the first.
+Add `-n0 --dist no` when you want a breakpoint or deterministic single process
+ordering; those override `-n auto --dist loadgroup` in `addopts`. `-p no:xdist`
+does **not** work, it makes those `addopts` unparseable.
 
 ### Tier 2, pre-commit
 

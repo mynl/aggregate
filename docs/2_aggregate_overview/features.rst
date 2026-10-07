@@ -1984,8 +1984,8 @@ an unchanged FFT length, and the mean comes back exact:
 
 A scaled support such as ``100000 * beta 2 5``, every unbounded severity and every
 compound grid are unchanged. A ``bs`` the user pinned is still honored verbatim,
-grid ending on the support top and all, tracked as ``[Bounded-Residual-Lump]`` in
-``dev/TODO.md``.
+grid ending on the support top and all, tracked as ``[Bounded-Residual-Lump]``
+in the project backlog.
 
 Tail-thickness classification (a29)
 -----------------------------------

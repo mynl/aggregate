@@ -194,19 +194,19 @@ or DecL.
 
 All authored documents — Quarto `.qmd` pages and any future artifact that supports citations — reference the author's master BibTeX library. This applies to every future doc request without being re-asked.
 
-- **Bibliography:** `C:/s/TELOS/Biblio/uber-library.bib` (~7,100 entries), maintained by the author with `archivum` (`C:/s/TELOS/Python/archivum_project`). **Read-only from this project — never edit it.** If a needed reference is missing, list it in the run summary for the author to add via archivum, then cite once the key exists.
+- **Bibliography:** `D:/Projects/Biblio/uber-library.bib` (~7,100 entries), maintained by the author with `archivum` (`V:/dev/archivum`). **Read-only from this project — never edit it.** If a needed reference is missing, list it in the run summary for the author to add via archivum, then cite once the key exists.
 - **Keys** follow `AuthorYYYY[a-z]` (e.g. `Mildenhall2022a`). Always `rg` the bib file for the exact key — never guess or fabricate one.
 - **Quarto YAML** on every page:
   ```yaml
-  bibliography: C:/s/TELOS/Biblio/uber-library.bib
-  csl: C:/s/TELOS/Biblio/journal-of-risk-and-uncertainty.csl
+  bibliography: D:/Projects/Biblio/uber-library.bib
+  csl: D:/Projects/Biblio/journal-of-risk-and-uncertainty.csl
   ```
 - Cite inline with `@Key` / `[@Key; @Key2]`; pages that cite end with a `## References` heading over an empty `::: {#refs}` div.
 - House anchors: `Mildenhall2022` (Similar Risks Have Similar Prices, IME), `Mildenhall2022a` (*Pricing Insurance Risk*, with Major), `Major2026` (*Introduction to Capital Modeling and Portfolio Management*, CAS), `Grubel1999`/`Grubel2000` (FFT compound distributions), `Klugman2012` (*Loss Models*), `Heckman1983`, `Panjer1981`, `Wang1995`/`Wang1996` (distortions).
 
 ## Testing
 
-The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. Each line of `aggregate/agg/test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:
+The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. The DecL corpora live in `src/aggregate/agg/`: `_test_suite.agg` and `_test_suite2.agg` (the SLY-parity scaffold, still load-bearing for eleven test files — see `[Scaffold-Retirement]` in `dev/TODO.md`), plus the shipped `library.agg` and `decl-testers.agg`. Each line of `_test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:
 
 - `test_line_parses` — the line parses to a valid `(kind, name, spec)` shape.
 - `test_spec_matches_snapshot` — the spec matches `tests/data/expected_specs.json`. This catches semantic drift in the grammar/transformer.
@@ -217,41 +217,20 @@ Validation failures surface as warnings via `explain_validation()`; numerical is
 
 ### Running the suite efficiently (standard operating procedure)
 
-**The suite is not bloated — measure before trimming it.** As of 1.0.0a161:
-**2,562 fast cases in ~105 s, i.e. ~41 ms per test** on FFT/numpy-bound work.
-The three parametrized corpus files (`test_decl_parser` 326 cases,
-`test_decl_unparser` 444, `test_grammar_sync` 169) are 37% of the case count but
-only ~29% of wall clock. If the suite *feels* slow, the cause is almost always
-running the whole thing inside the edit loop. Re-measure with
-`uv run pytest -m 'slow or not slow' --durations=40` before proposing a cull.
+**The suite is not bloated — measure before trimming it.** As of 1.0.0a396:
+**5,413 fast cases in ~70 s, i.e. ~13 ms per test** on FFT/numpy-bound work.
+The case count has more than doubled since a161 while wall clock fell, so the
+whole fast suite is now a reasonable thing to run. If it *feels* slow, measure
+first: `uv run pytest -m 'slow or not slow' --durations=40` before proposing a
+cull.
 
 Three tiers. Use the first one that covers the change:
 
-- **1. Edit loop — `pytest -n0 --dist no --testmon-forceselect`.**
-  `pytest-testmon` records which tests execute which source lines and reruns
-  **only those your edit touched**. Measured on this repo: a 3-file scope went
-  **10.9 s → 0.16 s** when nothing changed, and a real edit to
-  `src/aggregate/recipe.py` selected **6 of 55** in 0.71 s. The first run builds
-  the map (one full run); every run after is near-instant.
-
-  Every flag in that command is load-bearing — this is not `--testmon` alone:
-  - **`--testmon-forceselect`, not `--testmon`.** `addopts` carries
-    `-m 'not slow'`, and testmon *silently* downgrades to
-    `--testmon-noselect` (reorder, deselect nothing) whenever `-m` / `-k` /
-    `--lf` / `::test_name` is in play. Plain `--testmon` therefore looks like
-    it works — it writes `.testmondata` and prints no warning — while running
-    every test. `--testmon-forceselect` intersects the impact set with the
-    selectors, which is what you actually want.
-  - **`-n0 --dist no`.** testmon traces coverage in-process; xdist breaks it.
-    Both flags are needed to override `-n auto --dist loadgroup` in `addopts`
-    (`-p no:xdist` does *not* work — it makes those `addopts` unparseable).
-    Losing parallelism costs nothing when the point is running 6 tests.
-  - A **comment-only edit correctly selects nothing** — testmon hashes
-    executable blocks, not file mtimes. That is right, not a failure.
-  - Database is `.testmondata` (gitignored); delete it to force a rebuild.
-  - No-setup fallbacks: `pytest tests/test_pnl.py` (one file, or
-    `::test_name`), `-k "pnl and not engine"`, `--lf` (rerun last failures;
-    `--ff` failures-first, `-x` stop at first).
+- **1. Edit loop — narrow the selection by hand.** `pytest tests/test_pnl.py`
+  (a single file, or `::test_name`), `-k "pnl and not engine"`, `--lf` (rerun
+  last failures; `--ff` failures-first, `-x` stop at first). No setup and
+  nothing to keep in sync, and if the selection misses something the full fast
+  suite behind it is under 90 s.
 - **2. Pre-commit — `uv run pytest`.** The full fast suite, parallel via
   `-n auto`, `slow` deselected. This is the gate for "am I done", **not** an
   edit-loop tool. Running it eight times in one session is the mistake this
@@ -335,7 +314,13 @@ These are standing rules — follow them without being re-asked:
     fact lives in exactly one of the four.
 - **Keep `dev/TODO.md` current.** When a tracked item lands, mark it done (and
   note the version / `dev/done/plan-*.md`); when scope shifts, edit the entry.
-  Move a completed plan from `dev/` to `dev/done/`.
+  Move a completed plan from `dev/` to `dev/done/`. The file was restarted on
+  2026-10-07 at `1.0.0a396`; its 1,706-line predecessor is archived at
+  `dev/done/TODO-2026-10-07.md` and holds the full historical backlog, so check
+  there before concluding an item was never considered. **Keep entries to one
+  tight paragraph** — the predecessor became unreviewable, which is why it was
+  retired. Source comments cite entries by label, so renaming one means
+  grepping for it.
 - **Claude commits version bumps; the author commits everything else.** Every
   version bump is committed by Claude as its own commit, at the moment it lands.
   A multi-step implementation that bumps three times leaves three commits, so
@@ -372,9 +357,10 @@ These are standing rules — follow them without being re-asked:
 
 ## TODO
 
-The full pending list — pre-ship work and post-v1.0 ideas — lives in
-**`dev/TODO.md`**; what's landed is in `CHANGELOG.md` and the git log. Check
-there before proposing structural changes so you don't reinvent something
-already scoped (or already deferred for a reason).
+The live post-1.0 list is **`dev/TODO.md`**, led by
+`[Portfolio-Shared-Mixing-Dependence]`; the full historical backlog is
+`dev/done/TODO-2026-10-07.md`. What's landed is in `CHANGELOG.md` and the git
+log. Check both TODO files before proposing structural changes so you don't
+reinvent something already scoped (or already deferred for a reason).
 
 - **PIR case-study reproduction.** The `CaseStudy` machinery (formerly `extensions/case_studies.py`, `portfolio_pir.py`, `risk_progression.py`, and the `cnc`/`discrete`/`hs`/`tame` runner scripts) was deleted at 1.0.0a12. **PMIR is a separate forward-looking project and does NOT reproduce PIR exhibits** — do not point users at it for that purpose. The only path to reproducing the published PIR exhibits is `pip install aggregate==0.30.1` in an isolated environment.

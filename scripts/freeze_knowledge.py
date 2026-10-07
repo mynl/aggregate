@@ -161,7 +161,8 @@ def _agg_port_programs(uw):
         The kind (``'agg'`` or ``'port'``), the object name, and its DecL
         program text.
     """
-    k = uw.knowledge
+    # ``.knowledge`` became ``.recipes`` at 1.0.0a164; same shape.
+    k = uw.recipes
     mask = k.index.get_level_values(0).isin(FROZEN_KINDS)
     for (kind, name), row in k[mask].iterrows():
         yield kind, name, row["program"]

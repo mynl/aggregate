@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'ft', 'ift',
-    'below_grid_fill',
     'subsets',
     'remove_fuzz',
     'round_bucket',

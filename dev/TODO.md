@@ -91,6 +91,24 @@
   adds that the aggregate "has no negative density even under aliasing" (795,744
   buckets are negative at `log2=21`).
 
+- **[Matrix-Verdict-Colorblind]** (measured 2026-10-07) — the `matrix` panel
+  encodes its verdict on a red/green diverging ramp whose two ends have a
+  luminance contrast ratio of **1.25:1** (`MATRIX_FAVORABLE` `#008300`,
+  relative luminance 0.1623; `MATRIX_UNFAVORABLE` `#e34948`, 0.2156). They
+  differ almost purely in hue, on the red/green axis, so for a deuteranope or
+  protanope (~8% of men) and in greyscale print the two verdicts are
+  indistinguishable. That matters more here than on an ordinary chart: the
+  numbers are printed in every cell, so magnitude survives, but **which
+  direction is favorable is row-dependent and carried by color alone** (
+  `row_polarity`), and `tests/test_chartdoc_matrix.py` says in as many words
+  that it "is the one thing a reader cannot check by eye against the numbers".
+  The ramp was a deliberate choice (see the comment above the constants in
+  `plots/_chartdoc.py`: a verdict rather than a magnitude), so this is a
+  revisit, not a bug report. Three ways out: keep the hues but separate their
+  luminance, switch to a colorblind-safe diverging pair, or add a redundant
+  non-color cue per cell. **Blocks nothing**, but it should be settled before
+  the matrix baseline image is blessed, since blessing freezes the picture.
+
 ## Tests and the parity scaffold
 
 - **[Rationalize-Tests]** (#51), then **[Scaffold-Retirement]** — **in that
@@ -247,7 +265,7 @@
 - **[Library-Round-Two]**, **[Showcase-Examples-Tune]** — library curation
   calls, each needing an author ruling rather than a rule.
 - **[bs_describe-Wart]**, **[DecL-Colorizer-Resync]**, **[Colorizer-Style-Choice]**,
-  **[Switcheroo-Sample-Regression]**, **[Bucket-Baseline-Script-Rot]**,
+  **[Switcheroo-Sample-Regression]**,
   **[Pedagogy-Migrations]**, **[Bivariate-Gate-Flake]**,
   **[Plot-Severity-Outside-Window]** — small hygiene items.
 

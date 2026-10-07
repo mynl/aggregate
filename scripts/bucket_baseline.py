@@ -55,6 +55,10 @@ import pandas as pd
 BAR_KINDS = ("agg", "port")
 
 # Default database load request: reproduces the imported ``build``.
+# NOTE: ``_test_suite`` is the SLY-parity scaffold, which ``[Scaffold-Retirement]``
+# (dev/TODO.md) will delete after ``[Rationalize-Tests]``. When it goes, repoint
+# this at ``library`` and regenerate; the baseline content changes wholesale, so
+# that is a deliberate step and not a drop-in swap.
 DEFAULT_DATABASES = ("_test_suite",)
 
 # Canonical column order of ``_bs_window_df`` (shared by Aggregate/Portfolio).
@@ -105,7 +109,12 @@ def _agg_port_programs(uw):
         Kind (``'agg'``/``'port'``), object name, and DecL program text. Sorted
         by ``(kind, name)`` so the baseline is order-stable across runs.
     """
-    k = uw.knowledge
+    # ``Underwriter.knowledge`` became ``.recipes`` at 1.0.0a164
+    # ([Recipe-Is-The-Entry]); same ``(kind, name)`` MultiIndex and ``program``
+    # column, so this is a rename. Reading the old name raised AttributeError
+    # and made the whole script dead for ~200 versions
+    # ([Bucket-Baseline-Script-Rot]).
+    k = uw.recipes
     mask = k.index.get_level_values(0).isin(BAR_KINDS)
     for (kind, name), row in k[mask].sort_index().iterrows():
         yield kind, name, row["program"]

@@ -61,7 +61,7 @@ SLOW_ENTRIES = {
     # the capstone chain, 1.2s to 4.4s each
     'Capstone.Gross', 'Capstone.ExposureRating', 'Capstone.SelectedLosses',
     'Capstone.LossPicksTest', 'Capstone.XOL', 'Capstone.XOL.PnL',
-    'Capstone.FullProgram', 'Capstone.PnL', 'Capstone.PC',
+    'Capstone.FullProgram', 'Capstone.PnL', 'Capstone.Capped',
     'Capstone.GrossNet',
     # renewal counts convolve one wait law per arrival
     'RenewalExponentialWait', 'RenewalLayeredWait',

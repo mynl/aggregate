@@ -211,7 +211,7 @@ UNPARSER_EXEMPT = {
     # the spec. Same cause as the group above; kept separate because the fix
     # is different (the spec would have to record that a reference was
     # written).
-    'Capstone.XOL.PnL', 'Capstone.PnL', 'Capstone.PC',
+    'Capstone.XOL.PnL', 'Capstone.PnL', 'Capstone.Capped',
     # distortion combinator
     'MinimumDistortion', 'MixtureDistortion',
     # canonical form would be ambiguous

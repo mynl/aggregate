@@ -242,15 +242,16 @@ xpnl Capstone.PnL
   note{PnL (profit and loss) view of the capstone book by program and layer.}
   tags{topic:capstone, role:advanced};
 
-xpnl Capstone.PC
+xpnl Capstone.Capped
   derive premium
   less
-    agg Capstone.Slide agg.Capstone.XOL
+    agg Capstone.CappedQS agg.Capstone.XOL
       aggregate net of
-        75% po inf xs 0 rate 100% slide 0.48 at 0.42 and 0.38 at 0.62 and 0.18 at 0.82 as "QS w Slide"
+        75% po 20000 xs 0 rate 1 cede 0.30 as "Capped QS"
   less
     25% premium expenses as "G&A"
-  note{The final capstone model, adding a sliding scale commission to the quota share. The XOL program is pulled in by reference, ensuring all terms stay consistent. Look at Capstone.XOL.PnL to calibrate the slide: loss ratios net of XOL are broadly between 42% and 83%. Peel is not available in this case, but it would add nothing new.}
+  peel top-down
+  note{The final capstone model, adding a capped quota share at a flat 30% ceding commission on the book net of XOL. The cession is 75% of the first 20,000 of annual loss, so the reinsurer's recovery is bounded where Capstone.FullProgram's unlimited share is not, and the cap is what the ceded loss column shows working. The XOL program is pulled in by reference, ensuring all terms stay consistent. Peel is available here, and top-down, which is the whole point of the entry.}
   tags{topic:capstone, role:advanced};
 
 grossnet

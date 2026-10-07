@@ -20,6 +20,16 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a399
+
+**[Capstone-Capped] `Capstone.PC` leaves the example library and `Capstone.Capped` takes its place.** Breaking for anyone building `xpnl.Capstone.PC` by name, which is an example-library entry rather than API. Requested by the api's 2026-10-07 punch list; plan `aggregate-api dev/plan-a198-punch-list.md`, batch [capstone].
+
+`Capstone.PC` was the sliding-scale-commission capstone, and a slide blocks peeling, so the one entry whose point was the final program could not show the ledger that makes a final program worth reading. `Capstone.Capped` cedes a **capped** quota share instead, 75% of the first 20,000 of annual loss at a flat 30% ceding commission on the book net of XOL, and `peel top-down` works. The cap is not decoration: it bounds the reinsurer's recovery where `Capstone.FullProgram`'s unlimited share does not, and the ceded loss column is where that shows.
+
+The inner aggregate is renamed with it, `Capstone.Slide` to `Capstone.CappedQS`, since it no longer cedes a slide. The entry replaces the old one **in place**, so its position in `library.agg` is unchanged and the reading order every consumer sorts by does not move. The note is rewritten and the old sentence about calibrating a slide against `Capstone.XOL.PnL` goes with the slide.
+
+`tests/test_agg_libraries.py` and `tests/test_library_entries.py` follow the rename; both list the Capstone entries by name.
+
 ## 1.0.0a398
 
 **[Reins-Annual-Triple] the reinsurance chart's right panel names the year and the program it answers about.** `Gross`, `Ceded to occurrence`, `Net of occurrence`, in place of the three `Gross` / `Ceded` / `Net` constants the left panel keeps. Provisional surface (`aggregate.charts`), and the chart IR's series names change, so a consumer keying off them sees it. Requested by the api's 2026-10-07 punch list; plan `aggregate-api dev/plan-a198-punch-list.md`, batch [reins-labels].

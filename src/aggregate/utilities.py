@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     'ft', 'ift',
+    'below_grid_fill',
     'subsets',
     'remove_fuzz',
     'round_bucket',
@@ -423,6 +424,54 @@ def mv(x, y=None):
         print(f'mean     = {x:.6g}')
         print(f'variance = {y:.7g}')
         print(f'std dev  = {y**.5:.6g}')
+
+
+def below_grid_fill(grid_bottom, signed):
+    """The ``cdf`` value below a grid's lower edge, or ``nan`` when unknown.
+
+    Parameters
+    ----------
+    grid_bottom : float
+        The first abscissa of the computed grid, ``xs[0]`` for an
+        :class:`~aggregate.distributions.Aggregate` or
+        ``density_df.loss.iloc[0]`` for a
+        :class:`~aggregate.portfolio.Portfolio`.
+    signed : bool
+        Whether the law reaches below zero, i.e. ``_signed()``.
+
+    Returns
+    -------
+    float
+        ``0.0`` when the law provably has no mass below ``grid_bottom``, and
+        ``nan`` when it may have mass there that was never computed.
+
+    Notes
+    -----
+    The rule is: **report zero only where zero is knowledge.** A non-negative
+    law on a grid starting at or below the origin had nothing below the grid to
+    begin with, so ``cdf`` there is exactly ``0`` and saying so costs nothing.
+
+    Every other case is a grid whose lower edge sits *above* the law's reach,
+    which happens two ways: a support window deliberately placed above the
+    origin, and a signed law whose two-sided window the sizer positioned from
+    three moments. In both, mass below the edge was discretized away, or never
+    computed, and its size is not known from the grid. Returning ``0`` would
+    assert an absence of mass that was in fact discarded, which can be badly
+    wrong: ``docs/2_aggregate_overview/bucket-selection.rst`` records a
+    heavy-left signed severity losing a measured 47% of its mass below
+    ``x_min``. ``nan`` says "not computed", which is the true answer.
+
+    This is deliberately conservative on the signed and windowed sides. A
+    bounded law whose window demonstrably covers its whole support could in
+    principle report ``0`` as well, but boundedness cannot be proved from the
+    grid alone, and a wrong ``0`` is far worse than an honest ``nan``.
+
+    See Also
+    --------
+    aggregate.distributions.Aggregate.cdf
+    aggregate.portfolio.Portfolio.cdf
+    """
+    return 0.0 if (grid_bottom <= 0.0 and not signed) else np.nan
 
 
 def balanced_window(ser, p, bs=None):

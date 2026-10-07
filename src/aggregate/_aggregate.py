@@ -34,7 +34,7 @@ from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_mwrangler,
                       xsden_to_meancv, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
-from .utilities import (ft, ift,
+from .utilities import (ft, ift, below_grid_fill,
                         round_bucket,
                         balanced_window,
                         agg_help, remove_fuzz, value_type_role)
@@ -7698,26 +7698,77 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return self._sev
 
     def cdf(self, x, kind='previous'):
-        """
-        Return cumulative probability distribution at x using kind interpolation.
+        """Cumulative distribution function at ``x``.
 
-        2022-10 change: kind introduced; default was linear
+        Parameters
+        ----------
+        x : float or array_like
+            Loss size. May lie outside the computed grid; see Notes.
+        kind : str, default 'previous'
+            Interpolation passed to :func:`scipy.interpolate.interp1d`. The
+            default steps, which is right for a discrete law on a lattice.
+            (2022-10 change: ``kind`` introduced; the default was ``linear``.)
 
-        :param x: loss size
-        :return:
+        Returns
+        -------
+        float or ndarray
+
+        Notes
+        -----
+        **Outside the grid the answer is only given where it is known.** Below
+        the grid's lower edge this returns ``0`` when the law provably has no
+        mass there, which is the ordinary case of a non-negative aggregate on a
+        grid starting at the origin, and ``nan`` otherwise. "Otherwise" means a
+        support window placed above the origin, or a signed law whose two-sided
+        window the sizer positioned: in both, mass below the edge was
+        discretized away or never computed, and the grid does not say how much.
+        Reporting ``0`` there would assert an absence that is not known, so
+        ``nan`` is reported instead. The rule lives in
+        :func:`aggregate.utilities.below_grid_fill`.
+
+        Above the grid the value is the top of the cumulative sum, which is the
+        total mass actually computed and is therefore slightly below ``1`` for
+        an unbounded law. That is the cdf of the discretized law this object
+        *is*, not an estimate of the true law's upper tail.
+
+        :meth:`q` is unaffected: it inverts within the grid and never
+        extrapolates.
+
+        See Also
+        --------
+        sf
+        aggregate.utilities.below_grid_fill
         """
         if self._cdf is None:
-            self._cdf = interpolate.interp1d(self.xs, self.agg_density.cumsum(), kind=kind,
-                                             bounds_error=False, fill_value='extrapolate')
+            # fill_value is (below, above): honest nan or a known 0 on the low
+            # side, and the computed total mass on the high side. Do NOT use
+            # 'extrapolate': kind='previous' has no knot below the first, so it
+            # yields nan everywhere below the grid, which is wrong for an
+            # ordinary non-negative aggregate where 0 is known.
+            cum = self.agg_density.cumsum()
+            self._cdf = interpolate.interp1d(
+                self.xs, cum, kind=kind, bounds_error=False,
+                fill_value=(below_grid_fill(self.xs[0], self._signed()), cum[-1]))
         # 0+ converts to float
         return 0. + self._cdf(x)
 
     def sf(self, x):
-        """
-        Return survival function using linear interpolation.
+        """Survival function at ``x``, computed as ``1 - cdf(x)``.
 
-        :param x: loss size
-        :return:
+        Parameters
+        ----------
+        x : float or array_like
+            Loss size.
+
+        Returns
+        -------
+        float or ndarray
+
+        Notes
+        -----
+        Inherits :meth:`cdf`'s outside-the-grid behavior exactly, so ``sf`` is
+        ``nan`` wherever ``cdf`` is: below a window, and below a signed law's
+        grid. See :meth:`cdf`.
         """
         return 1 - self.cdf(x)
 

@@ -41,7 +41,7 @@ from .moments import (MomentAggregator, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
 from ._program import ProgramMixin
 from . import _program
-from .utilities import (ft, ift,
+from .utilities import (ft, ift, below_grid_fill,
                         round_bucket,
                         agg_help, explain_validation,
                         remove_fuzz as remove_fuzz_util)
@@ -2392,24 +2392,69 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return self._dist
 
     def cdf(self, x):
-        """
-        distribution function
+        """Cumulative distribution function of the portfolio total at ``x``.
 
-        :param x:
-        :return:
+        Parameters
+        ----------
+        x : float or array_like
+            Total loss. May lie outside the computed grid; see Notes.
+
+        Returns
+        -------
+        float or ndarray
+
+        Notes
+        -----
+        **Outside the grid the answer is only given where it is known.** Below
+        the grid's lower edge this returns ``0`` when the total provably has no
+        mass there (a non-negative portfolio on a grid starting at the origin)
+        and ``nan`` otherwise, meaning a window placed above the origin or a
+        signed combine. In those cases mass below the edge was discretized away
+        or never computed and the grid does not say how much, so ``nan`` is
+        reported rather than an absence that is not known. Above the grid the
+        value is the computed total mass. Same rule and rationale as
+        :meth:`aggregate.distributions.Aggregate.cdf`, whose Notes carry the
+        full account; the predicate is
+        :func:`aggregate.utilities.below_grid_fill`.
+
+        See Also
+        --------
+        sf
+        aggregate.distributions.Aggregate.cdf
         """
         if self._cdf is None:
             # Dec 2019: kind='linear' --> kind='previous'
-            self._cdf = interpolate.interp1d(self.density_df.loss, self.density_df.F, kind='previous',
-                                             bounds_error=False, fill_value='extrapolate')
+            # fill_value is (below, above): an honest nan or a known 0 on the
+            # low side, and the computed total mass on the high side. Do NOT
+            # use 'extrapolate': kind='previous' has no knot below the first,
+            # so it yields nan everywhere below the grid, which is wrong for an
+            # ordinary non-negative portfolio where 0 is known. See
+            # aggregate.utilities.below_grid_fill and Aggregate.cdf's Notes.
+            loss, F = self.density_df.loss, self.density_df.F
+            self._cdf = interpolate.interp1d(
+                loss, F, kind='previous', bounds_error=False,
+                fill_value=(below_grid_fill(loss.iloc[0], self._signed()),
+                            F.iloc[-1]))
         return 0. + self._cdf(x)
 
     def sf(self, x):
-        """
-        survival function
+        """Survival function at ``x``, computed as ``1 - cdf(x)``.
 
-        :param x:
-        :return:
+        Parameters
+        ----------
+        x : float or array_like
+            Loss size.
+
+        Returns
+        -------
+        float or ndarray
+
+        Notes
+        -----
+        Inherits :meth:`cdf`'s outside-the-grid behavior, so ``sf`` is ``nan``
+        wherever ``cdf`` is. See
+        :meth:`aggregate.distributions.Aggregate.cdf` for the rule and why it
+        is not ``0`` or ``1``.
         """
         return 1 - self.cdf(x)
 

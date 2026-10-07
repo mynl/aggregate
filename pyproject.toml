@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a399"
+version = "1.0.0a400"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -74,10 +74,6 @@ dev = [
     "sphinx-multitoc-numbering",
     "pytest>=7",
     "pytest-xdist>=3",
-    # Test-impact analysis for the edit loop: reruns only the tests your change
-    # actually touched. NB it traces coverage in-process, so it does NOT work
-    # under xdist -- use `pytest -n0 --testmon`. See CLAUDE.md.
-    "pytest-testmon>=2",
     "pyarrow>=15",
     "ruff>=0.6",
 ]

@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a400
+
+**[Outside-Grid-Is-Nan] `cdf` and `sf` report `0` below the grid where zero is known, and keep `nan` where it is not.** `Aggregate.cdf` / `.sf` and `Portfolio.cdf` / `.sf` previously returned `nan` for *every* query below the grid's lower edge, including the ordinary non-negative case where the answer is simply `0`; the four interpolators used `fill_value='extrapolate'`, and scipy's `kind='previous'` has no knot below the first. They now fill `0` when the law provably has no mass below the edge (a non-negative law on a grid starting at the origin) and `nan` otherwise, meaning a support window placed above the origin or a signed law whose two-sided window the sizer positioned. The predicate is the new `aggregate.utilities.below_grid_fill`. Above the grid the value is unchanged: the computed total mass, which is strictly below `1` for an unbounded law. In-grid values are bit-identical, and `q` is unaffected.
+
+Numbers move only below a grid: `cdf(x) == 0` and `sf(x) == 1` for `x` below a non-negative law's origin, where both were `nan`. The windowed and signed `nan` is deliberate and now pinned by `tests/test_cdf_outside_grid.py` (24 cases), so a future interpolator or scipy change cannot silently replace it with a fabricated `0` or `1`.
+
 ## 1.0.0a399
 
 **[Capstone-Capped] `Capstone.PC` leaves the example library and `Capstone.Capped` takes its place.** Breaking for anyone building `xpnl.Capstone.PC` by name, which is an example-library entry rather than API. Requested by the api's 2026-10-07 punch list; plan `aggregate-api dev/plan-a198-punch-list.md`, batch [capstone].

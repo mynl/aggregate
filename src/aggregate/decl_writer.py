@@ -338,7 +338,7 @@ def _render_sev_clause(spec: dict):
     """
     # Interior ``severity`` label rides in ``label_map`` (dev/plan-labels.md S3),
     # appended after the whole clause.
-    label = _render_label(spec.get('label_map', {}).get('severity'))
+    label = _render_label((spec.get('label_map') or {}).get('severity'))
     # A deferred ``agg.NAME`` / ``port.NAME`` reference renders back AS a
     # reference, from the ``sev_ref`` the parser recorded. This is the first
     # dotted reference in DecL that round-trips as one -- ``sev.NAME`` and
@@ -435,7 +435,7 @@ def _render_wait(spec: dict) -> str:
     """
     if spec.get('freq_name') != 'renewal':
         return ''
-    label = _render_label(spec.get('label_map', {}).get('wait'))
+    label = _render_label((spec.get('label_map') or {}).get('wait'))
     if _is_dwait(spec):
         s = f'dwait {_fmt_seq(spec["wait_xs"])}'
         ps = np.atleast_1d(np.asarray(spec['wait_ps'], dtype=float))
@@ -496,7 +496,7 @@ def _render_exposure(spec: dict) -> str:
         return _render_dfreq(spec)
     # Interior ``exposure`` label rides in ``label_map`` (dev/plan-labels.md S1);
     # it prints right after the amount/keyword unit, before any ``at ... lr/rate``.
-    label = _render_label(spec.get('label_map', {}).get('exposure'))
+    label = _render_label((spec.get('label_map') or {}).get('exposure'))
     if spec.get('freq_name') == 'renewal':
         # FIRST: a ``years at rate`` spec also carries ``exp_premium`` and
         # would otherwise mis-render as ``premium at lr``. ``exp_rate`` is
@@ -511,7 +511,7 @@ def _render_exposure(spec: dict) -> str:
     # informational premium suffix on a claims / loss head (no exp_lr)
     fyi = ''
     if 'exp_premium' in spec:
-        plabel = _render_label(spec.get('label_map', {}).get('premium'))
+        plabel = _render_label((spec.get('label_map') or {}).get('premium'))
         fyi = f' {_fmt_seq(spec["exp_premium"])} premium{plabel}'
     if 'exp_el' in spec:
         return f'{_fmt_seq(spec["exp_el"])} loss{label}{fyi}'
@@ -530,7 +530,7 @@ def _render_layers(spec: dict) -> str:
     if 'exp_limit' in spec:
         # Interior ``layer`` label rides in ``label_map`` (dev/plan-labels.md S2),
         # appended after the ``xs`` clause.
-        label = _render_label(spec.get('label_map', {}).get('layer'))
+        label = _render_label((spec.get('label_map') or {}).get('layer'))
         return (f'{_fmt_seq(spec["exp_limit"])} xs '
                 f'{_fmt_seq(spec["exp_attachment"])}{label}')
     return ''
@@ -1243,6 +1243,67 @@ def _spec_to_node(spec: dict, kind: str = 'agg', name: str | None = None,
     return renderer(name, spec, trailer)
 
 
+# ----------------------------------------------------------------------
+# Dense-spec guard
+# ----------------------------------------------------------------------
+
+#: Lazily cached constructor parameter names, keyed by DecL kind. Populated on
+#: first use to keep this module free of any ``aggregate`` import at module
+#: scope (it currently imports only ``re`` and ``numpy``).
+_CONSTRUCTOR_PARAMS: dict[str, frozenset[str]] = {}
+
+
+def _constructor_params(kind: str) -> frozenset[str]:
+    """Parameter names of the constructor behind ``kind``, or empty."""
+    if kind not in _CONSTRUCTOR_PARAMS:
+        import inspect
+        try:
+            from .distributions import Aggregate, Severity
+            cls = {'agg': Aggregate, 'sev': Severity}.get(kind)
+            # Private parameters are excluded: ``Aggregate.spec`` carries every
+            # public constructor argument but omits ``_tweedie``, so including
+            # it would make the subset test miss by exactly one key.
+            names = (frozenset(n for n in inspect.signature(cls.__init__).parameters
+                               if n != 'self' and not n.startswith('_'))
+                     if cls is not None else frozenset())
+        except Exception:                      # pragma: no cover - defensive
+            names = frozenset()
+        _CONSTRUCTOR_PARAMS[kind] = names
+    return _CONSTRUCTOR_PARAMS[kind]
+
+
+def _is_dense_spec(spec: dict, kind: str) -> bool:
+    """Whether ``spec`` is a dense constructor-argument dict, not a parser spec.
+
+    Parameters
+    ----------
+    spec : dict
+        The candidate spec.
+    kind : str
+        The DecL kind, as passed to :func:`spec_to_decl`.
+
+    Returns
+    -------
+    bool
+
+    Notes
+    -----
+    The two shapes are distinguished structurally rather than by sentinel keys.
+    A dense spec **is** the constructor-argument dict, so it necessarily carries
+    every parameter of ``__init__``; a parser spec carries only the keys its
+    clauses produced. The test is therefore "does this contain the entire
+    constructor signature", which needs no hand-maintained key list and keeps
+    working when a parameter is added.
+
+    The margin is wide, so this cannot realistically false-positive: measured
+    over the 780 programs of the shipped ``.agg`` corpus, the richest parser
+    spec carries 28 keys against ``Aggregate.__init__``'s 62 public
+    parameters, and none is flagged.
+    """
+    params = _constructor_params(kind)
+    return bool(params) and params <= set(spec)
+
+
 def spec_to_decl(spec: dict, kind: str = 'agg', name: str | None = None) -> str:
     """Render a parsed spec back to canonical DecL text (the unparser).
 
@@ -1276,13 +1337,41 @@ def spec_to_decl(spec: dict, kind: str = 'agg', name: str | None = None) -> str:
         For a ``minimum`` / ``mixture`` combinator distortion (references cannot
         round-trip).
     ValueError
-        For an unknown kind.
+        For an unknown kind, and for a **dense** constructor-argument spec
+        (``Aggregate.spec`` / ``Severity.spec``) handed in where the sparse
+        parser spec is wanted. See Notes.
 
     Notes
     -----
     The output is canonical, not verbatim --- see the module docstring on the
     "idempotence one step removed" contract.
+
+    **The dense spec is rejected, not rendered.** ``Aggregate.spec`` is the
+    constructor-argument dict: it spells "unset" as ``0`` or ``None`` where the
+    parser simply omits the key. Because ``0`` is *legitimate* for
+    ``exp_premium`` and ``sev_scale``, rendering it produced DecL that was
+    quietly wrong rather than obviously broken: ``13.7376 claims`` came out as
+    ``0 premium at 0 lr``, the severity picked up a ``0 *`` scale, and a
+    spurious ``poisson 0 0 loss`` appeared. That text re-parsed and built, to
+    ``est_m = 0`` and ``est_cv = nan``, with no error anywhere. So the dense
+    shape is detected up front by :func:`_is_dense_spec` and raises.
+
+    This is a guard, deliberately **not** a decompiler. Turning a built object
+    back into DecL needs a per-key inverse of the constructor's defaulting,
+    which is a separate and much larger question; the two must not be
+    conflated. Where a program exists, use it: ``Aggregate.program``, or
+    ``to_agg``, both of which carry the text the object was built from.
     """
+    if _is_dense_spec(spec, kind):
+        raise ValueError(
+            f'spec_to_decl got a dense constructor-argument spec for '
+            f'kind={kind!r}, which cannot be rendered: it spells unset values '
+            f'as 0 / None, and 0 is legitimate for exp_premium and sev_scale, '
+            f'so the result would be silently wrong DecL rather than an error. '
+            f'Pass the sparse parser spec instead (the third element of '
+            f'Underwriter.parser.parse(...), or the .spec of a recipe). If you '
+            f'want the DecL an object was built from, read its .program '
+            f'attribute or call to_agg().')
     return _render_terse(_spec_to_node(spec, kind, name))
 
 

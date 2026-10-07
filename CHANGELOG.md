@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a401
+
+**[Unparse-Dense-Spec-Guard] `decl_writer.spec_to_decl` rejects a dense constructor-argument spec instead of emitting wrong DecL.** Handed `Aggregate.spec` where the sparse parser spec is documented, it used to render quietly wrong output: `13.7376 claims` came out as `0 premium at 0 lr`, the severity picked up a `0 *` scale, and a spurious `poisson 0 0 loss` appeared, because the dense dict spells unset as `0` / `None` while `0` is legitimate for `exp_premium` and `sev_scale`. That text re-parsed and built to `est_m = 0`, `est_cv = nan`, with no error anywhere. It now raises `ValueError` naming the sparse spec, `.program` and `to_agg` as the routes that work. The five `label_map` reads are `None`-tolerant, so the guard fires rather than the incidental `AttributeError` that previously masked it.
+
+This is a guard, not a decompiler: rendering a built object back to DecL needs a per-key inverse of the constructor's defaulting and is not attempted. The dense shape is detected structurally, by whether the spec contains every public `__init__` parameter, so no key list needs maintaining; `tests/test_unparse_dense_spec_guard.py` (26 cases) pins zero false positives across the 780-program shipped corpus, whose widest parser spec carries 28 keys against 62 parameters.
+
 ## 1.0.0a400
 
 **[Outside-Grid-Is-Nan] `cdf` and `sf` report `0` below the grid where zero is known, and keep `nan` where it is not.** `Aggregate.cdf` / `.sf` and `Portfolio.cdf` / `.sf` previously returned `nan` for *every* query below the grid's lower edge, including the ordinary non-negative case where the answer is simply `0`; the four interpolators used `fill_value='extrapolate'`, and scipy's `kind='previous'` has no knot below the first. They now fill `0` when the law provably has no mass below the edge (a non-negative law on a grid starting at the origin) and `nan` otherwise, meaning a support window placed above the origin or a signed law whose two-sided window the sizer positioned. The predicate is the new `aggregate.utilities.below_grid_fill`. Above the grid the value is unchanged: the computed total mass, which is strictly below `1` for an unbounded law. In-grid values are bit-identical, and `q` is unaffected.

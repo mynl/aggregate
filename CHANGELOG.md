@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a397
+
+**[PnL-Positions-And-Margin-Ratio] the P&L summary and waterfall bold the three positions, and the walk states its margin ratio instead of a combined ratio.** Both halves are presentation decisions on the `economic_ratios` and `economic_waterfall` exhibits, so both sit inside the PEP 411 provisional surface. Requested by the api's 2026-10-07 punch list; plan `aggregate-api dev/plan-a198-punch-list.md`, batch [pnl-emphasis].
+
+**Gross, each net of tier, and the closing net are bold.** They are the **positions** a reader of a margin walk looks for, and the rows between them are the steps that get from one position to the next. Row 0 and the net-of-tier rows take `subtotal` and the closing row keeps `total`, so the bottom line still reads as the end of the walk: `gt.css` gives both `font-weight: 600` and `total` a rule above as well.
+
+**This reverses the muting of a388**, where a net-of-tier row read quiet because it restates the rows above it. That reason has not changed and is still true, which is why both captions still say a cumulative row sits outside the footing. What changed is the emphasis it was given: reading quiet and reading important are not opposites on a frame whose rows are not all the same kind of thing, and the caption is the right place to state that a row does not add. The word "muted" is gone from both captions, since nothing is.
+
+**`waterfall_df` carries `Margin ratio` where it carried `CR`.** Breaking, on a provisional surface. The two are one fact, `margin ratio == 1 - CR`, and the walk is a margin walk: `Margin spent`, `Margin` and `MSD` all read margin, so the single column stating the complement made the reader subtract on the one column that answered the block's own question backwards. This reverses [Waterfall-Capital] (a390), which retired a `Margin ratio` column for sitting beside `CR`; the resolution is to carry one of them, and on this frame it is the margin ratio. `economic_ratios_df` still carries `CR` and is unchanged: that frame is a rate filing's ratios of means and a combined ratio belongs there.
+
+**Numbers change on that column**, which is the point: a ceded step whose `CR` read 309.7% now reads a margin ratio of −209.7%, the margin given up per unit of premium ceded. The format sheet entry returns as `'Margin ratio': ratio`.
+
+`tests/data/exhibit_snapshots.json` regenerated: eleven cases, the header rename, the flipped column and the two captions. New `tests/test_exhibits.py::test_the_three_positions_are_bold_on_the_summary_and_the_walk`, which builds a two-tier ledger of its own because a net-of-tier row needs both tiers and no module fixture has them. The capstone acceptance test now asserts `Margin ratio == 1 - economic_ratios_df['CR']` row by row.
+
+**Downstream:** `aggregate-relativity` read `walk.loc[step, 'CR']` and derived the margin itself, so it breaks silently on this version. Fixed in that package's `0.9.0`, which reads `Margin ratio` directly, drops its own duplicate `CR` column and floors `aggregate>=1.0.0a397`.
+
 ## 1.0.0a396
 
 **[Recipe-Detached] building a stored `pnl` / `xpnl` a second time in one session no longer raises `KeyError: 'consideration'`.** `Recipe.detached()` is the new form a recipe takes on its way out of the recipe base, and the four hand-out sites in `Underwriter` use it: it deep-copies the `spec`, which `dataclasses.replace` alone did not, so the recipe base and the caller no longer share one dict. Building a P&L destructures its spec, popping every P&L clause off so the remainder is a valid `Aggregate(**spec)` call, and while the dict was shared the first build stripped the stored library entry and every later build of that name failed. `consideration` is the only mandatory P&L key and so the only one popped without a default, which is why it was the one that announced itself; its optional siblings (expenses, ledger labels, reinstatements, retro, the variable rating features) were coming back silently absent. A long-lived kernel is where this bit, a Quarto render in particular, since Quarto holds one kernel across renders.

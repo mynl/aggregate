@@ -2921,8 +2921,8 @@ the last row is the net position:
     qd(tower.waterfall_df)
 
 It reads in two halves. The first is the walk: premium and margin spent against
-the gross block, the combined ratio (the margin per unit of premium being
-``1 - CR``), the margin itself, and ``MSD``, the margin over its own standard
+the gross block, the margin ratio (the margin per unit of premium, ``1 - CR``),
+the margin itself, and ``MSD``, the margin over its own standard
 deviation. The second is **three capital bases, each beside its own cost of
 capital**, which is the comparison the frame exists to support.
 
@@ -2961,9 +2961,12 @@ three changed sign: ``M01 standalone`` / ``M01 div net`` / ``M01 div gross``
 became ``Capital standalone`` / ``Capital net`` / ``Capital gross`` and carry
 ``-M01``; ``SA CoC`` / ``Div CoC net`` / ``Div CoC gross`` became
 ``CoC standalone`` / ``CoC net`` / ``CoC gross``, unchanged in value. The
-``Margin ratio`` column is gone, being ``1 - CR`` beside ``CR``. The return
-period left the column names so that the level can become a parameter without
-churning the format sheets, and rides in
+``Margin ratio`` column went, being ``1 - CR`` beside ``CR``; **a397 reversed
+that and the column is back, in place of ``CR``**, since the walk reads margin
+in every other column and stating the complement made the reader subtract.
+``economic_ratios_df`` still carries ``CR``, which is where a combined ratio
+belongs. The return period left the column names so that the level can become a
+parameter without churning the format sheets, and rides in
 ``waterfall_df.attrs['return_period']`` and in the exhibit's captions.
 
 Ceding commission is a contra expense (a304)

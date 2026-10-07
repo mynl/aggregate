@@ -27926,6 +27926,9 @@
        "raw": 0.700006208118447,
        "text": "70.0%"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -28102,7 +28105,7 @@
      ]
     }
    ],
-   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. The three bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier and sits outside the sum, so the footing runs over the steps between them alone. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -28302,6 +28305,9 @@
        "raw": 0.700006319270119,
        "text": "70.0%"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -28478,7 +28484,7 @@
      ]
     }
    ],
-   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. The three bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier and sits outside the sum, so the footing runs over the steps between them alone. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -28678,10 +28684,13 @@
        "raw": 0.8499999927797967,
        "text": "85.0%"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     }
    ],
-   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. The three bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier and sits outside the sum, so the footing runs over the steps between them alone. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -28881,6 +28890,9 @@
        "raw": 0.7000061449405244,
        "text": "70.0%"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -28972,7 +28984,7 @@
      ]
     }
    ],
-   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. A net of tier row is the running position through that tier and sits outside the sum, which is why it reads muted. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
+   "caption": "One row per block, read across: premium written, loss, expense, the margin left, the standard deviation of that margin, and the three ratios the amounts imply. P, L, E and M are signed in the gross direction, so they add across blocks and the identity M = P - L - E holds exactly; loss absorbs cession recoveries and any unclassified obligation leg, and expense absorbs ceding commission, a contra expense. SD is a marginal row property and does not add. LR, ER and CR are ratios of means, the convention of a rate filing, re-derived from each block's own amounts and never averaged from the blocks below, so CR satisfies 1 - CR = M / P on every row. The three bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier and sits outside the sum, so the footing runs over the steps between them alone. The raw view itemizes the declared legs and adds the expected-ratio columns, which are the same three read as means of ratios and part company with these exactly when premium is random and correlated with loss, the signature of a retro, a swing, a slide or a profit commission.",
    "columns": [
     {
      "align": "l",
@@ -37005,8 +37017,8 @@
        "text": "100.0%"
       },
       {
-       "raw": 0.700006208118447,
-       "text": "70.0%"
+       "raw": 0.29999379188155295,
+       "text": "30.0%"
       },
       {
        "raw": 299.99379188155297,
@@ -37016,6 +37028,9 @@
        "raw": 0.5070774083024571,
        "text": "0.507"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -37034,8 +37049,11 @@
        "text": "28.0%"
       },
       {
-       "raw": 3.097316297622789,
-       "text": "309.7%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097316297622789,
+       "text": "-209.7%"
       },
       {
        "raw": 83.89265190491155,
@@ -37063,8 +37081,11 @@
        "text": "21.3%"
       },
       {
-       "raw": 2.06267184042244,
-       "text": "206.3%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.06267184042244,
+       "text": "-106.3%"
       },
       {
        "raw": 63.76031042534639,
@@ -37092,8 +37113,11 @@
        "text": "49.2%"
       },
       {
-       "raw": 2.4765296233025795,
-       "text": "247.7%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4765296233025795,
+       "text": "-147.7%"
       },
       {
        "raw": 147.65296233038313,
@@ -37118,8 +37142,8 @@
        "text": "149.2%"
       },
       {
-       "raw": 0.5026147175424324,
-       "text": "50.3%"
+       "raw": 0.49738528245756763,
+       "text": "49.7%"
       },
       {
        "raw": 447.6467541234374,
@@ -37135,7 +37159,7 @@
      ]
     }
    ],
-   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, CR is its combined ratio and the margin per unit of premium is 1 less CR, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. The capital each step calls for, and what that capital costs, are in the table below.",
+   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, Margin ratio is the margin per unit of premium, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. The bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the steps between the positions alone. The capital each step calls for, and what that capital costs, are in the table below.",
    "columns": [
     {
      "align": "l",
@@ -37185,7 +37209,7 @@
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Margin ratio"
      ],
      "raw": true,
      "tag": "ratio"
@@ -37230,7 +37254,7 @@
       "text": "Margin spent"
      },
      {
-      "text": "CR"
+      "text": "Margin ratio"
      },
      {
       "text": "Margin"
@@ -37273,6 +37297,9 @@
        "raw": 0.16483175378107268,
        "text": "16.5%"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -37596,8 +37623,8 @@
        "text": "100.0%"
       },
       {
-       "raw": 0.700006319270119,
-       "text": "70.0%"
+       "raw": 0.299993680729881,
+       "text": "30.0%"
       },
       {
        "raw": 299.993680729881,
@@ -37607,6 +37634,9 @@
        "raw": 0.25400925574735117,
        "text": "0.254"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -37625,8 +37655,11 @@
        "text": "28.0%"
       },
       {
-       "raw": 3.097271662808524,
-       "text": "309.7%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097271662808524,
+       "text": "-209.7%"
       },
       {
        "raw": 83.89086651234096,
@@ -37654,8 +37687,11 @@
        "text": "21.3%"
       },
       {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.0625936322027307,
+       "text": "-106.3%"
       },
       {
        "raw": 63.755617932163844,
@@ -37683,8 +37719,11 @@
        "text": "49.2%"
       },
       {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.476464844445048,
+       "text": "-147.6%"
       },
       {
        "raw": 147.64648444442403,
@@ -37709,8 +37748,8 @@
        "text": "149.2%"
       },
       {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
+       "raw": 0.4973779613048731,
+       "text": "49.7%"
       },
       {
        "raw": 447.64016512017713,
@@ -37726,7 +37765,7 @@
      ]
     }
    ],
-   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, CR is its combined ratio and the margin per unit of premium is 1 less CR, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. The capital each step calls for, and what that capital costs, are in the table below.",
+   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, Margin ratio is the margin per unit of premium, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. The bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the steps between the positions alone. The capital each step calls for, and what that capital costs, are in the table below.",
    "columns": [
     {
      "align": "l",
@@ -37776,7 +37815,7 @@
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Margin ratio"
      ],
      "raw": true,
      "tag": "ratio"
@@ -37821,7 +37860,7 @@
       "text": "Margin spent"
      },
      {
-      "text": "CR"
+      "text": "Margin ratio"
      },
      {
       "text": "Margin"
@@ -37864,6 +37903,9 @@
        "raw": null,
        "text": "\u2014"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -38151,8 +38193,8 @@
        "text": "100.0%"
       },
       {
-       "raw": 0.7000061449405244,
-       "text": "70.0%"
+       "raw": 0.2999938550594756,
+       "text": "30.0%"
       },
       {
        "raw": 299.9938550594756,
@@ -38162,6 +38204,9 @@
        "raw": 0.5057099917516722,
        "text": "0.506"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -38183,8 +38228,8 @@
        "text": "-16.3%"
       },
       {
-       "raw": 0.5111309650691787,
-       "text": "51.1%"
+       "raw": 0.48886903493082134,
+       "text": "48.9%"
       },
       {
        "flags": [
@@ -38215,8 +38260,8 @@
        "text": "83.7%"
       },
       {
-       "raw": 0.7209922760373406,
-       "text": "72.1%"
+       "raw": 0.2790077239626594,
+       "text": "27.9%"
       },
       {
        "raw": 251.10695156639355,
@@ -38232,7 +38277,7 @@
      ]
     }
    ],
-   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, CR is its combined ratio and the margin per unit of premium is 1 less CR, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. A muted net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the unmuted steps alone. The capital each step calls for, and what that capital costs, are in the table below.",
+   "caption": "The margin walk: gross, what each layer cedes, and the closing net. Premium spent and Margin spent are the step against the gross block, Margin ratio is the margin per unit of premium, Margin is the expected result, and MSD is that margin over its own standard deviation, a multiple. The bold rows are the positions: gross, the book net of each tier, and the closing net. A net of tier row is the running position through that tier, the book once that tier's program has worked; it restates the rows above it, so the footing runs over the steps between the positions alone. The capital each step calls for, and what that capital costs, are in the table below.",
    "columns": [
     {
      "align": "l",
@@ -38282,7 +38327,7 @@
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Margin ratio"
      ],
      "raw": true,
      "tag": "ratio"
@@ -38327,7 +38372,7 @@
       "text": "Margin spent"
      },
      {
-      "text": "CR"
+      "text": "Margin ratio"
      },
      {
       "text": "Margin"
@@ -38370,6 +38415,9 @@
        "raw": 0.1630401386192802,
        "text": "16.3%"
       }
+     ],
+     "flags": [
+      "subtotal"
      ]
     },
     {
@@ -38588,8 +38636,8 @@
        "text": "100.0%"
       },
       {
-       "raw": 0.700006208118447,
-       "text": "70.0%"
+       "raw": 0.29999379188155295,
+       "text": "30.0%"
       },
       {
        "raw": 299.99379188155297,
@@ -38641,8 +38689,11 @@
        "text": "28.0%"
       },
       {
-       "raw": 3.097316297622789,
-       "text": "309.7%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097316297622789,
+       "text": "-209.7%"
       },
       {
        "raw": 83.89265190491155,
@@ -38712,8 +38763,11 @@
        "text": "21.3%"
       },
       {
-       "raw": 2.06267184042244,
-       "text": "206.3%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.06267184042244,
+       "text": "-106.3%"
       },
       {
        "raw": 63.76031042534639,
@@ -38783,8 +38837,11 @@
        "text": "49.2%"
       },
       {
-       "raw": 2.4765296233025795,
-       "text": "247.7%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.4765296233025795,
+       "text": "-147.7%"
       },
       {
        "raw": 147.65296233038313,
@@ -38851,8 +38908,8 @@
        "text": "149.2%"
       },
       {
-       "raw": 0.5026147175424324,
-       "text": "50.3%"
+       "raw": 0.49738528245756763,
+       "text": "49.7%"
       },
       {
        "raw": 447.6467541234374,
@@ -38939,7 +38996,7 @@
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Margin ratio"
      ],
      "raw": true,
      "tag": "ratio"
@@ -39068,7 +39125,7 @@
       "text": "Margin spent"
      },
      {
-      "text": "CR"
+      "text": "Margin ratio"
      },
      {
       "text": "Margin"
@@ -39116,8 +39173,8 @@
        "text": "100.0%"
       },
       {
-       "raw": 0.700006319270119,
-       "text": "70.0%"
+       "raw": 0.299993680729881,
+       "text": "30.0%"
       },
       {
        "raw": 299.993680729881,
@@ -39169,8 +39226,11 @@
        "text": "28.0%"
       },
       {
-       "raw": 3.097271662808524,
-       "text": "309.7%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -2.097271662808524,
+       "text": "-209.7%"
       },
       {
        "raw": 83.89086651234096,
@@ -39228,8 +39288,11 @@
        "text": "21.3%"
       },
       {
-       "raw": 2.0625936322027307,
-       "text": "206.3%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.0625936322027307,
+       "text": "-106.3%"
       },
       {
        "raw": 63.755617932163844,
@@ -39287,8 +39350,11 @@
        "text": "49.2%"
       },
       {
-       "raw": 2.476464844445048,
-       "text": "247.6%"
+       "flags": [
+        "neg"
+       ],
+       "raw": -1.476464844445048,
+       "text": "-147.6%"
       },
       {
        "raw": 147.64648444442403,
@@ -39343,8 +39409,8 @@
        "text": "149.2%"
       },
       {
-       "raw": 0.5026220386951269,
-       "text": "50.3%"
+       "raw": 0.4973779613048731,
+       "text": "49.7%"
       },
       {
        "raw": 447.64016512017713,
@@ -39431,7 +39497,7 @@
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Margin ratio"
      ],
      "raw": true,
      "tag": "ratio"
@@ -39560,7 +39626,7 @@
       "text": "Margin spent"
      },
      {
-      "text": "CR"
+      "text": "Margin ratio"
      },
      {
       "text": "Margin"
@@ -39608,8 +39674,8 @@
        "text": "100.0%"
       },
       {
-       "raw": 0.7000061449405244,
-       "text": "70.0%"
+       "raw": 0.2999938550594756,
+       "text": "30.0%"
       },
       {
        "raw": 299.9938550594756,
@@ -39664,8 +39730,8 @@
        "text": "-16.3%"
       },
       {
-       "raw": 0.5111309650691787,
-       "text": "51.1%"
+       "raw": 0.48886903493082134,
+       "text": "48.9%"
       },
       {
        "flags": [
@@ -39729,8 +39795,8 @@
        "text": "83.7%"
       },
       {
-       "raw": 0.7209922760373406,
-       "text": "72.1%"
+       "raw": 0.2790077239626594,
+       "text": "27.9%"
       },
       {
        "raw": 251.10695156639355,
@@ -39817,7 +39883,7 @@
      },
      "key": "c3",
      "name": [
-      "CR"
+      "Margin ratio"
      ],
      "raw": true,
      "tag": "ratio"
@@ -39946,7 +40012,7 @@
       "text": "Margin spent"
      },
      {
-      "text": "CR"
+      "text": "Margin ratio"
      },
      {
       "text": "Margin"

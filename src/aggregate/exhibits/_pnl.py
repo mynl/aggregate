@@ -464,17 +464,32 @@ _SUMMARY_COLS = ('P', 'L', 'E', 'M', 'SD', 'LR', 'ER', 'CR')
 
 
 def _ratio_row_flags(obj, df):
-    """Total on the last row, and the net-of-tier rows muted.
+    """Total on the last row; the gross row and the net-of-tier rows subtotal.
 
-    The same treatment the ledger gives them (:data:`LEDGER_ROW_FLAGS`): a
-    net-of-tier row is the running position through the tier, a cumulative
-    reading aid rather than a block of its own, so it reads quiet. Matched by
-    label against the P&L's own net-span labels, with the ledger exhibit's
-    declining rule: presentation code never guesses a row.
+    **The three rows a reader looks for are bold.** The gross block is row 0 in
+    every builder, which is the fact the waterfall docstring already relies on;
+    the net-of-tier rows are the book once each tier's program has worked; and
+    the closing row is the net position. Those are the positions, and everything
+    between them is a step that gets from one to the next.
+
+    This reverses the muting of a388, where a net-of-tier row read quiet because
+    it restates the rows above it. That reason has not changed and is not what
+    the emphasis was saying: a cumulative row still sits outside the footing, and
+    the **caption** is where that is stated. Reading quiet and reading important
+    are not opposites on a frame whose rows are not all the same kind of thing.
+
+    ``subtotal`` and ``total`` both render at ``font-weight: 600`` in
+    ``gt.css``, the latter with a rule above it, so the closing row still reads
+    as the end of the walk rather than as one more position.
+
+    Matched by label against the P&L's own net-span labels, with the ledger
+    exhibit's declining rule: presentation code never guesses a row.
     """
     nets = set(getattr(obj, '_net_span_labels', {}).values())
-    flags = {i: ('muted',) for i, label in enumerate(df.index)
+    flags = {i: ('subtotal',) for i, label in enumerate(df.index)
              if label in nets}
+    if len(df):
+        flags[0] = ('subtotal',)
     if len(df) > 1:
         flags[len(df) - 1] = ('total',)
     return flags
@@ -515,9 +530,11 @@ def _economic_ratios_insurer(obj, blocks):
             'does not add. LR, ER and CR are ratios of means, the convention '
             'of a rate filing, re-derived from each block\'s own amounts and '
             'never averaged from the blocks below, so CR satisfies '
-            '1 - CR = M / P on every row. A net of tier row is the running '
-            'position through that tier and sits outside the sum, which is why '
-            'it reads muted. The raw view itemizes the declared legs and adds '
+            '1 - CR = M / P on every row. The three bold rows are the '
+            'positions: gross, the book net of each tier, and the closing net. '
+            'A net of tier row is the running position through that tier and '
+            'sits outside the sum, so the footing runs over the steps between '
+            'them alone. The raw view itemizes the declared legs and adds '
             'the expected-ratio columns, which are the same three read as '
             'means of ratios and part company with these exactly when premium '
             'is random and correlated with loss, the signature of a retro, a '
@@ -568,11 +585,16 @@ def _economic_waterfall_insurer(obj, blocks):
     gross_available = not gross_col.isna().all()
     gross_truncated = gross_available and gross_col.isna().any()
 
-    # Total on the closing net; the net-of-tier rows muted, the ledger's own
-    # treatment: each is the running position through its tier, a cumulative
-    # reading aid that sits outside the walk's sum.
+    # Total on the closing net; the gross row and the net-of-tier rows
+    # subtotal, which is a397's reversal of a388's muting. The three are the
+    # positions a reader of a margin walk looks for, the steps between them get
+    # from one to the next, and the gross block is row 0 in every builder. That
+    # a cumulative row sits outside the walk's sum has not changed and is the
+    # caption's to say; see `_ratio_row_flags`.
     nets = set(getattr(obj, '_net_span_labels', {}).values())
-    total_row = {i: ('muted',) for i, step in enumerate(idx) if step in nets}
+    total_row = {i: ('subtotal',) for i, step in enumerate(idx) if step in nets}
+    if len(idx):
+        total_row[0] = ('subtotal',)
     if len(idx) > 1:
         total_row[len(idx) - 1] = ('total',)
 
@@ -582,12 +604,14 @@ def _economic_waterfall_insurer(obj, blocks):
     walk_caption = (
         'The margin walk: gross, what each layer cedes, and the closing net. '
         'Premium spent and Margin spent are the step against the gross block, '
-        'CR is its combined ratio and the margin per unit of premium is 1 less '
-        'CR, Margin is the expected result, and MSD is that margin over its '
-        'own standard deviation, a multiple. A muted net of tier row is the '
+        'Margin ratio is the margin per unit of premium, Margin is the '
+        'expected result, and MSD is that margin over its own standard '
+        'deviation, a multiple. The bold rows are the positions: gross, the '
+        'book net of each tier, and the closing net. A net of tier row is the '
         'running position through that tier, the book once that tier\'s '
         'program has worked; it restates the rows above it, so the footing '
-        'runs over the unmuted steps alone. The capital each step calls for, '
+        'runs over the steps between the positions alone. The capital each '
+        'step calls for, '
         'and what that capital costs, are in the table below.')
     capital_caption = (
         f'Three capital bases for the same walk, each beside its own cost of '
@@ -631,9 +655,10 @@ def _economic_waterfall_insurer(obj, blocks):
     # table and its caption, so the level rides in the caption and in
     # `.attrs['return_period']`.
     #
-    # No ratio_cols on either block: 'Premium spent', 'Margin spent', 'CR' and
-    # the three CoC columns each point at the `ratio` style in the format
-    # sheets, which stamps greater_tables' own tag wherever they appear.
+    # No ratio_cols on either block: 'Premium spent', 'Margin spent',
+    # 'Margin ratio' and the three CoC columns each point at the `ratio` style
+    # in the format sheets, which stamps greater_tables' own tag wherever they
+    # appear.
     return [
         ('walk', df[walk_cols],
          dict(kw, caption=walk_caption, row_flags=total_row)),

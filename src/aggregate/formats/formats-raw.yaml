@@ -135,8 +135,8 @@ columns:
   M_share: ratio
   'Premium spent': ratio
   'Margin spent': ratio
-  # 'Margin ratio' was here until [Waterfall-Capital] retired the column: it is
-  # 1 - CR and sits beside CR, so the merged waterfall does not carry it.
+  'Margin ratio': ratio    # the margin walk's own ratio, 1 - CR, which replaced
+                           # CR on waterfall_df at a397
   MSD: '.3f'           # margin to standard deviation, a multiple, read to
                        # the same places as PQ and VaR/Mean
   'CoC standalone': ratio  # cost of capital, one per basis: margin over the

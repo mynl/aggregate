@@ -819,14 +819,22 @@ _RATIO_COLS = ('P', 'L', 'E', 'M', 'SD', 'LR', 'ER', 'CR',
 #: to support and which previously required reading across two tables.
 #:
 #: The presented exhibit splits after ``MSD``, so the split is by **question**
-#: rather than by unit. ``Margin ratio``, which the retired ``evaluation_df``
-#: carried, is gone: it is ``1 - CR`` and sits beside ``CR``.
+#: rather than by unit.
+#:
+#: ``Margin ratio`` rather than ``CR``, since a397. The two carry one fact,
+#: ``margin ratio == 1 - CR``, and the walk is a margin walk: every other column
+#: in the block reads margin (``Margin spent``, ``Margin``, ``MSD``), so stating
+#: the complement here made the reader do the subtraction on the one column that
+#: answered the block's own question backwards. ``CR`` was the column through
+#: a396, and ``economic_ratios_df`` still carries it: that frame is the rate
+#: filing's three ratios of means and a combined ratio belongs there.
 #:
 #: No return period appears in a name. ``M01`` hard-coded 1-in-100 into a
 #: header, so a parametrized level would have churned both format sheets on
 #: every level; the level rides in the caption, the block heading and
 #: ``.attrs['return_period']`` instead. See :data:`WATERFALL_RETURN_PERIOD`.
-_WATERFALL_COLS = ('Premium spent', 'Margin spent', 'CR', 'Margin', 'MSD',
+_WATERFALL_COLS = ('Premium spent', 'Margin spent', 'Margin ratio', 'Margin',
+                   'MSD',
                    'Capital standalone', 'Capital net', 'Capital gross',
                    'CoC standalone', 'CoC net', 'CoC gross')
 
@@ -2718,10 +2726,14 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             q_standalone, q_net, q_gross = (-standalone, -divers,
                                             -divers_gross)
             r = ratios.loc[step]
-            cr = float(r['CR'])
+            # The margin ratio, not the combined ratio, since a397: the walk
+            # reads margin in every other column and `1 - CR` is the margin per
+            # unit of premium. One subtraction off the same block amounts;
+            # `economic_ratios_df` still states `CR` itself.
+            margin_ratio = 1.0 - float(r['CR'])
             index.append(step)
             recs.append([
-                float(r['P_share']), float(r['M_share']), cr, margin,
+                float(r['P_share']), float(r['M_share']), margin_ratio, margin,
                 margin / sd if sd > 0 else np.nan,
                 q_standalone, q_net, q_gross,
                 _capital_ratio(margin, q_standalone),
@@ -2765,9 +2777,11 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             ``Premium spent``, ``Margin spent``
                 The step's premium and margin against the **gross** block's,
                 which is the first block in every builder.
-            ``CR``
-                The step's combined ratio, ``(L + E) / P``. The margin ratio is
-                ``1 - CR`` and is not carried as a column of its own.
+            ``Margin ratio``
+                The step's margin per unit of premium, ``M / P``, computed as
+                ``1 - CR`` off the same block amounts. Renamed from ``CR`` at
+                a397; the combined ratio itself stays on
+                :attr:`economic_ratios_df`.
             ``Margin``
                 The step's own signed result, its expected value.
             ``MSD``

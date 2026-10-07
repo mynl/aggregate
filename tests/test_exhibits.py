@@ -1135,6 +1135,55 @@ def test_economic_ratios_insurer_is_one_walk(tower):
                                atol=1e-12)
 
 
+def test_the_three_positions_are_bold_on_the_summary_and_the_walk(peel, tower):
+    """a397: gross, each net of tier, and the closing net, all emphasized.
+
+    This reverses a388, which muted the net-of-tier rows because each restates
+    the rows above it. That reason has not changed and is still in both
+    captions; what changed is the reading it was given. These three rows are the
+    **positions** a reader of a margin walk looks for, and the rows between them
+    are the steps that get from one position to the next, so the positions are
+    what should catch the eye.
+
+    ``subtotal`` on the first two and ``total`` on the closing row, which is how
+    the closing row keeps reading as the end of the walk: ``gt.css`` gives both
+    ``font-weight: 600`` and ``total`` a rule above as well.
+    """
+    # A net-of-tier row needs **both** tiers: it is the book once the
+    # occurrence program has worked and before the aggregate one does, so a
+    # single-tier ledger has no tier to close and the module's own fixtures
+    # carry none. One two-tier object, built here, is what makes the middle
+    # case assertable at all.
+    both = build('xpnl EX.Positions 1000 premium less '
+                 'agg EX.PositionsE 1000 premium at 70% lr '
+                 'sev lognorm 100 cv 2 '
+                 'occurrence net of 100 xs 100 deposit 60 poisson '
+                 'aggregate net of 75% po inf xs 0 rate 1 cede 0.25 as QS '
+                 'peel bottom-up')
+    nets = set(both._net_span_labels.values())
+    assert nets == {'Net of occurrence'}
+    for obj, label in ((both, 'Positions'), (peel, 'Peel'), (tower, 'Tower')):
+        for exhibit in ('economic_ratios', 'economic_waterfall'):
+            blocks = exhibit_frames(obj, exhibit, 'insurer')
+            _, df, kw = next(b for b in blocks if b[0] == 'walk')
+            flags = kw['row_flags']
+            where = f'{label}/{exhibit}'
+            assert flags[0] == ('subtotal',), f'{where}: the gross row is bold'
+            assert flags[len(df) - 1] == ('total',), f'{where}: one bottom line'
+            for i, step in enumerate(df.index):
+                if step in nets and i != len(df) - 1:
+                    assert flags[i] == ('subtotal',), f'{where}: {step}'
+            # Nothing is muted any more, on any of the three.
+            assert not any('muted' in f for f in flags.values()), where
+    # And both captions still say a cumulative row sits outside the footing,
+    # which is the fact the muting was carrying and the caption now carries
+    # alone.
+    for exhibit in ('economic_ratios', 'economic_waterfall'):
+        _, _, kw = exhibit_frames(both, exhibit, 'insurer')[0]
+        assert 'net of tier' in kw['caption']
+        assert 'muted' not in kw['caption']
+
+
 def test_ratio_frame_sd_is_the_walk_denominator(tower):
     """The ``SD`` column and the walk's ``MSD`` cannot disagree.
 
@@ -1209,8 +1258,8 @@ def test_waterfall_raw_is_one_frame_insurer_splits_by_question(tower):
     insurer = exhibit_frames(tower, 'economic_waterfall', 'insurer')
     assert [b for b, _, _ in insurer] == ['walk', 'capital']
     walk, capital = insurer[0][1], insurer[1][1]
-    assert list(walk.columns) == ['Premium spent', 'Margin spent', 'CR',
-                                 'Margin', 'MSD']
+    assert list(walk.columns) == ['Premium spent', 'Margin spent',
+                                 'Margin ratio', 'Margin', 'MSD']
     assert list(capital.columns) == ['Capital standalone', 'Capital net',
                                      'Capital gross', 'CoC standalone',
                                      'CoC net', 'CoC gross']
@@ -1356,9 +1405,16 @@ def test_waterfall_capstone_acceptance():
     assert w['Capital standalone']['QS'] == pytest.approx(-5036.25)
     assert w['Capital standalone']['Net of occurrence'] == \
         pytest.approx(7500.0)
-    # `Margin ratio` is gone from the merged frame: it is 1 - CR and sits
-    # beside CR, so the reader does the subtraction the column was doing
-    assert 'Margin ratio' not in w.columns
+    # `Margin ratio` replaced `CR` at a397, which reverses [Waterfall-Capital]'s
+    # retirement of the name: the walk reads margin in every other column, so
+    # the one column stating the complement made the reader subtract. The frame
+    # does not carry `CR` any more; `economic_ratios_df` still does.
+    assert 'Margin ratio' in w.columns and 'CR' not in w.columns
+    ratios = p.economic_ratios_df
+    assert 'CR' in ratios.columns
+    import numpy as np
+    np.testing.assert_allclose(
+        w['Margin ratio'], 1.0 - ratios.loc[w.index, 'CR'], rtol=1e-12)
 
 
 def test_waterfall_closing_row_standalone_equals_diversified(tower):

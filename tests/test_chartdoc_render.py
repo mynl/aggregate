@@ -21,6 +21,16 @@ Two of the baselines have moved deliberately, and both are recorded in
   is new at 1.0.0a350 and the tower panel kind is new with it, so the
   baseline is the approved picture from the start. It moved once, at
   1.0.0a352, when the loss axis learned to reach the policy limit.
+* ``matrix`` (``[Matrix-Panel]``) is a hand built document, not one any
+  library object emits: the panel kind exists for plugins, and the renderer
+  landed at 1.0.0a379 with its structure pinned by
+  ``test_chartdoc_matrix.py``. The baseline is the approved picture, blessed by
+  the author on 2026-10-07 after looking at the render. Note that blessing it
+  freezes the red/green verdict ramp, whose two ends sit at a 1.25:1 luminance
+  ratio and so separate on hue alone; that is tracked as
+  ``[Matrix-Verdict-Colorblind]`` in ``dev/TODO.md`` and a ramp change means
+  regenerating this baseline.
+
 * ``structure_log`` is the same document on ``log='y'``, added at
   1.0.0a353. It is the reading a geometrically layered program is meant to
   be read on, and it gates three things a linear render cannot: a block
@@ -71,8 +81,15 @@ _STRUCTURE = ('agg CD.Program 5 claims 100 xs 0 sev lognorm 10 cv .75 '
               'aggregate net of 20 xs 0')
 
 
-def _subjects():
-    """``name -> ChartDoc``, built fresh so nothing caches across tests."""
+def _subjects(matrix_doc):
+    """``name -> ChartDoc``, built fresh so nothing caches across tests.
+
+    ``matrix_doc`` is passed in rather than built here: it is hand constructed
+    in ``conftest.py`` and shared with ``test_chartdoc_matrix.py`` so the
+    picture gated here and the structure gated there cannot drift. It arrives
+    as a fixture because a cross test module import does not resolve under
+    pytest's import mode or under xdist workers.
+    """
     from aggregate import build
     from aggregate.charts import build_chart_doc
     return {
@@ -83,6 +100,7 @@ def _subjects():
                                      lee=True),
         'structure_log': build_chart_doc(build(_STRUCTURE), 'structure',
                                          lee=True),
+        'matrix': matrix_doc,
     }
 
 
@@ -106,18 +124,21 @@ def _compare(actual, baseline_name):
 
 
 @pytest.mark.parametrize('name', ['distortion', 'agg', 'structure',
-                                  'structure_log'])
-def test_chartdoc_matches_baseline(name, tmp_path):
+                                  'structure_log', 'matrix'])
+def test_chartdoc_matches_baseline(name, tmp_path, matrix_chartdoc):
     """The gate: the rendered document is the picture that was approved."""
     target = tmp_path / f'{name}.png'
-    _render(_subjects()[name], target, **_OPTIONS.get(name, {}))
+    _render(_subjects(matrix_chartdoc)[name], target, **_OPTIONS.get(name, {}))
     _compare(target, f'{name}.png')
 
 
 def _regen():
+    # Run as a script, so tests/ is on sys.path and conftest imports directly;
+    # under pytest the same document arrives as the matrix_chartdoc fixture.
+    from conftest import matrix_document
     matplotlib.use('Agg')
     _BASELINES.mkdir(parents=True, exist_ok=True)
-    for name, doc in _subjects().items():
+    for name, doc in _subjects(matrix_document()).items():
         _render(doc, _BASELINES / f'{name}.png', **_OPTIONS.get(name, {}))
     print(f'baselines regenerated under {_BASELINES} '
           f'with matplotlib {matplotlib.__version__}')

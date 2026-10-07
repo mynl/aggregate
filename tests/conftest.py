@@ -48,3 +48,60 @@ def underwriter(test_suite_lines):
             continue
         uw.add_recipe(kind, name, spec, line)
     return uw
+
+
+# ---------------------------------------------------------------------------
+# The 'matrix' ChartDoc, shared by test_chartdoc_matrix (structure) and
+# test_chartdoc_render (the approved picture).
+#
+# It lives here rather than in either test module because a cross test module
+# import does not resolve under xdist workers, and because the two files must
+# gate the *same* document: if they drift, the baseline stops meaning what the
+# structure tests assert. No library object emits a 'matrix' panel (the kind
+# exists for plugins), so there is no build(...) that produces one.
+# ---------------------------------------------------------------------------
+
+def matrix_data():
+    """Two positions against two readings, read in opposite directions."""
+    from aggregate.charts import MatrixData
+    return MatrixData(
+        rows=('gross book', 'QS'),
+        columns=('gini ph', 'margin'),
+        values=((1.0, 1.0), (1.60, 0.40)),
+        annotations=(('0.209', '7.3%'), ('0.314', '2.9%')),
+        center=1.0, neutral=0.05,
+        # The book row is read the other way: pricing above the reference is an
+        # improvement for it, and paying above the reference is not for the QS.
+        row_polarity=(-1, 1),
+        row_groups=('book', 'aggregate'),
+        column_groups=('family', 'point'),
+    )
+
+
+def matrix_document(matrix=None):
+    """The one panel ``matrix`` ChartDoc."""
+    from aggregate.charts import ChartAxis, ChartDoc, ChartSeries, Panel
+    matrix = matrix_data() if matrix is None else matrix
+    return ChartDoc(
+        name='relativity', title='Relativity',
+        axes=(ChartAxis(id='x', label='reading', kind='category'),
+              ChartAxis(id='y', label='position', kind='category'),
+              ChartAxis(id='z', label='multiple of gross')),
+        panels=(Panel(id='m', kind='matrix', x_axis='x', y_axis='y',
+                      z_axis='z'),),
+        series=(ChartSeries(name='relativity', role='identity', panel_id='m',
+                            matrix=matrix),))
+
+
+# The fixtures are named for what they are, not 'doc' / 'matrix', which are far
+# too generic for the global fixture namespace. Test modules wanting the short
+# names wrap these locally.
+
+@pytest.fixture
+def matrix_chartdoc_data():
+    return matrix_data()
+
+
+@pytest.fixture
+def matrix_chartdoc(matrix_chartdoc_data):
+    return matrix_document(matrix_chartdoc_data)

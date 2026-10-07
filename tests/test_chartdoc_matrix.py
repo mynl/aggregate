@@ -8,7 +8,9 @@ pinned here is what the renderer must be *doing*: the ticks it writes, the text
 in each cell, and above all which way each cell is colored, since row polarity
 is the one thing a reader cannot check by eye against the numbers.
 
-A baseline image for this panel kind is still owed, and is noted in the plan.
+The baseline image is no longer owed: the author approved the rendered picture
+on 2026-10-07 and ``test_chartdoc_render.py`` gates it as the ``matrix``
+subject, built from :func:`matrix_document` here so the two files cannot drift.
 """
 
 import matplotlib
@@ -25,34 +27,18 @@ from aggregate.plots._chartdoc import (  # noqa: E402
 )
 
 
+# The document is built in conftest.py so test_chartdoc_render.py can gate the
+# *same* document as an approved picture. These are local short aliases for its
+# fixtures: 'doc' and 'matrix' are too generic to define globally.
+
 @pytest.fixture
-def matrix():
-    """Two positions against two readings, read in opposite directions."""
-    return MatrixData(
-        rows=('gross book', 'QS'),
-        columns=('gini ph', 'margin'),
-        values=((1.0, 1.0), (1.60, 0.40)),
-        annotations=(('0.209', '7.3%'), ('0.314', '2.9%')),
-        center=1.0, neutral=0.05,
-        # The book row is read the other way: pricing above the reference is an
-        # improvement for it, and paying above the reference is not for the QS.
-        row_polarity=(-1, 1),
-        row_groups=('book', 'aggregate'),
-        column_groups=('family', 'point'),
-    )
+def matrix(matrix_chartdoc_data):
+    return matrix_chartdoc_data
 
 
 @pytest.fixture
-def doc(matrix):
-    return ChartDoc(
-        name='relativity', title='Relativity',
-        axes=(ChartAxis(id='x', label='reading', kind='category'),
-              ChartAxis(id='y', label='position', kind='category'),
-              ChartAxis(id='z', label='multiple of gross')),
-        panels=(Panel(id='m', kind='matrix', x_axis='x', y_axis='y',
-                      z_axis='z'),),
-        series=(ChartSeries(name='relativity', role='identity', panel_id='m',
-                            matrix=matrix),))
+def doc(matrix_chartdoc):
+    return matrix_chartdoc
 
 
 def _axes(fig):

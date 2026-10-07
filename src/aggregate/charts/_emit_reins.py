@@ -13,7 +13,11 @@ flattens everything else against, so this axis declares no linear alternative
 rather than offering a control that draws a worse picture.
 
 **Right, in total.** The same three distributions for the year, as a Lee
-diagram, so a chosen probability reads off as a loss. It is the panel the
+diagram, so a chosen probability reads off as a loss. Its three curves are
+named for the year and the program they answer about, ``Gross``,
+``Ceded to occurrence`` and ``Net of occurrence``, where the left panel's are
+named per claim; through a397 both triples took the same three names and
+nothing on the picture said which horizon a curve was about. It is the panel the
 readings live on: log on both axes, the return-period reading of its
 probability axis, and the inversion that turns it into the distribution
 function. It is *interrogated* the other way round, by loss, since that
@@ -60,7 +64,25 @@ __all__ = ['chart_reins']
 SEV_COLUMNS = ('p_sev_gross', 'p_sev_ceded', 'p_sev_net')
 AGG_COLUMNS = ('p_agg_gross', 'p_agg_ceded_occ', 'p_agg_net_occ')
 ROLES = ('gross', 'ceded', 'net')
-NAMES = (REINS_LABEL_GROSS, REINS_LABEL_CEDED, REINS_LABEL_NET)
+
+#: Per-claim names. The three shared constants, where they mean per claim: one
+#: claim gross, what the program takes off that claim, and what is left of it.
+SEV_NAMES = (REINS_LABEL_GROSS, REINS_LABEL_CEDED, REINS_LABEL_NET)
+
+#: Annual names, which say which program and which horizon, since a398.
+#:
+#: The right panel is the **year**, and its middle and right curves are total
+#: ceded to the **occurrence** program and net of it. Both triples took
+#: :data:`SEV_NAMES` through a397, so the picture said `Gross`, `Ceded`, `Net`
+#: twice and nothing on it distinguished a claim from a year. The three
+#: ``REINS_LABEL_*`` constants are untouched: four other emitters use them.
+#:
+#: One consequence, and it is the reason this is its own version. A consumer
+#: whose legend strip is document wide and dedupes by name goes from three chips
+#: to six, so hovering one panel fills that panel's three and leaves the other
+#: panel's blank. In exchange, clicking ``Ceded`` stops hiding the annual curve
+#: along with the per-claim one, which through a397 it did.
+AGG_NAMES = ('Gross', 'Ceded to occurrence', 'Net of occurrence')
 
 #: How far below the occurrence limit the per-claim window starts, as a
 #: fraction of it. The compositor's ``-l / 50``: a cession is bounded by
@@ -123,7 +145,7 @@ def _reins(agg):
     grid = lattice_payload(x, agg.bs)
 
     series = []
-    for column, role, name in zip(SEV_COLUMNS, ROLES, NAMES):
+    for column, role, name in zip(SEV_COLUMNS, ROLES, SEV_NAMES):
         mass = df[column].to_numpy(dtype=float)
         drawn_x, drawn_mass = collapse_empty_runs(x, mass)
         series.append(ChartSeries(
@@ -131,7 +153,7 @@ def _reins(agg):
             y=tuple(float(v) for v in drawn_mass),
             **lattice_payload(drawn_x, agg.bs)))
     tops = []
-    for column, role, name in zip(AGG_COLUMNS, ROLES, NAMES):
+    for column, role, name in zip(AGG_COLUMNS, ROLES, AGG_NAMES):
         p, outcome = quantile_curve(x, df[column].to_numpy(dtype=float))
         tops.append(float(outcome[-1]) if outcome.size else 0.0)
         series.append(ChartSeries(
@@ -142,7 +164,7 @@ def _reins(agg):
     # The annual window comes from the gross curve, the widest of the
     # three: a cession is bounded by its subject.
     gross = GridDistribution(x, df[AGG_COLUMNS[0]].to_numpy(dtype=float),
-                             bs=agg.bs, name=NAMES[0])
+                             bs=agg.bs, name=AGG_NAMES[0])
     annual = loss_window(gross.q, float(x[0]))
     claim = _claim_window(agg)
     claim_extent = (min(0.0, float(x[0])), float(x[-1]))

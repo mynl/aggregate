@@ -20,6 +20,18 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0a398
+
+**[Reins-Annual-Triple] the reinsurance chart's right panel names the year and the program it answers about.** `Gross`, `Ceded to occurrence`, `Net of occurrence`, in place of the three `Gross` / `Ceded` / `Net` constants the left panel keeps. Provisional surface (`aggregate.charts`), and the chart IR's series names change, so a consumer keying off them sees it. Requested by the api's 2026-10-07 punch list; plan `aggregate-api dev/plan-a198-punch-list.md`, batch [reins-labels].
+
+The right panel is the **year**, and its middle and right curves are total ceded to the occurrence program and the year net of it. Both triples took `REINS_LABEL_GROSS` / `CEDED` / `NET` through a397, so the picture said the same three words twice and nothing on it distinguished one claim from one year. `_emit_reins.NAMES` becomes `SEV_NAMES` and `AGG_NAMES`; the three `REINS_LABEL_*` constants are untouched, four other emitters using them.
+
+**The roles are deliberately still shared.** `gross` / `ceded` / `net` is what a renderer colors and orders by, and that has not changed; only the names a reader sees have.
+
+**One consequence, and it is why this is its own version.** A consumer whose legend strip is document wide and dedupes by name goes from three chips to six, so hovering one panel fills that panel's three and leaves the other panel's blank. In exchange, clicking `Ceded` stops hiding the annual curve along with the per-claim one, which through a397 it did. If three chips are wanted back, the revert is the one line naming the series.
+
+**The horizontal read-off stays**, and was reconsidered rather than inherited. The panel declares `read_axis='y'`, so it is interrogated by loss: the three curves share the outcome lattice and nothing else, so a loss is the only coordinate at which all three can answer at once, and reading by probability would let only one curve answer at a time. New `tests/test_chart_reins.py::test_each_panel_names_its_own_horizon` pins the names, the five distinct names across the document, and that `read_axis`.
+
 ## 1.0.0a397
 
 **[PnL-Positions-And-Margin-Ratio] the P&L summary and waterfall bold the three positions, and the walk states its margin ratio instead of a combined ratio.** Both halves are presentation decisions on the `economic_ratios` and `economic_waterfall` exhibits, so both sit inside the PEP 411 provisional surface. Requested by the api's 2026-10-07 punch list; plan `aggregate-api dev/plan-a198-punch-list.md`, batch [pnl-emphasis].

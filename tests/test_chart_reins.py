@@ -24,7 +24,7 @@ from aggregate.charts import (  # noqa: E402
     primary_chart,
 )
 from aggregate.charts._emit_reins import (  # noqa: E402
-    AGG_COLUMNS, NAMES, _claim_window,
+    AGG_COLUMNS, AGG_NAMES, SEV_NAMES, _claim_window,
 )
 
 _OCC = ('agg CR.Occ 100 claims 1000 xs 0 sev lognorm 50 cv 2 '
@@ -80,7 +80,29 @@ def test_the_triple_draws_on_both_panels_net_last(occ):
     doc = chart_reins(occ)
     for panel in ('occurrence', 'aggregate'):
         assert [s.role for s in on(doc, panel)] == ['gross', 'ceded', 'net']
-        assert [s.name for s in on(doc, panel)] == list(NAMES)
+
+
+def test_each_panel_names_its_own_horizon(occ):
+    """a398: the annual triple says which program and which horizon.
+
+    The roles are shared, which is what a renderer colors by; the names are
+    not, which is what a reader sees. Through a397 both triples took the three
+    ``REINS_LABEL_*`` constants, so the picture said ``Gross``, ``Ceded``,
+    ``Net`` twice and nothing on it distinguished one claim from one year.
+    """
+    doc = chart_reins(occ)
+    assert [s.name for s in on(doc, 'occurrence')] == list(SEV_NAMES)
+    assert [s.name for s in on(doc, 'aggregate')] == list(AGG_NAMES)
+    assert SEV_NAMES == ('Gross', 'Ceded', 'Net')
+    assert AGG_NAMES == ('Gross', 'Ceded to occurrence', 'Net of occurrence')
+    # Six distinct names across the document bar the shared `Gross`, which is
+    # what makes a document-wide legend strip grow from three chips to six.
+    assert len({s.name for s in doc.series}) == 5
+    # The right panel keeps its horizontal read-off: the three curves share the
+    # outcome lattice and nothing else, so a loss is the only coordinate at
+    # which all three answer at once. The renaming does not touch that.
+    annual = next(p for p in doc.panels if p.id == 'aggregate')
+    assert annual.read_axis == 'y'
 
 
 def test_the_left_panel_is_the_claim_and_the_right_the_year(occ):

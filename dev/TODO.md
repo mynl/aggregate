@@ -109,6 +109,20 @@
   non-color cue per cell. **Blocks nothing**, but it should be settled before
   the matrix baseline image is blessed, since blessing freezes the picture.
 
+- **[Wheel-Smoke-Check]** (found the hard way at 1.0.1) — a packaging defect is
+  **invisible to pytest by construction**: the suite runs against the editable
+  install, where every module is present on disk, so `packages = ["aggregate"]`
+  silently dropped `aggregate.charts`, `.plots` and `.exhibits` from the 1.0.0
+  wheel and `a.plot()` raised `ModuleNotFoundError` for anyone who installed
+  it. Nothing in the repo would ever have said so. Wanted: a
+  `scripts/check_wheel.py` that runs `uv build`, installs the wheel into a
+  throwaway venv, and asserts the smoke set (import, `build(...)`, `.plot()`,
+  each subpackage, a `library.agg` recipe, `qd`), plus a listing check that
+  every `src/aggregate/**/__init__.py` has a counterpart in the artifact. A
+  release-time command like the numerics gate, **not** part of the suite, since
+  it needs a built artifact. Until it exists, the clean-venv install is a
+  manual step in `V:\worktrees\BETA-MERGE.md` and must not be skipped.
+
 ## Tests and the parity scaffold
 
 - **[Rationalize-Tests]** (#51), then **[Scaffold-Retirement]** — **in that

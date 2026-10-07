@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0"
+version = "1.0.1"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -120,7 +120,18 @@ all = [
 [tool.setuptools]
 include-package-data = true
 package-dir = {"" = "src"}
-packages = ["aggregate"]
+
+# Automatic discovery, NOT an explicit list. `packages = ["aggregate"]` names
+# only the top level package: setuptools does not recurse, so the subpackages
+# aggregate.charts, aggregate.exhibits and aggregate.plots were silently
+# omitted from the wheel. That shipped an `aggregate` whose `.plot()` raised
+# ModuleNotFoundError, and no test could see it, because the suite runs against
+# the editable install where every module is present. A packaging bug is only
+# visible from a built artifact, so this is verified by installing the wheel
+# into a clean environment, not by pytest.
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["aggregate*"]
 
 [tool.setuptools.package-data]
 aggregate = ["*.lark", "agg/*.agg", "data/*.mplstyle", "data/*.toml",
@@ -163,10 +174,6 @@ markers = [
     "slow: bleeding-edge / multi-minute cases (bivariate, massive bivariate, reins bivariate). Deselected by default via addopts; run the full suite with `-m 'slow or not slow'`.",
     "xdist_group: pin a set of tests to one xdist worker so they do not run concurrently with each other (memory-heavy 2-D FFT cases).",
 ]
-
-#[tool.setuptools.packages.find]
-#where = ["."]
-#exclude = ["templates*", "agg*"]
 
 [project.entry-points."pygments.lexers"]
 lexer = "aggregate.decl_pygments:AggLexer"

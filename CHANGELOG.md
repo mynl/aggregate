@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.1 - 2026-10-07
+
+**[Packaging-Subpackages] the wheel ships `aggregate.charts`, `aggregate.plots` and `aggregate.exhibits`, which 1.0.0 omitted.** `[tool.setuptools]` declared `packages = ["aggregate"]`, which names only the top level package: setuptools does not recurse, so 34 of 85 modules were left out of the built artifact. In that wheel `a.plot()` raised `ModuleNotFoundError: No module named 'aggregate.charts'`. Packaging now uses automatic discovery (`[tool.setuptools.packages.find]`, `where = ["src"]`, `include = ["aggregate*"]`). No library code changed.
+
+**1.0.0 was tagged but never published**, and 1.0.1 is the first release on PyPI; there is nothing to upgrade from. The defect was invisible to the test suite by construction, because the suite runs against the editable install where every module is present on disk, so it was found by installing the built wheel into a clean environment. That check is now part of the release procedure.
+
 ## 1.0.0 - 2026-10-07
 
 **The 1.0 release.** No code changes from `1.0.0a401`. What changes is the promise: the API stability policy in the preamble above takes effect, and the package classifier moves from `Development Status :: 4 - Beta` to `5 - Production/Stable`. From here a documented name in the stable set keeps its meaning, a breaking change waits for a major release and is preceded by a deprecation period, and the breaking changes recorded in the alpha entries below are what the alpha series was for. `aggregate.charts` and `aggregate.exhibits` stay provisional in the PEP 411 sense and are **not** covered. Requires Python 3.12 to 3.14.

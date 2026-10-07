@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.0.0 - 2026-10-07
+
+**The 1.0 release.** No code changes from `1.0.0a401`. What changes is the promise: the API stability policy in the preamble above takes effect, and the package classifier moves from `Development Status :: 4 - Beta` to `5 - Production/Stable`. From here a documented name in the stable set keeps its meaning, a breaking change waits for a major release and is preceded by a deprecation period, and the breaking changes recorded in the alpha entries below are what the alpha series was for. `aggregate.charts` and `aggregate.exhibits` stay provisional in the PEP 411 sense and are **not** covered. Requires Python 3.12 to 3.14.
+
+One thing to act on: the published *Pricing Insurance Risk* exhibits do **not** reproduce on 1.0. Much of the machinery they used was removed during the alpha series because it compared recommended spectral methods against legacy ones that are not recommended. Use `pip install aggregate==0.30.1` in an isolated environment, as the README's "Pricing Insurance Risk Examples" section records.
+
 ## 1.0.0a401
 
 **[Unparse-Dense-Spec-Guard] `decl_writer.spec_to_decl` rejects a dense constructor-argument spec instead of emitting wrong DecL.** Handed `Aggregate.spec` where the sparse parser spec is documented, it used to render quietly wrong output: `13.7376 claims` came out as `0 premium at 0 lr`, the severity picked up a `0 *` scale, and a spurious `poisson 0 0 loss` appeared, because the dense dict spells unset as `0` / `None` while `0` is legitimate for `exp_premium` and `sev_scale`. That text re-parsed and built to `est_m = 0`, `est_cv = nan`, with no error anywhere. It now raises `ValueError` naming the sparse spec, `.program` and `to_agg` as the routes that work. The five `label_map` reads are `None`-tolerant, so the guard fires rather than the incidental `AttributeError` that previously masked it.

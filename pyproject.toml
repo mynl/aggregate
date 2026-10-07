@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.0.0a401"
+version = "1.0.0"
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -14,7 +14,7 @@ maintainers = [
     {name = "Stephen J. Mildenhall", email = "mynl@me.com"},
 ]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Education",
     "Intended Audience :: Financial and Insurance Industry",
     "Programming Language :: Python :: 3",

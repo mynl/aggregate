@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.1.0a4 - 2026-10-09
+
+**[NTT-Exact-Moments] `AggregateNTT.stats_df` gains an `exact` column and validation runs against it.** Frequency and severity raw moments come from the input rationals and aggregate raw moments from the reconstructed numerators (`sum n**k H_n / D`), all exact; `cv` and `skew` take one float square root at the end, so every entry is the correctly rounded float of an exact quantity. The same values overwrite the `mixed` theoretical rows, so `validation_df`, `explain_validation` and the score terms compare the FFT estimate against the exact baseline with no change to `_validation.py`.
+
 ## 1.1.0a3 - 2026-10-09
 
 **[NTT-Class] `aggregate.ntt.AggregateNTT`: `build('nttagg ...')` returns the exact compound.** An ordinary `Aggregate` (the float FFT pipeline runs as usual, driven bit-identically from the exact spec) that also computes the distribution exactly: `density_df` gains `p_exact` (reduced `Fraction` per bucket) and `p_exact_float`; new `accuracy_df` (per-bucket `p_exact_float`, `p_fft` from the raw `agg_density`, exact-before-rounding `err`, `abs_err`, `rel_err`) and `ntt_audit` (sizes, primes, timings, error summaries). `update` pins `bs=1`, resolves `log2` from the support, and raises naming the required `log2` when the cap (16 via `build`) is too small; soft guardrails `NTT_MAX_SUPPORT` / `NTT_MAX_BYTES` in `constants.py` refuse monster cases with a full size estimate unless `ntt_override=True`; the 32-bit prime supply is a hard limit. The 100 x 100 dice-of-dice builds in about a second (21 primes, 672-bit denominator) and reproduces the exact endpoint `1/100^101` against a float noise floor near `6e-19`.

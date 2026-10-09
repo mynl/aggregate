@@ -330,3 +330,39 @@ def test_aggregate_ntt_build_default_cap_names_required_log2(underwriter):
     # the build refuses up front naming the value to pass. No heavy work runs.
     with pytest.raises(ValueError, match='log2 >= 18'):
         underwriter.build('nttagg CT.TooBig dfreq [1:400] dsev [1:400]')
+
+
+# -------------------------------- [exact-moments] ([NTT-Exact-Moments] stage)
+
+def test_aggregate_ntt_stats_df_exact_column(underwriter):
+    a = underwriter.build('nttagg EM.Dice dfreq [1:6] dsev [1:6]')
+    sdf = a.stats_df
+    assert 'exact' in sdf.columns
+    # E[A] = E[N] E[X] = 3.5 * 3.5 = 49/4 and E[A^2] = 196 exactly
+    assert sdf['exact'][('agg', 'mean')] == 12.25
+    assert sdf['exact'][('agg', 'ex2')] == 196.0
+    assert sdf['exact'][('freq', 'mean')] == 3.5
+    assert sdf['exact'][('sev', 'ex2')] == float(Fraction(91, 6))
+    # the validation baseline rows carry the exact values
+    assert sdf['mixed'][('agg', 'mean')] == 12.25
+    assert sdf['mixed'][('agg', 'ex2')] == 196.0
+
+
+def test_aggregate_ntt_validates_against_exact(underwriter):
+    a = underwriter.build('nttagg EM.Val dfreq [0 1 2] [1/4 1/2 1/4] '
+                          'dsev [1 2 10] [0.3 0.5 0.2]')
+    # zero flags (NOT_UNREASONABLE) means validation passes against the
+    # exact baseline now sitting in the mixed column
+    assert not a.valid
+    vdf = a.validation_df
+    assert vdf is not None and len(vdf) == 3
+    # exact mean: E[N] = 1, E[X] = 3/10 + 1 + 2 = 33/10
+    assert a.stats_df['exact'][('agg', 'mean')] == float(Fraction(33, 10))
+
+
+def test_aggregate_ntt_degenerate_severity_moments(underwriter):
+    a = underwriter.build('nttagg EM.Degenerate dfreq [2] dsev [5]')
+    sdf = a.stats_df
+    assert sdf['exact'][('agg', 'mean')] == 10.0
+    assert sdf['exact'][('sev', 'cv')] == 0.0
+    assert np.isnan(sdf['exact'][('sev', 'skew')])

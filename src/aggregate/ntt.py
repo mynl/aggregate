@@ -721,7 +721,54 @@ class AggregateNTT(Aggregate):
         self._ntt_denominator = denominator
         self._ntt_meta = meta
         self._accuracy_df = None
+        self._attach_exact_moments()
         return rv
+
+    def _attach_exact_moments(self):
+        """Add the ``exact`` column to ``stats_df`` and rebase validation.
+
+        The raw moments are exact rational sums: frequency and severity from
+        the input rationals, aggregate as ``sum n**k H_n / D`` over the
+        reconstructed numerators (cheap bigint work). ``mean`` is ``ex1``;
+        ``cv`` and ``skew`` are computed from exact central moments with a
+        single float square root at the end, so every entry is the correctly
+        rounded float of an exact quantity. The same values then overwrite
+        the ``mixed`` theoretical rows: ``mixed`` is defined as the analytic
+        moments, the exact rationals are those moments computed without
+        rounding, and every validation reader (``explain_validation``,
+        ``validation_df``, the score terms) picks up the exact baseline
+        through the one column it already reads, with no fork of
+        ``_validation.py``.
+        """
+        components = {
+            'freq': [sum(Fraction(x) ** k * q for x, q in
+                         zip(self.ntt_freq_outcomes, self.ntt_freq_probs))
+                     for k in (1, 2, 3)],
+            'sev': [sum(Fraction(x) ** k * q for x, q in
+                        zip(self.ntt_sev_outcomes, self.ntt_sev_probs))
+                    for k in (1, 2, 3)],
+            'agg': [Fraction(sum(n ** k * h for n, h in
+                                 enumerate(self._ntt_numerators)),
+                             self._ntt_denominator)
+                    for k in (1, 2, 3)],
+        }
+        exact = pd.Series(np.nan, index=self.stats_df.index, dtype=float)
+        for comp, (e1, e2, e3) in components.items():
+            exact[(comp, 'ex1')] = float(e1)
+            exact[(comp, 'ex2')] = float(e2)
+            exact[(comp, 'ex3')] = float(e3)
+            exact[(comp, 'mean')] = float(e1)
+            variance = e2 - e1 * e1
+            if e1 != 0 and variance > 0:
+                sd = math.sqrt(variance)  # the one float rounding
+                exact[(comp, 'cv')] = sd / float(e1)
+                exact[(comp, 'skew')] = \
+                    float(e3 - 3 * e1 * e2 + 2 * e1 ** 3) / sd ** 3
+            elif variance == 0:
+                exact[(comp, 'cv')] = 0.0
+        self.stats_df['exact'] = exact
+        moment_rows = exact.notna()
+        self.stats_df.loc[moment_rows, 'mixed'] = exact[moment_rows]
 
     def _exact_on_grid(self):
         """``p_exact`` as a list of reduced Fractions aligned to ``self.xs``."""

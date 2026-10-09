@@ -50,8 +50,9 @@
   Landed so far: `[NTT-Engine]` at 1.1.0a1 (`aggregate.ntt` engine functions
   and `tests/test_ntt.py`); `[NTT-DecL]` at 1.1.0a2 (grammar, transformer,
   writer, mirrors, corpus and snapshot); `[NTT-Class]` at 1.1.0a3
-  (`AggregateNTT`, `accuracy_df`, `ntt_audit`, guardrails). Remaining stages:
-  exact moments into validation, measured parallelism, docs, 1.1.0 final.
+  (`AggregateNTT`, `accuracy_df`, `ntt_audit`, guardrails);
+  `[NTT-Exact-Moments]` at 1.1.0a4 (`stats_df` exact column, validation
+  rebased on it). Remaining: measured parallelism, docs, 1.1.0 final.
 
 ## Correctness
 

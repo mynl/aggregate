@@ -19,6 +19,13 @@ side by side with the exact answer (``density_df.p_exact_log10``, ``p_exact``,
 ``ntt_audit``, and a ``stats_df`` ``exact`` column that validation measures
 against). History and design rulings: ``dev/done/plan-nttagg.md``.
 
+An optional compiled accelerator, the separate ``aggregate-ntt`` package, is
+used for the reconstruction phase when it happens to be installed and ignored
+when it is not. It is discovered rather than declared: this library does not
+depend on it, is never slower or less correct for its absence, and computes
+the same integers either way. See :func:`_resolve_engine` and
+``dev/plan-ntt-rust-integration.md``.
+
 Access is by submodule only, matching ``ft.py`` and ``tweedie.py``: there is
 no top-level re-export.
 """
@@ -27,6 +34,7 @@ import logging
 import math
 import os
 import time
+import warnings
 from fractions import Fraction
 from math import lcm
 
@@ -39,6 +47,148 @@ __all__ = ['is_prime_u64', 'ntt_primes', 'ntt', 'exact_compound',
            'exact_compound_poly', 'AggregateNTT']
 
 logger = logging.getLogger(__name__)
+
+
+# ----------------------------------------------- [NTT-Rust-Integration]
+# The optional compiled accelerator, discovered and never declared. It is a
+# separate distribution so this library stays pure Python, so no GMP license
+# obligation can reach it, and so it can be built for one machine with
+# target-cpu=native, which a published wheel cannot be. Design and rulings:
+# dev/plan-ntt-rust-integration.md here, dev/plan-rust-engine.md there.
+#
+# The requirement that governs every line below: a user who has never heard
+# of aggregate-ntt must see no change whatsoever.
+try:
+    import aggregate_ntt as _engine
+except ImportError:
+    _engine = None
+
+#: Seam contract version this library speaks. ``aggregate_ntt`` declares its
+#: own as ``PROTOCOL_VERSION``; the two must agree before anything is
+#: computed across the boundary.
+_ENGINE_PROTOCOL = 1
+
+# Latch so a protocol mismatch warns once per process rather than once per
+# computation. The tests that exercise the mismatch reset it.
+_PROTOCOL_WARNED = False
+
+
+def _resolve_engine(requested='auto'):
+    """
+    Decide which engine computes a call: ``'python'`` or ``'rust'``.
+
+    Parameters
+    ----------
+    requested : {'auto', 'python', 'rust'}, default 'auto'
+        ``'auto'`` uses the compiled engine when it is installed and speaks
+        :data:`_ENGINE_PROTOCOL`, otherwise the pure-Python path.
+        ``'python'`` always gives the pure-Python path. ``'rust'`` demands
+        the engine.
+
+    Returns
+    -------
+    str
+        ``'python'`` or ``'rust'``.
+
+    Raises
+    ------
+    ValueError
+        If ``requested`` is not one of the three, or is ``'rust'`` when the
+        engine is missing or speaks a protocol this library does not know.
+
+    Notes
+    -----
+    Three things have to be decided together, which is why this is a
+    function rather than an inline conditional: whether the engine exists,
+    whether its seam version is one this library knows, and what the caller
+    asked for.
+
+    **A protocol mismatch never computes.** Two separately versioned
+    packages drift, and the one unacceptable outcome is a silently wrong
+    answer rather than a loud refusal, so an unknown protocol is treated as
+    no engine at all. Under ``'auto'`` that is a fallback with a warning,
+    because a user who upgraded one of the two packages should still get
+    answers; under ``'rust'`` it raises, because an explicit request that
+    cannot be honored is an error and never a silent downgrade.
+
+    ``'python'`` is the bisecting switch and must never fail: it is how two
+    answers are compared when they disagree, so it does not consult the
+    engine at all.
+    """
+    global _PROTOCOL_WARNED
+    if requested not in ('auto', 'python', 'rust'):
+        raise ValueError(
+            f"ntt_engine must be 'auto', 'python' or 'rust', got "
+            f"{requested!r}")
+    if requested == 'python':
+        return 'python'
+    if _engine is None:
+        if requested == 'rust':
+            raise ValueError(
+                "ntt_engine='rust' needs the optional aggregate-ntt "
+                "package, which is not installed. Pass ntt_engine='python', "
+                "or leave the default ntt_engine='auto', which uses the "
+                "engine when it is present and the pure-Python path when it "
+                "is not.")
+        return 'python'
+    protocol = getattr(_engine, 'PROTOCOL_VERSION', None)
+    if protocol != _ENGINE_PROTOCOL:
+        version = getattr(_engine, '__version__', 'unknown')
+        if requested == 'rust':
+            raise ValueError(
+                f"ntt_engine='rust' refuses aggregate-ntt {version}: it "
+                f"speaks seam protocol {protocol!r} and this library speaks "
+                f"{_ENGINE_PROTOCOL}. Upgrade whichever of the two is "
+                f"older. Computing across a seam that has moved risks a "
+                f"wrong answer, so this refuses instead.")
+        if not _PROTOCOL_WARNED:
+            # UserWarning, not RuntimeWarning: the library emits no
+            # RuntimeWarning of its own ([RuntimeWarning-Census], 1.0.0a220)
+            # so that -W error::RuntimeWarning is a numerics gate. A
+            # mismatched package is not a numerical event and must not trip
+            # it. UserWarning is also what the rest of the library uses to
+            # tell the user something about how a computation was set up.
+            _PROTOCOL_WARNED = True
+            warnings.warn(
+                f'aggregate-ntt {version} speaks seam protocol '
+                f'{protocol!r} and this library speaks {_ENGINE_PROTOCOL}, '
+                f'so the compiled engine is being ignored and the exact '
+                f'answers come from the pure-Python path. Upgrade whichever '
+                f'of the two is older to use it.',
+                UserWarning, stacklevel=3)
+        return 'python'
+    return 'rust'
+
+
+def _engine_provenance(engine):
+    """
+    The three ``meta`` keys naming what produced an answer.
+
+    Parameters
+    ----------
+    engine : {'python', 'rust'}
+        The resolved engine, as returned by :func:`_resolve_engine`.
+
+    Returns
+    -------
+    dict
+        ``engine``, ``engine_version`` and ``engine_protocol``, the last two
+        ``None`` on the pure-Python path.
+
+    Notes
+    -----
+    A result must always say what produced it. Without these keys two
+    machines disagree about a number and nobody can tell which computed it
+    how; with them a saved :attr:`AggregateNTT.ntt_audit` is
+    self-describing. ``engine_version`` is the compiled module's own build,
+    not the Python package metadata, so a stale binary is visible.
+    """
+    if engine == 'rust':
+        return {'engine': 'rust',
+                'engine_version': getattr(_engine, '__version__', None),
+                'engine_protocol': getattr(_engine, 'PROTOCOL_VERSION', None)}
+    return {'engine': 'python', 'engine_version': None,
+            'engine_protocol': None}
 
 
 # First twelve primes: a witness set making Miller-Rabin deterministic for all
@@ -761,7 +911,7 @@ def _safe_float(value):
 
 
 def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
-                   workers=None):
+                   workers=None, ntt_engine='auto'):
     """
     Exact bounded discrete compound distribution via NTT and CRT.
 
@@ -786,6 +936,15 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         threads is where the gain stops being worth its CPU, measured on
         that case at 216.4 s against 212.3 s for eight, for half the
         thread-seconds (709 against 1356); both are 1.45x serial.
+    ntt_engine : {'auto', 'python', 'rust'}, default 'auto'
+        Which engine computes the reconstruction. ``'auto'`` uses the
+        optional compiled ``aggregate-ntt`` package when it is installed and
+        speaks the seam protocol, otherwise the pure-Python path, so a user
+        who does not have it sees no change. ``'python'`` forces the
+        pure-Python path and never fails, which makes it the switch for
+        bisecting a disagreement. ``'rust'`` demands the engine and raises
+        if it is absent or speaks an unknown protocol. See
+        :func:`_resolve_engine`.
 
     Returns
     -------
@@ -798,8 +957,9 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     meta : dict
         Audit record: ``support`` (``N``), ``transform_length`` (``L``),
         ``bound_bits`` (``D.bit_length()``), ``primes_used``,
-        ``prime_bits_min`` / ``prime_bits_max``, ``transform_seconds``,
-        ``crt_seconds``.
+        ``prime_bits_min`` / ``prime_bits_max``, ``engine``,
+        ``engine_version``, ``engine_protocol``, ``transform_seconds``,
+        ``crt_seconds``, ``limb_decode_seconds``.
 
     Notes
     -----
@@ -835,6 +995,25 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     at most ``log2(n)`` partials rather than every prime's residue vector,
     so peak memory is roughly twice the answer.
 
+    When the optional ``aggregate-ntt`` package is installed, that
+    reconstruction runs in Rust instead: the same balanced merge stack, with
+    every merge parallelized over coefficients behind a released GIL, which
+    is the thing this module cannot do. Residue vectors are pushed into a
+    stateful accumulator one at a time as the thread pool produces them, so
+    the online memory profile is preserved rather than handing every prime's
+    residues across the boundary at once. The answer comes back as
+    fixed-width little-endian 64-bit limbs, one row per coefficient, which
+    is a memory copy rather than a million object allocations; decoding
+    those limbs into Python integers is the one unavoidably Python-side cost
+    of that path and is reported separately as ``limb_decode_seconds``, so
+    it cannot hide inside ``crt_seconds``.
+
+    **Both engines must produce identical integers**, which is what
+    ``test_rust_engine_matches_python`` pins, and the three checks below run
+    on either answer unchanged. The transform phase is not yet handed over:
+    prime selection and ``_residues_mod_prime`` stay here whatever the
+    engine, which is why the audit's prime rows do not move between the two.
+
     Three end-to-end checks always run and raise on failure: the
     reconstructed coefficients sum to exactly ``D``, every coefficient is
     nonnegative, and every coefficient beyond the support is zero. Together
@@ -852,6 +1031,9 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         # twice the CPU, because what threads mostly buy here is overlap
         # with the serial reconstruction rather than parallel speedup.
         workers = min(4, os.cpu_count() or 1)
+    # Before any work, so an impossible request fails immediately rather
+    # than after the transform phase has run.
+    engine = _resolve_engine(ntt_engine)
     freq_outcomes, freq_probs = _validate_exact_inputs(
         freq_outcomes, freq_probs, 'frequency')
     sev_outcomes, sev_probs = _validate_exact_inputs(
@@ -872,7 +1054,11 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
                 'bound_bits': bound_bits, 'primes_used': 0,
                 'prime_bits_min': 0, 'prime_bits_max': 0,
                 'transform_seconds': 0.0, 'crt_seconds': 0.0,
-                'workers': 1}
+                'limb_decode_seconds': 0.0, 'workers': 1,
+                # Neither engine ran, there being nothing to transform or
+                # reconstruct. Reporting the resolved one keeps the audit
+                # record the same shape on every path.
+                **_engine_provenance(engine)}
         return [denominator], denominator, meta
 
     length = 1 << support.bit_length()  # 2**ceil(log2(support + 1))
@@ -900,17 +1086,26 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
 
     t_transform = 0.0
     t_crt = 0.0
-    # CRT state, Python ints throughout and serial in this thread; the phase
-    # is GIL-bound bigint work. Two reachable shapes. The merge stack holds
-    # (partial, modulus, weight) triples, weight counting the primes behind
-    # a partial, and merges equal-weight neighbors as they appear, which
-    # builds the balanced product tree without ever holding every prime's
-    # residues at once. The linear fold is the quadratic predecessor, kept
-    # reachable so a test can pin the two against each other.
+    t_limbs = 0.0
+    # CRT state. Three reachable shapes. The compiled engine owns the whole
+    # phase when it is resolved, holding the merge stack on its own side.
+    # Otherwise the work is Python ints, serial in this thread and GIL-bound
+    # bigint arithmetic: the merge stack holds (partial, modulus, weight)
+    # triples, weight counting the primes behind a partial, and merges
+    # equal-weight neighbors as they appear, which builds the balanced
+    # product tree without ever holding every prime's residues at once. The
+    # linear fold is the quadratic predecessor, kept reachable so a test can
+    # pin the two against each other.
     use_tree = len(primes) >= _CRT_TREE_MIN
     stack = []
     reconstructed = None
     modulus = 1
+    accumulator = None
+    if engine == 'rust':
+        # Every prime up front: the accumulator needs the full set to know
+        # the final modulus width, and residues then arrive in this order.
+        accumulator = _engine.Reconstructor(
+            [int(p) for p, _ in primes], support + 1)
     try:
         for i, ((prime, _root), (head, seconds)) in enumerate(
                 zip(primes, results)):
@@ -918,7 +1113,13 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
                         i + 1, len(primes), prime, seconds)
             t_transform += seconds
             t0 = time.perf_counter()
-            if use_tree:
+            if accumulator is not None:
+                # The engine releases the GIL for the merges this triggers,
+                # so the transform threads keep running through a push. That
+                # is the whole reason the phase moves: the Python merge
+                # stack holds the GIL and starves them.
+                accumulator.push(head)
+            elif use_tree:
                 partial = [int(r) for r in head]
                 partial_modulus, weight = prime, 1
                 while stack and stack[-1][2] == weight:
@@ -943,7 +1144,23 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         if pool is not None:
             pool.shutdown()
 
-    if use_tree:
+    if accumulator is not None:
+        t0 = time.perf_counter()
+        limbs, modulus_bytes = accumulator.finish()
+        t_crt += time.perf_counter() - t0
+        # Fixed-width little-endian 64-bit limbs, one row per coefficient,
+        # so the answer crosses the boundary as a single memory copy. The
+        # decode is a million int.from_bytes calls and is timed on its own,
+        # because folding it into crt_seconds would hide the one cost this
+        # path adds.
+        t0 = time.perf_counter()
+        modulus = int.from_bytes(modulus_bytes, 'little')
+        width = limbs.shape[1] * 8
+        raw = limbs.tobytes()
+        reconstructed = [int.from_bytes(raw[i:i + width], 'little')
+                         for i in range(0, len(raw), width)]
+        t_limbs = time.perf_counter() - t0
+    elif use_tree:
         # Drain the stack, smallest weight first. At most log2(n) partials
         # remain, so the peak memory is about twice the answer rather than
         # the answer plus every prime's residue vector.
@@ -974,7 +1191,8 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
             'prime_bits_min': min(prime_bits),
             'prime_bits_max': max(prime_bits),
             'transform_seconds': t_transform, 'crt_seconds': t_crt,
-            'workers': workers}
+            'limb_decode_seconds': t_limbs, 'workers': workers,
+            **_engine_provenance(engine)}
     return reconstructed, denominator, meta
 
 
@@ -1170,8 +1388,13 @@ class AggregateNTT(Aggregate):
             per-prime transform phase, which defaults to
             ``min(4, os.cpu_count())``; pass ``ntt_workers=1`` to force
             serial. The GIL-bound CRT phase stays serial either way and
-            dominates a large case. Everything else passes to
-            :meth:`Aggregate.update`.
+            dominates a large case. ``ntt_engine='auto' | 'python' | 'rust'``
+            chooses the engine for the reconstruction phase: the default
+            ``'auto'`` uses the optional compiled ``aggregate-ntt`` package
+            when it is installed and the pure-Python path when it is not, so
+            it needs no attention unless an answer is in dispute, when
+            ``'python'`` forces the reference path. Everything else passes
+            to :meth:`Aggregate.update`.
 
         Notes
         -----
@@ -1187,6 +1410,7 @@ class AggregateNTT(Aggregate):
         from .constants import NTT_MAX_BYTES, NTT_MAX_SUPPORT
         override = bool(kwargs.pop('ntt_override', False))
         ntt_workers = kwargs.pop('ntt_workers', None)
+        ntt_engine = kwargs.pop('ntt_engine', 'auto')
         if bs not in (0, 1):
             raise ValueError(
                 f'{self.name}: nttagg pins the exact integer lattice, so bs '
@@ -1220,7 +1444,8 @@ class AggregateNTT(Aggregate):
                 f"0..{sizes['support']}); this is a bug, please report it")
         numerators, denominator, meta = exact_compound(
             self.ntt_freq_outcomes, self.ntt_freq_probs,
-            self.ntt_sev_outcomes, self.ntt_sev_probs, workers=ntt_workers)
+            self.ntt_sev_outcomes, self.ntt_sev_probs, workers=ntt_workers,
+            ntt_engine=ntt_engine)
         self._ntt_numerators = numerators
         self._ntt_denominator = denominator
         self._ntt_meta = meta
@@ -1448,7 +1673,12 @@ class AggregateNTT(Aggregate):
 
         Rows: ``support``, ``transform_length``, ``denominator_bits``,
         ``primes_used``, ``prime_bits_min`` / ``prime_bits_max``,
-        ``workers``, ``transform_seconds``, ``crt_seconds``, ``max_abs_err``,
+        ``workers``, ``engine`` (``'python'`` or ``'rust'``),
+        ``engine_version`` and ``engine_protocol`` (the compiled engine's own
+        build and the negotiated seam version, both ``None`` on the
+        pure-Python path), ``transform_seconds``, ``crt_seconds``,
+        ``limb_decode_seconds`` (turning the compiled engine's limbs into
+        Python integers, ``0.0`` on the pure-Python path), ``max_abs_err``,
         ``max_rel_err`` (over *resolved* buckets only, defined below),
         ``rel_err_buckets`` (how many buckets that maximum is taken over),
         ``unresolved_buckets`` (nonzero exact probability at or below
@@ -1482,6 +1712,12 @@ class AggregateNTT(Aggregate):
         from its own noise, and ``underflow_buckets`` is mass it cannot
         represent at any precision. Read ``density_df.p_exact_log10`` to see
         those buckets, since ``p_exact_float`` is zero across them.
+
+        The three ``engine`` rows make a saved audit self-describing. The
+        exact answer is identical whichever engine produced it, by design
+        and by test, so these rows explain a timing difference between two
+        machines and never a numerical one. A number that does differ across
+        them is a bug, and these rows are how it gets reported.
         """
         if self._ntt_numerators is None:
             raise ValueError(
@@ -1520,8 +1756,12 @@ class AggregateNTT(Aggregate):
              'prime_bits_min': meta['prime_bits_min'],
              'prime_bits_max': meta['prime_bits_max'],
              'workers': meta['workers'],
+             'engine': meta['engine'],
+             'engine_version': meta['engine_version'],
+             'engine_protocol': meta['engine_protocol'],
              'transform_seconds': meta['transform_seconds'],
              'crt_seconds': meta['crt_seconds'],
+             'limb_decode_seconds': meta['limb_decode_seconds'],
              'max_abs_err': adf.abs_err.max(),
              'max_rel_err': max_rel,
              'rel_err_buckets': int(np.count_nonzero(resolved)),

@@ -12,6 +12,7 @@ denominator, nonnegative, zero beyond the support) that every call exercises.
 import math
 import os
 import random
+import warnings
 from fractions import Fraction
 
 import numpy as np
@@ -422,10 +423,11 @@ def test_aggregate_ntt_accuracy_df_and_audit(underwriter):
     audit = a.ntt_audit
     assert list(audit.index) == [
         'support', 'transform_length', 'denominator_bits', 'primes_used',
-        'prime_bits_min', 'prime_bits_max', 'workers', 'transform_seconds',
-        'crt_seconds', 'max_abs_err', 'max_rel_err', 'rel_err_buckets',
-        'unresolved_buckets', 'underflow_buckets', 'noise_floor',
-        'exact_zero_nonzero_float']
+        'prime_bits_min', 'prime_bits_max', 'workers', 'engine',
+        'engine_version', 'engine_protocol', 'transform_seconds',
+        'crt_seconds', 'limb_decode_seconds', 'max_abs_err', 'max_rel_err',
+        'rel_err_buckets', 'unresolved_buckets', 'underflow_buckets',
+        'noise_floor', 'exact_zero_nonzero_float']
     assert audit['support'] == 36
     assert audit['primes_used'] >= 1
     assert audit['max_abs_err'] == adf.abs_err.max()
@@ -535,9 +537,12 @@ def test_crt_tree_matches_forced_fold(monkeypatch, seed):
     rng = random.Random(seed)
     fo, fp = _random_clause(rng)
     so, sp = _random_clause(rng)
-    tree = exact_compound(fo, fp, so, sp)
+    # Both sides pin the Python engine: _CRT_TREE_MIN selects between the two
+    # Python shapes, and with the compiled engine installed 'auto' would run
+    # neither, making this comparison vacuously true.
+    tree = exact_compound(fo, fp, so, sp, ntt_engine='python')
     monkeypatch.setattr(ntt_module, '_CRT_TREE_MIN', 10 ** 6)
-    folded = exact_compound(fo, fp, so, sp)
+    folded = exact_compound(fo, fp, so, sp, ntt_engine='python')
     assert tree[0] == folded[0]
     assert tree[1] == folded[1]
 
@@ -552,9 +557,11 @@ def test_crt_tree_matches_forced_fold_dice(monkeypatch):
     """
     outcomes = list(range(1, 101))
     probs = [Fraction(1, 100)] * 100
-    tree = exact_compound(outcomes, probs, outcomes, probs, workers=1)
+    tree = exact_compound(outcomes, probs, outcomes, probs, workers=1,
+                          ntt_engine='python')
     monkeypatch.setattr(ntt_module, '_CRT_TREE_MIN', 10 ** 6)
-    folded = exact_compound(outcomes, probs, outcomes, probs, workers=1)
+    folded = exact_compound(outcomes, probs, outcomes, probs, workers=1,
+                            ntt_engine='python')
     assert tree[0] == folded[0]
     assert tree[1] == folded[1]
     assert tree[2]['primes_used'] > 16
@@ -668,3 +675,182 @@ def test_p_exact_before_update_raises(underwriter):
                           update=False)
     with pytest.raises(ValueError, match='update the object'):
         _ = a.p_exact
+
+
+# ------------------------ [rust-engine] ([NTT-Rust-Integration] phase 1)
+#
+# The engine is optional and discovered, so every test here runs on a machine
+# without it: the resolution tests fake the module, and the conformance tests
+# skip. That is the normal case and it must stay the normal case.
+
+
+class _FakeEngine:
+    """Stand-in for an ``aggregate_ntt`` whose seam has moved."""
+
+    def __init__(self, protocol):
+        self.PROTOCOL_VERSION = protocol
+        self.__version__ = '9.9.9'
+
+
+@pytest.fixture
+def unwarned():
+    """Clear the once-per-process protocol warning latch around a test."""
+    saved = ntt_module._PROTOCOL_WARNED
+    ntt_module._PROTOCOL_WARNED = False
+    yield
+    ntt_module._PROTOCOL_WARNED = saved
+
+
+def test_resolve_engine_python_never_consults_the_engine(monkeypatch):
+    """``'python'`` is the bisecting switch, so it cannot fail."""
+    for fake in (None, _FakeEngine(ntt_module._ENGINE_PROTOCOL),
+                 _FakeEngine(99)):
+        monkeypatch.setattr(ntt_module, '_engine', fake)
+        assert ntt_module._resolve_engine('python') == 'python'
+
+
+def test_resolve_engine_auto_falls_back_when_absent(monkeypatch):
+    monkeypatch.setattr(ntt_module, '_engine', None)
+    assert ntt_module._resolve_engine('auto') == 'python'
+    assert ntt_module._resolve_engine() == 'python'
+
+
+def test_resolve_engine_rust_raises_when_absent(monkeypatch):
+    """An explicit request that cannot be met is an error, not a downgrade."""
+    monkeypatch.setattr(ntt_module, '_engine', None)
+    with pytest.raises(ValueError, match='not installed'):
+        ntt_module._resolve_engine('rust')
+
+
+def test_resolve_engine_uses_a_matching_protocol(monkeypatch):
+    monkeypatch.setattr(ntt_module, '_engine',
+                        _FakeEngine(ntt_module._ENGINE_PROTOCOL))
+    assert ntt_module._resolve_engine('auto') == 'rust'
+    assert ntt_module._resolve_engine('rust') == 'rust'
+
+
+def test_resolve_engine_refuses_an_unknown_protocol(monkeypatch, unwarned):
+    """A mismatched seam never computes: it warns under auto, raises under rust.
+
+    The single most important rule of the integration. Two separately
+    versioned packages drift, and a silently wrong answer must lose to a
+    loud refusal.
+    """
+    monkeypatch.setattr(ntt_module, '_engine', _FakeEngine(99))
+    with pytest.warns(UserWarning, match='seam protocol'):
+        assert ntt_module._resolve_engine('auto') == 'python'
+    with pytest.raises(ValueError, match='refuses aggregate-ntt 9.9.9'):
+        ntt_module._resolve_engine('rust')
+
+
+def test_resolve_engine_warns_once_per_process(monkeypatch, unwarned):
+    """The second mismatched call falls back silently, having already said so."""
+    monkeypatch.setattr(ntt_module, '_engine', _FakeEngine(99))
+    with pytest.warns(UserWarning):
+        ntt_module._resolve_engine('auto')
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        assert ntt_module._resolve_engine('auto') == 'python'
+
+
+def test_resolve_engine_rejects_an_unknown_request():
+    with pytest.raises(ValueError, match="must be 'auto', 'python' or 'rust'"):
+        ntt_module._resolve_engine('fortran')
+
+
+def test_exact_compound_rejects_an_unknown_engine_before_working():
+    """The request is validated before the transform phase, not after."""
+    with pytest.raises(ValueError, match="must be 'auto', 'python' or 'rust'"):
+        exact_compound([1], [Fraction(1)], [1], [Fraction(1)],
+                       ntt_engine='fortran')
+
+
+def test_provenance_keys_are_present_on_every_path():
+    """Every answer says what produced it, degenerate support included."""
+    for fo, fp, so, sp in (([1, 2], [Fraction(1, 2)] * 2,
+                            [1, 2], [Fraction(1, 2)] * 2),
+                           ([0], [Fraction(1)], [5], [Fraction(1)])):
+        _, _, meta = exact_compound(fo, fp, so, sp, ntt_engine='python')
+        assert meta['engine'] == 'python'
+        assert meta['engine_version'] is None
+        assert meta['engine_protocol'] is None
+        assert meta['limb_decode_seconds'] == 0.0
+
+
+def test_aggregate_ntt_update_accepts_ntt_engine(underwriter):
+    """The keyword reaches ``exact_compound`` through ``update``."""
+    a = underwriter.build('nttagg EN.Dice dfreq [1:6] dsev [1:6]',
+                          ntt_engine='python')
+    assert a._ntt_meta['engine'] == 'python'
+    assert a.ntt_audit['engine'] == 'python'
+    assert a.p_exact.sum() == 1
+
+
+# ---- conformance, on a machine that has the engine
+
+@pytest.mark.parametrize('seed', range(6))
+def test_rust_engine_matches_python(seed):
+    """The two engines reconstruct identical integers on the oracle corpus.
+
+    The pin that makes the engine safe to use at all. Nothing here is
+    compared approximately: the reconstruction is exact arithmetic, so the
+    integers agree bit for bit or the engine is wrong.
+    """
+    pytest.importorskip('aggregate_ntt')
+    rng = random.Random(seed)
+    fo, fp = _random_clause(rng)
+    so, sp = _random_clause(rng)
+    py = exact_compound(fo, fp, so, sp, ntt_engine='python')
+    rs = exact_compound(fo, fp, so, sp, ntt_engine='rust')
+    assert rs[1] == py[1]
+    assert rs[0] == py[0]
+    assert rs[2]['engine'] == 'rust'
+    assert py[2]['engine'] == 'python'
+
+
+def test_rust_engine_matches_python_dice():
+    """The same pin at a size where the engine's merge stack has real depth.
+
+    The 100 x 100 uniform dice case needs 22 primes over 10,001
+    coefficients, so the stack reaches depth 5 and its final drain combines
+    partials of unequal weight, which the small oracle cases do not reach.
+    """
+    pytest.importorskip('aggregate_ntt')
+    outcomes = list(range(1, 101))
+    probs = [Fraction(1, 100)] * 100
+    py = exact_compound(outcomes, probs, outcomes, probs,
+                        ntt_engine='python')
+    rs = exact_compound(outcomes, probs, outcomes, probs, ntt_engine='rust')
+    assert rs[0] == py[0]
+    assert rs[1] == py[1]
+    assert rs[2]['primes_used'] > 16
+
+
+def test_rust_engine_matches_the_polynomial_oracle():
+    """The engine's answer against the reference that shares no machinery.
+
+    ``exact_compound_poly`` uses neither a transform nor the CRT, so this
+    checks the engine against something genuinely independent rather than
+    against the implementation it replaces.
+    """
+    pytest.importorskip('aggregate_ntt')
+    rng = random.Random(17)
+    fo, fp = _random_clause(rng)
+    so, sp = _random_clause(rng)
+    rs = exact_compound(fo, fp, so, sp, ntt_engine='rust')
+    slow = exact_compound_poly(fo, fp, so, sp)
+    assert rs[1] == slow[1]
+    assert rs[0] == slow[0]
+
+
+def test_rust_engine_audit_names_itself(underwriter):
+    """A saved audit record is self-describing about what computed it."""
+    engine = pytest.importorskip('aggregate_ntt')
+    a = underwriter.build('nttagg EN.Rust dfreq [1:6] dsev [1:6]',
+                          ntt_engine='rust')
+    audit = a.ntt_audit
+    assert audit['engine'] == 'rust'
+    assert audit['engine_version'] == engine.__version__
+    assert audit['engine_protocol'] == ntt_module._ENGINE_PROTOCOL
+    assert audit['limb_decode_seconds'] >= 0.0
+    assert a.p_exact.sum() == 1

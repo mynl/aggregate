@@ -20,6 +20,31 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a8
+
+**[NTT-Rust-Integration] the optional compiled engine is used when it is
+installed.** `aggregate.ntt` discovers the separate `aggregate-ntt` package
+at import time and runs the Chinese remainder reconstruction there, falling
+back to the pure-Python path when it is absent, which is the normal case and
+needs no attention: a user who has never heard of the package sees no change.
+New keyword `ntt_engine='auto' | 'python' | 'rust'` on `exact_compound` and
+`build(..., ntt_engine=...)`, where `'auto'` is the default, `'python'`
+always forces the reference path, and `'rust'` raises rather than quietly
+downgrading when the engine is missing. `ntt_audit` and the `meta` record
+gain `engine`, `engine_version`, `engine_protocol` and
+`limb_decode_seconds`, so a saved record says what produced it. The seam is
+versioned and a protocol mismatch never computes: it raises under `'rust'`
+and falls back with one `UserWarning` under `'auto'`. Measured on this
+machine with the engine present, both answers bit-identical: 500 x 500 from
+18.3 s to 4.3 s, the headline 1000 x 1000 uniform dice case from 212.3 s to
+39.2 s, its reconstruction phase from 187 s to 7.5 s, and limb decoding
+0.9 s.
+
+`aggregate-ntt` is **not** a dependency, optional extra or otherwise, and
+will not become one. Install it by hand to use it. The pure-Python path is
+unchanged, stays the reference the engine is tested against, and is fast
+enough for any ordinary problem.
+
 ## 1.2.0a7 - 2026-10-09
 
 **[NTT-Exact-Log10-Lazy] `density_df` gains `p_exact_log10`, which can see the tail, and stops building a million Fractions to hide it.** On a large `nttagg` the exact probabilities run far below the smallest double, so `p_exact_float` is `0.0` across most of the tail and the exact answer was invisible in the frame. `p_exact_log10` is the base-10 logarithm formed as `log10(numerator) - log10(denominator)`, which is a float for any coefficient however small: on a 200 x 200 uniform dice of dice the deepest bucket carrying mass reads **-462.5** where `p_exact_float` reads `0.0`. It is `-inf` only where the probability is exactly zero, and it is accurate to about 1e-10 in the implied probability, which in the denormal range makes it strictly more accurate than taking the logarithm of `p_exact_float`.

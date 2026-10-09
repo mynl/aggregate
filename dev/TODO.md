@@ -58,8 +58,8 @@
   `dev/done/`.**
 
 
-- **[NTT-Rust-Integration]** (`dev/plan-ntt-rust-integration.md`, SPECIFIED,
-  blocked on the sibling) — use the compiled engine in
+- **[NTT-Rust-Integration]** (`dev/plan-ntt-rust-integration.md`, phase 1 of
+  2 landed at **1.2.0a8**) — use the compiled engine in
   `V:\dev\aggregate-ntt` when it is installed, and behave exactly as today
   when it is not. The engine is a separate optional Rust package, discovered
   at import time and never declared as a dependency, which keeps this library
@@ -69,9 +69,18 @@
   verified rather than trusted; it gets the per-prime transform and the CRT
   reconstruction. New keyword `ntt_engine='auto'|'python'|'rust'`, provenance
   rows in `ntt_audit`, and a versioned seam that **refuses** on protocol
-  mismatch rather than computing. Blocked until `[Rust-Reconstruction]` lands
-  over there. Its reflected half is `dev/plan-rust-engine.md` in that repo;
-  the scaffold landed there at 1.0.0a1 on 2026-10-09.
+  mismatch rather than computing. The **reconstruction phase landed at
+  1.2.0a8** against the engine's 1.0.0a2, bit-identical to the Python path
+  and taking the headline 1000 x 1000 case from 212.3 s to 39.2 s. **What
+  remains is the transform phase**, which waits on `[Rust-Transform]` over
+  there and carries the one open design call: the engine can use 64-bit
+  primes and this library cannot, so either `ntt_primes` grows a width
+  parameter or the engine reports the primes it chose. Note also that the
+  `ntt_workers` default of 4 was tuned when the Python CRT held the GIL and
+  is now **too low on the engine path**: measured at 500 x 500, four threads
+  3.57 s against 1.92 s for sixteen. That is an author call, untouched here
+  because it would also move the pure-Python path. Its reflected half is
+  `dev/plan-rust-engine.md` in that repo.
 
 - **[NTT-CRT]** (`dev/plan-ntt-crt.md`) — stage 1
   `[NTT-CRT-ProductTree]` landed at **1.2.0a4**: the reconstruction is a

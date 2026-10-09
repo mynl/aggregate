@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a4 - 2026-10-09
+
+**[NTT-CRT-ProductTree] the `nttagg` Chinese remainder reconstruction is a product tree instead of a linear fold, and large exact cases run about 2.8x faster.** The reconstruction folded one prime at a time into a running answer, multiplying by a modulus that grew with every prime, so the phase was quadratic in the prime count and had become 99.3 percent of the wall clock on the largest cases. It is now a balanced product tree, built online as a merge stack so that no more than `log2(n)` partial reconstructions are ever held and each prime's residues are still consumed as they arrive. The headline 1000 x 1000 uniform dice case, support 10^6 at transform length 2**20 over 321 primes, runs in 212 s against 594 s at 1.2.0a3, with the reconstruction itself falling from 590 s to 198 s; the 500 x 500 case runs in 16.6 s against 35.2 s. Answers are bit identical, pinned by a test that the tree and the linear fold reconstruct the same integers, and the three end-to-end checks are unchanged.
+
+The transform phase speeds up as a side effect, because the old reconstruction held the GIL in stretches of up to several seconds and starved the worker threads. Transform thread-seconds on the 500 x 500 case fall from 266 to 119 for the same arithmetic, and the per-prime log lines no longer climb through a run.
+
+Peak memory on the largest cases roughly doubles, since the merge stack holds partial reconstructions alongside the answer. `NTT_MAX_BYTES` still estimates the answer only, so a case near the cap now needs about twice the headroom it did.
+
 ## 1.2.0a3 - 2026-10-09
 
 **[NTT-Composability] `AggregateNTT` no longer carries the two methods it refuses, and `library.agg` gains an `nttagg` entry.** `pnl_program` and `reins_program` are now absent on an `nttagg` rather than present and raising at call time, so `hasattr(o, 'pnl_program')` answers False, which is how this library already states composability: `PnL` carries neither, `Portfolio` carries `pnl_program` and not `reins_program`. Reading either member still prints the full explanation, now as `AttributeError` rather than `ValueError`, and `dir()` still lists the name. Consumers that derive navigation from object capability no longer need a hard-coded list of kinds. `library.agg` gains `ExactDiceOfDice` in the Numerical character section, tagged `topic:numerics, role:intermediate`, so the kind is reachable from `build.recipes`. Details and divergences: `dev/done/plan-nttagg-composability.md`.

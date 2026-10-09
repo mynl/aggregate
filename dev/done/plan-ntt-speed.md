@@ -1,10 +1,12 @@
 # [NTT-Speed] geometric spectral runs, in-place kernels, and a numba engine
 
-Status: RULED AND READY TO EXECUTE. Written 2026-10-09 against 1.1.0 (commit
-88f9476); the three open decisions were ruled by the author the same day
-(see Rulings below). Target release: 1.2.0 (performance plus one new engine
-capability), staged 1.2.0a1 through 1.2.0a3 with 1.2.0 final at the last
-stage, one commit per bump.
+Status: CLOSED 2026-10-09. Stages 1 and 2 landed at 1.2.0a1 and 1.2.0a2.
+**Stage 3 `[NTT-Numba-Kernel]` was dropped**, on the measurement it was staged
+behind: the transform phase it compiles is 0.7 percent of the headline wall
+clock. Stage 4, the 1.2.0 rollup, was not run either; the author kept the
+`1.2.0a*` series open. The CRT work the measurement points at is
+`dev/plan-ntt-crt.md`. Written 2026-10-09 against 1.1.0 (commit 88f9476);
+execution log and rulings below.
 
 ## Goal
 
@@ -379,6 +381,75 @@ across processes, each process running the incremental CRT over its own slice of
 coefficients for all primes, which parallelizes cleanly because the CRT is
 elementwise across coefficients. If stage 3 is wanted anyway, review finding 2
 records the REDC correction it needs.
+
+## Closing, 2026-10-09
+
+Two of four stages landed, and the plan is retired here rather than at its
+intended 1.2.0 rollup.
+
+| stage | label | outcome |
+|---|---|---|
+| 1 | `[NTT-Uniform-Geometric]` | landed, 1.2.0a1 |
+| 2 | `[NTT-Inplace-Kernels]` | landed, 1.2.0a2, carrying rulings 1 and 8 |
+| 3 | `[NTT-Numba-Kernel]` | **dropped**, see below |
+| 4 | `[NTT-Speed-Release]` | not run, the `1.2.0a*` series stays open |
+
+**What the plan achieved.** The headline 1000 x 1000 uniform dice case went
+from about an hour serial, about 25 minutes at eight workers, to **594 s at the
+default workers**: 6x on the serial baseline, 2.5x on the threaded one. The
+dense 400 x 400 case went from 119 s to 13.8 s. The plan's own target for the
+whole case was the 3 to 5 minute range after stages 1 and 2, and 594 s is close
+to twice that, for a reason the plan did not model: it costed the transform
+phase and assumed the CRT stayed a tenth of it.
+
+**Why stage 3 was dropped.** Review finding 3 raised it as an estimate before
+any code was written, and the measurements turned the estimate into a fact. The
+serial pure-Python bigint CRT is **589.6 s of the 594.0 s** headline wall clock,
+99.3 percent, and 12.1 s of the 19.9 s serial 400 x 400 wall clock. A compiled
+Montgomery engine attacks the transform phase, which has already disappeared
+behind the CRT. The author ruled it dropped on 2026-10-09.
+
+**What replaces it.** `dev/plan-ntt-crt.md`, which leads with a serial
+algorithmic fix rather than the process pool this plan's notes anticipated. The
+reconstruction is quadratic in the prime count because the fold multiplies by a
+modulus that grows with every prime, and a divide-and-conquer product tree is
+`O(n log n)` with no new dependency, no pickling and no process. The process
+pool is staged behind it, conditional on the measurement.
+
+**Findings carried forward.** Two things learned here that the next plan needs.
+The GIL starvation diagnosis, recorded below, explains the per-prime log lines
+that climb through a run and is the symptom any future reader will meet first.
+And if `[NTT-Numba-Kernel]` is ever revived, review finding 2 stands: the
+plan's REDC sequence overflows uint64 at these prime sizes, and the high-word
+formulation is the correction.
+
+### The per-prime ramp, diagnosed 2026-10-09
+
+The author observed per-prime transform times climbing from about 0.2 s to
+about 4.6 s through a 500 x 500 run and asked why. Instrumenting the two phases
+separately settled it, and the cause is not in anything these two stages
+changed.
+
+| prime block | transform, serial | CRT, serial | transform, 8 workers | CRT, 8 workers | modulus bits |
+|---|---|---|---|---|---|
+| 1..28 | 0.074 s | 0.084 s | 0.647 s | 0.089 s | 896 |
+| 29..56 | 0.076 s | 0.164 s | 1.327 s | 0.161 s | 1,792 |
+| 57..84 | 0.074 s | 0.230 s | 1.838 s | 0.233 s | 2,688 |
+| 85..112 | 0.073 s | 0.291 s | 2.434 s | 0.301 s | 3,584 |
+| 113..140 | 0.074 s | 0.397 s | 3.135 s | 0.395 s | 4,480 |
+| first to last | 0.8x | 39.6x | 28.1x | 26.8x | |
+
+Serial transform spans are **flat**, 0.8x first to last, so the transform
+arithmetic does not slow down. The CRT span grows 39.6x, tracking the modulus
+exactly: that is the quadratic fold. The threaded transform spans ramp 28.1x in
+lockstep with the CRT ramp, on arrays of constant size, which is the signature
+of **GIL starvation**: the uint64 ufuncs release the GIL, but a worker needs it
+back between ufunc calls, and the main thread holds it for 0.4 s at a stretch
+doing bigint arithmetic. A constant contention component exists on top (block 1
+is 8.7x serial), but the ramp is the CRT.
+
+The consequence for `dev/plan-ntt-crt.md` is that shortening the CRT does two
+things at once, since it also unstarves the transform threads.
 
 ## Known limits (unchanged, documented)
 

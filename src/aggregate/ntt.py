@@ -11,7 +11,7 @@ the NTT plus CRT route is exact, at a quantifiable cost of roughly
 ``bound_bits / 31`` modular transforms.
 
 The engine functions are pure and class free. :func:`exact_compound` is the
-production path (vectorized numpy NTT per prime, incremental CRT);
+production path (vectorized numpy NTT per prime, product-tree CRT);
 :func:`exact_compound_poly` is the slow direct polynomial reference used by
 the tests as an independent oracle. :class:`AggregateNTT` is the class behind
 the DecL ``nttagg`` kind: an ordinary Aggregate running the float pipeline
@@ -665,6 +665,68 @@ def _residues_mod_prime(prime, root, length, support, sev_index, big_q,
     return residues[:support + 1], time.perf_counter() - t0
 
 
+# Minimum prime count at which the Chinese remainder reconstruction uses the
+# merge stack (dev/plan-ntt-crt.md, [NTT-CRT-ProductTree]). Below it, and
+# whenever a test raises this above the prime count, the linear fold it
+# replaced runs instead; the two produce identical integers, which is what
+# test_crt_tree_matches_forced_fold pins.
+_CRT_TREE_MIN = 2
+
+
+def _crt_merge(left, left_modulus, right, right_modulus):
+    """
+    Combine two partial CRT reconstructions into one, elementwise.
+
+    Parameters
+    ----------
+    left, right : list of int
+        Coefficient vectors, exact modulo ``left_modulus`` and
+        ``right_modulus`` respectively, of equal length.
+    left_modulus, right_modulus : int
+        Coprime moduli, each the product of a disjoint set of NTT primes.
+
+    Returns
+    -------
+    list of int
+        The coefficients exact modulo ``left_modulus * right_modulus``, each
+        in ``0 .. left_modulus * right_modulus - 1``.
+
+    Notes
+    -----
+    One Garner step on composite moduli: with ``a`` exact mod ``Ma`` and
+    ``b`` exact mod ``Mb``, the value exact mod ``Ma * Mb`` is
+
+        ``a + Ma * ((b - a) * Ma**(-1) mod Mb)``
+
+    which lies in range because the bracket is reduced mod ``Mb``. The
+    inverse exists because the moduli are products of distinct primes. Only
+    the scalar inverse depends on the moduli, so it is computed once and
+    shared across every coefficient.
+
+    This is the merge the product tree is built from. The tree matters
+    because the linear fold it replaces multiplies by a modulus that grows
+    with every prime, costing ``sum_i O(i) = O(n**2)`` per coefficient. The
+    balanced tree does ``log2(n)`` levels of merges on operands that are
+    each at most half the final size, which is a constant-factor win rather
+    than an asymptotic one in CPython: multiplication is Karatsuba well
+    above the sizes reached here, but division is schoolbook at every size,
+    and the reduction above is the step that dominates. Summing it over the
+    levels gives about ``n**2 / 2`` against the fold's ``n**2``, with the
+    Karatsuba terms making the ratio improve as ``n`` grows. Measured on the
+    500 x 500 uniform dice case (141 primes) the tree is 2.3x the fold; on
+    the 1000 x 1000 case (321 primes, a 9,976 bit coefficient bound) it is
+    3.1x.
+
+    A Barrett reciprocal in place of the ``mod Mb`` division was measured
+    and is slightly slower: both operands of that division are near the same
+    size, so its quotient is a single digit and CPython's schoolbook
+    division is already linear in the operand size.
+    """
+    inverse_mod = pow(left_modulus, -1, right_modulus)
+    return [a + left_modulus * ((b - a) * inverse_mod % right_modulus)
+            for a, b in zip(left, right)]
+
+
 def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
                    workers=None):
     """
@@ -714,7 +776,7 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     has nonnegative integer coefficients summing to ``D``, and ``P(A = n)``
     is ``H_n / D``. The coefficients are recovered exactly by computing
     ``H mod p`` for enough NTT primes ``p ≡ 1 (mod L)`` below ``2**32``
-    (product exceeding ``D``) and reconstructing with an incremental CRT.
+    (product exceeding ``D``) and reconstructing with a product-tree CRT.
     Per prime: forward NTT of ``A`` padded to ``L = 2**ceil(log2(N + 1))``
     (which prevents circular aliasing), spectral evaluation of ``H`` in
     ascending outcome order with a running power array (each gap bridged by
@@ -725,6 +787,18 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     by :func:`_spectral_walk` at ``log2(run_length)`` array multiplies
     instead of ``run_length``: a uniform claim count is one such run, so the
     dominant phase of a dense case collapses by an order of magnitude.
+
+    The reconstruction is a balanced product tree over the primes, built
+    online as a merge stack by :func:`_crt_merge`: each prime's residues are
+    pushed as a one-prime partial and any two equal-weight partials on top
+    of the stack are merged at once. It replaced a linear fold whose cost
+    was quadratic in the prime count, because that fold multiplied by a
+    modulus growing with every prime. On the 1000 x 1000 uniform dice case
+    the phase was 99.3 percent of the wall clock and the tree is 3.1x
+    faster; the fold also held the GIL in long stretches, which starved the
+    transform threads, so shortening it speeds both phases. The stack holds
+    at most ``log2(n)`` partials rather than every prime's residue vector,
+    so peak memory is roughly twice the answer.
 
     Three end-to-end checks always run and raise on failure: the
     reconstructed coefficients sum to exactly ``D``, every coefficient is
@@ -788,10 +862,15 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
 
     t_transform = 0.0
     t_crt = 0.0
-    # Incremental CRT state: bigint coefficients reconstructed so far and the
-    # modulus they are exact mod. Python ints throughout, serial in this
-    # thread; this phase is GIL-bound bigint work (see the plan's
-    # parallelism stage).
+    # CRT state, Python ints throughout and serial in this thread; the phase
+    # is GIL-bound bigint work. Two reachable shapes. The merge stack holds
+    # (partial, modulus, weight) triples, weight counting the primes behind
+    # a partial, and merges equal-weight neighbors as they appear, which
+    # builds the balanced product tree without ever holding every prime's
+    # residues at once. The linear fold is the quadratic predecessor, kept
+    # reachable so a test can pin the two against each other.
+    use_tree = len(primes) >= _CRT_TREE_MIN
+    stack = []
     reconstructed = None
     modulus = 1
     try:
@@ -801,7 +880,17 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
                         i + 1, len(primes), prime, seconds)
             t_transform += seconds
             t0 = time.perf_counter()
-            if reconstructed is None:
+            if use_tree:
+                partial = [int(r) for r in head]
+                partial_modulus, weight = prime, 1
+                while stack and stack[-1][2] == weight:
+                    left, left_modulus, _ = stack.pop()
+                    partial = _crt_merge(left, left_modulus,
+                                         partial, partial_modulus)
+                    partial_modulus *= left_modulus
+                    weight *= 2
+                stack.append((partial, partial_modulus, weight))
+            elif reconstructed is None:
                 reconstructed = [int(r) for r in head]
                 modulus = prime
             else:
@@ -815,6 +904,19 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     finally:
         if pool is not None:
             pool.shutdown()
+
+    if use_tree:
+        # Drain the stack, smallest weight first. At most log2(n) partials
+        # remain, so the peak memory is about twice the answer rather than
+        # the answer plus every prime's residue vector.
+        t0 = time.perf_counter()
+        reconstructed, modulus, _ = stack.pop()
+        while stack:
+            left, left_modulus, _ = stack.pop()
+            reconstructed = _crt_merge(left, left_modulus,
+                                       reconstructed, modulus)
+            modulus *= left_modulus
+        t_crt += time.perf_counter() - t0
 
     if modulus <= denominator:
         raise AssertionError(

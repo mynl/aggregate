@@ -511,3 +511,43 @@ def test_aggregate_ntt_update_accepts_ntt_workers(underwriter):
                           ntt_workers=2)
     assert a._ntt_meta['workers'] == 2
     assert a.density_df.p_exact.sum() == 1
+
+
+# ----------------------------------------- [crt-tree] ([NTT-CRT] stage 1)
+
+@pytest.mark.parametrize('seed', range(8))
+def test_crt_tree_matches_forced_fold(monkeypatch, seed):
+    """The product tree equals the linear fold it replaced, bit for bit.
+
+    Raising ``_CRT_TREE_MIN`` above any prime count forces the quadratic
+    fold on the same case. Both paths reconstruct the same integers from the
+    same residues, so they must agree exactly; this is the strongest check
+    on the merge stack, in the spirit of
+    :func:`test_geometric_path_matches_forced_walk`.
+    """
+    rng = random.Random(seed)
+    fo, fp = _random_clause(rng)
+    so, sp = _random_clause(rng)
+    tree = exact_compound(fo, fp, so, sp)
+    monkeypatch.setattr(ntt_module, '_CRT_TREE_MIN', 10 ** 6)
+    folded = exact_compound(fo, fp, so, sp)
+    assert tree[0] == folded[0]
+    assert tree[1] == folded[1]
+
+
+def test_crt_tree_matches_forced_fold_dice(monkeypatch):
+    """The same pin at a size where the tree has real depth.
+
+    The 100 x 100 uniform dice case needs 22 primes over 10,001
+    coefficients, so the merge stack reaches depth 5 and its final drain
+    combines partials of unequal weight, which the small oracle cases above
+    do not reach.
+    """
+    outcomes = list(range(1, 101))
+    probs = [Fraction(1, 100)] * 100
+    tree = exact_compound(outcomes, probs, outcomes, probs, workers=1)
+    monkeypatch.setattr(ntt_module, '_CRT_TREE_MIN', 10 ** 6)
+    folded = exact_compound(outcomes, probs, outcomes, probs, workers=1)
+    assert tree[0] == folded[0]
+    assert tree[1] == folded[1]
+    assert tree[2]['primes_used'] > 16

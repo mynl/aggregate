@@ -42,21 +42,32 @@
 
 ## In flight
 
-- **[NTT-Speed]** (`dev/plan-ntt-speed.md`) — make large `nttagg` cases fast.
-  Stage 1 `[NTT-Uniform-Geometric]` landed at **1.2.0a1**: equal-weight outcome
-  runs are summed as a geometric series, 37.5x on the spectral walk and the
-  dense 400 x 400 case from 119 s to 25.1 s serial. Stage 2
-  `[NTT-Inplace-Kernels]` landed at **1.2.0a2**: `out=` kernels throughout,
-  1.65x on the transform phase, and `ntt_workers` defaulting to
-  `min(8, os.cpu_count())`. **The measurement has now ruled.** Stage 3
-  `[NTT-Numba-Kernel]` is **not worth building yet**: the serial pure-Python
-  CRT is 12.1 s of the 19.9 s serial 400 x 400 wall clock and essentially all
-  of the 13.8 s threaded wall clock, so compiled transforms would move the
-  headline number by a few percent. `[NTT-CRT-ProcessPool]` is the live next
-  step and needs its own plan. Awaiting the author's call on whether to retire
-  this plan at 1.2.0 with stage 3 dropped, or keep it open.
+- **[NTT-CRT]** (`dev/plan-ntt-crt.md`) — stage 1
+  `[NTT-CRT-ProductTree]` landed at **1.2.0a4**: the reconstruction is a
+  balanced product tree built as an online merge stack, taking the headline
+  1000 x 1000 case from 594 s to 212 s and its reconstruction phase from
+  590 s to 198 s, and unstarving the transform threads as a side effect
+  (500 x 500 transform thread-seconds 266 to 119). **Two calls now sit with
+  the author.** Stage 2 `[NTT-CRT-ProcessPool]`: the plan set about 100 s on
+  the headline case as the bar for dropping it, and stage 1 landed at 212 s,
+  so it is neither clearly wanted nor clearly dropped. Weigh it against
+  pickling hundreds of megabytes of bigints across a process boundary, and
+  against the remaining shape of the cost, which is now 198 s of
+  reconstruction against 105 s of serial transform. The `ntt_workers`
+  default: at the headline size eight workers give 212 s against 313 s
+  serial, a 1.47x gain for 13x the CPU, so a default of 2 to 4 may be the
+  better trade. Measurements for both are in the plan's execution log.
 
 ## Recently landed
+
+- **[NTT-Speed]** DONE at **1.2.0a1** and **1.2.0a2** (2026-10-09,
+  `dev/done/plan-ntt-speed.md`): geometric spectral runs for equal-weight
+  outcomes and `out=` kernels throughout took the 1000 x 1000 uniform dice case
+  from about an hour to 594 s, and the dense 400 x 400 case from 119 s to
+  13.8 s. `ntt_workers` now defaults to `min(8, os.cpu_count())` and
+  `ntt_audit` reports it. Stage 3, a numba Montgomery transform engine, was
+  **dropped** on the measurement: the transform phase is 0.7 percent of the
+  headline wall clock. The CRT work it points at is `[NTT-CRT]` above.
 
 - **[NTT-Composability]** DONE at **1.2.0a3** (2026-10-09,
   `dev/done/plan-nttagg-composability.md`): `pnl_program` and `reins_program`

@@ -260,7 +260,73 @@ def test_nttagg_writer_round_trip(program, underwriter):
     assert spec_to_decl(spec2, kind2, name2) == rendered
 
 
-def test_nttagg_build_not_yet_wired(underwriter):
-    """[NTT-DecL] stage pin: replaced by AggregateNTT at [NTT-Class]."""
-    with pytest.raises(NotImplementedError, match='NTT-Class'):
-        underwriter.build('nttagg T dfreq [1:6] dsev [1:6]')
+def test_nttagg_knowledge_write_read_round_trip(underwriter):
+    """The writer output re-parses through the knowledge path (spec_to_decl)."""
+    from aggregate.decl_writer import spec_to_decl
+    kind, name, spec = _parse(
+        underwriter, 'nttagg RT.Store dfreq [1 3] [2/5 3/5] dsev [1:4]')
+    assert spec_to_decl(spec, kind, name) == \
+        'nttagg RT.Store dfreq [1 3] [2/5 3/5] dsev [1 2 3 4]'
+
+
+# ---------------------------------------------- [class] ([NTT-Class] stage)
+
+def test_aggregate_ntt_builds_and_is_exact(underwriter):
+    from aggregate.ntt import AggregateNTT
+    a = underwriter.build('nttagg CT.Dice dfreq [1:6] dsev [1:6]')
+    assert isinstance(a, AggregateNTT)
+    assert a.bs == 1
+    df = a.density_df
+    assert df.p_exact.sum() == 1                      # exact Fraction algebra
+    assert df.p_exact.loc[1.0] == Fraction(1, 36)
+    assert df.p_exact.loc[36.0] == Fraction(1, 6 ** 7)
+    assert df.p_exact_float.loc[36.0] == float(Fraction(1, 6 ** 7))
+
+
+def test_aggregate_ntt_accuracy_df_and_audit(underwriter):
+    a = underwriter.build('nttagg CT.Dice2 dfreq [1:6] dsev [1:6]')
+    adf = a.accuracy_df
+    assert list(adf.columns) == ['p_exact_float', 'p_fft', 'err', 'abs_err',
+                                 'rel_err']
+    assert len(adf) == len(a.xs)
+    # the float pipeline is excellent in absolute terms on this lattice
+    assert adf.abs_err.max() < 1e-12
+    # rel_err is NaN exactly where the exact probability is zero (loss 0)
+    assert np.isnan(adf.rel_err.loc[0.0])
+    audit = a.ntt_audit
+    assert list(audit.index) == [
+        'support', 'transform_length', 'denominator_bits', 'primes_used',
+        'prime_bits_min', 'prime_bits_max', 'transform_seconds',
+        'crt_seconds', 'max_abs_err', 'max_rel_err', 'noise_floor',
+        'exact_zero_nonzero_float']
+    assert audit['support'] == 36
+    assert audit['primes_used'] >= 1
+    assert audit['max_abs_err'] == adf.abs_err.max()
+
+
+def test_aggregate_ntt_update_pins_lattice(underwriter):
+    a = underwriter.build('nttagg CT.Pin dfreq [1:6] dsev [1:6]', update=False)
+    with pytest.raises(ValueError, match='bs must be 0 or 1'):
+        a.update(bs=0.5)
+    with pytest.raises(ValueError, match='log2 >= 6'):
+        a.update(log2=5)
+    a.update()   # log2=0 resolves to the required 6
+    assert a.bs == 1
+    assert len(a.xs) >= 37
+
+
+def test_aggregate_ntt_guardrail(underwriter, monkeypatch):
+    import aggregate.constants
+    monkeypatch.setattr(aggregate.constants, 'NTT_MAX_SUPPORT', 30)
+    with pytest.raises(ValueError, match='ntt_override'):
+        underwriter.build('nttagg CT.Big dfreq [1:6] dsev [1:6]')
+    a = underwriter.build('nttagg CT.Big dfreq [1:6] dsev [1:6]',
+                          ntt_override=True)
+    assert a.density_df.p_exact.sum() == 1
+
+
+def test_aggregate_ntt_build_default_cap_names_required_log2(underwriter):
+    # support 160000 needs log2 18; the underwriter's default cap is 16, so
+    # the build refuses up front naming the value to pass. No heavy work runs.
+    with pytest.raises(ValueError, match='log2 >= 18'):
+        underwriter.build('nttagg CT.TooBig dfreq [1:400] dsev [1:400]')

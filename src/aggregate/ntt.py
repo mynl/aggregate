@@ -21,14 +21,21 @@ Access is by submodule only, matching ``ft.py`` and ``tweedie.py``: there is
 no top-level re-export.
 """
 
+import logging
+import math
 import time
 from fractions import Fraction
 from math import lcm
 
 import numpy as np
+import pandas as pd
+
+from .distributions import Aggregate
 
 __all__ = ['is_prime_u64', 'ntt_primes', 'ntt', 'exact_compound',
-           'exact_compound_poly']
+           'exact_compound_poly', 'AggregateNTT']
+
+logger = logging.getLogger(__name__)
 
 
 # First twelve primes: a witness set making Miller-Rabin deterministic for all
@@ -411,7 +418,9 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
     # GIL-bound bigint work (see the plan's parallelism stage).
     reconstructed = None
     modulus = 1
-    for prime, root in primes:
+    for i, (prime, root) in enumerate(primes):
+        logger.info('NTT prime %d of %d: %d (%d bits)',
+                    i + 1, len(primes), prime, prime.bit_length())
         t0 = time.perf_counter()
         a = np.zeros(length, dtype=np.uint64)
         a[sev_index] = [q % prime for q in big_q]
@@ -539,3 +548,273 @@ def exact_compound_poly(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
             'prime_bits_min': 0, 'prime_bits_max': 0,
             'transform_seconds': 0.0, 'crt_seconds': 0.0}
     return accumulator, denominator, meta
+
+
+class AggregateNTT(Aggregate):
+    """
+    Compound distribution computed exactly alongside the float FFT pipeline.
+
+    The DecL ``nttagg`` kind builds this class. It is an ordinary
+    :class:`~aggregate.distributions.Aggregate` (empirical frequency,
+    ``dhistogram`` severity, driven from the exact spec through correctly
+    rounded ``float(Fraction)``, so the float pipeline sees bit-identical
+    inputs) that additionally computes the distribution exactly, as rational
+    numbers, via :func:`exact_compound`. The two answers sit side by side on
+    the same integer lattice:
+
+    - :attr:`density_df` gains ``p_exact`` (reduced :class:`~fractions.Fraction`
+      per bucket, ``Fraction(0)`` off support) and ``p_exact_float`` (the
+      correctly rounded binary64 of the rational);
+    - :attr:`accuracy_df` compares the exact and float answers per bucket;
+    - :attr:`ntt_audit` records sizes, primes, timings and error summaries.
+
+    Parameters
+    ----------
+    name : str
+        Object name (the knowledge-base key).
+    ntt_freq_outcomes : sequence of int
+        Claim-count outcomes, nonnegative integers.
+    ntt_freq_probs : sequence of Fraction
+        Exact claim-count probabilities summing to exactly 1.
+    ntt_sev_outcomes : sequence of int
+        Severity outcomes, nonnegative integers.
+    ntt_sev_probs : sequence of Fraction
+        Exact severity probabilities summing to exactly 1.
+    label, label_map, note, hints, tags
+        The usual presentation and trailer metadata, passed through to
+        :class:`~aggregate.distributions.Aggregate`.
+
+    Notes
+    -----
+    The float inputs are derived, never stated twice: ``float(Fraction(a, b))``
+    is correctly rounded, hence bit-identical to what the float pipeline would
+    compute from the same literals, so the exact-vs-float comparison isolates
+    pure algorithm error (Wilson and Keich's framing; see the module
+    docstring). ``update`` pins the lattice to ``bs=1`` and a transform-sized
+    ``log2``; guardrails refuse monster cases up front (override the soft caps
+    with ``update(..., ntt_override=True)``; the 32-bit prime supply is a hard
+    limit with no override). ``nttagg`` cannot appear inside a portfolio, pnl,
+    or bivariate.
+    """
+
+    def __init__(self, name, ntt_freq_outcomes=None, ntt_freq_probs=None,
+                 ntt_sev_outcomes=None, ntt_sev_probs=None, label=None,
+                 label_map=None, note='', hints='', tags=()):
+        self.ntt_freq_outcomes, self.ntt_freq_probs = _validate_exact_inputs(
+            ntt_freq_outcomes, ntt_freq_probs, 'frequency')
+        self.ntt_sev_outcomes, self.ntt_sev_probs = _validate_exact_inputs(
+            ntt_sev_outcomes, ntt_sev_probs, 'severity')
+        # exact results, filled by update
+        self._ntt_numerators = None
+        self._ntt_denominator = None
+        self._ntt_meta = None
+        self._accuracy_df = None
+        super().__init__(
+            name,
+            exp_en=-1,
+            freq_name='empirical',
+            freq_a=np.array([float(k) for k in self.ntt_freq_outcomes]),
+            freq_b=np.array([float(q) for q in self.ntt_freq_probs]),
+            sev_name='dhistogram',
+            sev_xs=np.array([float(s) for s in self.ntt_sev_outcomes]),
+            sev_ps=np.array([float(q) for q in self.ntt_sev_probs]),
+            label=label, label_map=label_map, note=note, hints=hints,
+            tags=tags)
+
+    def _ntt_sizes(self):
+        """Size estimates for the guardrail and the audit, cheap arithmetic.
+
+        Returns a dict with the support ``N``, transform length ``L``,
+        denominator ``D`` and its bit length ``B``, the estimated primes
+        needed (about ``B / 31``), an analytic estimate of the primes
+        available (the supply of ``p = c * L + 1 < 2**32`` thins as
+        ``2**32 / (L * ln 2**32)`` by the prime number theorem on the
+        arithmetic progression), and the estimated exact-numerator memory
+        ``(N + 1) * B / 8`` bytes.
+        """
+        df, _ = _clear_denominators(self.ntt_freq_probs)
+        ds, _ = _clear_denominators(self.ntt_sev_probs)
+        kmax = self.ntt_freq_outcomes[-1]
+        support = kmax * self.ntt_sev_outcomes[-1]
+        length = 1 << max(support.bit_length(), 1)
+        denominator = df * ds ** kmax
+        bound_bits = denominator.bit_length()
+        return {
+            'support': support,
+            'transform_length': length,
+            'bound_bits': bound_bits,
+            'primes_needed': -(-bound_bits // 31),
+            'primes_available': int(2 ** 32 / (length * math.log(2 ** 32))),
+            'bytes_estimate': (support + 1) * bound_bits // 8,
+        }
+
+    def update(self, log2=0, bs=0, **kwargs):
+        """
+        Run the float FFT pipeline, then attach the exact NTT answer.
+
+        Parameters
+        ----------
+        log2 : int, default 0
+            Grid-size cap, as for :meth:`Aggregate.update`. ``0`` uses the
+            smallest transform covering the support,
+            ``ceil(log2(N + 1))`` where ``N = max(freq) * max(sev)``. A cap
+            below that required value raises, naming the value to pass (the
+            underwriter's ``build`` supplies its default cap of 16, so a case
+            needing more asks for an explicit ``build(..., log2=r)`` or a
+            ``hints{log2=r}`` clause).
+        bs : {0, 1}, default 0
+            The lattice is the integers: anything other than 0 (choose) or 1
+            raises, and 0 is pinned to 1.
+        kwargs
+            ``ntt_override=True`` lifts the soft guardrail caps
+            (``NTT_MAX_SUPPORT``, ``NTT_MAX_BYTES`` in ``constants.py``);
+            everything else passes to :meth:`Aggregate.update`.
+
+        Notes
+        -----
+        Guardrails run before any heavy work: the soft caps raise with the
+        full size estimate (support, transform length, denominator bits,
+        primes needed against supply, memory) unless overridden; an
+        insufficient 32-bit prime supply raises from :func:`ntt_primes` with
+        no override, because past roughly ``L = 2**22`` exactness would need
+        62-bit Montgomery arithmetic, which is out of scope. The float
+        pipeline and the exact transform share the integer lattice, checked
+        after the parent update.
+        """
+        from .constants import NTT_MAX_BYTES, NTT_MAX_SUPPORT
+        override = bool(kwargs.pop('ntt_override', False))
+        if bs not in (0, 1):
+            raise ValueError(
+                f'{self.name}: nttagg pins the exact integer lattice, so bs '
+                f'must be 0 or 1, got {bs}')
+        sizes = self._ntt_sizes()
+        required = max(sizes['support'].bit_length(), 1)
+        if log2 == 0:
+            log2 = required
+        elif log2 < required:
+            raise ValueError(
+                f"{self.name}: the exact support 0..{sizes['support']} needs "
+                f"log2 >= {required}, got {log2}. Pass build(..., "
+                f"log2={required}) or add hints{{log2={required}}} to the "
+                f"declaration.")
+        if not override and (sizes['support'] > NTT_MAX_SUPPORT
+                             or sizes['bytes_estimate'] > NTT_MAX_BYTES):
+            raise ValueError(
+                f"{self.name}: refusing a monster exact computation: support "
+                f"0..{sizes['support']} (cap {NTT_MAX_SUPPORT}), transform "
+                f"length {sizes['transform_length']}, denominator of "
+                f"{sizes['bound_bits']} bits, about {sizes['primes_needed']} "
+                f"primes against roughly {sizes['primes_available']} "
+                f"available, estimated exact-numerator memory "
+                f"{sizes['bytes_estimate']:,} bytes (cap {NTT_MAX_BYTES:,}). "
+                f"Pass ntt_override=True to proceed anyway.")
+        rv = super().update(log2=log2, bs=1, **kwargs)
+        if self.bs != 1 or len(self.xs) < sizes['support'] + 1:
+            raise ValueError(
+                f'{self.name}: the float pipeline left the exact lattice '
+                f'(bs={self.bs}, {len(self.xs)} points for support '
+                f"0..{sizes['support']}); this is a bug, please report it")
+        numerators, denominator, meta = exact_compound(
+            self.ntt_freq_outcomes, self.ntt_freq_probs,
+            self.ntt_sev_outcomes, self.ntt_sev_probs)
+        self._ntt_numerators = numerators
+        self._ntt_denominator = denominator
+        self._ntt_meta = meta
+        self._accuracy_df = None
+        return rv
+
+    def _exact_on_grid(self):
+        """``p_exact`` as a list of reduced Fractions aligned to ``self.xs``."""
+        numerators = self._ntt_numerators
+        denominator = self._ntt_denominator
+        zero = Fraction(0)
+        return [Fraction(numerators[int(x)], denominator)
+                if 0 <= int(x) < len(numerators) else zero
+                for x in np.asarray(self.xs)]
+
+    @property
+    def density_df(self):
+        """Parent frame plus the exact columns ``p_exact`` / ``p_exact_float``.
+
+        ``p_exact`` is an object column of reduced :class:`~fractions.Fraction`
+        (``Fraction(0)`` off support); ``p_exact_float`` its correctly rounded
+        binary64. Attached lazily to the parent's cached frame, so the usual
+        caching pattern (rebuilt after each ``update``) carries over. Note
+        ``p_total`` here is the display density (fuzz removed); the raw
+        algorithm output compared in :attr:`accuracy_df` is ``agg_density``.
+        """
+        df = Aggregate.density_df.fget(self)
+        if self._ntt_numerators is not None and 'p_exact' not in df.columns:
+            exact = self._exact_on_grid()
+            df['p_exact'] = exact
+            df['p_exact_float'] = [float(q) for q in exact]
+        return df
+
+    @property
+    def accuracy_df(self):
+        """Full-grid frame comparing the exact and float answers per bucket.
+
+        Indexed by loss over the whole output grid, columns
+        ``p_exact_float``, ``p_fft`` (the raw algorithm float,
+        ``agg_density``, before any display fuzz removal), ``err`` (signed,
+        computed as ``float(Fraction(p_fft) - exact)`` so the subtraction is
+        exact before the single rounding), ``abs_err``, and ``rel_err``
+        (exact ratio, NaN where the exact value is zero).
+        """
+        if self._ntt_numerators is None:
+            raise ValueError(
+                f'{self.name}: update the object before reading accuracy_df')
+        if self._accuracy_df is None:
+            exact = self._exact_on_grid()
+            p_fft = np.asarray(self.agg_density, dtype=float)
+            err = np.array([float(Fraction(float(p)) - q)
+                            for p, q in zip(p_fft, exact)])
+            rel_err = np.array([float((Fraction(float(p)) - q) / q)
+                                if q != 0 else np.nan
+                                for p, q in zip(p_fft, exact)])
+            self._accuracy_df = pd.DataFrame(
+                {'p_exact_float': [float(q) for q in exact],
+                 'p_fft': p_fft,
+                 'err': err,
+                 'abs_err': np.abs(err),
+                 'rel_err': rel_err},
+                index=pd.Index(np.asarray(self.xs, dtype=float), name='loss'))
+        return self._accuracy_df
+
+    @property
+    def ntt_audit(self):
+        """Audit Series: sizes, primes, timings, and error summaries.
+
+        Rows: ``support``, ``transform_length``, ``denominator_bits``,
+        ``primes_used``, ``prime_bits_min`` / ``prime_bits_max``,
+        ``transform_seconds``, ``crt_seconds``, ``max_abs_err``,
+        ``max_rel_err`` (over buckets with nonzero exact probability),
+        ``noise_floor`` (max ``|p_fft|`` over exact-zero buckets), and
+        ``exact_zero_nonzero_float`` (count of exact-zero buckets carrying a
+        nonzero float). The raw material for a Wilson-and-Keich style
+        accuracy exhibit.
+        """
+        if self._ntt_numerators is None:
+            raise ValueError(
+                f'{self.name}: update the object before reading ntt_audit')
+        adf = self.accuracy_df
+        meta = self._ntt_meta
+        exact_zero = np.array([q == 0 for q in self._exact_on_grid()])
+        p_fft = adf.p_fft.to_numpy()
+        noise = np.abs(p_fft[exact_zero])
+        max_rel = np.nanmax(np.abs(adf.rel_err.to_numpy())) \
+            if np.any(~exact_zero) else np.nan
+        return pd.Series(
+            {'support': meta['support'],
+             'transform_length': meta['transform_length'],
+             'denominator_bits': meta['bound_bits'],
+             'primes_used': meta['primes_used'],
+             'prime_bits_min': meta['prime_bits_min'],
+             'prime_bits_max': meta['prime_bits_max'],
+             'transform_seconds': meta['transform_seconds'],
+             'crt_seconds': meta['crt_seconds'],
+             'max_abs_err': adf.abs_err.max(),
+             'max_rel_err': max_rel,
+             'noise_floor': noise.max() if len(noise) else 0.0,
+             'exact_zero_nonzero_float': int(np.count_nonzero(noise))},
+            name=self.name, dtype=object)

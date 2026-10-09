@@ -170,6 +170,17 @@ FCC_REQUIRED = ('info', 'help',
 #: the check.
 FCC_CONTRACT_EXCEPTIONS = {}
 
+#: Soft guardrail caps for the exact NTT compound (``AggregateNTT.update``,
+#: dev/plan-nttagg.md). Exceeding either refuses with an informative estimate;
+#: override with ``update(..., ntt_override=True)``. The prime-supply limit is
+#: a hard error with no override: past roughly ``L = 2**22`` the 32-bit NTT
+#: prime supply runs out, and 62-bit Montgomery arithmetic is out of scope.
+NTT_MAX_SUPPORT = 2 ** 20
+
+#: Soft cap on the estimated exact-numerator memory, ``(N + 1) * B / 8`` bytes
+#: (support times denominator bits): 8 GB.
+NTT_MAX_BYTES = 8 * 2 ** 30
+
 #: Narrative stems allowed to carry only ONE half of the description /
 #: explanation pair.
 #:

@@ -1851,13 +1851,11 @@ class Underwriter(HelpMixin):
             obj = Distortion.from_spec(spec)
             obj.program = program
         elif kind == 'nttagg':
-            # Grammar and spec landed ahead of the class ([NTT-DecL] stage of
-            # dev/plan-nttagg.md); AggregateNTT dispatch replaces this raise
-            # at the [NTT-Class] stage.
-            raise NotImplementedError(
-                f"{name}: the DecL 'nttagg' kind parses but the AggregateNTT "
-                f"class is not wired yet (dev/plan-nttagg.md, [NTT-Class] "
-                f"stage)")
+            # Local import matching the bvagg pattern: the exact-NTT module
+            # is loaded only when a program actually declares one.
+            from .ntt import AggregateNTT
+            obj = AggregateNTT(**spec)
+            obj.program = program
         elif kind == 'expr':
             # a bare expression is its own answer: the parser has already
             # evaluated it, so the spec is the number. There is no object to

@@ -49,7 +49,8 @@
   (`accuracy_df`, `ntt_audit`), the computational answer to Wilson and Keich.
   Landed so far: `[NTT-Engine]` at 1.1.0a1 (`aggregate.ntt` engine functions
   and `tests/test_ntt.py`); `[NTT-DecL]` at 1.1.0a2 (grammar, transformer,
-  writer, mirrors, corpus and snapshot). Remaining stages: `AggregateNTT`,
+  writer, mirrors, corpus and snapshot); `[NTT-Class]` at 1.1.0a3
+  (`AggregateNTT`, `accuracy_df`, `ntt_audit`, guardrails). Remaining stages:
   exact moments into validation, measured parallelism, docs, 1.1.0 final.
 
 ## Correctness

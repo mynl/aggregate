@@ -210,7 +210,13 @@ def test_dice_of_dice_closed_form():
         Fraction(1, 100 ** 101)
     assert meta['support'] == 10000
     assert meta['transform_length'] == 2 ** 14
-    assert meta['primes_used'] in (21, 22)
+    # The exact rationals above are the content of this test and they do not
+    # depend on which primes carried them. The prime count does: it is about
+    # bound_bits / prime_bits, so it halves when the compiled engine draws
+    # 63-bit primes. Assert the relationship rather than a literal, or this
+    # test fails on a machine that merely has the engine installed.
+    expected = -(-meta['bound_bits'] // meta['prime_bits_min'])
+    assert meta['primes_used'] in (expected, expected + 1)
 
 
 # ------------------------------- [geometric] ([NTT-Uniform-Geometric] stage)
@@ -824,7 +830,14 @@ def test_rust_engine_matches_python_dice():
     rs = exact_compound(outcomes, probs, outcomes, probs, ntt_engine='rust')
     assert rs[0] == py[0]
     assert rs[1] == py[1]
-    assert rs[2]['primes_used'] > 16
+    # Depth comes from the Python side's 22 primes; the engine reaches the
+    # same answer from about half as many, which is the width win and the
+    # reason conformance compares answers and never audit records.
+    assert py[2]['primes_used'] > 16
+    assert rs[2]['primes_used'] == pytest.approx(
+        py[2]['primes_used'] / 2, abs=2)
+    assert py[2]['prime_bits_max'] == 32
+    assert rs[2]['prime_bits_max'] == 63
 
 
 def test_rust_engine_matches_the_polynomial_oracle():
@@ -989,16 +1002,23 @@ def test_ntt_refuses_a_prime_too_wide_for_numpy():
         ntt(values, p, w, inverse=True)
 
 
-def test_exact_compound_still_draws_32_bit_primes():
-    """Nothing can consume wide primes yet, so the pipeline does not ask.
+def test_prime_width_follows_the_engine():
+    """Each path draws the widest prime it can actually transform with.
 
-    ``exact_compound`` deliberately does not pass ``max_bits`` through: the
-    engine's ``Reconstructor`` takes 32-bit primes as of aggregate-ntt
-    1.0.0a2, so a wide draw would be refused at the seam even with the
-    engine installed. This pins that deliberate choice so phase 2 has to
-    change it on purpose.
+    The pure-Python path is capped at 32 bits by ``_mulmod``'s uint64
+    products. The engine's Montgomery field needs ``2 * prime`` to fit a
+    64-bit word, so it is capped at 63, not 64, and it refuses anything
+    above: offering a 64-bit prime would be a loud failure rather than a
+    wrong answer, but a failure all the same.
     """
     outcomes = list(range(1, 21))
     probs = [Fraction(1, 20)] * 20
-    _, _, meta = exact_compound(outcomes, probs, outcomes, probs)
-    assert meta['prime_bits_max'] <= 32
+    _, _, slim = exact_compound(outcomes, probs, outcomes, probs,
+                                ntt_engine='python')
+    assert slim['prime_bits_max'] <= ntt_module._NUMPY_PRIME_MAX_BITS
+
+    pytest.importorskip('aggregate_ntt')
+    _, _, wide = exact_compound(outcomes, probs, outcomes, probs,
+                                ntt_engine='rust')
+    assert wide['prime_bits_max'] == ntt_module._ENGINE_PRIME_MAX_BITS == 63
+    assert wide['primes_used'] < slim['primes_used']

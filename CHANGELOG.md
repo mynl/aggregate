@@ -20,6 +20,36 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a10
+
+**[Rust-Engine-Phases] the compiled engine now owns both heavy phases, and
+the 1000 x 1000 case takes 10.7 s.** With `aggregate-ntt` 1.0.0a4 installed,
+the per-prime transform runs there as well as the reconstruction, drawing
+63-bit primes instead of 32-bit and so needing about half as many. Measured,
+answers bit-identical to the pure-Python path: 500 x 500 from 16.4 s to
+**1.11 s**, the headline 1000 x 1000 uniform dice from 212.3 s to **10.71 s**
+(159 primes rather than 322, transform 33.8 s of thread time over four
+workers, reconstruction 5.74 s, limb decode 0.94 s). Nothing changes without
+the engine.
+
+**`_ENGINE_PROTOCOL` is now 2**, matching the engine's own bump when its
+transform signature landed. An `aggregate-ntt` older than 1.0.0a3 is refused
+rather than called wrongly: `ntt_engine='rust'` raises and `'auto'` falls
+back with one warning. Upgrade both together.
+
+Which route a computation took is reported two ways. `ntt_audit` and `meta`
+carry `engine`, `engine_version` and `engine_protocol` as before. New: the
+`aggregate.ntt` logger emits one `INFO` line before the work naming the
+engine and version, the prime count and width, and the worker count, and one
+after it with the time each phase took.
+
+**`primes_used` and `prime_bits_*` now differ between the two engines, and
+both are correct**: the reconstructed integers are determined by the
+mathematics, not by which primes carried them. Three tests that asserted a
+literal 32-bit prime count were rewritten to assert the relationship
+instead; any downstream check of those two audit rows against a fixed number
+needs the same treatment.
+
 ## 1.2.0a9
 
 **[Rust-Engine-Prime-Width] `ntt_primes` draws primes of a chosen width, and

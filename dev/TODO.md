@@ -58,8 +58,9 @@
   `dev/done/`.**
 
 
-- **[NTT-Rust-Integration]** (`dev/plan-ntt-rust-integration.md`, phase 1 of
-  2 landed at **1.2.0a8**) — use the compiled engine in
+- **[NTT-Rust-Integration]** (**DONE**,
+  `dev/done/plan-ntt-rust-integration.md`, phases landed at **1.2.0a8**,
+  **1.2.0a9** and **1.2.0a10**) — use the compiled engine in
   `V:\dev\aggregate-ntt` when it is installed, and behave exactly as today
   when it is not. The engine is a separate optional Rust package, discovered
   at import time and never declared as a dependency, which keeps this library
@@ -72,18 +73,21 @@
   mismatch rather than computing. The **reconstruction phase landed at
   1.2.0a8** against the engine's 1.0.0a2, bit-identical to the Python path
   and taking the headline 1000 x 1000 case from 212.3 s to 39.2 s. **What
-  remains is the transform phase**, which waits on `[Rust-Transform]` over
-  there. The prime-width question is **ruled and half built**: selection
-  stays here, `ntt_primes` grew `max_bits` at **1.2.0a9**
-  (`[Rust-Engine-Prime-Width]` in the plan), and `exact_compound` will pass
-  64 once the engine can take wide primes, which needs **both** its kernels
-  widened, since `Reconstructor` takes `u32` today, plus a seam protocol
-  bump on both sides. Note also that the
-  `ntt_workers` default of 4 was tuned when the Python CRT held the GIL and
-  is now **too low on the engine path**: measured at 500 x 500, four threads
-  3.57 s against 1.92 s for sixteen. That is an author call, untouched here
-  because it would also move the pure-Python path. Its reflected half is
-  `dev/plan-rust-engine.md` in that repo.
+  **Both phases are integrated.** Reconstruction at 1.2.0a8, the `max_bits`
+  prime-width contract at 1.2.0a9 (`[Rust-Engine-Prime-Width]`), and the
+  transform at 1.2.0a10 against engine 1.0.0a4, which took the headline
+  1000 x 1000 case to 10.71 s from 212.3 s with bit-identical answers. The
+  seam sits at protocol 2 and proved itself in a real drift event: a
+  1.0.0a4 engine met a protocol 1 library and fell back with a warning
+  rather than computing. **One item left for the author**, no longer
+  pressing: the `ntt_workers` default of 4 could be 8. Measured at 1.2.0a8,
+  when the Python transform dominated, four threads ran 3.57 s against
+  1.92 s for sixteen, which looked urgent; with the Rust transform the whole
+  phase is 18x faster and the headroom is 25 percent (500 x 500: 1.12 s at
+  four, 0.84 s at eight, 0.80 s at sixteen; 1000 x 1000: 11.10 s at four,
+  8.30 s at eight). Raising it would also move the pure-Python path, where 4
+  is right, so it wants a per-engine default if it is worth doing at all.
+  Its reflected half is `dev/plan-rust-engine.md` in that repo.
 
 - **[NTT-CRT]** (`dev/plan-ntt-crt.md`) — stage 1
   `[NTT-CRT-ProductTree]` landed at **1.2.0a4**: the reconstruction is a

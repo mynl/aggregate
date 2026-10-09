@@ -498,3 +498,106 @@ already calls. So:
 - The engine should **validate on arrival** rather than trust us: every
   prime below 2^64 and congruent to 1 modulo the transform length. The
   residue-reduction check it already does is the model.
+
+## Note from the engine side, 2026-10-09: protocol 2 is live
+
+`[Rust-Transform]` landed over there (1.0.0a3, with the `Reconstructor`
+widening following immediately as 1.0.0a4), and the section above is
+answered. **Set `_ENGINE_PROTOCOL = 2` against engine 1.0.0a4 or later.**
+What protocol 2 means, from the engine's `src/lib.rs` and the execution log
+of `dev/plan-rust-engine.md`:
+
+- **`residues_mod_prime(prime, root, length, support, sev_index,
+  sev_weights, freq_runs, ds, kmax)` is real and its inputs arrive already
+  reduced modulo the working prime.** The scaffold's `ds` array became a
+  `u64` scalar. The call site here performs the reduction the pure-Python
+  `_residues_mod_prime` does internally, per prime: `sev_weights` is
+  `np.array([q % p for q in big_q], dtype=np.uint64)`, runs are
+  `(start, run_length, weight % p)`, and `ds` is `ds % p`, whose zero is
+  also what routes the engine's own singular walk. The engine returns the
+  `uint64` head truncated to `support + 1` and raises the aliasing check
+  itself; it refuses unreduced inputs, a non-primitive root, inconsistent
+  runs and a bad prime loudly, as asked above.
+- **One correction to the section above: the prime ceiling is `2**63`, not
+  `2**64`.** The engine's Montgomery arithmetic needs `2 * p` to fit `u64`,
+  so `ntt_primes` at width 64 must scan below `2**63`, and the engine
+  refuses anything at or above it (also any even value). The halving of the
+  prime count survives intact: about 160 primes of 62 to 63 bits cover the
+  headline bound.
+- **`Reconstructor` takes `u64` primes from 1.0.0a4**, a widening with no
+  further protocol change (every protocol 2 call shape stays valid).
+- Measured over there at 32-bit primes, headline case: transform phase
+  alone 4.3 s against 104.8 s serial Python; end to end through both
+  kernels 10.3 s against 212.3 s.
+
+### Phase 2, the transform, landed at 1.2.0a10 on 2026-10-10
+
+Against engine 1.0.0a4, which completed `[Rust-Transform]` and widened
+`Reconstructor` to `u64` primes in the same breath. **COMPLETE**: this plan
+retires to `dev/done/`.
+
+**The versioned seam earned its keep before any of this was written.** The
+engine reached 1.0.0a4 with `PROTOCOL_VERSION = 2` while this library still
+spoke 1. Observed, not hypothesized: `'auto'` fell back to the pure-Python
+path with one warning naming both versions, and `'rust'` raised. Neither
+computed across the moved signature. That was the single most important rule
+in this plan and it held in a real drift event.
+
+Changes, all specified above and landed as specified: `_ENGINE_PROTOCOL` to
+2; prime width follows the resolved engine, 63 bits for Rust and 32 for
+numpy; `run_engine` performs the per-prime reduction the seam requires,
+since the cleared weights are arbitrary precision and the boundary carries
+fixed-width `u64` only.
+
+**One contract detail differed from this plan's assumption**, and the engine
+side flagged it: the engine's ceiling is `2**63`, not `2**64`, because its
+Montgomery field needs `2 * prime` to fit a 64-bit word. `max_bits` as built
+at 1.2.0a9 expresses this without change, since it means "primes below
+`2**max_bits`", so `exact_compound` passes 63. `_ENGINE_PRIME_MAX_BITS`
+records it.
+
+| case | Python | Rust | ratio |
+|---|---|---|---|
+| 500 x 500 wall | 16.37 s | **1.11 s** | 15x |
+| 1000 x 1000 wall | 212.3 s (a4) | **10.71 s** | 20x |
+| 1000 x 1000 primes | 322 | 159 | half, as predicted |
+| 1000 x 1000 transform | 147.2 s thread | 33.8 s thread | 4.4x |
+| 1000 x 1000 reconstruction | 187.0 s | 5.74 s | 33x |
+
+Against the original 594.0 s of 1.2.0a0, the headline case is **55x**.
+Answers bit-identical at both sizes, and the oracle agrees with the engine
+at 63-bit primes on the randomized corpus.
+
+**Three tests failed for exactly the right reason** and were rewritten:
+`test_dice_of_dice_closed_form`, `test_rust_engine_matches_python_dice` and
+the `exact_compound` width pin all asserted a literal 32-bit prime count.
+This plan predicted it ("conformance tests must compare answers, never audit
+records") and it still caught three. They now assert the relationship,
+`primes_used` about `bound_bits / prime_bits_min`, so they hold at either
+width.
+
+**Route visibility**, asked for by the author during this phase: `ntt_audit`
+already named the engine, but a long run gave no sign until it finished. The
+`aggregate.ntt` logger now emits one `INFO` line before the work (engine and
+version, prime count and width, workers, support, denominator bits) and one
+after (time per phase). The existing per-prime line is unchanged.
+
+### The `ntt_workers` finding, revised down
+
+Recorded at 1.2.0a8 as "the default of 4 is now too low", measured then at
+3.57 s against 1.92 s for sixteen threads. **That finding was measured
+against a Python transform and has largely dissolved**: the Rust transform is
+18x faster, so the phase it was parallelizing is no longer the cost.
+Remeasured at 1.2.0a10, 32 cores:
+
+| workers | 500 x 500 | 1000 x 1000 |
+|---|---|---|
+| 1 | 3.50 s | |
+| 4 (default) | 1.12 s | 11.10 s |
+| 8 | 0.84 s | 8.30 s |
+| 16 | 0.80 s | |
+| 32 | 0.85 s | |
+
+Eight is worth about 25 percent and sixteen adds nothing beyond it. Left at
+4, which remains right for the pure-Python path; a per-engine default is the
+only clean way to take the 25 percent, and that is the author's call.

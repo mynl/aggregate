@@ -65,8 +65,19 @@ except ImportError:
 
 #: Seam contract version this library speaks. ``aggregate_ntt`` declares its
 #: own as ``PROTOCOL_VERSION``; the two must agree before anything is
-#: computed across the boundary.
-_ENGINE_PROTOCOL = 1
+#: computed across the boundary. Raised to 2 at 1.2.0a10, when the engine
+#: took over the transform phase: that moved ``residues_mod_prime``'s
+#: signature, so protocol 1 engines (reconstruction only) are refused rather
+#: than called wrongly. The mechanism was exercised for real in between, a
+#: 1.0.0a4 engine against a protocol 1 library, and fell back as designed.
+_ENGINE_PROTOCOL = 2
+
+#: Widest prime the compiled engine accepts. Its Montgomery field needs
+#: ``2 * prime`` to fit in a 64-bit word, so primes stay below ``2**63``
+#: rather than ``2**64``: the engine refuses anything above, and this
+#: library must not offer it. Twice the bits of the numpy ceiling means
+#: about half as many primes for a given bound.
+_ENGINE_PRIME_MAX_BITS = 63
 
 # Latch so a protocol mismatch warns once per process rather than once per
 # computation. The tests that exercise the mismatch reset it.
@@ -1083,7 +1094,13 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         pure-Python path and never fails, which makes it the switch for
         bisecting a disagreement. ``'rust'`` demands the engine and raises
         if it is absent or speaks an unknown protocol. See
-        :func:`_resolve_engine`.
+        :func:`_resolve_engine`. Which route a call actually took is
+        reported two ways: in ``meta`` (and so in
+        :attr:`AggregateNTT.ntt_audit`) as ``engine`` with its version and
+        protocol, and on the ``aggregate.ntt`` logger at ``INFO``, where one
+        line before the work names the engine, the prime count and width,
+        and the worker count, and one line after it gives the time each
+        phase took.
 
     Returns
     -------
@@ -1147,11 +1164,22 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     of that path and is reported separately as ``limb_decode_seconds``, so
     it cannot hide inside ``crt_seconds``.
 
+    From 1.2.0a10 the engine owns the per-prime transform too, and with it
+    a different prime set: its Montgomery field carries primes just below
+    ``2**63`` where numpy is capped at ``2**32``, so it needs about half as
+    many (159 against 322 on the 1000 x 1000 case). **Prime selection
+    itself stays here** whatever the engine, which is what keeps the
+    sufficiency check honest: this library tests that the CRT modulus
+    exceeds ``D`` using its own data about its own choices, rather than
+    taking an engine's word about numbers the engine also supplied.
+
     **Both engines must produce identical integers**, which is what
     ``test_rust_engine_matches_python`` pins, and the three checks below run
-    on either answer unchanged. The transform phase is not yet handed over:
-    prime selection and ``_residues_mod_prime`` stay here whatever the
-    engine, which is why the audit's prime rows do not move between the two.
+    on either answer unchanged. Note what that does *not* mean: the audit's
+    ``primes_used`` and ``prime_bits_*`` rows legitimately differ between
+    the two, because the reconstructed integers are determined by the
+    mathematics and not by which primes carried them. Conformance therefore
+    compares answers and never audit records.
 
     Three end-to-end checks always run and raise on failure: the
     reconstructed coefficients sum to exactly ``D``, every coefficient is
@@ -1201,7 +1229,16 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         return [denominator], denominator, meta
 
     length = 1 << support.bit_length()  # 2**ceil(log2(support + 1))
-    primes = ntt_primes(length, denominator)
+    # The engine has 128-bit intermediates, so it can carry primes twice as
+    # wide and needs about half as many of them; the numpy transform cannot
+    # ([Rust-Engine-Prime-Width]). This is the one place the two paths see a
+    # different problem, and it is why conformance compares answers and
+    # never audit records: the reconstructed integers are determined by the
+    # mathematics, not by which primes carried them.
+    primes = ntt_primes(
+        length, denominator,
+        max_bits=(_ENGINE_PRIME_MAX_BITS if engine == 'rust'
+                  else _NUMPY_PRIME_MAX_BITS))
 
     # Severity coefficient vector index. The integer weights Q_j can exceed
     # any single prime, so reduction mod p happens per prime in the worker.
@@ -1215,13 +1252,47 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         return _residues_mod_prime(prime, root, length, support, sev_index,
                                    big_q, freq_runs, ds, kmax)
 
+    def run_engine(pair):
+        """One prime's residues from the compiled engine.
+
+        The seam carries fixed-width ``u64`` only, so the cleared integer
+        weights, which are arbitrary precision and routinely exceed a single
+        prime, are reduced here. That is the same one-line reduction
+        :func:`_residues_mod_prime` does at the top of its own body, moved
+        across to the caller. The engine releases the GIL for the whole
+        computation, so these calls parallelize across threads properly
+        rather than queueing on the interpreter.
+        """
+        prime, root = pair
+        t0 = time.perf_counter()
+        head = _engine.residues_mod_prime(
+            prime, root, length, support, sev_index,
+            np.array([q % prime for q in big_q], dtype=np.uint64),
+            [(start, run_length, weight % prime)
+             for start, run_length, weight in freq_runs],
+            ds % prime, kmax)
+        return head, time.perf_counter() - t0
+
+    transform = run_engine if engine == 'rust' else run
+    prime_bits = [p.bit_length() for p, _ in primes]
+    logger.info(
+        'NTT exact compound: support 0..%d, transform length %d, '
+        'denominator %d bits, %d prime%s of %d..%d bits, engine %s%s, '
+        '%d transform worker%s',
+        support, length, bound_bits, len(primes),
+        '' if len(primes) == 1 else 's', min(prime_bits),
+        max(prime_bits), engine,
+        f' {_engine.__version__} (protocol {_ENGINE_PROTOCOL})'
+        if engine == 'rust' else '',
+        workers, '' if workers == 1 else 's')
+
     pool = None
     if workers > 1:
         from concurrent.futures import ThreadPoolExecutor
         pool = ThreadPoolExecutor(max_workers=workers)
-        results = pool.map(run, primes)
+        results = pool.map(transform, primes)
     else:
-        results = map(run, primes)
+        results = map(transform, primes)
 
     t_transform = 0.0
     t_crt = 0.0
@@ -1324,7 +1395,6 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         raise AssertionError(
             'NTT internal check failed: negative reconstructed coefficient')
 
-    prime_bits = [p.bit_length() for p, _ in primes]
     meta = {'support': support, 'transform_length': length,
             'bound_bits': bound_bits, 'primes_used': len(primes),
             'prime_bits_min': min(prime_bits),
@@ -1332,6 +1402,11 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
             'transform_seconds': t_transform, 'crt_seconds': t_crt,
             'limb_decode_seconds': t_limbs, 'workers': workers,
             **_engine_provenance(engine)}
+    logger.info(
+        'NTT exact compound done (%s): transform %.2fs of thread time over '
+        '%d worker%s, reconstruction %.2fs, limb decode %.2fs',
+        engine, t_transform, workers, '' if workers == 1 else 's', t_crt,
+        t_limbs)
     return reconstructed, denominator, meta
 
 

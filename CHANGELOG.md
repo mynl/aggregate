@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a7 - 2026-10-09
+
+**[NTT-Exact-Log10-Lazy] `density_df` gains `p_exact_log10`, which can see the tail, and stops building a million Fractions to hide it.** On a large `nttagg` the exact probabilities run far below the smallest double, so `p_exact_float` is `0.0` across most of the tail and the exact answer was invisible in the frame. `p_exact_log10` is the base-10 logarithm formed as `log10(numerator) - log10(denominator)`, which is a float for any coefficient however small: on a 200 x 200 uniform dice of dice the deepest bucket carrying mass reads **-462.5** where `p_exact_float` reads `0.0`. It is `-inf` only where the probability is exactly zero, and it is accurate to about 1e-10 in the implied probability, which in the denormal range makes it strictly more accurate than taking the logarithm of `p_exact_float`.
+
+**Breaking: `p_exact` is no longer a `density_df` column. It is now a property, `a.p_exact`,** returning the same reduced Fractions as a Series aligned the same way, built on first access and cached. Migration is `a.density_df.p_exact` to `a.p_exact`. The column was built eagerly whenever the frame was touched, at one gcd per bucket against a 9,976 bit denominator, which measured **77.7 s on a 1000 x 1000 case** where every other column is effectively free. First access to `density_df` on a 500 x 500 case now costs 0.4 s against 5.8 s. `p_exact_float` is computed by integer division rather than through a Fraction, which is bit-identical and 730x cheaper.
+
 ## 1.2.0a6 - 2026-10-09
 
 **[NTT-Accuracy-Overflow] `ntt_audit` and `accuracy_df` no longer raise on a large `nttagg`, and `max_rel_err` reports a number that means something.** Both properties raised `OverflowError` whenever the exact tail reached below about 1e-328, because the per-bucket relative error divides by an exact probability far smaller than any double. That is every uniform dice of dice from roughly 150 x 150 up, so the headline diagnostic was unusable on exactly the cases the exact engine exists for. The ratio now reports a signed infinity instead of raising.

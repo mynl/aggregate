@@ -15,7 +15,7 @@ production path (vectorized numpy NTT per prime, product-tree CRT);
 :func:`exact_compound_poly` is the slow direct polynomial reference used by
 the tests as an independent oracle. :class:`AggregateNTT` is the class behind
 the DecL ``nttagg`` kind: an ordinary Aggregate running the float pipeline
-side by side with the exact answer (``density_df.p_exact``, ``accuracy_df``,
+side by side with the exact answer (``density_df.p_exact_log10``, ``p_exact``,
 ``ntt_audit``, and a ``stats_df`` ``exact`` column that validation measures
 against). History and design rulings: ``dev/done/plan-nttagg.md``.
 
@@ -1056,9 +1056,12 @@ class AggregateNTT(Aggregate):
     numbers, via :func:`exact_compound`. The two answers sit side by side on
     the same integer lattice:
 
-    - :attr:`density_df` gains ``p_exact`` (reduced :class:`~fractions.Fraction`
-      per bucket, ``Fraction(0)`` off support) and ``p_exact_float`` (the
-      correctly rounded binary64 of the rational);
+    - :attr:`density_df` gains ``p_exact_float`` (the correctly rounded
+      binary64 of the exact rational) and ``p_exact_log10`` (its base-10
+      logarithm, which stays readable in the tail where the float
+      underflows to zero); the reduced :class:`~fractions.Fraction` per
+      bucket is the :attr:`p_exact` property, built on demand because it
+      costs a gcd per bucket;
     - :attr:`accuracy_df` compares the exact and float answers per bucket;
     - :attr:`ntt_audit` records sizes, primes, timings and error summaries.
 
@@ -1103,6 +1106,7 @@ class AggregateNTT(Aggregate):
         self._ntt_denominator = None
         self._ntt_meta = None
         self._accuracy_df = None
+        self._p_exact_series = None
         super().__init__(
             name,
             exp_en=-1,
@@ -1221,6 +1225,7 @@ class AggregateNTT(Aggregate):
         self._ntt_denominator = denominator
         self._ntt_meta = meta
         self._accuracy_df = None
+        self._p_exact_series = None
         self._attach_exact_moments()
         return rv
 
@@ -1270,31 +1275,132 @@ class AggregateNTT(Aggregate):
         moment_rows = exact.notna()
         self.stats_df.loc[moment_rows, 'mixed'] = exact[moment_rows]
 
-    def _exact_on_grid(self):
-        """``p_exact`` as a list of reduced Fractions aligned to ``self.xs``."""
+    def _exact_numerators_on_grid(self):
+        """The integer numerators aligned to ``self.xs``, zero off support.
+
+        The cheap primitive the other exact views are built from: no
+        ``Fraction``, so no gcd per bucket.
+        """
         numerators = self._ntt_numerators
+        return [numerators[int(x)] if 0 <= int(x) < len(numerators) else 0
+                for x in np.asarray(self.xs)]
+
+    def _exact_on_grid(self):
+        """``p_exact`` as a list of reduced Fractions aligned to ``self.xs``.
+
+        Notes
+        -----
+        One reduced :class:`~fractions.Fraction` per bucket, so one gcd per
+        bucket against a denominator that is 9,976 bits on a 1000 x 1000
+        case. Measured at 77.7 s over 10^6 buckets, which is why this is no
+        longer called from :attr:`density_df`: see :attr:`p_exact`.
+        """
         denominator = self._ntt_denominator
         zero = Fraction(0)
-        return [Fraction(numerators[int(x)], denominator)
-                if 0 <= int(x) < len(numerators) else zero
-                for x in np.asarray(self.xs)]
+        return [Fraction(n, denominator) if n else zero
+                for n in self._exact_numerators_on_grid()]
+
+    def _exact_log10_on_grid(self):
+        """``log10`` of the exact probability per bucket, ``-inf`` at zero.
+
+        Notes
+        -----
+        The only view of the exact answer that stays readable in the deep
+        tail, and the cheapest. ``math.log10`` takes an arbitrary-precision
+        integer, so
+
+            ``log10(H_n / D) = log10(H_n) - log10(D)``
+
+        is a float for any coefficient however small: a bucket whose exact
+        probability is about 1e-462 reads -467.7 where ``p_exact_float``
+        reads ``0.0``, having underflowed. Measured at 0.06 s per 200,000
+        buckets against 13.9 s for the equivalent Fractions, 239x cheaper.
+
+        ``math.log10`` of an integer is formed from its top 53 bits and its
+        bit length, so the result carries roughly 1e-13 relative error in
+        the logarithm, hence about 1e-10 relative error in the implied
+        probability. That is far finer than the float density it
+        complements; :attr:`p_exact` remains available where even that is
+        not enough.
+        """
+        log_denominator = math.log10(self._ntt_denominator)
+        return [math.log10(n) - log_denominator if n else -math.inf
+                for n in self._exact_numerators_on_grid()]
+
+    @property
+    def p_exact(self):
+        """Exact probability per bucket as reduced Fractions, built on demand.
+
+        Returns
+        -------
+        pandas.Series
+            Reduced :class:`~fractions.Fraction` indexed by loss, aligned to
+            :attr:`density_df`, ``Fraction(0)`` off support. Summing it is
+            exactly 1.
+
+        Notes
+        -----
+        This was a ``density_df`` column until 1.2.0a7 and moved here
+        because it was built eagerly whenever that frame was touched, at
+        77.7 s on a 1000 x 1000 case where every other column is
+        effectively free. Reading it is the same work it always was; the
+        difference is that reading the frame no longer pays for it. Cached
+        after the first access, and discarded with the rest of the cached
+        state on ``update``.
+
+        For the common questions use the frame instead:
+        ``p_exact_float`` for a value to compute with, ``p_exact_log10``
+        for the magnitude in the tail where the float underflows.
+        """
+        if self._ntt_numerators is None:
+            raise ValueError(
+                f'{self.name}: update the object before reading p_exact')
+        if self._p_exact_series is None:
+            self._p_exact_series = pd.Series(
+                self._exact_on_grid(),
+                index=pd.Index(np.asarray(self.xs, dtype=float), name='loss'),
+                name='p_exact', dtype=object)
+        return self._p_exact_series
 
     @property
     def density_df(self):
-        """Parent frame plus the exact columns ``p_exact`` / ``p_exact_float``.
+        """Parent frame plus ``p_exact_float`` and ``p_exact_log10``.
 
-        ``p_exact`` is an object column of reduced :class:`~fractions.Fraction`
-        (``Fraction(0)`` off support); ``p_exact_float`` its correctly rounded
-        binary64. Attached lazily to the parent's cached frame, so the usual
-        caching pattern (rebuilt after each ``update``) carries over. Note
+        ``p_exact_float`` is the correctly rounded binary64 of the exact
+        rational, ``0.0`` off support and also ``0.0`` wherever the exact
+        value underflows, which on a large case is most of the tail.
+        ``p_exact_log10`` is that value's base-10 logarithm, ``-inf`` only
+        where the probability is exactly zero, so it stays readable where
+        the float has underflowed: a bucket at 1e-462 reads -467.7. Neither
+        column builds a :class:`~fractions.Fraction`, which is what makes
+        both cheap; :attr:`p_exact` is there when the rationals are wanted.
+
+        Attached lazily to the parent's cached frame, so the usual caching
+        pattern (rebuilt after each ``update``) carries over. Note
         ``p_total`` here is the display density (fuzz removed); the raw
         algorithm output compared in :attr:`accuracy_df` is ``agg_density``.
+
+        Notes
+        -----
+        The reduced-Fraction column ``p_exact`` lived here until 1.2.0a7 and
+        is now the :attr:`p_exact` property. It cost one gcd per bucket
+        against a 9,976 bit denominator, measured at 77.7 s on a 1000 x 1000
+        case, which every reader of this frame paid whether or not they
+        wanted exact rationals. Both columns here are cheap: the floats are
+        a division and the logarithms about 0.3 s over 10^6 buckets.
         """
         df = Aggregate.density_df.fget(self)
-        if self._ntt_numerators is not None and 'p_exact' not in df.columns:
-            exact = self._exact_on_grid()
-            df['p_exact'] = exact
-            df['p_exact_float'] = [float(q) for q in exact]
+        if self._ntt_numerators is not None \
+                and 'p_exact_float' not in df.columns:
+            denominator = self._ntt_denominator
+            numerators = self._exact_numerators_on_grid()
+            # Integer true division is already correctly rounded and needs no
+            # Fraction, so no gcd: 730x cheaper than float(Fraction(n, D))
+            # and bit-identical. It underflows to 0.0 across the deep tail
+            # without raising, which is what p_exact_log10 is for.
+            df['p_exact_float'] = [n / denominator if n else 0.0
+                                   for n in numerators]
+            df['p_exact_log10'] = self._exact_log10_on_grid()
         return df
 
     @property
@@ -1386,10 +1492,8 @@ class AggregateNTT(Aggregate):
         # Reading it off _exact_on_grid() built the whole reduced-Fraction
         # vector a second time, which doubled the cost of the audit on a
         # large case ([NTT-Accuracy-Overflow]).
-        numerators = self._ntt_numerators
         exact_zero = np.array(
-            [not (0 <= int(x) < len(numerators)) or numerators[int(x)] == 0
-             for x in np.asarray(self.xs)])
+            [n == 0 for n in self._exact_numerators_on_grid()])
         p_fft = adf.p_fft.to_numpy()
         noise = np.abs(p_fft[exact_zero])
         floor = noise.max() if len(noise) else 0.0

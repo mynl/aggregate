@@ -9,6 +9,7 @@ and through the always-on internal checks (coefficients sum to the
 denominator, nonnegative, zero beyond the support) that every call exercises.
 """
 
+import math
 import os
 import random
 from fractions import Fraction
@@ -397,10 +398,15 @@ def test_aggregate_ntt_builds_and_is_exact(underwriter):
     assert isinstance(a, AggregateNTT)
     assert a.bs == 1
     df = a.density_df
-    assert df.p_exact.sum() == 1                      # exact Fraction algebra
-    assert df.p_exact.loc[1.0] == Fraction(1, 36)
-    assert df.p_exact.loc[36.0] == Fraction(1, 6 ** 7)
+    # p_exact moved off the frame at 1.2.0a7; the frame keeps the cheap views.
+    assert 'p_exact' not in df.columns
     assert df.p_exact_float.loc[36.0] == float(Fraction(1, 6 ** 7))
+    assert df.p_exact_log10.loc[36.0] == pytest.approx(
+        math.log10(1 / 6 ** 7))
+    exact = a.p_exact
+    assert exact.sum() == 1                           # exact Fraction algebra
+    assert exact.loc[1.0] == Fraction(1, 36)
+    assert exact.loc[36.0] == Fraction(1, 6 ** 7)
 
 
 def test_aggregate_ntt_accuracy_df_and_audit(underwriter):
@@ -443,7 +449,7 @@ def test_aggregate_ntt_guardrail(underwriter, monkeypatch):
         underwriter.build('nttagg CT.Big dfreq [1:6] dsev [1:6]')
     a = underwriter.build('nttagg CT.Big dfreq [1:6] dsev [1:6]',
                           ntt_override=True)
-    assert a.density_df.p_exact.sum() == 1
+    assert a.p_exact.sum() == 1
 
 
 def test_aggregate_ntt_build_default_cap_names_required_log2(underwriter):
@@ -511,7 +517,7 @@ def test_aggregate_ntt_update_accepts_ntt_workers(underwriter):
     a = underwriter.build('nttagg PW.Dice dfreq [1:6] dsev [1:6]',
                           ntt_workers=2)
     assert a._ntt_meta['workers'] == 2
-    assert a.density_df.p_exact.sum() == 1
+    assert a.p_exact.sum() == 1
 
 
 # ----------------------------------------- [crt-tree] ([NTT-CRT] stage 1)
@@ -592,3 +598,73 @@ def test_safe_float_reports_infinity_not_overflow():
     assert ntt_module._safe_float(Fraction(1, 4)) == 0.25
     # Underflow is not overflow: it rounds to zero without complaint.
     assert ntt_module._safe_float(Fraction(1, 10 ** 400)) == 0.0
+
+
+# ------------------------- [exact-log10-lazy] ([NTT-Exact-Log10-Lazy])
+
+def test_p_exact_log10_sees_below_the_float_floor(underwriter):
+    """``p_exact_log10`` is readable where ``p_exact_float`` has underflowed.
+
+    A 200 x 200 uniform dice of dice puts exact probabilities near 1e-462 in
+    the tail. Those are not representable as a double, so ``p_exact_float``
+    reads ``0.0`` and the exact answer is invisible in the frame. The
+    logarithm is formed as ``log10(numerator) - log10(denominator)``, which
+    is a float for any coefficient, so it reports the magnitude.
+    """
+    a = underwriter.build('nttagg LG.Dice dfreq [1:200] dsev [1:200]',
+                          log2=16)
+    df = a.density_df
+    underflowed = (df.p_exact_float == 0) & np.isfinite(df.p_exact_log10)
+    assert underflowed.sum() > 0, 'expected an unrepresentable tail'
+    # Those buckets carry real mass, far below the double range.
+    assert df.p_exact_log10[underflowed].min() < -400
+    # Exactly-zero buckets are -inf, never a finite number.
+    assert np.isneginf(df.p_exact_log10.loc[0.0])
+    # Where the float is a normal number, the two agree.
+    normal = df.index[df.p_exact_float > 1e-200][-1]
+    assert df.p_exact_log10.loc[normal] == pytest.approx(
+        math.log10(float(a.p_exact.loc[normal])), rel=1e-12)
+    # In the denormal range they do not, and the logarithm is the accurate
+    # one: a double near 1e-323 carries only a few significant bits, so
+    # log10(p_exact_float) is wrong in the first decimal place where
+    # p_exact_log10, formed from the exact integers, is not. This is the
+    # reason the column exists rather than being derived from the float.
+    denormal = df.index[(df.p_exact_float > 0)
+                        & (df.p_exact_float < 1e-310)][-1]
+    exact_log = (math.log10(a.p_exact.loc[denormal].numerator)
+                 - math.log10(a.p_exact.loc[denormal].denominator))
+    assert df.p_exact_log10.loc[denormal] == pytest.approx(exact_log,
+                                                           rel=1e-12)
+    via_float = math.log10(float(a.p_exact.loc[denormal]))
+    assert abs(via_float - exact_log) > 1e-3
+
+
+def test_p_exact_log10_matches_the_fractions(underwriter):
+    """The cheap views agree with the exact rationals bucket by bucket."""
+    a = underwriter.build('nttagg LG.Small dfreq [1:6] dsev [1:6]')
+    df = a.density_df
+    for loss, q in a.p_exact.items():
+        if q == 0:
+            assert np.isneginf(df.p_exact_log10.loc[loss])
+        else:
+            assert df.p_exact_log10.loc[loss] == pytest.approx(
+                math.log10(q.numerator) - math.log10(q.denominator))
+            assert df.p_exact_float.loc[loss] == float(q)
+
+
+def test_p_exact_is_cached_and_reset_by_update(underwriter):
+    """The Fractions are built once, and discarded when the object updates."""
+    a = underwriter.build('nttagg LG.Cache dfreq [1:6] dsev [1:6]')
+    first = a.p_exact
+    assert a.p_exact is first                  # cached, not rebuilt
+    a.update(log2=10, bs=1)
+    assert a.p_exact is not first              # discarded on update
+    assert a.p_exact.sum() == 1
+
+
+def test_p_exact_before_update_raises(underwriter):
+    """Reading the Fractions before the exact answer exists is an error."""
+    a = underwriter.build('nttagg LG.Pending dfreq [1:6] dsev [1:6]',
+                          update=False)
+    with pytest.raises(ValueError, match='update the object'):
+        _ = a.p_exact

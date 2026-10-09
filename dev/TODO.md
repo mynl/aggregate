@@ -48,12 +48,14 @@
   double range (every uniform dice from about 150 x 150 up), and
   `max_rel_err` is restricted to buckets the float pipeline can actually
   resolve, so it reads 0.078 rather than 7.2e304 on a 200 x 200 case. Phase 2
-  `[NTT-Exact-Log10-Lazy]` is next: a `p_exact_log10` column, which costs
-  about 0.3 s where the Fractions cost 78 s and is the only way to see a
-  1e-462 bucket, and `p_exact` moving from an eagerly built `density_df`
-  column to a cached property. That second half matters more than it looks:
-  once the Rust engine lands, `density_df`'s 78 s would be 74 percent of the
-  wall clock.
+  `[NTT-Exact-Log10-Lazy]` landed at **1.2.0a7**: `density_df` carries
+  `p_exact_log10`, which reads -462.5 on a bucket whose `p_exact_float` has
+  underflowed to zero, and `p_exact` moved from an eagerly built column to
+  the cached `a.p_exact` property, taking first access to `density_df` on a
+  500 x 500 case from 5.8 s to 0.4 s. That mattered more than it looked:
+  the Fractions would have been 74 percent of the wall clock once the Rust
+  engine lands. **Both phases are done; the plan is retired to
+  `dev/done/`.**
 
 
 - **[NTT-Rust-Integration]** (`dev/plan-ntt-rust-integration.md`, SPECIFIED,

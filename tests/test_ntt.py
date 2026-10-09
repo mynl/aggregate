@@ -417,7 +417,8 @@ def test_aggregate_ntt_accuracy_df_and_audit(underwriter):
     assert list(audit.index) == [
         'support', 'transform_length', 'denominator_bits', 'primes_used',
         'prime_bits_min', 'prime_bits_max', 'workers', 'transform_seconds',
-        'crt_seconds', 'max_abs_err', 'max_rel_err', 'noise_floor',
+        'crt_seconds', 'max_abs_err', 'max_rel_err', 'rel_err_buckets',
+        'unresolved_buckets', 'underflow_buckets', 'noise_floor',
         'exact_zero_nonzero_float']
     assert audit['support'] == 36
     assert audit['primes_used'] >= 1
@@ -551,3 +552,43 @@ def test_crt_tree_matches_forced_fold_dice(monkeypatch):
     assert tree[0] == folded[0]
     assert tree[1] == folded[1]
     assert tree[2]['primes_used'] > 16
+
+
+# ---------------------------- [accuracy-overflow] ([NTT-Accuracy-Overflow])
+
+@pytest.mark.parametrize('n,log2', [(150, 16), (200, 16)])
+def test_audit_survives_unrepresentable_tail(n, log2, underwriter):
+    """``ntt_audit`` reports rather than raising when the tail leaves float.
+
+    A uniform dice of dice at this size has exact probabilities below
+    1e-328, so the relative error against one of them, a ratio of float
+    noise to an unrepresentable number, has no double value. It used to
+    raise ``OverflowError`` out of :attr:`accuracy_df`, which
+    :attr:`ntt_audit` reads, so the headline diagnostic failed on every
+    large case. Now the ratio reports an infinity and the maximum is taken
+    over the resolved buckets only.
+    """
+    a = underwriter.build(f'nttagg OF{n} dfreq [1:{n}] dsev [1:{n}]',
+                          log2=log2)
+    audit = a.ntt_audit
+    # The headline relative error is finite and modest, not 1e300.
+    assert np.isfinite(audit['max_rel_err'])
+    assert audit['max_rel_err'] < 10
+    assert audit['rel_err_buckets'] > 0
+    # Buckets the float pipeline cannot resolve are counted, not averaged in.
+    assert audit['unresolved_buckets'] > 0
+    assert audit['underflow_buckets'] > 0
+    # accuracy_df itself holds infinities there rather than raising.
+    adf = a.accuracy_df
+    assert np.isinf(adf.rel_err.to_numpy()).any()
+    assert not np.isnan(audit['max_rel_err'])
+
+
+def test_safe_float_reports_infinity_not_overflow():
+    """The helper converts, or saturates, but never raises."""
+    huge = Fraction(10 ** 400, 1)
+    assert ntt_module._safe_float(huge) == np.inf
+    assert ntt_module._safe_float(-huge) == -np.inf
+    assert ntt_module._safe_float(Fraction(1, 4)) == 0.25
+    # Underflow is not overflow: it rounds to zero without complaint.
+    assert ntt_module._safe_float(Fraction(1, 10 ** 400)) == 0.0

@@ -20,6 +20,14 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a6 - 2026-10-09
+
+**[NTT-Accuracy-Overflow] `ntt_audit` and `accuracy_df` no longer raise on a large `nttagg`, and `max_rel_err` reports a number that means something.** Both properties raised `OverflowError` whenever the exact tail reached below about 1e-328, because the per-bucket relative error divides by an exact probability far smaller than any double. That is every uniform dice of dice from roughly 150 x 150 up, so the headline diagnostic was unusable on exactly the cases the exact engine exists for. The ratio now reports a signed infinity instead of raising.
+
+`max_rel_err` is now taken over *resolved* buckets only, those whose exact probability is nonzero and strictly above `noise_floor`, which is the measured amplitude of the float pipeline's own numerical noise. Unrestricted it reported the ratio of noise to an unrepresentable number: 2.1e183 on a 100 x 100 case and 7.2e304 on a 200 x 200. It now reads 0.31 and 0.078. **This number has moved, and the old one was meaningless rather than merely imprecise.**
+
+`ntt_audit` gains three rows: `rel_err_buckets` (how many buckets the maximum covers), `unresolved_buckets` (nonzero exact probability at or below the noise floor, so the float pipeline never had the signal) and `underflow_buckets` (nonzero exact probability that underflows to zero as a double). On a 200 x 200 case those read 26,302, 13,698 and 277. It also stops rebuilding the whole reduced-Fraction vector a second time to find the exact zeros, which halves the audit's cost on a large case.
+
 ## 1.2.0a5 - 2026-10-09
 
 **[NTT-Workers-Default] the `nttagg` transform thread count defaults to `min(4, os.cpu_count())` instead of `min(8, ...)`.** What threads buy in this engine is overlap with the serial reconstruction rather than parallel speedup, so once the product tree shortened the reconstruction at 1.2.0a4 the eighth thread stopped paying for itself. Measured on the 1000 x 1000 uniform dice case: four threads give 216.4 s against 212.3 s for eight, so 2 percent of wall clock for twice the CPU, 709 transform thread-seconds against 1356. Both are 1.45x the 312.9 s serial run. Pass `ntt_workers=n` to `build` or `workers=n` to `exact_compound` to choose explicitly; `1` still forces serial. Answers are unaffected either way.

@@ -727,6 +727,39 @@ def _crt_merge(left, left_modulus, right, right_modulus):
             for a, b in zip(left, right)]
 
 
+def _safe_float(value):
+    """
+    ``float(value)`` with overflow reported as an infinity, never a raise.
+
+    Parameters
+    ----------
+    value : Fraction or int
+        An exact quantity whose magnitude may exceed the double range.
+
+    Returns
+    -------
+    float
+        The rounded value, or ``+inf`` / ``-inf`` when it is too large to
+        represent, carrying the sign of ``value``.
+
+    Notes
+    -----
+    Exact tail probabilities here run far below the smallest double: a
+    1000 x 1000 compound reaches about 1e-3000. A relative error formed
+    against one of those, ``(p_float - q) / q``, therefore has a magnitude
+    like 1e2700, and ``float()`` on it raises ``OverflowError`` rather than
+    returning an infinity, because the quotient of two integers has no
+    representable result. The honest report is an infinity: the float
+    pipeline's value is unboundedly larger than the exact one. Raising
+    instead made :attr:`AggregateNTT.ntt_audit` unusable on every case from
+    about 150 x 150 up, which is the range the exact engine exists for.
+    """
+    try:
+        return float(value)
+    except OverflowError:
+        return math.inf if value > 0 else -math.inf
+
+
 def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
                    workers=None):
     """
@@ -1273,7 +1306,11 @@ class AggregateNTT(Aggregate):
         ``agg_density``, before any display fuzz removal), ``err`` (signed,
         computed as ``float(Fraction(p_fft) - exact)`` so the subtraction is
         exact before the single rounding), ``abs_err``, and ``rel_err``
-        (exact ratio, NaN where the exact value is zero).
+        (exact ratio, NaN where the exact value is zero, and an infinity
+        where the exact value is nonzero but so far below the double range
+        that the ratio has no representable value; see :attr:`ntt_audit`,
+        whose ``max_rel_err`` is restricted to the buckets where the
+        comparison has an answer).
         """
         if self._ntt_numerators is None:
             raise ValueError(
@@ -1281,9 +1318,13 @@ class AggregateNTT(Aggregate):
         if self._accuracy_df is None:
             exact = self._exact_on_grid()
             p_fft = np.asarray(self.agg_density, dtype=float)
-            err = np.array([float(Fraction(float(p)) - q)
+            # Both errors go through _safe_float: the subtraction is exact
+            # before the single rounding, and a ratio against a tail
+            # probability below the double range reports an infinity rather
+            # than raising ([NTT-Accuracy-Overflow]).
+            err = np.array([_safe_float(Fraction(float(p)) - q)
                             for p, q in zip(p_fft, exact)])
-            rel_err = np.array([float((Fraction(float(p)) - q) / q)
+            rel_err = np.array([_safe_float((Fraction(float(p)) - q) / q)
                                 if q != 0 else np.nan
                                 for p, q in zip(p_fft, exact)])
             self._accuracy_df = pd.DataFrame(
@@ -1302,22 +1343,71 @@ class AggregateNTT(Aggregate):
         Rows: ``support``, ``transform_length``, ``denominator_bits``,
         ``primes_used``, ``prime_bits_min`` / ``prime_bits_max``,
         ``workers``, ``transform_seconds``, ``crt_seconds``, ``max_abs_err``,
-        ``max_rel_err`` (over buckets with nonzero exact probability),
-        ``noise_floor`` (max ``|p_fft|`` over exact-zero buckets), and
+        ``max_rel_err`` (over *resolved* buckets only, defined below),
+        ``rel_err_buckets`` (how many buckets that maximum is taken over),
+        ``unresolved_buckets`` (nonzero exact probability at or below
+        ``noise_floor``, so the float pipeline never had the signal),
+        ``underflow_buckets`` (nonzero exact probability that underflows to
+        zero as a double, so the exact engine is reporting mass the float
+        pipeline cannot express at all), ``noise_floor`` (max ``|p_fft|``
+        over exact-zero buckets, which is the amplitude of the float
+        pipeline's own numerical noise), and
         ``exact_zero_nonzero_float`` (count of exact-zero buckets carrying a
         nonzero float). The raw material for a Wilson-and-Keich style
         accuracy exhibit.
+
+        Notes
+        -----
+        ``max_rel_err`` is restricted to **resolved** buckets: those whose
+        exact probability is nonzero and strictly above ``noise_floor``.
+        That restriction is the whole point of the row. The exact engine
+        computes probabilities down to 1e-3000 on a large case, where the
+        float pipeline holds nothing but rounding noise, so an unrestricted
+        maximum reports the ratio of noise to an unrepresentable number and
+        is always astronomically large and always uninformative. Measured
+        before the restriction: 2.1e183 on a 100 x 100 case and 7.2e304 on a
+        200 x 200. ``noise_floor`` calibrates the cut empirically from the
+        object itself, being the largest float density sitting on a bucket
+        whose true probability is exactly zero.
+
+        The two counts say how much of the support lies outside that
+        comparison, and they are the interesting numbers on a large case:
+        ``unresolved_buckets`` is mass the float pipeline cannot distinguish
+        from its own noise, and ``underflow_buckets`` is mass it cannot
+        represent at any precision. Read ``density_df.p_exact_log10`` to see
+        those buckets, since ``p_exact_float`` is zero across them.
         """
         if self._ntt_numerators is None:
             raise ValueError(
                 f'{self.name}: update the object before reading ntt_audit')
         adf = self.accuracy_df
         meta = self._ntt_meta
-        exact_zero = np.array([q == 0 for q in self._exact_on_grid()])
+        # Exact zero is a property of the numerator, so it needs no Fraction.
+        # Reading it off _exact_on_grid() built the whole reduced-Fraction
+        # vector a second time, which doubled the cost of the audit on a
+        # large case ([NTT-Accuracy-Overflow]).
+        numerators = self._ntt_numerators
+        exact_zero = np.array(
+            [not (0 <= int(x) < len(numerators)) or numerators[int(x)] == 0
+             for x in np.asarray(self.xs)])
         p_fft = adf.p_fft.to_numpy()
         noise = np.abs(p_fft[exact_zero])
-        max_rel = np.nanmax(np.abs(adf.rel_err.to_numpy())) \
-            if np.any(~exact_zero) else np.nan
+        floor = noise.max() if len(noise) else 0.0
+        # A relative error only means something where the float pipeline
+        # could resolve the exact answer at all, and `floor` measures
+        # exactly that: the largest float density on a bucket whose true
+        # probability is zero, so the amplitude of the pipeline's own noise.
+        # Below it the ratio is noise over signal the pipeline never had.
+        # Reporting it unrestricted gave a max_rel_err of 2e183 on a
+        # 100 x 100 case and 7e304 on a 200 x 200, numbers about nothing;
+        # "representable as a double" is not enough of a restriction either,
+        # since a denormal near 1e-320 sits far below the noise.
+        resolved = (~exact_zero) & (adf.p_exact_float.to_numpy() > floor)
+        max_rel = np.nanmax(np.abs(adf.rel_err.to_numpy()[resolved])) \
+            if np.any(resolved) else np.nan
+        underflow = int(np.count_nonzero(
+            (~exact_zero) & (adf.p_exact_float.to_numpy() == 0)))
+        unresolved = int(np.count_nonzero((~exact_zero) & ~resolved))
         return pd.Series(
             {'support': meta['support'],
              'transform_length': meta['transform_length'],
@@ -1330,7 +1420,10 @@ class AggregateNTT(Aggregate):
              'crt_seconds': meta['crt_seconds'],
              'max_abs_err': adf.abs_err.max(),
              'max_rel_err': max_rel,
-             'noise_floor': noise.max() if len(noise) else 0.0,
+             'rel_err_buckets': int(np.count_nonzero(resolved)),
+             'unresolved_buckets': unresolved,
+             'underflow_buckets': underflow,
+             'noise_floor': floor,
              'exact_zero_nonzero_float': int(np.count_nonzero(noise))},
             name=self.name, dtype=object)
 

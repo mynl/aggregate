@@ -42,6 +42,35 @@
 
 ## In flight
 
+- **[NTT-Tail-Visibility]** (`dev/plan-ntt-tail-visibility.md`) — phase 1
+  `[NTT-Accuracy-Overflow]` landed at **1.2.0a6**: `ntt_audit` and
+  `accuracy_df` no longer raise on any case whose exact tail falls below the
+  double range (every uniform dice from about 150 x 150 up), and
+  `max_rel_err` is restricted to buckets the float pipeline can actually
+  resolve, so it reads 0.078 rather than 7.2e304 on a 200 x 200 case. Phase 2
+  `[NTT-Exact-Log10-Lazy]` is next: a `p_exact_log10` column, which costs
+  about 0.3 s where the Fractions cost 78 s and is the only way to see a
+  1e-462 bucket, and `p_exact` moving from an eagerly built `density_df`
+  column to a cached property. That second half matters more than it looks:
+  once the Rust engine lands, `density_df`'s 78 s would be 74 percent of the
+  wall clock.
+
+
+- **[NTT-Rust-Integration]** (`dev/plan-ntt-rust-integration.md`, SPECIFIED,
+  blocked on the sibling) — use the compiled engine in
+  `V:\dev\aggregate-ntt` when it is installed, and behave exactly as today
+  when it is not. The engine is a separate optional Rust package, discovered
+  at import time and never declared as a dependency, which keeps this library
+  pure Python, keeps its BSD license clear of GMP, and lets the author build
+  for one machine. This library keeps input validation, prime selection, the
+  guardrails, the audit and the three end-to-end checks, so the engine is
+  verified rather than trusted; it gets the per-prime transform and the CRT
+  reconstruction. New keyword `ntt_engine='auto'|'python'|'rust'`, provenance
+  rows in `ntt_audit`, and a versioned seam that **refuses** on protocol
+  mismatch rather than computing. Blocked until `[Rust-Reconstruction]` lands
+  over there. Its reflected half is `dev/plan-rust-engine.md` in that repo;
+  the scaffold landed there at 1.0.0a1 on 2026-10-09.
+
 - **[NTT-CRT]** (`dev/plan-ntt-crt.md`) — stage 1
   `[NTT-CRT-ProductTree]` landed at **1.2.0a4**: the reconstruction is a
   balanced product tree built as an online merge stack, taking the headline
@@ -53,11 +82,15 @@
   so it is neither clearly wanted nor clearly dropped. Weigh it against
   pickling hundreds of megabytes of bigints across a process boundary, and
   against the remaining shape of the cost, which is now 198 s of
-  reconstruction against 105 s of serial transform. Stage 3
-  `[NTT-CRT-Gmpy2]` is the author's live choice and is specified in the
-  plan: use `gmpy2` for the reconstruction bigints when it is installed,
-  for GMP's subquadratic division, which is the step the product tree now
-  spends its time in. The `ntt_workers` default was settled at **1.2.0a5**,
+  reconstruction against 105 s of serial transform; **superseded** by
+  `[NTT-Rust-Integration]` above, since threads without a GIL are what it
+  tried to approximate with processes. Stage 3 `[NTT-CRT-Gmpy2]` is
+  specified and measured at 2.0x on the reconstruction (a hybrid keeping
+  CPython integers at the bottom of the product tree and promoting to `mpz`
+  at 16 primes, since GMP is 7x on the wide merges and slower on the narrow
+  ones), and is **SHELVED** as the fallback if the Rust engine stalls. Do not
+  implement it without the author saying so. The `ntt_workers` default was
+  settled at **1.2.0a5**,
   `[NTT-Workers-Default]`, narrowing from `min(8, ...)` to `min(4, ...)`
   on the measurement that four threads match eight for half the CPU.
 

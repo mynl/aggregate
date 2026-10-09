@@ -1226,3 +1226,48 @@ class AggregateNTT(Aggregate):
              'noise_floor': noise.max() if len(noise) else 0.0,
              'exact_zero_nonzero_float': int(np.count_nonzero(noise))},
             name=self.name, dtype=object)
+
+    # ------------------------------------------------- [NTT-Composability]
+    # Presence of a member is this library's answer to "can this compose".
+    # ``PnL`` carries neither of these, ``Portfolio`` carries ``pnl_program``
+    # and not ``reins_program``, and the suite states the convention with
+    # ``assert not hasattr(p, 'reins_program')``. ``AggregateNTT`` inherited
+    # both from ``Aggregate`` and refused them at call time, which is the one
+    # place in the library where ``hasattr`` lied. A negative override reads
+    # as a mistake to anyone meeting it cold, so: it is deliberate, and the
+    # ``AttributeError`` is the point. ``hasattr`` swallows that and nothing
+    # else, so it answers False, while a direct read still prints the full
+    # explanation and ``dir()`` still lists the name. Consumers deriving
+    # navigation from object capability (``aggregate_api`` reads exactly these
+    # two) therefore grey the P&L button and the Reins tab by themselves, with
+    # no hard-coded list of kinds to go stale when the v1 restriction lifts.
+    # Delete these two properties and the capability reappears on its own.
+
+    @property
+    def pnl_program(self):
+        """Absent: an exact NTT aggregate cannot be the engine of a P&L.
+
+        Raises
+        ------
+        AttributeError
+            Always, carrying the explanation. The member is absent on
+            purpose, so ``hasattr(o, 'pnl_program')`` is False.
+        """
+        raise AttributeError(
+            "pnl_program: cannot wrap a 'nttagg' declaration in a P&L; the "
+            'engine must be an aggregate or a portfolio.')
+
+    @property
+    def reins_program(self):
+        """Absent: an exact NTT aggregate carries no cession clause.
+
+        Raises
+        ------
+        AttributeError
+            Always, carrying the explanation. The member is absent on
+            purpose, so ``hasattr(o, 'reins_program')`` is False.
+        """
+        raise AttributeError(
+            f"reins_program: {self.name!r} is a 'nttagg' declaration, and a "
+            'cession clause belongs to an ordinary aggregate. Declare the '
+            'cession on an agg and compare against it.')

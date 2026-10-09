@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a3 - 2026-10-09
+
+**[NTT-Composability] `AggregateNTT` no longer carries the two methods it refuses, and `library.agg` gains an `nttagg` entry.** `pnl_program` and `reins_program` are now absent on an `nttagg` rather than present and raising at call time, so `hasattr(o, 'pnl_program')` answers False, which is how this library already states composability: `PnL` carries neither, `Portfolio` carries `pnl_program` and not `reins_program`. Reading either member still prints the full explanation, now as `AttributeError` rather than `ValueError`, and `dir()` still lists the name. Consumers that derive navigation from object capability no longer need a hard-coded list of kinds. `library.agg` gains `ExactDiceOfDice` in the Numerical character section, tagged `topic:numerics, role:intermediate`, so the kind is reachable from `build.recipes`. Details and divergences: `dev/done/plan-nttagg-composability.md`.
+
 ## 1.2.0a2 - 2026-10-09
 
 **[NTT-Inplace-Kernels] the `nttagg` transform writes through preallocated buffers, and the transform phase now threads by default.** Every hot array expression in `aggregate.ntt` goes through `out=` against scratch allocated once per call: the butterflies in `ntt`, the twiddle table doubling, the inverse scaling, the binary exponentiations and the power updates in both spectral walks. Same integer arithmetic in the same prime fields, so answers are bit identical; what goes away is a full-length temporary per modular multiply, worth 1.65x on the transform phase of the dense 400 x 400 case (12.7 s to 7.7 s) and 1.5x on the spectral walk at transform length 2**20.

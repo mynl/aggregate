@@ -537,6 +537,35 @@ def test_reins_program_rejects_a_portfolio_program():
     assert not hasattr(p, 'reins_program')
 
 
+def test_nttagg_has_neither_derived_program():
+    """An exact NTT aggregate composes with neither a P&L nor a cession.
+
+    Sibling of :func:`test_reins_program_rejects_a_portfolio_program`:
+    ``hasattr`` is how this library answers "can this compose", so the two
+    members are absent rather than present and refusing. See the
+    ``[NTT-Composability]`` block in ``aggregate/ntt.py``.
+    """
+    o = build('nttagg DP.Dice dfreq [1:6] dsev [1:6]')
+    assert not hasattr(o, 'pnl_program')
+    assert not hasattr(o, 'reins_program')
+    # an ordinary aggregate still carries both, so the override is not global
+    a = build(DISCRETE)
+    assert hasattr(a, 'pnl_program')
+    assert hasattr(a, 'reins_program')
+
+
+@pytest.mark.parametrize('member, expected', [
+    ('pnl_program', 'nttagg'),
+    ('reins_program', 'nttagg'),
+])
+def test_nttagg_derived_program_access_explains_itself(member, expected):
+    """The absence is explained, so it cannot decay into a bare AttributeError."""
+    o = build('nttagg DP.Dice2 dfreq [1:6] dsev [1:6]')
+    with pytest.raises(AttributeError, match=expected) as excinfo:
+        getattr(o, member)
+    assert member in str(excinfo.value)
+
+
 # -------------------------------------------------------- trailer merging
 
 @pytest.mark.parametrize('hints, updates, expected', [

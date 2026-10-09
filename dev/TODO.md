@@ -58,6 +58,15 @@
 
 ## Recently landed
 
+- **[NTT-Composability]** DONE at **1.2.0a3** (2026-10-09,
+  `dev/done/plan-nttagg-composability.md`): `pnl_program` and `reins_program`
+  are absent on an `nttagg` instead of present and refusing, so `hasattr` is
+  the honest capability probe a consumer can navigate by, and `library.agg`
+  carries `ExactDiceOfDice`. Raised from `aggregate_api`, where the defect was
+  visible. One divergence: the generic kind guards in `_program.py` stay, the
+  plan's premise for deleting them (an `'nttagg'` arm in each) not matching the
+  code.
+
 - **[NTT-Exact-Aggregate]** DONE at **1.1.0** (2026-10-09,
   `dev/done/plan-nttagg.md`): the `nttagg` DecL kind and
   `aggregate.ntt.AggregateNTT` compute bounded discrete compounds exactly

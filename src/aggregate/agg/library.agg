@@ -1541,6 +1541,12 @@ port SignedPortfolioMixed
 # pricing surfaces are hand checked against.
 # ----------------------------------------------------------------------
 
+nttagg ExactDiceOfDice
+  dfreq [1 2 3 4 5 6]
+  dsev [1 2 3 4 5 6]
+  note{The exact dice of dice, computed as rational numbers over prime fields rather than in floating point. Read density_df.p_exact for the probabilities, accuracy_df for the float pipeline's error bucket by bucket, and ntt_audit for the sizes, the primes and the timings.}
+  tags{topic:numerics, role:intermediate};
+
 agg RawLognorm
   5000 claims
   sev lognorm 100 cv 2

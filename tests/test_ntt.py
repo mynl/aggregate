@@ -9,6 +9,7 @@ and through the always-on internal checks (coefficients sum to the
 denominator, nonnegative, zero beyond the support) that every call exercises.
 """
 
+import os
 import random
 from fractions import Fraction
 
@@ -305,6 +306,7 @@ def test_prime_dividing_severity_denominator_stays_exact():
     assert Fraction(fast[1], d_fast) == \
         Fraction(1, 2) * Fraction(big_prime - 1, big_prime)
 
+
 # ----------------------------------------------- [decl] ([NTT-DecL] stage)
 
 NTT_PROGRAMS = [
@@ -414,7 +416,7 @@ def test_aggregate_ntt_accuracy_df_and_audit(underwriter):
     audit = a.ntt_audit
     assert list(audit.index) == [
         'support', 'transform_length', 'denominator_bits', 'primes_used',
-        'prime_bits_min', 'prime_bits_max', 'transform_seconds',
+        'prime_bits_min', 'prime_bits_max', 'workers', 'transform_seconds',
         'crt_seconds', 'max_abs_err', 'max_rel_err', 'noise_floor',
         'exact_zero_nonzero_float']
     assert audit['support'] == 36
@@ -492,11 +494,16 @@ def test_exact_compound_workers_match_serial():
     """The thread pool changes wall clock only, never the answer."""
     outcomes = list(range(1, 51))
     probs = [Fraction(1, 50)] * 50
-    serial = exact_compound(outcomes, probs, outcomes, probs)
+    serial = exact_compound(outcomes, probs, outcomes, probs, workers=1)
     pooled = exact_compound(outcomes, probs, outcomes, probs, workers=4)
     assert serial[0] == pooled[0]
     assert serial[1] == pooled[1]
+    assert serial[2]['workers'] == 1
     assert pooled[2]['workers'] == 4
+    # the default is the thread pool, not serial
+    default = exact_compound(outcomes, probs, outcomes, probs)
+    assert default[2]['workers'] == min(8, os.cpu_count() or 1)
+    assert default[0] == serial[0]
 
 
 def test_aggregate_ntt_update_accepts_ntt_workers(underwriter):

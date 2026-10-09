@@ -46,12 +46,15 @@
   Stage 1 `[NTT-Uniform-Geometric]` landed at **1.2.0a1**: equal-weight outcome
   runs are summed as a geometric series, 37.5x on the spectral walk and the
   dense 400 x 400 case from 119 s to 25.1 s serial. Stage 2
-  `[NTT-Inplace-Kernels]` is next. Stage 3 `[NTT-Numba-Kernel]`, a compiled
-  Montgomery engine, is **held pending measurement**: the author ruled on
-  2026-10-09 that the stage 2 numbers decide between it and
-  `[NTT-CRT-ProcessPool]`, because the serial pure-Python CRT is already half
-  the wall clock of a dense case and becomes nearly all of it once the
-  transforms are this fast.
+  `[NTT-Inplace-Kernels]` landed at **1.2.0a2**: `out=` kernels throughout,
+  1.65x on the transform phase, and `ntt_workers` defaulting to
+  `min(8, os.cpu_count())`. **The measurement has now ruled.** Stage 3
+  `[NTT-Numba-Kernel]` is **not worth building yet**: the serial pure-Python
+  CRT is 12.1 s of the 19.9 s serial 400 x 400 wall clock and essentially all
+  of the 13.8 s threaded wall clock, so compiled transforms would move the
+  headline number by a few percent. `[NTT-CRT-ProcessPool]` is the live next
+  step and needs its own plan. Awaiting the author's call on whether to retire
+  this plan at 1.2.0 with stage 3 dropped, or keep it open.
 
 ## Recently landed
 

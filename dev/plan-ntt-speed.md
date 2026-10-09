@@ -303,6 +303,83 @@ transform against 12.4 s CRT serial, so the CRT is half the wall clock, and at
 transform spans sum to 129.6 thread-seconds against 12.7 s serial, a 10x
 inflation under contention.
 
+### Stage 2 `[NTT-Inplace-Kernels]`, 1.2.0a2
+
+Ruling 6 folded in: the `ntt_workers` default moved here from stage 3, and
+`ntt_audit` gained its `workers` row (ruling 8; the `engine` row waits for
+stage 3). The language reference sentence on `ntt_workers` was reworded to
+state the new default, a one-sentence docs edit the plan said would not be
+needed.
+
+Measurements on DOOB, 2026-10-09, against the 1.2.0a1 numbers above.
+
+| case | 1.2.0a1 | 1.2.0a2 |
+|---|---|---|
+| forward NTT, one prime, L = 2**20 | 0.192 s | 0.164 s |
+| inverse NTT, one prime, L = 2**20 | 0.124 s | 0.082 s |
+| geometric spectral walk, one prime | 0.230 s | 0.148 s |
+| per-outcome spectral walk, one prime | 8.62 s | 4.82 s |
+| dense 400 x 400, transform phase, serial | 12.7 s | 7.7 s (1.65x) |
+| dense 400 x 400 end to end, serial | 25.1 s | 19.9 s |
+| dense 400 x 400 end to end, 8 workers | 17.2 s | 13.8 s |
+
+The 1.65x on the transform phase is squarely in the plan's predicted 1.4x to
+1.6x band. The in-place rewrite also lifts the per-outcome walk by 1.79x,
+which matters only on irregular outcome sets, the cases stage 1 cannot help.
+
+Headline case, 1000 x 1000 uniform dice, support 10^6, L = 2**20, 321 primes:
+
+| phase | value |
+|---|---|
+| wall clock, default 8 workers | 594.0 s |
+| of which serial CRT, main thread | 589.6 s (99.3 percent) |
+| transform phase, summed thread-seconds | 3638.8 |
+| 1.1.0 baseline, serial | about 3600 s |
+| 1.1.0 baseline, 8 workers | about 1500 s |
+
+Call it **6x on the serial baseline and 2.5x on the threaded one**, and the
+case is now bounded by one phase: the CRT holds 99.3 percent of the wall
+clock and the transform phase disappears entirely behind it.
+
+One further finding, which the plan did not anticipate and which matters for
+whatever comes next. At `L = 2**20` the threads do not merely stop scaling,
+they lose ground: the transform phase sums to 3638.8 thread-seconds, against
+a serial projection of 126 s (321 primes at 0.394 s each measured one prime
+at a time). That is a **29x inflation** under contention, so the threaded
+transform phase takes roughly 455 s of wall clock where serial would take
+126 s. The 8 MB arrays are far outside cache and eight of them in flight
+saturate the memory bus.
+
+Threading still wins end to end, 594 s against a serial estimate of about
+716 s, but **the gain is overlap with the serial CRT, not parallel speedup**.
+Any worker count above 1 buys that overlap; eight buys it at 29 times the
+CPU. If `[NTT-CRT-ProcessPool]` lands, the right shape is probably a
+parallel CRT with a small worker count on the transforms, and the default
+ruled here is worth revisiting at that point.
+
+
+### The measurement has ruled on stage 3
+
+Review finding 3 is now settled by numbers rather than by estimate. The serial
+pure-Python bigint CRT is **12.1 s of the 19.9 s** serial 400 x 400 wall clock
+and **essentially all** of the 13.8 s threaded wall clock: the transform phase
+at 8 workers hides almost entirely behind it. On the headline case the split is
+starker still, **589.6 s of 594.0 s, 99.3 percent**. A compiled Montgomery
+engine attacks only the phase that is no longer the cost.
+
+The bandwidth wall the plan predicted is also visible and worse than numpy
+thread counts suggest: at 8 workers the per-prime transform spans sum to 102.3
+thread-seconds against 7.7 s serial, a 13x inflation under contention. That is
+an argument for compiled kernels on their own merits, but not one that moves
+the headline number while the CRT is serial.
+
+**Recommendation to the author.** Retire `[NTT-Numba-Kernel]` from this plan and
+open `[NTT-CRT-ProcessPool]` as its own plan: chunk the coefficient vector
+across processes, each process running the incremental CRT over its own slice of
+coefficients for all primes, which parallelizes cleanly because the CRT is
+elementwise across coefficients. If stage 3 is wanted anyway, review finding 2
+records the REDC correction it needs.
+
 ## Known limits (unchanged, documented)
 
 The 32 bit prime supply still caps the envelope near transform length 2^22;

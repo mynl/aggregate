@@ -25,6 +25,7 @@ no top-level re-export.
 
 import logging
 import math
+import os
 import time
 from fractions import Fraction
 from math import lcm
@@ -47,6 +48,39 @@ _MILLER_RABIN_WITNESSES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
 #: Bit-reversal permutation indices, keyed by transform length and shared
 #: across primes: the permutation depends only on the length.
 _BIT_REVERSAL_CACHE = {}
+
+
+def _mulmod(out, x, y, prime):
+    """
+    ``out[:] = x * y % prime``, in place, allocating nothing.
+
+    Parameters
+    ----------
+    out : numpy.ndarray
+        uint64 destination, which may be ``x`` or ``y``.
+    x, y : numpy.ndarray or numpy.uint64
+        uint64 residues below ``2**32``, so the product fits in uint64.
+    prime : numpy.uint64
+        The modulus, already as a uint64 scalar.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``out``, for chaining.
+
+    Notes
+    -----
+    The modular multiply is the whole cost of the transform, and written as
+    ``x * y % p`` numpy allocates and fills two full-length temporaries per
+    call. On a ``2**20`` uint64 array that is 2.83 ms against 1.67 ms for
+    the same arithmetic through ``out=``, so the temporaries are about 40
+    percent of the work. The integer division behind ``%`` is 62 percent of
+    what remains, which is the wall a compiled Montgomery kernel would
+    remove (``[NTT-Numba-Kernel]``, held).
+    """
+    np.multiply(x, y, out=out)
+    np.mod(out, prime, out=out)
+    return out
 
 
 def is_prime_u64(n):
@@ -213,11 +247,14 @@ def _twiddle_table(length, w, p):
     half = length // 2
     table = np.empty(max(half, 1), dtype=np.uint64)
     table[0] = 1
+    p64 = np.uint64(p)
     size = 1
     while size < half:
         factor = int(table[size - 1]) * w % p  # w**size
         block = min(size, half - size)
-        table[size:size + block] = table[:block] * np.uint64(factor) % np.uint64(p)
+        # ``block <= size``, so source and destination slices are disjoint
+        # and the doubling can write straight into the table.
+        _mulmod(table[size:size + block], table[:block], np.uint64(factor), p64)
         size *= 2
     return table
 
@@ -249,41 +286,56 @@ def ntt(values, prime, root, inverse=False):
     Iterative radix-2 decimation-in-time Cooley-Tukey over ``Z/p``: the usual
     FFT with ``exp(-2*pi*i/L)`` replaced by ``root``. All arithmetic is
     full-array numpy uint64 (products of two residues below ``2**32`` fit in
-    uint64); subtraction is ``(u + p - t) % p`` to stay unsigned. The
+    uint64); subtraction is ``u + p - t`` to stay unsigned. The
     bit-reversal permutation is cached per length and shared across primes;
     the twiddle table is rebuilt per call (per prime and direction), a
     negligible log-doubling cost against caching hundreds of megabyte-scale
     tables. The inverse uses ``root**(p-2) mod p`` as its root and scales by
     ``L**(p-2) mod p``.
+
+    Every butterfly level writes through ``out=`` into one scratch buffer of
+    ``L / 2`` words, allocated once per call, and into the data array
+    itself. The two halves ``u`` and ``v`` are disjoint column slices of the
+    same reshaped view, so the in-place writes cannot alias, but the order
+    matters: ``v`` is written first, while ``u`` still holds its old value.
+    The caller's array is never modified (the bit-reversal fancy index hands
+    back a fresh owned copy, which is what the reduction then writes into).
     """
-    a = np.asarray(values, dtype=np.uint64) % np.uint64(prime)
+    a = np.asarray(values, dtype=np.uint64)
     length = len(a)
     if length & (length - 1):
         raise ValueError(f'transform length must be a power of two, got {length}')
+    p64 = np.uint64(prime)
     if length == 1:
-        return a.copy()
+        return a % p64
     if pow(root, length, prime) != 1 or pow(root, length // 2, prime) == 1:
         raise ValueError(
             f'root {root} is not a primitive {length}-th root of unity mod {prime}')
     a = a[_bit_reversal_indices(length)]
+    np.mod(a, p64, out=a)
     w = pow(root, prime - 2, prime) if inverse else root
     table = _twiddle_table(length, w, prime)
-    p64 = np.uint64(prime)
+    scratch = np.empty(length // 2, dtype=np.uint64)
     m = 1
     while m < length:
         stride = length // (2 * m)
-        wj = table[::stride][:m]
+        # a contiguous copy of the m twiddles this level needs: the strided
+        # view would make every multiply a gather
+        wj = np.ascontiguousarray(table[::stride][:m])
         b = a.reshape(-1, 2 * m)
         u = b[:, :m]
         v = b[:, m:]
-        t = v * wj % p64
+        t = scratch.reshape(u.shape)
+        _mulmod(t, v, wj, p64)
         # write v first from the untouched u, then u; the slices are disjoint
-        v[:] = (u + p64 - t) % p64
-        u[:] = (u + t) % p64
+        np.add(u, p64, out=v)
+        np.subtract(v, t, out=v)
+        np.mod(v, p64, out=v)
+        np.add(u, t, out=u)
+        np.mod(u, p64, out=u)
         m *= 2
     if inverse:
-        scale = np.uint64(pow(length, prime - 2, prime))
-        a = a * scale % p64
+        _mulmod(a, a, np.uint64(pow(length, prime - 2, prime)), p64)
     return a
 
 
@@ -385,21 +437,33 @@ def _array_pow(base, exponent, prime):
     ``exponent``, skipping the final squaring (its result would never be
     used). About ``2 * log2(exponent)`` full-array modular multiplies.
     Products of two residues below ``2**32`` fit in uint64.
+
+    Two buffers are allocated at most, the accumulator and the running
+    square, and every multiply after that writes through ``out=``.
+    ``base`` is never modified: the first squaring allocates the running
+    square rather than writing into the caller's array, and the accumulator
+    starts as a copy.
     """
     p64 = np.uint64(prime)
+    e = int(exponent)
+    if e == 0:
+        return np.ones(len(base), dtype=np.uint64)
     result = None
     current = base
-    e = int(exponent)
-    first = True
+    owned = False          # whether ``current`` is ours to write into
     while e:
-        if not first:
-            current = current * current % p64
-        first = False
         if e & 1:
-            result = current.copy() if result is None else result * current % p64
+            if result is None:
+                result = current.copy()
+            else:
+                _mulmod(result, result, current, p64)
         e >>= 1
-    if result is None:
-        return np.ones(len(base), dtype=np.uint64)
+        if e:
+            if owned:
+                _mulmod(current, current, current, p64)
+            else:
+                current = _mulmod(np.empty_like(current), current, current, p64)
+                owned = True
     return result
 
 
@@ -464,42 +528,60 @@ def _spectral_walk(a_hat, freq_runs, ds, kmax, prime):
     """
     p64 = np.uint64(prime)
     one = np.uint64(1)
-    b = a_hat * np.uint64(pow(ds % prime, prime - 2, prime)) % p64
+    n = len(a_hat)
+    b = _mulmod(np.empty(n, dtype=np.uint64), a_hat,
+                np.uint64(pow(ds % prime, prime - 2, prime)), p64)
     unit = b == one
-    total = np.zeros(len(b), dtype=np.uint64)
+    total = np.zeros(n, dtype=np.uint64)
     # ``power`` holds ``b**held``; every run bridges from the exponent in
     # hand by vectorized square-and-multiply over the gap.
-    power = np.ones(len(b), dtype=np.uint64)
+    power = np.ones(n, dtype=np.uint64)
+    term = np.empty(n, dtype=np.uint64)
     held = 0
     inv_bm1 = None
     for start, run_length, weight in freq_runs:
         gap = start - held
         if gap:
             base = b
+            owned = False      # whether ``base`` is ours to write into
             first = True
             while gap:
                 if not first:
-                    base = base * base % p64
+                    if owned:
+                        _mulmod(base, base, base, p64)
+                    else:
+                        base = _mulmod(np.empty(n, dtype=np.uint64), b, b, p64)
+                        owned = True
                 first = False
                 if gap & 1:
-                    power = power * base % p64
+                    _mulmod(power, power, base, p64)
                 gap >>= 1
             held = start
         w = np.uint64(weight % prime)
         if run_length < _GEOMETRIC_RUN_MIN:
             for j in range(run_length):
-                total = (total + w * power % p64) % p64
+                _mulmod(term, power, w, p64)
+                np.add(total, term, out=total)
+                np.mod(total, p64, out=total)
                 if j + 1 < run_length:
-                    power = power * b % p64
+                    _mulmod(power, power, b, p64)
                     held += 1
         else:
             if inv_bm1 is None:
-                inv_bm1 = _array_pow((b + p64 - one) % p64, prime - 2, prime)
-            series = (_array_pow(b, run_length, prime) + p64 - one) % p64
-            series = series * inv_bm1 % p64
+                inv_bm1 = np.empty(n, dtype=np.uint64)
+                np.add(b, p64 - one, out=inv_bm1)
+                np.mod(inv_bm1, p64, out=inv_bm1)
+                inv_bm1 = _array_pow(inv_bm1, prime - 2, prime)
+            series = _array_pow(b, run_length, prime)
+            np.add(series, p64 - one, out=series)
+            np.mod(series, p64, out=series)
+            _mulmod(series, series, inv_bm1, p64)
             series[unit] = run_length % prime
-            total = (total + w * (power * series % p64) % p64) % p64
-    return total * np.uint64(pow(ds, kmax, prime)) % p64
+            _mulmod(series, series, power, p64)
+            _mulmod(series, series, w, p64)
+            np.add(total, series, out=total)
+            np.mod(total, p64, out=total)
+    return _mulmod(total, total, np.uint64(pow(ds, kmax, prime)), p64)
 
 
 def _spectral_walk_singular(a_hat, freq_runs, ds, kmax, prime):
@@ -521,25 +603,35 @@ def _spectral_walk_singular(a_hat, freq_runs, ds, kmax, prime):
     array multiply each, exactly as before the geometric path existed.
     """
     p64 = np.uint64(prime)
-    total = np.zeros(len(a_hat), dtype=np.uint64)
-    power = np.ones(len(a_hat), dtype=np.uint64)
+    n = len(a_hat)
+    total = np.zeros(n, dtype=np.uint64)
+    power = np.ones(n, dtype=np.uint64)
+    term = np.empty(n, dtype=np.uint64)
     held = 0
     for start, run_length, weight in freq_runs:
         for j in range(run_length):
             k = start + j
             gap = k - held
             base = a_hat
+            owned = False      # whether ``base`` is ours to write into
             first = True
             while gap:
                 if not first:
-                    base = base * base % p64
+                    if owned:
+                        _mulmod(base, base, base, p64)
+                    else:
+                        base = _mulmod(np.empty(n, dtype=np.uint64),
+                                       a_hat, a_hat, p64)
+                        owned = True
                 first = False
                 if gap & 1:
-                    power = power * base % p64
+                    _mulmod(power, power, base, p64)
                 gap >>= 1
             held = k
             coefficient = weight % prime * pow(ds, kmax - k, prime) % prime
-            total = (total + np.uint64(coefficient) * power % p64) % p64
+            _mulmod(term, power, np.uint64(coefficient), p64)
+            np.add(total, term, out=total)
+            np.mod(total, p64, out=total)
     return total
 
 
@@ -589,13 +681,14 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     sev_probs : sequence of Fraction
         Exact severity probabilities, summing to exactly 1.
     workers : int, optional
-        Thread count for the per-prime transform phase. ``None`` or 1 runs
-        serial. The per-prime pipeline is embarrassingly parallel and the
-        uint64 ufuncs release the GIL, so threads parallelize it at zero
-        pickling cost; the CRT phase is GIL-bound bigint work and stays
-        serial in the calling thread either way (measured at about a tenth
-        of the transform cost on dense cases; see dev/plan-nttagg.md,
-        [NTT-Parallel]).
+        Thread count for the per-prime transform phase. ``None``, the
+        default, uses ``min(8, os.cpu_count())``; pass 1 to force serial.
+        The per-prime pipeline is embarrassingly parallel and the uint64
+        ufuncs release the GIL, so threads parallelize it at zero pickling
+        cost. The CRT phase is GIL-bound bigint work and stays serial in the
+        calling thread either way, which now sets the floor on a dense case:
+        at 400 x 400 it is about half the serial wall clock. Beyond about 8
+        threads the transforms gain nothing, being memory bandwidth bound.
 
     Returns
     -------
@@ -642,6 +735,11 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     The direct polynomial reference :func:`exact_compound_poly` computes the
     same answer slowly and independently; the tests compare the two.
     """
+    if workers is None:
+        # Ruled 2026-10-09 (dev/plan-ntt-speed.md): the serial default
+        # surprised the author on the first big run. Beyond 8 threads the
+        # bandwidth-bound ufuncs stop gaining.
+        workers = min(8, os.cpu_count() or 1)
     freq_outcomes, freq_probs = _validate_exact_inputs(
         freq_outcomes, freq_probs, 'frequency')
     sev_outcomes, sev_probs = _validate_exact_inputs(
@@ -681,7 +779,7 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
                                    big_q, freq_runs, ds, kmax)
 
     pool = None
-    if workers is not None and workers > 1:
+    if workers > 1:
         from concurrent.futures import ThreadPoolExecutor
         pool = ThreadPoolExecutor(max_workers=workers)
         results = pool.map(run, primes)
@@ -736,7 +834,7 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
             'prime_bits_min': min(prime_bits),
             'prime_bits_max': max(prime_bits),
             'transform_seconds': t_transform, 'crt_seconds': t_crt,
-            'workers': workers if workers else 1}
+            'workers': workers}
     return reconstructed, denominator, meta
 
 
@@ -924,10 +1022,12 @@ class AggregateNTT(Aggregate):
         kwargs
             ``ntt_override=True`` lifts the soft guardrail caps
             (``NTT_MAX_SUPPORT``, ``NTT_MAX_BYTES`` in ``constants.py``);
-            ``ntt_workers=<int>`` threads the per-prime transform phase
-            (measured at 2.5x on a dense 400 x 400 case with 8 workers;
-            the GIL-bound CRT stays serial); everything else passes to
-            :meth:`Aggregate.update`.
+            ``ntt_workers=<int>`` sets the thread count for the
+            per-prime transform phase, which defaults to
+            ``min(8, os.cpu_count())``; pass ``ntt_workers=1`` to force
+            serial. The GIL-bound CRT phase stays serial either way and is
+            about half the wall clock of a dense case. Everything else
+            passes to :meth:`Aggregate.update`.
 
         Notes
         -----
@@ -1094,7 +1194,7 @@ class AggregateNTT(Aggregate):
 
         Rows: ``support``, ``transform_length``, ``denominator_bits``,
         ``primes_used``, ``prime_bits_min`` / ``prime_bits_max``,
-        ``transform_seconds``, ``crt_seconds``, ``max_abs_err``,
+        ``workers``, ``transform_seconds``, ``crt_seconds``, ``max_abs_err``,
         ``max_rel_err`` (over buckets with nonzero exact probability),
         ``noise_floor`` (max ``|p_fft|`` over exact-zero buckets), and
         ``exact_zero_nonzero_float`` (count of exact-zero buckets carrying a
@@ -1118,6 +1218,7 @@ class AggregateNTT(Aggregate):
              'primes_used': meta['primes_used'],
              'prime_bits_min': meta['prime_bits_min'],
              'prime_bits_max': meta['prime_bits_max'],
+             'workers': meta['workers'],
              'transform_seconds': meta['transform_seconds'],
              'crt_seconds': meta['crt_seconds'],
              'max_abs_err': adf.abs_err.max(),

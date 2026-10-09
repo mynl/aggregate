@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a2 - 2026-10-09
+
+**[NTT-Inplace-Kernels] the `nttagg` transform writes through preallocated buffers, and the transform phase now threads by default.** Every hot array expression in `aggregate.ntt` goes through `out=` against scratch allocated once per call: the butterflies in `ntt`, the twiddle table doubling, the inverse scaling, the binary exponentiations and the power updates in both spectral walks. Same integer arithmetic in the same prime fields, so answers are bit identical; what goes away is a full-length temporary per modular multiply, worth 1.65x on the transform phase of the dense 400 x 400 case (12.7 s to 7.7 s) and 1.5x on the spectral walk at transform length 2**20.
+
+`ntt_workers` now defaults to `min(8, os.cpu_count())` instead of serial; pass `ntt_workers=1` to force serial. `ntt_audit` gains a `workers` row, which `meta` already carried unreported. The dense 400 x 400 case runs in 13.8 s at the default against 25.1 s serial at 1.2.0a1 and 119 s at 1.1.0; the headline 1000 x 1000 uniform dice case, support 10^6 at transform length 2**20 over 321 primes, now runs in 594 s against about an hour serial and about 25 minutes at eight workers on 1.1.0.
+
 ## 1.2.0a1 - 2026-10-09
 
 **[NTT-Uniform-Geometric] the `nttagg` spectral walk sums equal-weight outcome runs in closed form.** The frequency outcomes are decomposed once into maximal runs of consecutive integers sharing one cleared weight, and a run of eight or more is evaluated as a geometric series in the spectral variable rather than one modular array multiply per outcome, costing `log2(run_length)` array multiplies instead of `run_length`. A uniform claim count is a single such run, so the dominant phase of a dense case collapses: measured 37.5x on the spectral walk of the 1000 x 1000 uniform dice shape (8.62 s to 0.23 s per prime at transform length 2**20), taking the dense 400 x 400 case end to end from 119 s to 25.1 s serial. Shorter runs and irregular outcome sets keep the per-outcome walk and pay nothing new. Answers are unchanged: same integer arithmetic in the same prime fields, pinned by the polynomial oracle and by a direct test that the closed form and the forced per-outcome walk agree bit for bit.

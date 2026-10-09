@@ -1459,24 +1459,6 @@ agg PayoffPrimitive
   note{The payoff orientation suffix marks the variable as an asset-return primitive rather than a loss, so it prices through the dual distortion. loss is the twin suffix, stating the ordinary convention explicitly.}
   tags{topic:economics, role:advanced};
 
-port PnLBook
-  note{A two line profit and loss book, cat against property, each line carrying its own premium.}
-  tags{topic:portfolio, topic:economics, role:advanced}
-  pnl Cat
-    2000 premium
-    less
-      agg PnL.Cat
-        2000 premium at 0.55 lr
-        sev lognorm 500 cv 3
-        poisson
-  pnl Prop
-    5000 premium
-    less
-      agg PnL.Prop
-        5000 premium at 0.65 lr
-        sev lognorm 100 cv 2
-        poisson;
-
 agg SignedSeverity
   dfreq [3]
   dsev [-2 5]

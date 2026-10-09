@@ -1,0 +1,1322 @@
+# reproductions.agg
+# ======================================================================
+#
+# Every DecL program in *Reproductions*, the book of worked examples that
+# rebuilds published actuarial and numerical results with `aggregate`.
+# Each declaration carries a note{} naming the paper it comes from and
+# saying in one line what it is.
+#
+# See https://blog.mynl.com/posts/notes/2026-10-08-Aggregate-Reproductions/
+#
+# Generated from the book by `make_agg.py`; do not edit by hand. Programs
+# are in canonical form, which is what the parser understood rather than
+# what was typed, and are named `<CitationKey>.<declared name>` so that
+# nothing in the file shadows anything else. Declarations sharing a shape
+# are sampled two apiece, as the book appendix samples them, and a model
+# built by more than one chapter is listed once. The shipped severity
+# curves are exempt from the sampling, each being its own curve rather
+# than an arithmetic variant of the one above it.
+#
+# 124 programs from 27 chapters.
+#
+# Read it back with `build.load("reproductions.agg")`, or parse it
+# without loading with `build.interpret_file("reproductions.agg")`.
+# Sections below are the book chapters that built the programs; the
+# name and the note give the paper.
+#
+# Every declaration here parses. Not all of them build on a default
+# grid: where a severity has infinite variance or no mean, the bucket
+# sizer has nothing to size from and raises rather than guessing, which
+# is the behavior you want. Give those a limit or an explicit hints{}
+# clause. The severity curves chapter of the book says which and why.
+
+
+# Bibliography
+# ----------------------------------------------------------------------
+#
+# The 28 works the notes below cite, read from the library
+# the book itself cites, D:/Projects/Biblio/uber-library.bib.
+#
+# @Asmussen2016a
+#     Asmussen, Søren and Jensen, Jens Ledet and Rojas-Nandayapa, Leonardo
+#     (2016). Exponential Family Techniques for the Lognormal Left Tail.
+#     Scandinavian Journal of Statistics 43(3), 774-787.
+#     doi:10.1111/sjos.12203
+#
+# @Bear1990
+#     Bear, R. A. and Nemlick, K. J. (1990). Pricing the impact of
+#     adjustable features and loss sharing provisions of reinsurance
+#     treaties. Proceedings of the Casualty Actuarial Society 77(147),
+#     86-87. doi:10.1016/0167-6687(93)91078-9
+#
+# @BenAmar2023
+#     Ben Amar, Eya and Ben Rached, Nadhir and Haji-Ali, Abdul-Lateef and
+#     Tempone, Raúl (2023). State-dependent importance sampling for
+#     estimating expectations of functionals of sums of independent random
+#     variables. Statistics and Computing. doi:10.1007/s11222-022-10202-2
+#
+# @BenRached2024
+#     Ben Rached, Nadhir and Hoel, Håkon and Meo, Johannes Vincent (2024).
+#     A fast and accurate numerical method for the left tail of sums of
+#     independent random variables. Statistics and Computing.
+#     doi:10.1007/s11222-024-10514-5
+#
+# @Berens1997
+#     Berens, Regina M. (1997). Reinsurance contracts with a multi-year
+#     aggregate limit. Casualty Actuarial Society Forum.
+#
+# @Bodoff2017
+#     Bodoff, Neil M. (2017). An Actuarial Model of Excess of Policy
+#     Limits Losses. Variance 11. doi:10.66573/001c.116059
+#
+# @Bruno2006
+#     Bruno, Maria Giuseppina and Camerini, Emanuela and Manna, Angelo and
+#     Tomassetti, Alvaro (2006). A new method for evaluating the
+#     distribution of aggregate claims. Applied Mathematics and
+#     Computation. doi:10.1016/j.amc.2005.09.038
+#
+# @Denuit2019
+#     Denuit, Michel M. (2019). Size-biased transform and conditional mean
+#     risk sharing, with application to p2p insurance and tontines. ASTIN
+#     Bulletin 49(3), 591-617. doi:10.1017/asb.2019.24
+#
+# @Denuit2022b
+#     Denuit, Michel M. and Hieber, Peter and Robert, Christian Y. (2022).
+#     Mortality Credits Within Large Survivor Funds. ASTIN Bulletin 52(3),
+#     813-834. doi:10.1017/asb.2022.13
+#
+# @Denuit2025
+#     Denuit, Michel M. and Ortega-Jiménez, Patricia and Robert,
+#     Christian-Yann (2025). Conditional expectations given the sum of
+#     independent random variables with regularly varying densities. ASTIN
+#     Bulletin. doi:10.1017/asb.2025.11
+#
+# @Denuit2025a
+#     Denuit, Michel M. and Dhaene, Jan and Ghossoub, Mario and Robert,
+#     Christian Y. (2025). Comonotonicity and Pareto optimality, with
+#     application to collaborative insurance. Insurance: Mathematics and
+#     Economics 120, 1-16. doi:10.1016/j.insmatheco.2024.11.001
+#
+# @Embrechts1993
+#     Embrechts, Paul and Grübel, Rudolf and Pitts, S. M. (1993). Some
+#     applications of the fast Fourier transform algorithm in insurance
+#     mathematics. Statistica Neerlandica 47(1), 59-75.
+#     doi:10.1111/j.1467-9574.1993.tb01406.x
+#
+# @Embrechts2009a
+#     Embrechts, Paul and Frei, Marco (2009). Panjer recursion versus FFT
+#     for compound distributions. Mathematical Methods of Operations
+#     Research 69(3), 497-508. doi:10.1007/s00186-008-0249-2
+#
+# @Gerber1982
+#     Gerber, Hans U. (1982). On the numerical evaluation of the
+#     distribution of aggregate claims and its stop-loss premiums.
+#     Insurance Mathematics and Economics 1(1), 13-18.
+#     doi:10.1016/0167-6687(82)90016-6
+#
+# @Grubel1999
+#     Grübel, Rudolf and Hermesmeier, Renate (1999). Computation of
+#     Compound Distributions I: Aliasing Errors and Exponential Tilting.
+#     Astin Bulletin 29(2), 197-214. doi:10.2143/AST.29.2.504611
+#
+# @Homer2003
+#     Homer, David L. and Clark, David R. (2003). Insurance Applications
+#     of Bivariate Distributions. Proceedings of the Casualty Actuarial
+#     Society 90(iid), 274-307.
+#     http://www.casact.org/pubs/proceed/proceed03/03274.pdf
+#
+# @Jin2016
+#     Jin, Tao and Provost, Serge B. and Ren, Jiandong (2016). Moment-
+#     based density approximations for aggregate losses. Scandinavian
+#     Actuarial Journal 2016(3), 216-245. doi:10.1080/03461238.2014.921640
+#
+# @Kang2019
+#     Kang, John Sang Jin and Provost, Serge B. and Ren, Jiandong (2019).
+#     Moment-Based Density Approximation Techniques as Applied to Heavy-
+#     tailed Distributions. International Journal of Statistics and
+#     Probability. doi:10.5539/ijsp.v8n3p1
+#
+# @Liu2026
+#     Liu, Zhengyu and Wu, Jiaxi and Yao, Jing (2026). Estimating tail
+#     probabilities of heavy-tailed distributions using k-moment tilting.
+#     Operations Research Letters. doi:10.1016/j.orl.2026.107509
+#
+# @Mack2003
+#     Mack, Thomas and Fackler, Michael (2003). Exposure-rating in
+#     liability reinsurance. Blätter der DGVFM 26(2), 229-238.
+#
+# @Mata2005
+#     Mata, Ana J. and Verheyen, Mark A. (2005). An Improved Method for
+#     Experience Rating Excess of Loss Treaties using Exposure Rating
+#     Techniques. CAS Forum.
+#
+# @Robertson1992
+#     Robertson, John P. (1992). The computation of aggregate loss
+#     distributions. Proceedings of the Casualty Actuarial Society
+#     79(150), 57-133.
+#
+# @Schaller2008
+#     Schaller, P. and Temnov, G. (2008). Efficient and Precise
+#     Computation of Convolutions: Applying FFTs to Heavy Tailed
+#     Distributions. Computational Methods in Applied Mathematics 8(2),
+#     187-200.
+#
+# @Venter1983
+#     Venter, Gary G. (1983). Transformed beta and gamma distributions and
+#     aggregate losses. Proceedings of the Casualty Actuarial Society
+#     70(133), 289-308.
+#
+# @Wang2000
+#     Wang, Shaun S. (2000). A class of distorion operators for pricing
+#     financial and insurance risks. Journal of Risk and Insurance 67(1),
+#     15-36.
+#
+# @Wang2002
+#     Wang, Shaun S. (2002). A Universal Framework for Pricing Financial
+#     and Insurance Risks. ASTIN Bulletin 32(2), 213-234.
+#     doi:10.2143/AST.32.2.1027
+#
+# @Wilson2016a
+#     Wilson, Huon and Keich, Uri (2016). Accurate pairwise convolutions
+#     of non-negative vectors via FFT. Computational Statistics and Data
+#     Analysis 101, 300-315. doi:10.1016/j.csda.2016.03.010
+#
+# @Wilson2017
+#     Wilson, Huon and Keich, Uri (2017). Accurate small tail
+#     probabilities of sums of iid lattice-valued random variables via
+#     FFT. Journal of Computational and Graphical Statistics 26(1),
+#     223-229.
+#
+
+# Five papers, five programs  [summary.qmd]
+# ----------------------------------------------------------------------
+
+agg Venter1983.Venter
+  13.7376 claims
+  250000 xs 0
+  sev chistogram xps [0 1000 5000 6000 7000 8000 9000 10000 12500 15000 17500 20000 25000 35000 50000 75000 100000 125000 150000 175000 200000 225000 250000 300000] [0.38935 0.38935 0.00568 0.00543 0.00517 0.00495 0.00473 0.01098 0.00989 0.00896 0.00815 0.01426 0.02237 0.02353 0.02459 0.01517 0.01021 0.00732 0.00547 0.00423 0.00337 0.00274 0.0241]
+  poisson
+  note{@Venter1983, Exhibit 3, a compound Poisson over a tabulated claim size law.}
+
+agg Bear1990.BN.One
+  [9000 3000] premium at [0.04 0.03] lr
+  160 xs 0
+  sev 40 * pareto [0.9 0.95] + -40
+  poisson
+  note{@Bear1990, the subject book of two excess casualty classes.}
+
+agg Bear1990.BN.One.v2
+  [9000 3000] premium at [0.04 0.03] lr
+  160 xs 0
+  sev 40 * pareto [0.9 0.95] + -40
+  poisson
+  aggregate net of
+    360 xs 0
+  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.}
+
+agg Homer2003.HC
+  5 claims
+  dsev [200000 400000 600000 800000 1000000] [0.378 0.235 0.146 0.091 0.15]
+  occurrence net of
+    400000 xs 600000
+  mixed gamma 0.2
+  note{@Homer2003, Section 2's per occurrence layer, whose net and ceded views give Table 2.3.}
+
+agg Bruno2006.B7
+  91000 claims
+  dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.0103301 0.030799 0.0293511 0.0103301 0.0730414 0.0111568 0.0264554 0.1002133 0.0815418 0.0252146 0.0212857 0.0254214 0.0991756 0.4556837]
+  poisson
+  note{@Bruno2006, Table 7's compound Poisson at lambda = 91,000.}
+
+port Denuit2025a.Denuit.Pool
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  agg Agent1
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg Agent2
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg Agent3
+    1 claim
+    sev 2 * gamma [1 8] wts [0.504541349633 0.495458650367] splice [0 0] [30 30]
+    fixed
+
+
+# The threshold above which Riebesell is consistent  [Mack2003.qmd]
+# ----------------------------------------------------------------------
+
+agg Mack2003.S
+  1 claim
+  0.01 xs 0
+  sev expon
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v2
+  1 claim
+  0.1 xs 0
+  sev expon
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v3
+  1 claim
+  sev expon
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+
+agg Mack2003.S.v4
+  1 claim
+  0.01 xs 0
+  sev 10 * gamma 0.1
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v5
+  1 claim
+  0.1 xs 0
+  sev 10 * gamma 0.1
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v6
+  1 claim
+  sev 10 * gamma 0.1
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+
+agg Mack2003.S.v7
+  1 claim
+  0.01 xs 0
+  sev lognorm 1 cv 4.95315270785704
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v8
+  1 claim
+  0.1 xs 0
+  sev lognorm 1 cv 4.95315270785704
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v9
+  1 claim
+  sev lognorm 1 cv 4.95315270785704
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+
+agg Mack2003.S.v10
+  1 claim
+  0.01 xs 0
+  sev 0.5 * lomax 1.5
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v11
+  1 claim
+  0.1 xs 0
+  sev 0.5 * lomax 1.5
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+
+agg Mack2003.S.v12
+  1 claim
+  sev 0.5 * lomax 1.5
+  fixed
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+
+agg Mack2003.Riebesell
+  1 claim
+  5000000 xs 0
+  sev [9894.934954 259286.6924] * [lognorm pareto] [1.8 0.7369655942] wts [0.965191548087 0.034808451913] splice [0 259286.6924 inf]
+  fixed
+  note{@Mack2003, the spliced severity whose Pareto tail makes Riebesell's rule consistent.}
+
+agg Mack2003.Riebesell.v2
+  1 claim
+  50000 xs 0
+  sev [9894.934954 259286.6924] * [lognorm pareto] [1.8 0.7369655942] wts [0.965191548087 0.034808451913] splice [0 259286.6924 inf]
+  fixed
+  note{@Mack2003, the spliced severity whose Pareto tail makes Riebesell's rule consistent.}
+
+
+# Trend by layer, and a discrepancy in Table 1  [Mata2005.qmd]
+# ----------------------------------------------------------------------
+
+agg Mata2005.M
+  1 claim
+  250000 xs 0
+  sev lognorm 152062.97146657703 cv 13.727535749987513
+  fixed
+  note{@Mata2005, the lognormal severity behind Table 1, limited at one layer top.}
+
+agg Mata2005.M.v2
+  1 claim
+  500000 xs 0
+  sev lognorm 152062.97146657703 cv 13.727535749987513
+  fixed
+  note{@Mata2005, the lognormal severity behind Table 1, limited at one layer top.}
+
+agg Mata2005.M.v3
+  1 claim
+  sev lognorm 152062.97146657703 cv 13.727535749987513
+  fixed
+  note{@Mata2005, the lognormal severity behind Table 1, unlimited.}
+
+agg Mata2005.M.v4
+  1 claim
+  sev lognorm 103491.50327117534 cv 13.727535749987513
+  fixed
+  note{@Mata2005, the lognormal severity behind Table 1, unlimited.}
+
+
+# A policy limit that only usually holds  [Bodoff2017.qmd]
+# ----------------------------------------------------------------------
+
+agg Bodoff2017.B
+  1 claim
+  50000 xs 0
+  sev 50000 * lomax 1.5
+  fixed
+  note{@Bodoff2017, Exhibit 4's Pareto severity under a policy limit.}
+
+agg Bodoff2017.B.v2
+  1 claim
+  100000 xs 0
+  sev 50000 * lomax 1.5
+  fixed
+  note{@Bodoff2017, Exhibit 4's Pareto severity under a policy limit.}
+
+
+# The bivariate FFT, twenty years early  [Homer2003.qmd]
+# ----------------------------------------------------------------------
+
+bivariate Homer2003.A
+  dfreq [2]
+  dbvsev [0 1 2] [0 1 2] [[0.4 0 0] [0.3 0.3 0] [0 0 0]]
+  note{@Homer2003, the toy bivariate severity that checks the two dimensional convolution.}
+
+bivariate Homer2003.HC3
+  4 claims
+  dbvsev [0 200000 400000 600000 800000 1000000] [0 200000 400000 600000 800000 1000000 1200000] [[0.08389999999999327 0.014699999999998822 0.0012999999999998956 9.9999999999992e-05 0 0 0] [0.27979999999997757 0.13289999999998933 0.03159999999999747 0.004999999999999599 0.0005999999999999518 9.9999999999992e-05 0] [0.04149999999999668 0.03209999999999742 0.012499999999998998 0.003199999999999744 0.0005999999999999518 9.9999999999992e-05 0] [0.030699999999997542 0.03299999999999736 0.01769999999999858 0.006399999999999488 0.0016999999999998637 0.000399999999999968 9.9999999999992e-05] [0.022799999999998172 0.03129999999999749 0.021499999999998274 0.009899999999999208 0.0033999999999997275 0.0008999999999999279 0.000199999999999984] [0.033756260434097296 0.05659432387309546 0.047378964941596206 0.02644407345579788 0.011118530884799109 0.003706176961599703 0.0010016694490799197]]
+  mixed gamma 0.5
+  note{@Homer2003, Section 3's loss subject to an aggregate, plus unlimited ALAE.}
+
+bivariate Homer2003.HC4
+  10 claims
+  dbvsev [0 200000 400000 600000 800000] [0 1 2 3 4 5] [[0 0.10000000000000002 0 0 0 0] [0.43800000000000006 0 0 0 0 0] [0.24600000000000002 0 0 0 0 0] [0.13800000000000004 0 0 0 0 0] [0.07800000000000001 0 0 0 0 0]]
+  mixed gamma 0.31622776601683794
+  note{@Homer2003, Section 4's joint distribution of dollars against counts.}
+
+bivariate Homer2003.HC4b
+  10 claims
+  dbvsev [0 200000 400000 600000 800000] [0 1 2 3 4 5] [[0 0.10000000000000002 0 0 0 0] [0.43800000000000006 0 0 0 0 0] [0.24600000000000002 0 0 0 0 0] [0.13800000000000004 0 0 0 0 0] [0.07800000000000001 0 0 0 0 0]]
+  mixed gamma 0.31622776601683794
+  note{@Homer2003, Section 4's joint distribution on the smaller grid, for the reach comparison.}
+
+
+# Six adjustable features, one clause each  [Bear1990.qmd]
+# ----------------------------------------------------------------------
+
+port Bear1990.BearNemlick.One
+  note{@Bear1990, the Table I subject book as a two class portfolio.}
+  agg Class1
+    9000 premium at 0.04 lr
+    160 xs 0
+    sev 40 * pareto 0.9 + -40
+    mixed gamma 0.07879574790219362
+  agg Class2
+    3000 premium at 0.03 lr
+    160 xs 0
+    sev 40 * pareto 0.95 + -40
+    mixed gamma 0.22335691114062584
+
+port Bear1990.BearNemlick.Two
+  note{@Bear1990, the Treaty II subject book as a three class portfolio.}
+  agg Class1
+    2000 premium at 0.1 lr
+    700 xs 0
+    sev 300 * pareto 1.5 + -300
+    mixed gamma 0.09022811434760547
+  agg Class2
+    2000 premium at 0.14 lr
+    700 xs 0
+    sev 300 * pareto 1.3 + -300
+    mixed gamma 0.09869275424396479
+  agg Class3
+    2000 premium at 0.21 lr
+    700 xs 0
+    sev 300 * pareto 1.1 + -300
+    mixed gamma 0.12408498159738195
+
+xpnl Bear1990.BN.TreatyII
+  1172 premium
+  less
+    agg BN.Two
+      [2000 2000 2000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      occurrence net of
+        700 xs 0 deposit 1172 reinstatements [0 0 0] as Layer
+      poisson
+  note{@Bear1990, Treaty II, three free reinstatements.}
+
+agg Bear1990.BN.TwoAlt
+  [2000 2000 2000] premium at [0.1 0.14 0.21] lr
+  700 xs 0
+  sev 300 * pareto [1.5 1.3 1.1] + -300
+  poisson
+  aggregate ceded to
+    2800 xs 0
+  note{@Bear1990, Treaty II's layer ceded as an aggregate rather than walked.}
+
+xpnl Bear1990.BN.TreatyIII
+  10000 premium
+  less
+    agg BN.Three
+      [4500 4500 1000] premium at [0.032 0.038 0.035] lr
+      400 xs 0
+      sev 100 * pareto 1.1 + -100
+      poisson
+      aggregate net of
+        10000 xs 0 deposit 350 corridor 1 po 1 xs 1 as Corridor
+  note{@Bear1990, Treaty III, a loss corridor.}
+
+xpnl Bear1990.BN.TreatyIIIb
+  10000 premium
+  less
+    agg BN.Three
+      [4500 4500 1000] premium at [0.032 0.038 0.035] lr
+      400 xs 0
+      sev 100 * pareto 1.1 + -100
+      poisson
+      aggregate net of
+        10000 xs 0 deposit 366.9658642415209 corridor 1 po 0.9537671868292504 xs 0.9537671868292504 as Corridor
+  note{@Bear1990, Treaty III at a recalibrated deposit and corridor.}
+
+pnl Bear1990.BN.TreatyIV
+  retro basic 0 lcm 1.3333333333 min 360 max 1200 premium
+  less
+    agg BN.Four
+      [9000 3000] premium at [0.04 0.03] lr
+      160 xs 0
+      sev 40 * pareto [0.9 0.95] + -40
+      poisson
+  note{@Bear1990, Treaty IV, retrospective rating.}
+
+xpnl Bear1990.BN.TreatyV
+  18000 premium
+  less
+    agg BN.Five
+      [6000 6000 6000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      poisson
+      aggregate net of
+        80% po 100000 xs 0 deposit 5625 pc 0.25 after 0.2 as "PC layer"
+  note{@Bear1990, Treaty V, a three year profit commission.}
+
+xpnl Bear1990.BN.TreatyVI
+  25000 premium
+  less
+    agg BN.Six
+      25000 premium at 0.1 lr
+      900 xs 0
+      sev 100 * pareto 0.98 + -100
+      poisson
+      aggregate net of
+        100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
+  note{@Bear1990, Treaty VI, a sliding scale commission.}
+
+xpnl Bear1990.BN.TreatyVI.v2
+  25000 premium
+  less
+    agg BN.Six
+      25000 premium at 0.1 lr
+      900 xs 0
+      sev 100 * pareto 0.95 + -100
+      poisson
+      aggregate net of
+        100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
+  note{@Bear1990, Treaty VI, a sliding scale commission.}
+
+agg Bear1990.BN.One.v3
+  [9000 3000] premium at [0.04 0.03] lr
+  160 xs 0
+  sev 40 * pareto [0.9 0.95] + -40
+  mixed gamma 0.22360679774997896
+  note{@Bear1990, the subject book of two excess casualty classes.}
+
+agg Bear1990.BN.One.v4
+  [9000 3000] premium at [0.04 0.03] lr
+  160 xs 0
+  sev 40 * pareto [0.9 0.95] + -40
+  mixed gamma 0.31622776601683794
+  note{@Bear1990, the subject book of two excess casualty classes.}
+
+agg Bear1990.BN.One.v5
+  [9000 3000] premium at [0.04 0.03] lr
+  160 xs 0
+  sev 40 * pareto [0.9 0.95] + -40
+  mixed gamma 0.22360679774997896
+  aggregate net of
+    360 xs 0
+  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.}
+
+agg Bear1990.BN.One.v6
+  [9000 3000] premium at [0.04 0.03] lr
+  160 xs 0
+  sev 40 * pareto [0.9 0.95] + -40
+  mixed gamma 0.31622776601683794
+  aggregate net of
+    360 xs 0
+  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.}
+
+xpnl Bear1990.BN.TreatyII.v2
+  1172 premium
+  less
+    agg BN.Two
+      [2000 2000 2000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      occurrence net of
+        700 xs 0 deposit 1172 reinstatements [0 0 0] as Layer
+      mixed gamma 0.22360679774997896
+  note{@Bear1990, Treaty II, three free reinstatements.}
+
+xpnl Bear1990.BN.TreatyII.v3
+  1172 premium
+  less
+    agg BN.Two
+      [2000 2000 2000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      occurrence net of
+        700 xs 0 deposit 1172 reinstatements [0 0 0] as Layer
+      mixed gamma 0.31622776601683794
+  note{@Bear1990, Treaty II, three free reinstatements.}
+
+xpnl Bear1990.BN.TreatyIII.v2
+  10000 premium
+  less
+    agg BN.Three
+      [4500 4500 1000] premium at [0.032 0.038 0.035] lr
+      400 xs 0
+      sev 100 * pareto 1.1 + -100
+      mixed gamma 0.22360679774997896
+      aggregate net of
+        10000 xs 0 deposit 350 corridor 1 po 1 xs 1 as Corridor
+  note{@Bear1990, Treaty III, a loss corridor.}
+
+xpnl Bear1990.BN.TreatyIII.v3
+  10000 premium
+  less
+    agg BN.Three
+      [4500 4500 1000] premium at [0.032 0.038 0.035] lr
+      400 xs 0
+      sev 100 * pareto 1.1 + -100
+      mixed gamma 0.31622776601683794
+      aggregate net of
+        10000 xs 0 deposit 350 corridor 1 po 1 xs 1 as Corridor
+  note{@Bear1990, Treaty III, a loss corridor.}
+
+pnl Bear1990.BN.TreatyIV.v2
+  retro basic 0 lcm 1.3333333333 min 360 max 1200 premium
+  less
+    agg BN.Four
+      [9000 3000] premium at [0.04 0.03] lr
+      160 xs 0
+      sev 40 * pareto [0.9 0.95] + -40
+      mixed gamma 0.22360679774997896
+  note{@Bear1990, Treaty IV, retrospective rating.}
+
+pnl Bear1990.BN.TreatyIV.v3
+  retro basic 0 lcm 1.3333333333 min 360 max 1200 premium
+  less
+    agg BN.Four
+      [9000 3000] premium at [0.04 0.03] lr
+      160 xs 0
+      sev 40 * pareto [0.9 0.95] + -40
+      mixed gamma 0.31622776601683794
+  note{@Bear1990, Treaty IV, retrospective rating.}
+
+xpnl Bear1990.BN.TreatyV.v2
+  18000 premium
+  less
+    agg BN.Five
+      [6000 6000 6000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      mixed gamma 0.22360679774997896
+      aggregate net of
+        80% po 100000 xs 0 deposit 5625 pc 0.25 after 0.2 as "PC layer"
+  note{@Bear1990, Treaty V, a three year profit commission.}
+
+xpnl Bear1990.BN.TreatyV.v3
+  18000 premium
+  less
+    agg BN.Five
+      [6000 6000 6000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      mixed gamma 0.31622776601683794
+      aggregate net of
+        80% po 100000 xs 0 deposit 5625 pc 0.25 after 0.2 as "PC layer"
+  note{@Bear1990, Treaty V, a three year profit commission.}
+
+xpnl Bear1990.BN.TreatyVI.v3
+  25000 premium
+  less
+    agg BN.Six
+      25000 premium at 0.1 lr
+      900 xs 0
+      sev 100 * pareto 0.98 + -100
+      mixed gamma 0.22360679774997896
+      aggregate net of
+        100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
+  note{@Bear1990, Treaty VI, a sliding scale commission.}
+
+xpnl Bear1990.BN.TreatyVI.v4
+  25000 premium
+  less
+    agg BN.Six
+      25000 premium at 0.1 lr
+      900 xs 0
+      sev 100 * pareto 0.98 + -100
+      mixed gamma 0.31622776601683794
+      aggregate net of
+        100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
+  note{@Bear1990, Treaty VI, a sliding scale commission.}
+
+xpnl Bear1990.BN.TreatyIIp
+  1172 premium
+  less
+    agg BN.Two
+      [2000 2000 2000] premium at [0.1 0.14 0.21] lr
+      700 xs 0
+      sev 300 * pareto [1.5 1.3 1.1] + -300
+      occurrence net of
+        700 xs 0 deposit 1172 reinstatements [1 1 1] as Layer
+      poisson
+  note{@Bear1990, Treaty II with paid rather than free reinstatements.}
+
+
+# Risk load by layer, and a misprinted basic limit  [Wang2000.qmd]
+# ----------------------------------------------------------------------
+
+agg Wang2000.Wang.Layers
+  1 claim
+  10000000 xs 0
+  sev 2000 * lomax 1.2
+  occurrence ceded to
+    50000 xs 0 and
+    50000 xs 50000 and
+    100000 xs 100000 and
+    100000 xs 200000 and
+    100000 xs 300000 and
+    100000 xs 400000 and
+    500000 xs 500000 and
+    1000000 xs 1000000 and
+    3000000 xs 2000000 and
+    5000000 xs 5000000
+  fixed
+  note{@Wang2000, Table 1's ground up loss ceded to the paper's layer tower.}
+
+distortion Wang2000.wang_a wang 0.1
+  note{@Wang2000, the Wang transform at the paper lambda.}
+
+distortion Wang2000.ph_r ph 0.9245
+  note{@Wang2000, the proportional hazard transform at the paper r.}
+
+distortion Wang2000.tmp ph 0.9
+  note{@Wang2000, a proportional hazard transform from the sweep over r.}
+
+distortion Wang2000.tmp.v2 ph 0.95
+  note{@Wang2000, a proportional hazard transform from the sweep over r.}
+
+
+# Pricing weather options from 22 observations  [Wang2002.qmd]
+# ----------------------------------------------------------------------
+
+agg Wang2002.HDD
+  1 claim
+  dsev [972.5 1147 1244 901 1573 1055 1488 1065.5 1018.5 1155 1474.5 1129.5 1077.5 1129.5 1090.5 938.5 1199.5 1156 1040 940.5 1090.5 1517.5]
+  fixed
+  note{@Wang2002, the 22 observed heating degree day totals as a discrete severity.}
+
+distortion Wang2002.wang25 wang 0.25
+  note{@Wang2002, the Wang transform used to price the option.}
+
+
+# A horizontal line that settles a misprint  [Denuit2019.qmd]
+# ----------------------------------------------------------------------
+
+port Denuit2019.D61a
+  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.}
+  agg P1
+    0.08 claims
+    dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
+    poisson
+  agg P2
+    0.08 claims
+    dsev [1 2 3 4] [0.15 0.25 0.3 0.3]
+    poisson
+  agg P3
+    0.1 claims
+    dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
+    poisson
+  agg P4
+    0.1 claims
+    dsev [1 2 3 4] [0.15 0.25 0.3 0.3]
+    poisson
+
+port Denuit2019.D61b
+  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.}
+  agg P1
+    0.08 claims
+    dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
+    poisson
+  agg P2
+    0.08 claims
+    dsev [1 2 3 4] [0.15 0.25 0.3 0.3]
+    poisson
+  agg P3
+    0.1 claims
+    dsev [1 2 3 4] [0.1 0.2 0.3 0.4]
+    poisson
+  agg P4
+    0.1 claims
+    dsev [1 2 3 4] [0.15 0.25 0.3 0.3]
+    poisson
+
+port Denuit2019.Denuit61
+  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.}
+  agg P1
+    0.08 claims
+    dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
+    poisson
+  agg P2
+    0.08 claims
+    dsev [1 2 3 4] [0.15 0.25 0.3 0.3]
+    poisson
+  agg P3
+    0.1 claims
+    dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
+    poisson
+  agg P4
+    0.1 claims
+    dsev [1 2 3 4] [0.15 0.25 0.3 0.3]
+    poisson
+
+
+# Mortality credits, and what happens as the fund grows  [Denuit2022b.qmd]
+# ----------------------------------------------------------------------
+
+port Denuit2022b.Fund100
+  note{@Denuit2022b, Example 4.5's two group mortality pool at n = 100.}
+  agg Low
+    6 claims
+    dsev [1]
+    binomial 0.1
+  agg High
+    8 claims
+    dsev [3]
+    binomial 0.2
+
+port Denuit2022b.Fund500
+  note{@Denuit2022b, Example 4.5's two group mortality pool at n = 500.}
+  agg Low
+    30 claims
+    dsev [1]
+    binomial 0.1
+  agg High
+    40 claims
+    dsev [3]
+    binomial 0.2
+
+
+# A non-monotone allocation, and the algorithm that repairs it  [Denuit2025a.qmd]
+# ----------------------------------------------------------------------
+
+port Denuit2025a.Denuit.Pool.v2
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  hints{log2=16; bs=0.002; normalize=False; padding=1}
+  agg Agent1
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg Agent2
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg Agent3
+    1 claim
+    sev 2 * gamma [1 8] wts [0.504541349633 0.495458650367] splice [0 0] [30 30]
+    fixed
+
+port Denuit2025a.Denuit.PoolAlt
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  hints{log2=16; bs=0.002; normalize=False; padding=1}
+  agg A1
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg A2
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg A3
+    1 claim
+    sev 2 * gamma [1 8] wts=2
+    fixed
+
+port Denuit2025a.Denuit.PoolB
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  hints{log2=16; bs=0.002; normalize=False; padding=1}
+  agg B1
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg B2
+    1 claim
+    sev 2 * expon splice [0 10]
+    fixed
+  agg B3
+    1 claim
+    sev 2 * gamma [1 8] wts=2 splice [0 0] [30 30]
+    fixed
+
+
+# Where a conditional expectation given the sum turns over  [Denuit2025.qmd]
+# ----------------------------------------------------------------------
+
+port Denuit2025.K
+  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.}
+  hints{log2=20; bs=0.01; normalize=False; padding=1}
+  agg X
+    1 claim
+    sev pareto 3.5
+    fixed
+  agg Y
+    1 claim
+    sev pareto 2.5
+    fixed
+
+port Denuit2025.K.v2
+  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.}
+  hints{log2=20; bs=0.01; normalize=False; padding=1}
+  agg X
+    1 claim
+    sev pareto 2.5
+    fixed
+  agg Y
+    1 claim
+    sev pareto 1.5
+    fixed
+
+port Denuit2025.K.v3
+  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.}
+  hints{log2=18; bs=0.002; normalize=False; padding=1}
+  agg X
+    1 claim
+    sev lomax 3.5
+    fixed
+  agg Y
+    1 claim
+    sev lomax 3
+    fixed
+
+
+# Twenty eight stop loss premiums, and the grid they need  [Gerber1982.qmd]
+# ----------------------------------------------------------------------
+
+agg Gerber1982.Gerber
+  1 claim
+  sev 2 * uniform + 1
+  poisson
+  hints{log2=18; bs=0.0009765625}
+  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.}
+
+agg Gerber1982.Gerber.v2
+  10 claims
+  sev 2 * uniform + 1
+  poisson
+  hints{log2=18; bs=0.0078125}
+  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.}
+
+agg Gerber1982.Gerber.v3
+  100 claims
+  sev 2 * uniform + 1
+  poisson
+  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.}
+
+
+# An exact table a lattice method cannot match  [Robertson1992.qmd]
+# ----------------------------------------------------------------------
+
+agg Robertson1992.Robertson
+  5 claims
+  sev chistogram xps [0 0.2 0.4 0.6 0.8 1] [0.2 0.2 0.2 0.2 0.2]
+  fixed
+  note{@Robertson1992, Table 4's compound Poisson on a tabulated severity.}
+
+agg Robertson1992.Robertson2
+  5 claims
+  sev uniform
+  fixed
+  note{@Robertson1992, the same model with a continuous uniform severity.}
+
+
+# Discretization error is O(h squared), and Richardson removes it  [Embrechts1993.qmd]
+# ----------------------------------------------------------------------
+
+agg Embrechts1993.EGP
+  20 claims
+  sev expon 1
+  poisson
+  note{@Embrechts1993, the compound Poisson whose discretization error is O(h squared).}
+
+
+# Aliasing, and the tilt that removes it  [Grubel1999.qmd]
+# ----------------------------------------------------------------------
+
+agg Grubel1999.Levy
+  20 claims
+  sev levy
+  poisson
+  note{@Grubel1999, a compound Poisson Levy severity, the aliasing case tilting repairs.}
+
+
+# Three discretization designs, and the one that is not a bound  [Embrechts2009a.qmd]
+# ----------------------------------------------------------------------
+
+agg Embrechts2009a.EF
+  50 claims
+  sev expon
+  poisson
+  note{@Embrechts2009a, the compound Poisson exponential compared across three designs.}
+
+agg Embrechts2009a.EF1
+  20 claims
+  sev 3 * pareto 4 + -3
+  poisson
+  note{@Embrechts2009a, the compound Poisson Pareto compared across the same three.}
+
+
+# A severity with no mean, and the quantile it still produces  [Schaller2008.qmd]
+# ----------------------------------------------------------------------
+
+agg Schaller2008.SchallerTemnov
+  18 claims
+  sev 12000 * genpareto 1 + 7000
+  poisson
+  hints{log2=20; bs=4.76837158203125; padding=2; normalize=False}
+  note{@Schaller2008, a generalized Pareto severity with no mean.}
+
+
+# 92,832 convolutions in under a second  [Bruno2006.qmd]
+# ----------------------------------------------------------------------
+
+agg Bruno2006.B
+  504.814259 claims
+  dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.0103301 0.030799 0.0293511 0.0103301 0.0730414 0.0111568 0.0264554 0.1002133 0.0815418 0.0252146 0.0212857 0.0254214 0.0991756 0.4556837]
+  poisson
+  note{@Bruno2006, Table 6's compound Poisson at the smaller lambda.}
+
+agg Bruno2006.B8
+  dfreq [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17] [0.79870839980732 0.168928395537711 0.0275621536510322 0.00411140723243176 0.000591554176846273 8.41033531369783e-05 1.19716064327213e-05 1.71994460232325e-06 2.50751602571129e-07 3.72405307143863e-08 5.65056685224704e-09 8.77932283380845e-10 1.39934149169577e-10 2.29163277016947e-11 3.86088331748775e-12 6.69927670844654e-13 1.19834141403275e-13 2.211580538677e-14]
+  dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.0103301 0.030799 0.0293511 0.0103301 0.0730414 0.0111568 0.0264554 0.1002133 0.0815418 0.0252146 0.0212857 0.0254214 0.0991756 0.4556837]
+  note{@Bruno2006, Table 8's model, with the frequency given as a discrete law.}
+
+
+# Accurate FFT convolution: what breaks, and how you know  [Wilson2016a.qmd]
+# ----------------------------------------------------------------------
+
+agg Wilson2016a.Toy
+  dfreq [2]
+  dsev [1 2 3] [0.99999 1e-05 1e-20]
+  note{@Wilson2016a, the adversarial severity that breaks naive FFT convolution.}
+
+
+# sisFFT: keeping the FFT and fixing the tail  [Wilson2017.qmd]
+# ----------------------------------------------------------------------
+
+agg Wilson2017.WK
+  dfreq [2]
+  dsev [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127] [0.05698071412216734 0.06620214484224507 0.07439431506585613 0.0808594823064372 0.08500523661668595 0.08643386270782825 0.08500523661668595 0.0808594823064372 0.07439431506585613 0.06620214484224507 0.05698071412216734 0.0474359096066097 0.03819531491351482 0.02974654116430425 0.022407137097008607 0.016325247924520128 0.011504207774114473 0.007841103119752254 0.005169173762132145 0.003296010711360087 0.0020327296165158883 0.0012125345785902368 0.0006995715951974206 0.00039038553710257675 0.00021070691529164931 0.00010999865526234663 5.554173985207159e-05 2.7125334425354087e-05 1.2813100714451682e-05 5.854056311225143e-06 2.586920418962627e-06 1.105688414827683e-06 4.570944696450248e-07 1.827690656905043e-07 7.068429552096851e-08 2.644031917226084e-08 9.566079154710707e-09 3.347532207218618e-09 1.1330239115747578e-09 3.709171412794566e-10 1.1744600532204117e-10 3.59685651045085e-11 1.0654461224833036e-11 3.0525542488755614e-12 8.458995729331485e-13 2.2672412675735592e-13 5.8776021715289e-14 1.473757926702887e-14 3.574173561367906e-15 8.38394921987302e-16 1.902151734895072e-16 4.174122530025176e-17 8.859490495024046e-18 1.818761770055943e-18 3.611323587025658e-19 6.935543648882527e-20 1.2883033361832961e-20 2.3146177051578186e-21 4.0222024620549385e-22 6.760395460348606e-23 1.0990154370000577e-23 1.7280607304882195e-24 2.628074830109522e-25 3.865805235535093e-26 5.500038508200373e-27 7.568590490625302e-28 1.0073671919033027e-28 1.2968331832718913e-29 1.6147449836629747e-30 1.9446761623098232e-31 2.2652396490885474e-32 2.5521402435349255e-33 2.781111713376742e-34 2.931270180098265e-35 2.9882490005560692e-36 2.9464646373490424e-37 2.81001863961723e-38 2.5920339497460392e-39 2.3125742607080913e-40 1.9956032700263374e-41 1.6656212138890558e-42 1.3446269064639106e-43 1.0499070900667768e-44 7.929092000468263e-46 5.791880098166922e-47 4.092033548360507e-48 2.796290748421717e-49 1.8482000741056655e-50 1.1815147781965363e-51 7.305548867286579e-53 4.3690806287813747e-54 2.5272650181927225e-55 1.4139531828455055e-56 7.651433198651694e-58 4.004737637015077e-59 2.0273506236978068e-60 9.92675213472881e-62 4.701203037982131e-63 2.1534478334709612e-64 9.540765472727624e-66 4.088420924459984e-67 1.6945387385131509e-68 6.79314552283295e-70 2.6339883633345665e-71 9.878256594055475e-73 3.583193580753452e-74 1.2571403239902966e-75 4.2659991042454884e-77 1.4001716502139405e-78 4.4449340074571594e-80 1.364812125339333e-81 4.0532551594801475e-83 1.1642829388275267e-84 3.234719599335948e-86 8.692371190637349e-88 2.2592453900859697e-89 5.679525621992663e-91 1.3809699827592993e-92 3.247730108931048e-94 7.387528029916211e-96 1.625331188442783e-97 3.4586619315136957e-99 7.118653852801502e-101 1.4171347738069365e-102 2.7286507445183277e-104 5.081691135606408e-106 9.153603493842637e-108 1.5947750937110134e-109]
+  note{@Wilson2017, the severity on which sisFFT repairs the far tail.}
+
+
+# The log-normal left tail: saddlepoint, importance sampling, and FFT  [Asmussen2016a.qmd]
+# ----------------------------------------------------------------------
+
+agg Asmussen2016a.S
+  dfreq [4]
+  sev lognorm 0.25
+  note{@Asmussen2016a, a sum of independent lognormals, the saddlepoint test case.}
+
+agg Asmussen2016a.S.v2
+  dfreq [64]
+  sev lognorm 0.25
+  note{@Asmussen2016a, a sum of independent lognormals, the saddlepoint test case.}
+
+
+# State-dependent importance sampling, and what `aggregate` computes instead  [BenAmar2023.qmd]
+# ----------------------------------------------------------------------
+
+agg BenAmar2023.S10
+  dfreq [10]
+  sev lognorm 0.6907755278982137
+  note{@BenAmar2023, a sum of independent lognormals, the importance sampling test case.}
+
+agg BenAmar2023.S9
+  dfreq [9]
+  sev lognorm 0.6907755278982137
+  note{@BenAmar2023, a sum of independent lognormals, the importance sampling test case.}
+
+
+# Where the FFT floor is, and why it cannot be pushed lower  [BenRached2024.qmd]
+# ----------------------------------------------------------------------
+
+agg BenRached2024.S
+  dfreq [16]
+  sev lognorm 0.125
+  note{@BenRached2024, a sum of 16 heavy tailed variables, the FFT floor test case.}
+
+agg BenRached2024.L
+  dfreq [16]
+  sev 0.1 * levy
+  note{@BenRached2024, a sum of 16 Levy variables, the heaviest tailed case.}
+
+
+# k-moment tilting, and the exact answer it is approximating  [Liu2026.qmd]
+# ----------------------------------------------------------------------
+
+agg Liu2026.T
+  dfreq [1]
+  sev pareto 2.5
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+
+agg Liu2026.T.v2
+  dfreq [5]
+  sev pareto 2.5
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+
+agg Liu2026.T.v3
+  dfreq [1]
+  sev 1.1 * pareto 2.6
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+
+agg Liu2026.T.v4
+  dfreq [1]
+  sev 1.2 * pareto 2.7
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+
+port Liu2026.Paretos
+  note{@Liu2026, Table 2's portfolio of non-identically distributed Paretos.}
+  hints{log2=22;bs=1/8;padding=1;normalize=False}
+  agg P0
+    dfreq [1]
+    sev pareto 2.5
+  agg P1
+    dfreq [1]
+    sev 1.1 * pareto 2.6
+  agg P2
+    dfreq [1]
+    sev 1.2 * pareto 2.7
+  agg P3
+    dfreq [1]
+    sev 0.9 * pareto 2.8
+  agg P4
+    dfreq [1]
+    sev 0.8 * pareto 2.9
+
+port Liu2026.P
+  note{@Liu2026, the same portfolio rebuilt across the grid sweep.}
+  agg P0
+    dfreq [1]
+    sev pareto 2.5
+  agg P1
+    dfreq [1]
+    sev 1.1 * pareto 2.6
+  agg P2
+    dfreq [1]
+    sev 1.2 * pareto 2.7
+  agg P3
+    dfreq [1]
+    sev 0.9 * pareto 2.8
+  agg P4
+    dfreq [1]
+    sev 0.8 * pareto 2.9
+
+port Liu2026.LT
+  note{@Liu2026, Table C.1's light tailed portfolio, against an exact reference.}
+  hints{log2=18;bs=1/1024;padding=1;normalize=False}
+  agg C0
+    dfreq [1]
+    sev expon + 1
+  agg C1
+    dfreq [1]
+    sev 0.8333333333333334 * expon + 1.1
+  agg C2
+    dfreq [1]
+    sev 0.7142857142857143 * expon + 1.2
+  agg C3
+    dfreq [1]
+    sev 0.6666666666666666 * expon + 0.9
+  agg C4
+    dfreq [1]
+    sev 0.5555555555555556 * expon + 0.8
+
+
+# Why this one is not a reproduction  [Jin2016.qmd]
+# ----------------------------------------------------------------------
+
+agg Jin2016.J
+  3 claims
+  sev 2 * gamma 3
+  poisson
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+
+agg Jin2016.J.v2
+  15 claims
+  sev 2 * invgauss 1.5
+  poisson
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+
+agg Jin2016.J.v3
+  50 claims
+  sev 2 * gamma 3
+  mixed gamma 0.3162277660168379
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+
+agg Jin2016.J.v4
+  50 claims
+  sev 2 * invgauss 1.5
+  mixed gamma 0.3162277660168379
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+
+agg Jin2016.J.v5
+  3 claims
+  sev 100 * lomax 20
+  poisson
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+
+agg Jin2016.J.v6
+  6 claims
+  sev 100 * lomax 20
+  mixed gamma 0.5773502691896257
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+
+agg Jin2016.NB
+  50 claims
+  dsev [1]
+  mixed gamma 0.31622776601683794
+  note{@Jin2016, a negative binomial carrier, for the frequency check.}
+
+agg Jin2016.U
+  dfreq [1]
+  sev 2 * gamma 2
+  note{@Jin2016, a single claim severity from the bivariate convergence test.}
+
+agg Jin2016.V
+  dfreq [1]
+  sev 1.5 * gamma 3
+  note{@Jin2016, the other single claim severity from that test.}
+
+agg Jin2016.X
+  15 claims
+  sev 2 * gamma 2
+  poisson
+  note{@Jin2016, a marginal of the paper's bivariate example.}
+
+agg Jin2016.Y
+  16 claims
+  sev 1.5 * gamma 3
+  poisson
+  note{@Jin2016, the other marginal of that example.}
+
+
+# Provenance of the named severity curves  [severity-curves.qmd]
+# ----------------------------------------------------------------------
+
+agg Berens1997.Lognorm
+  1 claim
+  sev lognorm 150000 cv 0.25
+  fixed
+  note{@Berens1997, a carrier for the shipped Berens1997.Lognorm severity curve.}
+
+agg Berens1997.Pareto
+  1 claim
+  sev 50000 * pareto 1.5
+  fixed
+  note{@Berens1997, a carrier for the shipped Berens1997.Pareto severity curve.}
+
+agg Bodoff2017.Pareto
+  1 claim
+  sev 50000 * lomax 1.5
+  fixed
+  note{@Bodoff2017, a carrier for the shipped Bodoff2017.Pareto severity curve.}
+
+agg Jin2016.Gamma
+  1 claim
+  sev gamma 6 cv 0.5774
+  fixed
+  note{@Jin2016, a carrier for the shipped Jin2016.Gamma severity curve.}
+
+agg Jin2016.Pareto
+  1 claim
+  sev 100 * lomax 20
+  fixed
+  note{@Jin2016, a carrier for the shipped Jin2016.Pareto severity curve.}
+
+agg Kang2019.Pareto
+  1 claim
+  sev 3.5 * lomax 3.5
+  fixed
+  note{@Kang2019, a carrier for the shipped Kang2019.Pareto severity curve.}
+
+agg Mack2003.AmericanPareto
+  1 claim
+  sev 10000 * lomax 1.5
+  fixed
+  note{@Mack2003, a carrier for the shipped Mack2003.AmericanPareto severity curve.}
+
+agg Mack2003.Lognorm
+  1 claim
+  sev lognorm 10000 cv 4.953
+  fixed
+  note{@Mack2003, a carrier for the shipped Mack2003.Lognorm severity curve.}
+
+agg Mack2003.RiebesellPareto
+  1 claim
+  sev 10000 * lomax 0.737
+  fixed
+  note{@Mack2003, a carrier for the shipped Mack2003.RiebesellPareto severity curve.}
+
+agg Mata2005.Lognorm
+  1 claim
+  sev 11048 * lognorm 2.29
+  fixed
+  note{@Mata2005, a carrier for the shipped Mata2005.Lognorm severity curve.}
+
+agg Venter1983.Piecewise
+  1 claim
+  sev chistogram xps [0 1000 5000 6000 7000 8000 9000 10000 12500 15000 17500 20000 25000 35000 50000 75000 100000 125000 150000 175000 200000 225000 250000 300000] [0.38935 0.38935 0.00568 0.00543 0.00517 0.00495 0.00473 0.01098 0.00989 0.00896 0.00815 0.01426 0.02237 0.02353 0.02459 0.01517 0.01021 0.00732 0.00547 0.00423 0.00337 0.00274 0.0241]
+  fixed
+  note{@Venter1983, a carrier for the shipped Venter1983.Piecewise severity curve.}
+
+agg Bodoff2017.XPL
+  1 claim
+  1000000 xs 0
+  sev 50000 * lomax 1.5
+  fixed
+  note{@Bodoff2017, a shipped Pareto curve under a 1,000,000 policy limit.}
+
+agg Jin2016.J.v7
+  3 claims
+  sev gamma 6 cv 0.5774
+  poisson
+  note{@Jin2016, a shipped Gamma curve carried by a compound Poisson.}

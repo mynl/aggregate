@@ -73,9 +73,12 @@
   1.2.0a8** against the engine's 1.0.0a2, bit-identical to the Python path
   and taking the headline 1000 x 1000 case from 212.3 s to 39.2 s. **What
   remains is the transform phase**, which waits on `[Rust-Transform]` over
-  there and carries the one open design call: the engine can use 64-bit
-  primes and this library cannot, so either `ntt_primes` grows a width
-  parameter or the engine reports the primes it chose. Note also that the
+  there. The prime-width question is **ruled and half built**: selection
+  stays here, `ntt_primes` grew `max_bits` at **1.2.0a9**
+  (`[Rust-Engine-Prime-Width]` in the plan), and `exact_compound` will pass
+  64 once the engine can take wide primes, which needs **both** its kernels
+  widened, since `Reconstructor` takes `u32` today, plus a seam protocol
+  bump on both sides. Note also that the
   `ntt_workers` default of 4 was tuned when the Python CRT held the GIL and
   is now **too low on the engine path**: measured at 500 x 500, four threads
   3.57 s against 1.92 s for sixteen. That is an author call, untouched here

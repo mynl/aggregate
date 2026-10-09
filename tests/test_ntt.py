@@ -21,7 +21,8 @@ import pytest
 import aggregate.ntt as ntt_module
 from aggregate.ntt import (is_prime_u64, ntt, ntt_primes, exact_compound,
                            exact_compound_poly, _clear_denominators,
-                           _outcome_runs)
+                           _find_generator, _outcome_runs, _prime_factors,
+                           _root_of_unity)
 
 
 # ---------------------------------------------------------------- [primality]
@@ -854,3 +855,150 @@ def test_rust_engine_audit_names_itself(underwriter):
     assert audit['engine_protocol'] == ntt_module._ENGINE_PROTOCOL
     assert audit['limb_decode_seconds'] >= 0.0
     assert a.p_exact.sum() == 1
+
+
+# -------------- [prime-width] ([Rust-Engine-Prime-Width], phase 2 contract)
+
+
+@pytest.mark.parametrize('length', [2, 4, 1024, 2 ** 16])
+@pytest.mark.parametrize('max_bits', [32, 64])
+def test_root_of_unity_has_exact_order(length, max_bits):
+    """``w`` has multiplicative order exactly ``length``, at either width.
+
+    The defining property, checked the way the proof states it: ``w**L == 1``
+    with ``w**(L/2) == -1``, which together force the order to be ``L``
+    rather than a proper divisor of it.
+    """
+    for p, w in ntt_primes(length, 2, max_bits=max_bits)[:3]:
+        assert (p - 1) % length == 0
+        assert pow(w, length, p) == 1
+        assert pow(w, length // 2, p) == p - 1
+
+
+def test_root_of_unity_matches_the_generator_route():
+    """The factoring route it replaced agrees about the order.
+
+    The two roots are generally different elements, and both are correct:
+    any primitive ``length``-th root of unity gives a valid transform, since
+    the forward and inverse use the same one. What must agree is the
+    property, so that is what is compared, in the spirit of
+    :func:`test_crt_tree_matches_forced_fold`. The generator route is only
+    exercised at 32 bits, where factoring ``c`` is cheap, which is the whole
+    reason it was replaced.
+    """
+    length = 1024
+    for p, w in ntt_primes(length, 10 ** 40)[:4]:
+        c = (p - 1) // length
+        classic = pow(_find_generator(p, _prime_factors(c) | {2}),
+                      (p - 1) // length, p)
+        for candidate in (w, classic):
+            assert pow(candidate, length, p) == 1
+            assert pow(candidate, length // 2, p) == p - 1
+        # And both really do transform: round trip through the pair.
+        values = np.arange(length, dtype=np.uint64) % p
+        for candidate in (w, classic):
+            back = ntt(ntt(values, p, candidate), p, candidate, inverse=True)
+            assert np.array_equal(back, values)
+
+
+def test_root_of_unity_is_deterministic():
+    """Two runs agree, so a selection is reproducible across sessions."""
+    assert ntt_primes(1024, 10 ** 40) == ntt_primes(1024, 10 ** 40)
+    assert ntt_primes(1024, 10 ** 40, max_bits=64) == \
+        ntt_primes(1024, 10 ** 40, max_bits=64)
+
+
+def test_ntt_primes_default_width_is_32_bit():
+    """The default is unchanged, which every existing caller relies on."""
+    primes = ntt_primes(1024, 10 ** 60)
+    assert all(p < 2 ** 32 for p, _ in primes)
+    assert {p.bit_length() for p, _ in primes} == {32}
+
+
+def test_ntt_primes_64_bit_draw():
+    """A 64-bit draw is valid, sufficient, and about half as many primes."""
+    length, bound = 1024, 10 ** 200
+    narrow = ntt_primes(length, bound)
+    wide = ntt_primes(length, bound, max_bits=64)
+    for p, w in wide:
+        assert 2 ** 63 < p < 2 ** 64
+        assert is_prime_u64(p)
+        assert (p - 1) % length == 0
+        assert pow(w, length, p) == 1
+        assert pow(w, length // 2, p) == p - 1
+    product = 1
+    for p, _ in wide:
+        product *= p
+    assert product > bound
+    # Twice the bits per prime, so about half the count.
+    assert len(wide) == pytest.approx(len(narrow) / 2, abs=2)
+
+
+def test_ntt_primes_64_bit_at_the_shortest_length():
+    """``length=2`` with 64-bit primes, the shape that stressed the old root.
+
+    Here ``c = (p - 1) / 2`` is near ``2**63``, and the factoring route this
+    replaced faced a lottery on its shape, up to minutes for a single prime.
+    This must simply return.
+    """
+    primes = ntt_primes(2, 10 ** 30, max_bits=64)
+    assert primes
+    for p, w in primes:
+        assert 2 ** 63 < p < 2 ** 64
+        assert pow(w, 2, p) == 1
+        assert w == p - 1          # the primitive square root is -1
+
+
+@pytest.mark.parametrize('bad', [0, 1, 65, -4, 32.0, True, '32'])
+def test_ntt_primes_rejects_a_bad_max_bits(bad):
+    with pytest.raises(ValueError, match='max_bits must be an integer'):
+        ntt_primes(1024, 10 ** 10, max_bits=bad)
+
+
+def test_ntt_primes_rejects_a_max_bits_below_the_length():
+    """No candidate can exist, so say that rather than reporting no supply."""
+    with pytest.raises(ValueError, match='leaves no prime'):
+        ntt_primes(1024, 10 ** 10, max_bits=10)
+
+
+def test_ntt_primes_exhaustion_names_the_engine():
+    """Running out of 32-bit primes points at the real remedy.
+
+    The reader's instinct on this message is to blame the transform length.
+    The supply is simply exhausted, and the only way past it is 64-bit
+    primes, which the pure-Python transform cannot use.
+    """
+    with pytest.raises(ValueError, match='compiled aggregate-ntt engine'):
+        ntt_primes(2 ** 22, 10 ** 2000)
+    # The 64-bit draw of the same case succeeds, which is the point.
+    assert ntt_primes(2 ** 22, 10 ** 2000, max_bits=64)
+
+
+def test_ntt_refuses_a_prime_too_wide_for_numpy():
+    """The guard that pays for demoting a structural limit to a parameter.
+
+    ``_mulmod`` multiplies two residues in uint64. A 64-bit prime overflows
+    that silently and returns plausible nonsense, so the refusal is the only
+    thing standing between a wide prime and a wrong answer.
+    """
+    p, w = ntt_primes(1024, 2, max_bits=64)[0]
+    values = np.arange(1024, dtype=np.uint64)
+    with pytest.raises(ValueError, match='multiplies two residues'):
+        ntt(values, p, w)
+    with pytest.raises(ValueError, match='max_bits=64'):
+        ntt(values, p, w, inverse=True)
+
+
+def test_exact_compound_still_draws_32_bit_primes():
+    """Nothing can consume wide primes yet, so the pipeline does not ask.
+
+    ``exact_compound`` deliberately does not pass ``max_bits`` through: the
+    engine's ``Reconstructor`` takes 32-bit primes as of aggregate-ntt
+    1.0.0a2, so a wide draw would be refused at the seam even with the
+    engine installed. This pins that deliberate choice so phase 2 has to
+    change it on purpose.
+    """
+    outcomes = list(range(1, 21))
+    probs = [Fraction(1, 20)] * 20
+    _, _, meta = exact_compound(outcomes, probs, outcomes, probs)
+    assert meta['prime_bits_max'] <= 32

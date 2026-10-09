@@ -20,6 +20,33 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a9
+
+**[Rust-Engine-Prime-Width] `ntt_primes` draws primes of a chosen width, and
+the root no longer needs a factorization.** New `max_bits` parameter,
+defaulting to 32, which is the only width `ntt` can transform with:
+`ntt` now **raises** on a prime at or above `2**32`, because its uint64
+products overflow silently and return plausible nonsense. `max_bits=64`
+halves the prime count for a given bound (159 against 322 on the 1000 x 1000
+case) and lifts the supply ceiling that bounds the exact method's envelope,
+for a consumer with wider arithmetic. `exact_compound` does not yet pass it:
+the compiled engine's `Reconstructor` takes 32-bit primes as of
+`aggregate-ntt` 1.0.0a2, so wide primes have no consumer until the engine
+widens both of its kernels and the seam protocol bumps on both sides.
+
+Roots now come from `_root_of_unity`, which uses the fact that the transform
+length is a power of two instead of factoring `p - 1`. Returned roots
+therefore differ from earlier versions and **answers do not**: any primitive
+length-th root of unity gives the same transform, since forward and inverse
+use the same one. `_prime_factors` and `_find_generator` remain as the
+reference it is pinned against. The reason is the 64-bit case, where
+factoring `c = (p - 1) / length` is a lottery on the shape of `c`: a
+balanced-semiprime cofactor costs about four minutes for a single prime
+against 20 microseconds for the new route, which is indifferent to it.
+
+A supply exhaustion at 32 bits now names the real remedy, the compiled
+engine, rather than leaving the reader to suspect the transform length.
+
 ## 1.2.0a8
 
 **[NTT-Rust-Integration] the optional compiled engine is used when it is

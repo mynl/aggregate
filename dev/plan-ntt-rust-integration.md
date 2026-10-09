@@ -169,10 +169,11 @@ there is promoted and this phase waits.
 consequences to handle rather than discover:
 
 1. **Prime width.** The engine can use 64-bit primes, because Rust has `u128`;
-   this library cannot, because numpy has no 128-bit integer. So `ntt_primes`
-   grows a width parameter, or the engine reports the primes it chose. Either
-   way the pure-Python path keeps 32-bit primes. Decide this when the phase
-   starts, with the engine's measurement in hand.
+   this library cannot, because numpy has no 128-bit integer. **Ruled
+   2026-10-09: `ntt_primes` grows a `max_bits` parameter and selection stays
+   here.** See `[Rust-Engine-Prime-Width]` below for the ruling, its
+   measurements, and the envelope consequence, which is larger than the
+   speedup.
 2. **The two engines will then use different prime sets, and that is
    correct.** The reconstructed integers are determined by the mathematics,
    not by which primes carried them, so conformance still holds bit for bit.
@@ -339,3 +340,161 @@ prime-width question (64-bit primes in Rust against numpy's 64-bit ceiling
 here), and the rule that conformance tests compare answers and never audit
 records, since the two engines will then legitimately choose different
 primes.
+
+---
+
+## [Rust-Engine-Prime-Width]
+
+Ruled 2026-10-09, on the engine author's recommendation and the author's
+decision. This section is the phase 2 design; the `max_bits` parameter itself
+landed at **1.2.0a9**, ahead of the transform handover, because the engine
+side needs the contract to write its kernel against.
+
+### The ruling
+
+**Prime selection stays in `aggregate`, and `ntt_primes` grows a `max_bits`
+parameter** defaulting to 32. The engine never chooses primes; it is handed
+them, along with the root for each.
+
+Three reasons, in order of weight.
+
+**The safety argument.** The pipeline's decisive check is that the CRT
+modulus exceeds the coefficient bound `D`. If the engine chose the primes,
+this library would be asserting sufficiency over numbers it had just been
+handed, and the check becomes circular: a buggy engine would supply the
+primes *and* pass the test on its own product. With selection here, the
+check is made from this library's own data about this library's own choices,
+which is what makes the engine verified rather than trusted. Everything else
+in the division of labor follows the same principle.
+
+**One contract, testable without the engine.** `ntt_primes` is public and
+carries real tests. Splitting the contract across two packages means two
+implementations of the same number theory to keep honest, and the one in
+Rust could not be tested from here at all.
+
+**It is cheap, measured rather than assumed.** This was expected to be the
+blocker and is not. Primality is the easy half: `is_prime_u64` is
+deterministic Miller-Rabin to 3.3e24, far beyond 2^64, so a 64-bit candidate
+costs the same twelve witnesses a 32-bit one does. The half that looked
+fatal was the root: `ntt_primes` found a primitive root by factoring
+`c = (p - 1) / length` with trial division, and at 64 bits `c` is about
+2^44, which suggested seconds per prime. Measured on twelve real candidates
+at `length = 2**20`: **0.003 s mean, every one under 0.011 s.** Trial
+division bounds at the square root of the largest *remaining* cofactor, not
+of `c`, because it divides `n` down as it goes.
+
+### The root is computed without factoring anyway
+
+Landed at 1.2.0a9, and not a performance change: it removes a tail risk that
+`max_bits` would otherwise have created. `_prime_factors` bounds at the
+square root of the largest prime factor of `c`, which is why it is cheap at
+32 bits. But `c = (p - 1) / length` grows as `length` shrinks, so
+`ntt_primes(2, bound, max_bits=64)` reaches `c` near 2^63, and the cost
+becomes a lottery on the shape of `c`.
+
+Measured, so the claim is sized rather than asserted. Trial division runs at
+8.8 million steps per second here. The two primes that draw actually selects
+at `length = 2` cost **0.13 s and 0.05 s**, so this is not a hang in the
+cases hit. The worst shape is a `c` whose cofactor is a balanced semiprime,
+two prime factors near 2^31, which needs 2.1 billion steps: **about four
+minutes for one prime**, and 159 primes are drawn. Such `c` are neither
+contrived nor rare. So the old route is not broken at 64 bits, it is
+unpredictable, and an unpredictable multi-minute pause inside a public
+function is worth one page of number theory to remove.
+
+It is also unnecessary. Because `length` is a power of two, a primitive
+root of the whole multiplicative group is more than the transform needs. For
+`L = 2**m`, take any `a` and set `w = a**((p - 1) / L) mod p`. Then
+`w**L = a**(p-1) = 1`, so the order of `w` divides `L` and is therefore a
+power of two; and since `(w**(L/2))**2 = 1` in a field, `w**(L/2)` is `1` or
+`-1`. So
+
+    the order of `w` is exactly `L` **iff** `w**(L/2) == p - 1`
+
+which is one modular exponentiation to test. Writing `a = g**t`, the order is
+`L / gcd(t, L)`, so the test passes exactly when `t` is odd: **half of all
+`a` work**, and ascending `a` from 2 finds one in about two tries.
+`_root_of_unity` does this, deterministically (ascending `a`, never random,
+so two runs agree), in about 20 microseconds, and its cost does not depend
+on the shape of `c` at all, which is the property that matters here. `_prime_factors` and `_find_generator` stay in the
+module as the reference the new route is pinned against on 32-bit primes,
+where factoring is cheap.
+
+### The consequence that matters more than the speedup
+
+The expected payoff is the prime count: the headline 9,976-bit bound needs
+**322 primes at 32 bits and 159 at 64**. The transform phase is now 147 of
+157 thread-seconds, so halving the count roughly halves the dominant cost.
+
+But the envelope moves too, and that is the bigger change. These are *all*
+the 32-bit NTT primes that exist, by transform length, measured:
+
+| `L` | primes below 2^32 | total modulus available |
+|---|---|---|
+| 2^20 | 401 | 12,219 bits |
+| 2^22 | 96 | 2,947 bits |
+| 2^24 | 24 | 742 bits |
+
+The supply *falls* as `L` grows, because primes congruent to 1 mod `L` get
+rarer, and the 1000 x 1000 case already consumes 322 of the 401 available at
+`L = 2**20`: **80 percent of the entire supply at that length.** The
+documented envelope note ("the 32-bit prime supply caps the envelope near a
+transform length of 2^22") is accurate but understates how close the
+headline case already sits to the wall. At 64 bits the supply at `L = 2**22`
+is larger by a factor of about 2^32, so the wall ceases to bind.
+
+**Therefore: with the engine installed, cases become computable that the
+pure-Python path cannot compute at all.** Today the engine changes only
+speed, and this plan's symmetry argument ("never slower or less correct for
+its absence") rests on that. It survives, but a second property does not,
+and the loss has to be deliberate:
+
+- **A refusal must name the real cause.** A notebook that runs on the
+  author's machine will raise on a machine without the engine. The error
+  must say that the case needs 64-bit primes and therefore the compiled
+  engine, not "insufficient NTT prime supply", which would send the reader
+  after a nonexistent problem with the transform length.
+- **Conformance changes shape on those cases**, because there is no Python
+  answer to compare against. The pin becomes **64-bit-prime answers equal
+  32-bit-prime answers on every case both can do**, which is sound precisely
+  because the reconstructed integers are determined by the mathematics and
+  not by which primes carried them. On cases only the engine can reach, what
+  remains is the three end-to-end checks, which is why they stay in Python.
+
+### The trap, and the guard that pays for it
+
+`_mulmod` is `np.multiply` then `np.mod` in `uint64`. Two residues below
+2^32 have a product below 2^64, which is the whole reason the transform is
+vectorized numpy; two 64-bit residues **overflow silently** and give wrong
+answers with no warning anywhere. Until 1.2.0a9 that could not happen,
+because the 32-bit ceiling was structural inside `ntt_primes`. Making it a
+parameter demotes the guarantee from "cannot happen" to "must not happen",
+and that demotion is paid for with an explicit check: **`ntt` refuses a
+prime at or above 2^32**, naming `max_bits` and the engine. One comparison
+per call, twice per prime, against a transform of a million elements.
+
+`exact_compound` deliberately does **not** yet pass `max_bits=64`. There is
+nothing that can consume such primes (see the next section), and a keyword
+whose only reachable value is the default is better than one that resolves
+to a silently wrong answer.
+
+### What the engine side still owes, and one correction to it
+
+`[Rust-Transform]` had not landed when this was written:
+`residues_mod_prime` still raises `NotImplementedError`, so the handover
+cannot be built here yet.
+
+**And the transform kernel is not the only thing that has to widen.**
+`Reconstructor::new` takes `primes: Vec<u32>`, so 64-bit primes are refused
+by the *reconstruction* seam as it stands today, independently of the
+transform. Phase 2 therefore needs both halves of the engine widened to
+`u64` primes, which is an incompatible change to a signature this library
+already calls. So:
+
+- **`PROTOCOL_VERSION` bumps on their side and `_ENGINE_PROTOCOL` bumps
+  here, in lockstep.** This is exactly the drift the versioned seam exists
+  for: an `aggregate` that sends 64-bit primes to a `Reconstructor` built
+  for `u32` must get a loud refusal, not a truncated prime.
+- The engine should **validate on arrival** rather than trust us: every
+  prime below 2^64 and congruent to 1 modulo the transform length. The
+  residue-reduction check it already does is the model.

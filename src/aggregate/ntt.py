@@ -195,6 +195,14 @@ def _engine_provenance(engine):
 # n < 3.3 * 10^24 (Sorenson and Webster 2015), far beyond the 2^64 contract.
 _MILLER_RABIN_WITNESSES = (2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37)
 
+#: Widest NTT prime the vectorized numpy transform can use. Products of two
+#: residues must fit in uint64, so a prime must stay below ``2**32``: this is
+#: structural to :func:`ntt`, not a tuning choice. The compiled engine has
+#: 128-bit intermediates and is not bound by it, which is what
+#: ``max_bits`` on :func:`ntt_primes` exists to express
+#: (``[Rust-Engine-Prime-Width]`` in ``dev/plan-ntt-rust-integration.md``).
+_NUMPY_PRIME_MAX_BITS = 32
+
 #: Bit-reversal permutation indices, keyed by transform length and shared
 #: across primes: the permutation depends only on the length.
 _BIT_REVERSAL_CACHE = {}
@@ -310,7 +318,70 @@ def _find_generator(p, factors):
     raise ValueError(f'no generator found mod {p}; {p} is not prime')
 
 
-def ntt_primes(length, bound):
+def _root_of_unity(p, length):
+    """
+    Primitive ``length``-th root of unity mod ``p``, without factoring.
+
+    Parameters
+    ----------
+    p : int
+        Prime with ``p ≡ 1 (mod length)``.
+    length : int
+        A power of two, at least 2.
+
+    Returns
+    -------
+    int
+        ``w`` with multiplicative order exactly ``length`` mod ``p``.
+
+    Raises
+    ------
+    ValueError
+        If no such element is found, which means ``p`` is not prime or
+        ``length`` does not divide ``p - 1``.
+
+    Notes
+    -----
+    The transform needs a primitive ``L``-th root of unity, which is less
+    than a generator of the whole multiplicative group, and the difference
+    matters because finding a generator means factoring ``p - 1``. Since
+    ``L = 2**m``, take any ``a`` and set ``w = a**((p - 1) / L) mod p``.
+    Then ``w**L = a**(p-1) = 1`` by Fermat, so the order of ``w`` divides
+    ``L`` and is a power of two; and ``(w**(L/2))**2 = w**L = 1`` in a field
+    forces ``w**(L/2)`` to be ``1`` or ``-1``. Hence
+
+        the order of ``w`` is exactly ``L`` **iff** ``w**(L/2) == p - 1``
+
+    which is one modular exponentiation to test. Writing ``a = g**t`` for a
+    generator ``g``, the order of ``w`` is ``L / gcd(t, L)``, so the test
+    passes exactly when ``t`` is odd: half of all ``a`` work, and ascending
+    ``a`` from 2 finds one in about two tries.
+
+    Ascending rather than random, so two runs of :func:`ntt_primes` return
+    the same roots. The predecessor route, :func:`_find_generator` over
+    :func:`_prime_factors`, is kept in this module as the reference this is
+    pinned against on 32-bit primes, where factoring is cheap. At 64 bits it
+    is not merely slower: ``c = (p - 1) / length`` approaches ``2**63`` at
+    small lengths, and a ``c`` of the form ``2 * q`` with ``q`` a 62-bit
+    prime sends trial division to about ``2**31`` iterations, which is a
+    hang rather than a delay. This route is indifferent to the size of
+    ``c``: about 20 microseconds against 3 milliseconds for the factoring
+    route at ``length = 2**20``.
+    """
+    exponent = (p - 1) // length
+    half = length // 2
+    for a in range(2, p):
+        w = pow(a, exponent, p)
+        # Order exactly `length`, by the argument in Notes. For length == 2
+        # this reads w == -1, the primitive square root, as it should.
+        if pow(w, half, p) == p - 1:
+            return w
+    raise ValueError(
+        f'no primitive root of unity of order {length} mod {p}; {p} is not '
+        f'prime, or {length} does not divide {p - 1}')
+
+
+def ntt_primes(length, bound, max_bits=_NUMPY_PRIME_MAX_BITS):
     """
     NTT-friendly primes whose product exceeds ``bound``.
 
@@ -323,6 +394,16 @@ def ntt_primes(length, bound):
     bound : int
         The CRT modulus requirement: the product of the returned primes
         strictly exceeds it. Pass the coefficient bound ``D``.
+    max_bits : int, default 32
+        Primes are drawn below ``2**max_bits``. **The default is the only
+        value :func:`ntt` can transform with**, and it is structural rather
+        than conservative: that transform multiplies two residues in
+        ``uint64``, so a prime at or above ``2**32`` overflows silently.
+        Pass 64 only for a consumer with wider arithmetic, which today means
+        the optional compiled engine; :func:`ntt` refuses such a prime. A
+        64-bit draw needs about half as many primes for the same bound (159
+        against 322 on the 1000 x 1000 case) and, more importantly, lifts
+        the supply ceiling described under Raises.
 
     Returns
     -------
@@ -334,41 +415,75 @@ def ntt_primes(length, bound):
     Raises
     ------
     ValueError
-        If the supply of primes ``p = c * length + 1 < 2**32`` is
-        insufficient, quoting the supply found against the bound still
-        outstanding. The 32-bit ceiling is structural: products of two
-        residues must fit in uint64 for the vectorized transform.
+        If ``max_bits`` is out of range or leaves no candidate above
+        ``length``, or if the supply of primes
+        ``p = c * length + 1 < 2**max_bits`` is insufficient, quoting the
+        supply found against the bound still outstanding.
 
     Notes
     -----
-    Scans ``p = c * length + 1`` downward from ``2**32`` (largest primes
-    first minimizes the count needed). Each candidate is tested with
-    :func:`is_prime_u64`; a generator ``g`` of the multiplicative group is
-    found by checking ``g**((p-1)/f) != 1`` over the prime factors ``f`` of
-    ``p - 1`` (trial division of ``c``, plus the factor 2), and the root
-    returned is ``g**((p-1)/length) mod p``.
+    Scans ``p = c * length + 1`` downward from ``2**max_bits`` (largest
+    primes first minimizes the count needed). Each candidate is tested with
+    :func:`is_prime_u64`, deterministic well beyond ``2**64``, and the root
+    comes from :func:`_root_of_unity`, which needs no factorization.
+
+    **The supply is finite and falls as the transform grows**, because a
+    candidate must be congruent to 1 modulo ``length``. Every 32-bit NTT
+    prime that exists, by length, measured:
+
+    =========== ================== =========================
+    ``length``  primes < ``2**32``  total modulus available
+    =========== ================== =========================
+    ``2**20``   401                12,219 bits
+    ``2**22``   96                 2,947 bits
+    ``2**24``   24                 742 bits
+    =========== ================== =========================
+
+    The 1000 x 1000 uniform dice case needs 322 primes for its 9,976-bit
+    bound at ``length = 2**20``, so it already consumes 80 percent of the
+    supply there, and this ceiling rather than time is what bounds the
+    exact method's envelope. ``max_bits=64`` raises the supply at
+    ``2**22`` by a factor of roughly ``2**32`` and so lifts the bound
+    entirely, at the cost of primes only the compiled engine can transform
+    with.
     """
     if length < 2 or length & (length - 1):
         raise ValueError(f'length must be a power of two >= 2, got {length}')
+    # 64 is the ceiling because is_prime_u64 contracts to 64-bit inputs and
+    # because no consumer, here or in the engine, works wider than that.
+    if not isinstance(max_bits, int) or isinstance(max_bits, bool) \
+            or not 2 <= max_bits <= 64:
+        raise ValueError(
+            f'max_bits must be an integer in 2..64, got {max_bits!r}')
+    if 2 ** max_bits <= length + 1:
+        raise ValueError(
+            f'max_bits={max_bits} leaves no prime p = c * {length} + 1 below '
+            f'2**{max_bits}; raise max_bits or shorten the transform')
     primes = []
     product = 1
-    for c in range((2 ** 32 - 2) // length, 0, -1):
+    for c in range((2 ** max_bits - 2) // length, 0, -1):
         p = c * length + 1
         if not is_prime_u64(p):
             continue
-        factors = _prime_factors(c) | {2}
-        g = _find_generator(p, factors)
-        root = pow(g, (p - 1) // length, p)
+        root = _root_of_unity(p, length)
         primes.append((p, root))
         product *= p
         if product > bound:
             return primes
+    wider = ''
+    if max_bits <= _NUMPY_PRIME_MAX_BITS:
+        # Name the real remedy. The reader's instinct is to blame the
+        # transform length, but the supply is exhausted, and the only way
+        # past it is arithmetic this library does not have
+        # ([Rust-Engine-Prime-Width]).
+        wider = (' This case needs 64-bit primes, so it needs the optional '
+                 'compiled aggregate-ntt engine; the pure-Python transform '
+                 'multiplies residues in uint64 and cannot use them.')
     raise ValueError(
         f'insufficient NTT prime supply: found {len(primes)} primes '
-        f'p ≡ 1 (mod {length}) below 2**32 with product of '
+        f'p ≡ 1 (mod {length}) below 2**{max_bits} with product of '
         f'{product.bit_length()} bits, but the bound needs '
-        f'{bound.bit_length()} bits. The support is too large for 32-bit '
-        f'NTT primes at this transform length.')
+        f'{bound.bit_length()} bits.{wider}')
 
 
 def _bit_reversal_indices(length):
@@ -431,12 +546,28 @@ def ntt(values, prime, root, inverse=False):
     numpy.ndarray
         uint64 array of length ``L``: the forward or inverse transform.
 
+    Raises
+    ------
+    ValueError
+        If ``prime`` is at or above ``2**32``. Such a prime is not slow
+        here, it is wrong: see Notes.
+
     Notes
     -----
     Iterative radix-2 decimation-in-time Cooley-Tukey over ``Z/p``: the usual
     FFT with ``exp(-2*pi*i/L)`` replaced by ``root``. All arithmetic is
     full-array numpy uint64 (products of two residues below ``2**32`` fit in
-    uint64); subtraction is ``u + p - t`` to stay unsigned. The
+    uint64); subtraction is ``u + p - t`` to stay unsigned.
+
+    That parenthesis is the reason for the explicit refusal above. A prime
+    at or above ``2**32`` does not raise anywhere in the arithmetic: the
+    product of two of its residues exceeds ``2**64``, numpy wraps it
+    silently, and the transform returns plausible nonsense. Until
+    ``ntt_primes`` grew ``max_bits`` the case was unreachable, because the
+    32-bit ceiling lived inside prime selection. Now that a caller can ask
+    for 64-bit primes, meant for the compiled engine, the guarantee has to
+    be checked rather than assumed. One comparison per call, twice per
+    prime, against a transform over a million elements. The
     bit-reversal permutation is cached per length and shared across primes;
     the twiddle table is rebuilt per call (per prime and direction), a
     negligible log-doubling cost against caching hundreds of megabyte-scale
@@ -451,6 +582,14 @@ def ntt(values, prime, root, inverse=False):
     The caller's array is never modified (the bit-reversal fancy index hands
     back a fresh owned copy, which is what the reduction then writes into).
     """
+    if int(prime) >> _NUMPY_PRIME_MAX_BITS:
+        raise ValueError(
+            f'prime {prime} has {int(prime).bit_length()} bits; the numpy '
+            f'transform needs a prime below '
+            f'2**{_NUMPY_PRIME_MAX_BITS} because it multiplies two residues '
+            f'in uint64. A wider prime, from '
+            f'ntt_primes(..., max_bits=64), is for the compiled '
+            f'aggregate-ntt engine and would overflow silently here.')
     a = np.asarray(values, dtype=np.uint64)
     length = len(a)
     if length & (length - 1):

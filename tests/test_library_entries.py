@@ -87,11 +87,10 @@ CANNOT_BUILD = {
     # reorganization renamed it ``CommAutoMixedExponentialSev``.
     'CommAutoMixedExponentialSev': 'CannotBuild',
     'MixedExponentialSev': 'CannotBuild',
-    # Deferred by design: book-level P&L raises with the reason rather than
-    # producing something wrong. ``BivariatePnLAxis`` and ``NumericsPayPair``
-    # were the other two demonstrations and left the library in the same
-    # reorganization, with no successor.
-    'PnLBook': 'NotImplementedError',
+    # ``PnLBook`` (book-level P&L, deferred by design) demonstrated a
+    # NotImplementedError refusal here until it left the library with the
+    # broken-recipe cleanup of 2026-10-09, following ``BivariatePnLAxis`` and
+    # ``NumericsPayPair`` out in the earlier reorganization. No successor.
 }
 
 #: Entries that build but do not clear :attr:`Validation.passes`, with the

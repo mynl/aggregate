@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.1.0a5 - 2026-10-09
+
+**[NTT-Parallel] `exact_compound(..., workers=n)` threads the per-prime transform phase; `build(..., ntt_workers=n)` forwards it.** Measurement drove the design per the plan: the transform phase is over 90 percent of a dense case, so the per-prime pipeline (now `_residues_mod_prime`) runs on a `ThreadPoolExecutor` (numpy uint64 ufuncs release the GIL; the bigint CRT stays serial). The square-and-multiply walk also stops squaring past the last bit of each gap. Dense 400 x 400: 164s serial before, 119s after the walk fix, 47s with `workers=8`. Serial remains the default and the answer is bit-identical either way; `meta` / `ntt_audit` inputs gain a `workers` entry.
+
 ## 1.1.0a4 - 2026-10-09
 
 **[NTT-Exact-Moments] `AggregateNTT.stats_df` gains an `exact` column and validation runs against it.** Frequency and severity raw moments come from the input rationals and aggregate raw moments from the reconstructed numerators (`sum n**k H_n / D`), all exact; `cv` and `skew` take one float square root at the end, so every entry is the correctly rounded float of an exact quantity. The same values overwrite the `mixed` theoretical rows, so `validation_df`, `explain_validation` and the score terms compare the FFT estimate against the exact baseline with no change to `_validation.py`.

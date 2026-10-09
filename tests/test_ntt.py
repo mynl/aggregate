@@ -366,3 +366,23 @@ def test_aggregate_ntt_degenerate_severity_moments(underwriter):
     assert sdf['exact'][('agg', 'mean')] == 10.0
     assert sdf['exact'][('sev', 'cv')] == 0.0
     assert np.isnan(sdf['exact'][('sev', 'skew')])
+
+
+# ------------------------------------- [parallel] ([NTT-Parallel] stage)
+
+def test_exact_compound_workers_match_serial():
+    """The thread pool changes wall clock only, never the answer."""
+    outcomes = list(range(1, 51))
+    probs = [Fraction(1, 50)] * 50
+    serial = exact_compound(outcomes, probs, outcomes, probs)
+    pooled = exact_compound(outcomes, probs, outcomes, probs, workers=4)
+    assert serial[0] == pooled[0]
+    assert serial[1] == pooled[1]
+    assert pooled[2]['workers'] == 4
+
+
+def test_aggregate_ntt_update_accepts_ntt_workers(underwriter):
+    a = underwriter.build('nttagg PW.Dice dfreq [1:6] dsev [1:6]',
+                          ntt_workers=2)
+    assert a._ntt_meta['workers'] == 2
+    assert a.density_df.p_exact.sum() == 1

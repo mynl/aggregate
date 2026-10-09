@@ -52,7 +52,9 @@
   writer, mirrors, corpus and snapshot); `[NTT-Class]` at 1.1.0a3
   (`AggregateNTT`, `accuracy_df`, `ntt_audit`, guardrails);
   `[NTT-Exact-Moments]` at 1.1.0a4 (`stats_df` exact column, validation
-  rebased on it). Remaining: measured parallelism, docs, 1.1.0 final.
+  rebased on it); `[NTT-Parallel]` at 1.1.0a5 (measured, thread pool across
+  primes, 2.5x at 8 workers plus a 1.4x walk fix; measurements in the plan).
+  Remaining: docs, 1.1.0 final.
 
 ## Correctness
 

@@ -326,7 +326,54 @@ def _clear_denominators(probs):
     return d, [int(p * d) for p in probs]
 
 
-def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
+def _residues_mod_prime(prime, root, length, support, sev_index, big_q,
+                        freq_outcomes, big_f, ds, kmax):
+    """
+    One prime's slice of the pipeline: ``H mod p`` on the padded lattice.
+
+    Forward NTT of the severity polynomial, spectral evaluation of ``H``
+    walking the frequency outcomes with a running power array (square and
+    multiply per gap, skipping the final square), inverse NTT. Pure function
+    of its arguments plus read-only numpy work, so it is safe to run on a
+    thread pool: the uint64 ufuncs release the GIL, which is what makes
+    threads worth having here.
+
+    Returns ``(head, seconds)`` where ``head`` is the uint64 residue vector
+    truncated to the support. Raises if any residue beyond the support is
+    nonzero (the circular-aliasing check, decisive per prime).
+    """
+    t0 = time.perf_counter()
+    a = np.zeros(length, dtype=np.uint64)
+    a[sev_index] = [q % prime for q in big_q]
+    a_hat = ntt(a, prime, root)
+    p64 = np.uint64(prime)
+    h_hat = np.zeros(length, dtype=np.uint64)
+    power = np.ones(length, dtype=np.uint64)
+    previous_k = 0
+    for k, f in zip(freq_outcomes, big_f):
+        gap = k - previous_k
+        base = a_hat
+        first = True
+        while gap:
+            if not first:
+                base = base * base % p64
+            first = False
+            if gap & 1:
+                power = power * base % p64
+            gap >>= 1
+        previous_k = k
+        coefficient = f % prime * pow(ds, kmax - k, prime) % prime
+        h_hat = (h_hat + np.uint64(coefficient) * power % p64) % p64
+    residues = ntt(h_hat, prime, root, inverse=True)
+    if not np.all(residues[support + 1:] == 0):
+        raise AssertionError(
+            f'NTT internal check failed: nonzero residue beyond the '
+            f'support mod {prime}')
+    return residues[:support + 1], time.perf_counter() - t0
+
+
+def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
+                   workers=None):
     """
     Exact bounded discrete compound distribution via NTT and CRT.
 
@@ -340,6 +387,14 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
         Severity outcomes, nonnegative integers.
     sev_probs : sequence of Fraction
         Exact severity probabilities, summing to exactly 1.
+    workers : int, optional
+        Thread count for the per-prime transform phase. ``None`` or 1 runs
+        serial. The per-prime pipeline is embarrassingly parallel and the
+        uint64 ufuncs release the GIL, so threads parallelize it at zero
+        pickling cost; the CRT phase is GIL-bound bigint work and stays
+        serial in the calling thread either way (measured at about a tenth
+        of the transform cost on dense cases; see dev/plan-nttagg.md,
+        [NTT-Parallel]).
 
     Returns
     -------
@@ -400,69 +455,59 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
         meta = {'support': 0, 'transform_length': 1,
                 'bound_bits': bound_bits, 'primes_used': 0,
                 'prime_bits_min': 0, 'prime_bits_max': 0,
-                'transform_seconds': 0.0, 'crt_seconds': 0.0}
+                'transform_seconds': 0.0, 'crt_seconds': 0.0,
+                'workers': 1}
         return [denominator], denominator, meta
 
     length = 1 << support.bit_length()  # 2**ceil(log2(support + 1))
     primes = ntt_primes(length, denominator)
 
-    # Severity coefficient vector, zero padded to the transform length. The
-    # integer weights Q_j can exceed any single prime, so reduction mod p
-    # happens per prime below.
+    # Severity coefficient vector index. The integer weights Q_j can exceed
+    # any single prime, so reduction mod p happens per prime in the worker.
     sev_index = np.array(sev_outcomes, dtype=np.int64)
+
+    def run(pair):
+        prime, root = pair
+        return _residues_mod_prime(prime, root, length, support, sev_index,
+                                   big_q, freq_outcomes, big_f, ds, kmax)
+
+    pool = None
+    if workers is not None and workers > 1:
+        from concurrent.futures import ThreadPoolExecutor
+        pool = ThreadPoolExecutor(max_workers=workers)
+        results = pool.map(run, primes)
+    else:
+        results = map(run, primes)
 
     t_transform = 0.0
     t_crt = 0.0
     # Incremental CRT state: bigint coefficients reconstructed so far and the
-    # modulus they are exact mod. Python ints throughout; this phase is
-    # GIL-bound bigint work (see the plan's parallelism stage).
+    # modulus they are exact mod. Python ints throughout, serial in this
+    # thread; this phase is GIL-bound bigint work (see the plan's
+    # parallelism stage).
     reconstructed = None
     modulus = 1
-    for i, (prime, root) in enumerate(primes):
-        logger.info('NTT prime %d of %d: %d (%d bits)',
-                    i + 1, len(primes), prime, prime.bit_length())
-        t0 = time.perf_counter()
-        a = np.zeros(length, dtype=np.uint64)
-        a[sev_index] = [q % prime for q in big_q]
-        a_hat = ntt(a, prime, root)
-        # Spectral evaluation of H walking the outcomes in ascending order
-        # with a running power array a_hat**k, each gap bridged by vectorized
-        # square-and-multiply.
-        p64 = np.uint64(prime)
-        h_hat = np.zeros(length, dtype=np.uint64)
-        power = np.ones(length, dtype=np.uint64)
-        previous_k = 0
-        for k, f in zip(freq_outcomes, big_f):
-            gap = k - previous_k
-            base = a_hat.copy()
-            while gap:
-                if gap & 1:
-                    power = power * base % p64
-                base = base * base % p64
-                gap >>= 1
-            previous_k = k
-            coefficient = f % prime * pow(ds, kmax - k, prime) % prime
-            h_hat = (h_hat + np.uint64(coefficient) * power % p64) % p64
-        residues = ntt(h_hat, prime, root, inverse=True)
-        t_transform += time.perf_counter() - t0
-
-        t0 = time.perf_counter()
-        if not np.all(residues[support + 1:] == 0):
-            raise AssertionError(
-                f'NTT internal check failed: nonzero residue beyond the '
-                f'support mod {prime}')
-        head = residues[:support + 1]
-        if reconstructed is None:
-            reconstructed = [int(r) for r in head]
-            modulus = prime
-        else:
-            inverse_mod = pow(modulus % prime, prime - 2, prime)
-            reconstructed = [
-                current + modulus *
-                ((int(r) - current % prime) * inverse_mod % prime)
-                for current, r in zip(reconstructed, head)]
-            modulus *= prime
-        t_crt += time.perf_counter() - t0
+    try:
+        for i, ((prime, _root), (head, seconds)) in enumerate(
+                zip(primes, results)):
+            logger.info('NTT prime %d of %d done: %d (%.3fs)',
+                        i + 1, len(primes), prime, seconds)
+            t_transform += seconds
+            t0 = time.perf_counter()
+            if reconstructed is None:
+                reconstructed = [int(r) for r in head]
+                modulus = prime
+            else:
+                inverse_mod = pow(modulus % prime, prime - 2, prime)
+                reconstructed = [
+                    current + modulus *
+                    ((int(r) - current % prime) * inverse_mod % prime)
+                    for current, r in zip(reconstructed, head)]
+                modulus *= prime
+            t_crt += time.perf_counter() - t0
+    finally:
+        if pool is not None:
+            pool.shutdown()
 
     if modulus <= denominator:
         raise AssertionError(
@@ -481,7 +526,8 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
             'bound_bits': bound_bits, 'primes_used': len(primes),
             'prime_bits_min': min(prime_bits),
             'prime_bits_max': max(prime_bits),
-            'transform_seconds': t_transform, 'crt_seconds': t_crt}
+            'transform_seconds': t_transform, 'crt_seconds': t_crt,
+            'workers': workers if workers else 1}
     return reconstructed, denominator, meta
 
 
@@ -546,7 +592,8 @@ def exact_compound_poly(freq_outcomes, freq_probs, sev_outcomes, sev_probs):
     meta = {'support': support, 'transform_length': 0,
             'bound_bits': denominator.bit_length(), 'primes_used': 0,
             'prime_bits_min': 0, 'prime_bits_max': 0,
-            'transform_seconds': 0.0, 'crt_seconds': 0.0}
+            'transform_seconds': 0.0, 'crt_seconds': 0.0,
+            'workers': 1}
     return accumulator, denominator, meta
 
 
@@ -668,7 +715,10 @@ class AggregateNTT(Aggregate):
         kwargs
             ``ntt_override=True`` lifts the soft guardrail caps
             (``NTT_MAX_SUPPORT``, ``NTT_MAX_BYTES`` in ``constants.py``);
-            everything else passes to :meth:`Aggregate.update`.
+            ``ntt_workers=<int>`` threads the per-prime transform phase
+            (measured at 2.5x on a dense 400 x 400 case with 8 workers;
+            the GIL-bound CRT stays serial); everything else passes to
+            :meth:`Aggregate.update`.
 
         Notes
         -----
@@ -683,6 +733,7 @@ class AggregateNTT(Aggregate):
         """
         from .constants import NTT_MAX_BYTES, NTT_MAX_SUPPORT
         override = bool(kwargs.pop('ntt_override', False))
+        ntt_workers = kwargs.pop('ntt_workers', None)
         if bs not in (0, 1):
             raise ValueError(
                 f'{self.name}: nttagg pins the exact integer lattice, so bs '
@@ -716,7 +767,7 @@ class AggregateNTT(Aggregate):
                 f"0..{sizes['support']}); this is a bug, please report it")
         numerators, denominator, meta = exact_compound(
             self.ntt_freq_outcomes, self.ntt_freq_probs,
-            self.ntt_sev_outcomes, self.ntt_sev_probs)
+            self.ntt_sev_outcomes, self.ntt_sev_probs, workers=ntt_workers)
         self._ntt_numerators = numerators
         self._ntt_denominator = denominator
         self._ntt_meta = meta

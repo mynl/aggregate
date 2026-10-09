@@ -502,7 +502,7 @@ def test_exact_compound_workers_match_serial():
     assert pooled[2]['workers'] == 4
     # the default is the thread pool, not serial
     default = exact_compound(outcomes, probs, outcomes, probs)
-    assert default[2]['workers'] == min(8, os.cpu_count() or 1)
+    assert default[2]['workers'] == min(4, os.cpu_count() or 1)
     assert default[0] == serial[0]
 
 

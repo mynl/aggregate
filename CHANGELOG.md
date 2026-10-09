@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a5 - 2026-10-09
+
+**[NTT-Workers-Default] the `nttagg` transform thread count defaults to `min(4, os.cpu_count())` instead of `min(8, ...)`.** What threads buy in this engine is overlap with the serial reconstruction rather than parallel speedup, so once the product tree shortened the reconstruction at 1.2.0a4 the eighth thread stopped paying for itself. Measured on the 1000 x 1000 uniform dice case: four threads give 216.4 s against 212.3 s for eight, so 2 percent of wall clock for twice the CPU, 709 transform thread-seconds against 1356. Both are 1.45x the 312.9 s serial run. Pass `ntt_workers=n` to `build` or `workers=n` to `exact_compound` to choose explicitly; `1` still forces serial. Answers are unaffected either way.
+
 ## 1.2.0a4 - 2026-10-09
 
 **[NTT-CRT-ProductTree] the `nttagg` Chinese remainder reconstruction is a product tree instead of a linear fold, and large exact cases run about 2.8x faster.** The reconstruction folded one prime at a time into a running answer, multiplying by a modulus that grew with every prime, so the phase was quadratic in the prime count and had become 99.3 percent of the wall clock on the largest cases. It is now a balanced product tree, built online as a merge stack so that no more than `log2(n)` partial reconstructions are ever held and each prime's residues are still consumed as they arrive. The headline 1000 x 1000 uniform dice case, support 10^6 at transform length 2**20 over 321 primes, runs in 212 s against 594 s at 1.2.0a3, with the reconstruction itself falling from 590 s to 198 s; the 500 x 500 case runs in 16.6 s against 35.2 s. Answers are bit identical, pinned by a test that the tree and the linear fold reconstruct the same integers, and the three end-to-end checks are unchanged.

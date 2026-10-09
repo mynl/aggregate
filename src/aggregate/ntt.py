@@ -744,13 +744,15 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
         Exact severity probabilities, summing to exactly 1.
     workers : int, optional
         Thread count for the per-prime transform phase. ``None``, the
-        default, uses ``min(8, os.cpu_count())``; pass 1 to force serial.
+        default, uses ``min(4, os.cpu_count())``; pass 1 to force serial.
         The per-prime pipeline is embarrassingly parallel and the uint64
         ufuncs release the GIL, so threads parallelize it at zero pickling
         cost. The CRT phase is GIL-bound bigint work and stays serial in the
-        calling thread either way, which now sets the floor on a dense case:
-        at 400 x 400 it is about half the serial wall clock. Beyond about 8
-        threads the transforms gain nothing, being memory bandwidth bound.
+        calling thread either way, which sets the floor: on the 1000 x 1000
+        uniform dice case it is 93 percent of the threaded wall clock. Four
+        threads is where the gain stops being worth its CPU, measured on
+        that case at 216.4 s against 212.3 s for eight, for half the
+        thread-seconds (709 against 1356); both are 1.45x serial.
 
     Returns
     -------
@@ -811,9 +813,12 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     """
     if workers is None:
         # Ruled 2026-10-09 (dev/plan-ntt-speed.md): the serial default
-        # surprised the author on the first big run. Beyond 8 threads the
-        # bandwidth-bound ufuncs stop gaining.
-        workers = min(8, os.cpu_count() or 1)
+        # surprised the author on the first big run. Narrowed from 8 to 4 at
+        # 1.2.0a5 (dev/plan-ntt-crt.md) once the product tree shortened the
+        # CRT: the eighth thread then bought 2 percent of wall clock for
+        # twice the CPU, because what threads mostly buy here is overlap
+        # with the serial reconstruction rather than parallel speedup.
+        workers = min(4, os.cpu_count() or 1)
     freq_outcomes, freq_probs = _validate_exact_inputs(
         freq_outcomes, freq_probs, 'frequency')
     sev_outcomes, sev_probs = _validate_exact_inputs(
@@ -1126,10 +1131,10 @@ class AggregateNTT(Aggregate):
             (``NTT_MAX_SUPPORT``, ``NTT_MAX_BYTES`` in ``constants.py``);
             ``ntt_workers=<int>`` sets the thread count for the
             per-prime transform phase, which defaults to
-            ``min(8, os.cpu_count())``; pass ``ntt_workers=1`` to force
-            serial. The GIL-bound CRT phase stays serial either way and is
-            about half the wall clock of a dense case. Everything else
-            passes to :meth:`Aggregate.update`.
+            ``min(4, os.cpu_count())``; pass ``ntt_workers=1`` to force
+            serial. The GIL-bound CRT phase stays serial either way and
+            dominates a large case. Everything else passes to
+            :meth:`Aggregate.update`.
 
         Notes
         -----

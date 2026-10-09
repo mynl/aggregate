@@ -53,10 +53,13 @@
   so it is neither clearly wanted nor clearly dropped. Weigh it against
   pickling hundreds of megabytes of bigints across a process boundary, and
   against the remaining shape of the cost, which is now 198 s of
-  reconstruction against 105 s of serial transform. The `ntt_workers`
-  default: at the headline size eight workers give 212 s against 313 s
-  serial, a 1.47x gain for 13x the CPU, so a default of 2 to 4 may be the
-  better trade. Measurements for both are in the plan's execution log.
+  reconstruction against 105 s of serial transform. Stage 3
+  `[NTT-CRT-Gmpy2]` is the author's live choice and is specified in the
+  plan: use `gmpy2` for the reconstruction bigints when it is installed,
+  for GMP's subquadratic division, which is the step the product tree now
+  spends its time in. The `ntt_workers` default was settled at **1.2.0a5**,
+  `[NTT-Workers-Default]`, narrowing from `min(8, ...)` to `min(4, ...)`
+  on the measurement that four threads match eight for half the CPU.
 
 ## Recently landed
 

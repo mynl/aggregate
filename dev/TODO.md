@@ -40,21 +40,15 @@
   on 2026-10-07: the README and the ~30 worked reproductions already say what
   the library does, so no scope-disclaimer section is owed.
 
-## In flight
+## Recently landed
 
-- **[NTT-Exact-Aggregate]** (executing from `dev/plan-nttagg.md`, started
-  2026-10-09): a new DecL kind `nttagg` computing bounded discrete compounds
-  exactly (rational numbers) via the number-theoretic transform over prime
-  fields with CRT reconstruction, side by side with the float FFT pipeline
-  (`accuracy_df`, `ntt_audit`), the computational answer to Wilson and Keich.
-  Landed so far: `[NTT-Engine]` at 1.1.0a1 (`aggregate.ntt` engine functions
-  and `tests/test_ntt.py`); `[NTT-DecL]` at 1.1.0a2 (grammar, transformer,
-  writer, mirrors, corpus and snapshot); `[NTT-Class]` at 1.1.0a3
-  (`AggregateNTT`, `accuracy_df`, `ntt_audit`, guardrails);
-  `[NTT-Exact-Moments]` at 1.1.0a4 (`stats_df` exact column, validation
-  rebased on it); `[NTT-Parallel]` at 1.1.0a5 (measured, thread pool across
-  primes, 2.5x at 8 workers plus a 1.4x walk fix; measurements in the plan).
-  Remaining: docs, 1.1.0 final.
+- **[NTT-Exact-Aggregate]** DONE at **1.1.0** (2026-10-09,
+  `dev/done/plan-nttagg.md`): the `nttagg` DecL kind and
+  `aggregate.ntt.AggregateNTT` compute bounded discrete compounds exactly
+  (NTT over prime fields plus CRT) alongside the float pipeline, with
+  `accuracy_df`, `ntt_audit`, exact `stats_df` moments feeding validation,
+  and a measured thread-pool transform phase. Staged 1.1.0a1 to a5 then
+  1.1.0; divergences and measurements in the plan's execution log.
 
 ## Correctness
 

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.1.0 - 2026-10-09
+
+**[NTT-Exact-Aggregate] new DecL kind `nttagg`: exact compound distributions via the number-theoretic transform.** `build('nttagg DiceOfDice dfreq [1:100] dsev [1:100]')` returns `aggregate.ntt.AggregateNTT` (submodule access only), an `Aggregate` that runs the usual float FFT pipeline and, beside it, the exact rational answer computed over 32-bit prime fields with CRT reconstruction: `density_df` columns `p_exact` / `p_exact_float`, per-bucket `accuracy_df`, audit record `ntt_audit`, exact `stats_df` moments that validation measures against, guardrails for monster cases (`ntt_override=True`), and a threaded transform phase (`ntt_workers=`). Inputs are text-exact (`0.3` is `3/10`, `a/b`, exact uniform default); outcomes are nonnegative integers; the kind cannot appear in a portfolio, pnl, or bivariate. Rolls up the 1.1.0a1 to 1.1.0a5 entries below; language reference and `aggregate.ntt` API pages added, docs rebuild pending the author's run. Design, rulings and measurements: `dev/done/plan-nttagg.md`.
+
 ## 1.1.0a5 - 2026-10-09
 
 **[NTT-Parallel] `exact_compound(..., workers=n)` threads the per-prime transform phase; `build(..., ntt_workers=n)` forwards it.** Measurement drove the design per the plan: the transform phase is over 90 percent of a dense case, so the per-prime pipeline (now `_residues_mod_prime`) runs on a `ThreadPoolExecutor` (numpy uint64 ufuncs release the GIL; the bigint CRT stays serial). The square-and-multiply walk also stops squaring past the last bit of each gap. Dense 400 x 400: 164s serial before, 119s after the walk fix, 47s with `workers=8`. Serial remains the default and the answer is bit-identical either way; `meta` / `ntt_audit` inputs gain a `workers` entry.

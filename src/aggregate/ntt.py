@@ -10,12 +10,14 @@ aFFT-C controls relative error approximately: for bounded lattice compounds
 the NTT plus CRT route is exact, at a quantifiable cost of roughly
 ``bound_bits / 31`` modular transforms.
 
-The engine functions here are pure and class free. :func:`exact_compound` is
-the production path (vectorized numpy NTT per prime, incremental CRT);
+The engine functions are pure and class free. :func:`exact_compound` is the
+production path (vectorized numpy NTT per prime, incremental CRT);
 :func:`exact_compound_poly` is the slow direct polynomial reference used by
-the tests as an independent oracle. The :class:`AggregateNTT` class wiring
-arrives with the DecL ``nttagg`` kind in later stages of
-``dev/plan-nttagg.md``.
+the tests as an independent oracle. :class:`AggregateNTT` is the class behind
+the DecL ``nttagg`` kind: an ordinary Aggregate running the float pipeline
+side by side with the exact answer (``density_df.p_exact``, ``accuracy_df``,
+``ntt_audit``, and a ``stats_df`` ``exact`` column that validation measures
+against). History and design rulings: ``dev/done/plan-nttagg.md``.
 
 Access is by submodule only, matching ``ft.py`` and ``tweedie.py``: there is
 no top-level re-export.

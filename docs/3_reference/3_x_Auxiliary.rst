@@ -101,6 +101,21 @@ parameterizations.
 
 .. automodule:: aggregate.tweedie
 
+Exact NTT compounds
+-------------------
+
+:mod:`aggregate.ntt` computes bounded discrete compounds **exactly**, as
+rational numbers, via the number-theoretic transform over 32-bit prime fields
+with Chinese remainder reconstruction: the engine
+(:func:`~aggregate.ntt.exact_compound`, with the direct polynomial reference
+:func:`~aggregate.ntt.exact_compound_poly` as an independent oracle) and the
+:class:`~aggregate.ntt.AggregateNTT` class behind the DecL ``nttagg`` kind,
+which runs the float FFT pipeline side by side with the exact answer
+(``accuracy_df``, ``ntt_audit``). See the
+:doc:`language reference <../4_dec_Language_Reference>` for the DecL surface.
+
+.. automodule:: aggregate.ntt
+
 Correlation (Iman-Conover)
 --------------------------
 

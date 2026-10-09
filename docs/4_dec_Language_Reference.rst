@@ -96,6 +96,18 @@ Three behaviors are worth knowing.
 
 Expressions evaluate as the program parses, so the specification carries plain numbers and the formula is not retained. The canonical text that :func:`aggregate.decl_writer.spec_to_decl` and :func:`aggregate.decl_writer.format_program` produce therefore shows the evaluated literal: the program above decompiles with ``10 claims 133333.33333333334 premium``. This is the long-standing canonical, not verbatim, contract, the same one that collapses ``exp(.5)`` to its float.
 
+Exact Compounds (nttagg)
+========================
+
+The ``nttagg`` statement declares a bounded discrete compound that is computed **exactly**, as rational numbers, alongside the ordinary float FFT pipeline. It is the computational answer to Wilson and Keich's accuracy program: for a bounded integer lattice the number-theoretic transform over prime finite fields, reconstructed with the Chinese remainder theorem, has no rounding error at all, so the float pipeline can be audited bucket by bucket::
+
+    nttagg DiceOfDice dfreq [1:100] dsev [1:100]              note{exact dice of dice}
+    nttagg Skewed     dfreq [0 1 2] [1/4 1/2 1/4] dsev [1 2 10] [0.3 0.5 0.2]
+
+The body is exactly ``dfreq`` then ``dsev`` then the usual trailer: no exposures, layers, reinsurance, ``approximate``, ``!``, or ``picks``, so boundedness is guaranteed syntactically, and ``nttagg`` cannot appear inside a portfolio, pnl, or bivariate. Outcomes must be nonnegative integers (clear denominators and rescale the lattice yourself). Probabilities are **text exact**: a decimal literal ``0.3`` is exactly ``3/10``, scientific notation ``3e-2`` is exactly ``3/100``, an explicit ``a/b`` is the fraction itself, and an omitted probability list is the exact uniform ``1/m``. The list must sum to exactly 1; duplicates combine and sort as in ``dhistogram``.
+
+``build`` returns an :class:`aggregate.ntt.AggregateNTT`, an ordinary :class:`~aggregate.Aggregate` whose float pipeline is driven bit-identically from the exact spec (``float(Fraction)`` is correctly rounded), plus ``density_df`` columns ``p_exact`` / ``p_exact_float``, the per-bucket ``accuracy_df`` comparison, an ``ntt_audit`` record, and a ``stats_df`` ``exact`` column that validation measures against. Guardrails refuse monster cases up front with a size estimate (override with ``build(..., ntt_override=True)``); a case whose support needs more than the default ``log2`` cap asks for an explicit ``log2``; the 32-bit prime supply caps the envelope near a transform length of :math:`2^{22}`, intrinsic to the method. ``build(..., ntt_workers=8)`` threads the transform phase. See :mod:`aggregate.ntt` for the engine and the mathematics.
+
 Dec Language Grammar Specification
 ===================================
 

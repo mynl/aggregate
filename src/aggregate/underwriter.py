@@ -186,7 +186,7 @@ def _strip_ignored_economics(name, spec, context='agg'):
 # by the 99 fallback, which was the right answer for the wrong reason and
 # gave anything reimplementing this order nothing to copy.
 _KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3,
-                     'port': 4, 'pnl': 5, 'xpnl': 5}
+                     'nttagg': 3, 'port': 4, 'pnl': 5, 'xpnl': 5}
 
 
 def _entry_to_decl(r, layout='terse'):
@@ -1850,6 +1850,14 @@ class Underwriter(HelpMixin):
         elif kind == 'distortion':
             obj = Distortion.from_spec(spec)
             obj.program = program
+        elif kind == 'nttagg':
+            # Grammar and spec landed ahead of the class ([NTT-DecL] stage of
+            # dev/plan-nttagg.md); AggregateNTT dispatch replaces this raise
+            # at the [NTT-Class] stage.
+            raise NotImplementedError(
+                f"{name}: the DecL 'nttagg' kind parses but the AggregateNTT "
+                f"class is not wired yet (dev/plan-nttagg.md, [NTT-Class] "
+                f"stage)")
         elif kind == 'expr':
             # a bare expression is its own answer: the parser has already
             # evaluated it, so the spec is the number. There is no object to

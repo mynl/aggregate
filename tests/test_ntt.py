@@ -185,3 +185,82 @@ def test_dice_of_dice_closed_form():
     assert meta['support'] == 10000
     assert meta['transform_length'] == 2 ** 14
     assert meta['primes_used'] in (21, 22)
+
+
+# ----------------------------------------------- [decl] ([NTT-DecL] stage)
+
+NTT_PROGRAMS = [
+    'nttagg RT.Dice dfreq [1:6] dsev [1:6] note{exact dice of dice}',
+    'nttagg RT.Skewed dfreq [0 1 2] [1/4 1/2 1/4] dsev [1 2 10] [0.3 0.5 0.2]',
+    'nttagg RT.Stepped as "Even Counts" dfreq [2:10:2] dsev [5]',
+    'nttagg RT.Sci dfreq [1] dsev [1 2] [3e-1 7e-1] tags{exact, ntt}',
+]
+
+
+def _parse(uw, program):
+    return uw.parser.parse(uw.lexer.tokenize(program))
+
+
+def test_nttagg_parses_text_exact(underwriter):
+    kind, name, spec = _parse(
+        underwriter,
+        'nttagg T dfreq [0 1 2] [1/4 1/2 1/4] dsev [1 2 10] [0.3 0.5 0.2]')
+    assert kind == 'nttagg' and name == 'T'
+    assert spec['ntt_freq_outcomes'] == [0, 1, 2]
+    assert spec['ntt_freq_probs'] == [Fraction(1, 4), Fraction(1, 2),
+                                      Fraction(1, 4)]
+    assert spec['ntt_sev_probs'] == [Fraction(3, 10), Fraction(1, 2),
+                                     Fraction(1, 5)]
+
+
+def test_nttagg_uniform_default_and_ranges(underwriter):
+    _, _, spec = _parse(underwriter, 'nttagg T dfreq [1:6] dsev [2:10:2]')
+    assert spec['ntt_freq_outcomes'] == [1, 2, 3, 4, 5, 6]
+    assert spec['ntt_freq_probs'] == [Fraction(1, 6)] * 6
+    assert spec['ntt_sev_outcomes'] == [2, 4, 6, 8, 10]
+    assert spec['ntt_sev_probs'] == [Fraction(1, 5)] * 5
+
+
+def test_nttagg_combines_duplicates_and_sorts(underwriter):
+    _, _, spec = _parse(
+        underwriter, 'nttagg T dfreq [2 1 1] [1/2 1/4 1/4] dsev [1]')
+    assert spec['ntt_freq_outcomes'] == [1, 2]
+    assert spec['ntt_freq_probs'] == [Fraction(1, 2), Fraction(1, 2)]
+
+
+def test_nttagg_rejects_non_integer_outcome(underwriter):
+    with pytest.raises(ValueError, match='rescale the lattice'):
+        _parse(underwriter, 'nttagg T dfreq [1.5] dsev [1]')
+
+
+def test_nttagg_rejects_bad_probabilities(underwriter):
+    with pytest.raises(ValueError, match='sum to exactly 1'):
+        _parse(underwriter, 'nttagg T dfreq [1 2] [1/3 1/3] dsev [1]')
+    with pytest.raises(ValueError, match='zero denominator'):
+        _parse(underwriter, 'nttagg T dfreq [1] [1/0] dsev [1]')
+    with pytest.raises(ValueError, match='outcomes against'):
+        _parse(underwriter, 'nttagg T dfreq [1 2] [1/1] dsev [1]')
+
+
+def test_nttagg_shortfall_message_is_exact(underwriter):
+    with pytest.raises(ValueError, match='1/3'):
+        _parse(underwriter, 'nttagg T dfreq [1 2] [1/3 1/3] dsev [1]')
+
+
+@pytest.mark.parametrize('program', NTT_PROGRAMS)
+def test_nttagg_writer_round_trip(program, underwriter):
+    """parse -> write -> parse reproduces the exact spec, Fractions included."""
+    from aggregate.decl_writer import spec_to_decl
+    kind, name, spec = _parse(underwriter, program)
+    rendered = spec_to_decl(spec, kind, name)
+    kind2, name2, spec2 = _parse(underwriter, rendered)
+    assert (kind2, name2) == (kind, name)
+    assert spec2 == spec
+    # idempotent: f(f(x)) == f(x)
+    assert spec_to_decl(spec2, kind2, name2) == rendered
+
+
+def test_nttagg_build_not_yet_wired(underwriter):
+    """[NTT-DecL] stage pin: replaced by AggregateNTT at [NTT-Class]."""
+    with pytest.raises(NotImplementedError, match='NTT-Class'):
+        underwriter.build('nttagg T dfreq [1:6] dsev [1:6]')

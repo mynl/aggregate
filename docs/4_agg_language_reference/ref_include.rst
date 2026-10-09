@@ -25,6 +25,7 @@
           | xpnl_out         -> answer_xpnl
           | port_out         -> answer_port
           | bv_out           -> answer_bv
+          | nttagg_out       -> answer_nttagg
           | distortion_out   -> answer_distortion
           | expr             -> answer_expr
     
@@ -551,6 +552,45 @@
           |                                           -> splice_none
     
     // ======================================================================
+    // NTT exact aggregate (nttagg)
+    // ----------------------------------------------------------------------
+    // A bounded discrete compound computed EXACTLY (rational numbers) via the
+    // number-theoretic transform, alongside the ordinary float pipeline. The
+    // body is exactly dfreq then dsev then the trailer: no exposures, layers,
+    // reinsurance, approximate, `!`, or picks, so boundedness is guaranteed
+    // syntactically. Deliberately parallel to dfreq/dsev but kept separate: the
+    // transformer must keep token TEXT (a literal 0.3 is exactly 3/10, a/b is
+    // Fraction(a, b)), and the shared float paths stay untouched. NTT_NUMBER
+    // exists because the transformer's NUMBER terminal callback converts every
+    // NUMBER to binary64 before any rule callback runs; it admits no sign, no
+    // percent and no inf, so those are parse errors here. The dynamic Earley
+    // lexer never expects NUMBER and NTT_NUMBER at the same point, so the twin
+    // terminals cannot collide. `nttagg` is NOT a port_item and cannot appear
+    // inside a portfolio, pnl, or bivariate (v1). See dev/plan-nttagg.md.
+    // ======================================================================
+    
+    nttagg_out: NTTAGG name as_label ntt_dfreq ntt_dsev trailer
+    
+    ntt_dfreq: DFREQ ntt_doutcomes ntt_dprobs
+    ntt_dsev: DSEV ntt_doutcomes ntt_dprobs
+    
+    ntt_doutcomes: "[" ntt_intl "]"                                      -> ntt_doutcomes_list
+                 | "[" NTT_NUMBER RANGE NTT_NUMBER "]"                   -> ntt_doutcomes_range
+                 | "[" NTT_NUMBER RANGE NTT_NUMBER RANGE NTT_NUMBER "]"  -> ntt_doutcomes_range_step
+    
+    ntt_dprobs: "[" ntt_ratl "]"   -> ntt_dprobs_list
+              |                    -> ntt_dprobs_none
+    
+    ntt_intl: ntt_intl NTT_NUMBER   -> ntt_intl_cons
+            | NTT_NUMBER            -> ntt_intl_one
+    
+    ntt_ratl: ntt_ratl ntt_rat   -> ntt_ratl_cons
+            | ntt_rat            -> ntt_ratl_one
+    
+    ntt_rat: NTT_NUMBER                    -> ntt_rat_number
+           | NTT_NUMBER DIVIDE NTT_NUMBER  -> ntt_rat_fraction
+    
+    // ======================================================================
     // Layers
     // ======================================================================
     
@@ -800,6 +840,7 @@
     DBVSEV.2:     /dbvsev(?![a-zA-Z0-9._:~\-])/
     DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
     DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
+    NTTAGG.2:     /nttagg(?![a-zA-Z0-9._:~\-])/
     WAIT.2:       /wait(?![a-zA-Z0-9._:~\-])/
     DWAIT.2:      /dwait(?![a-zA-Z0-9._:~\-])/
     YEARS.2:      /(?:years|year)(?![a-zA-Z0-9._:~\-])/
@@ -860,6 +901,13 @@
     // the transformer needs no change.
     NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)*)?%?|-?inf/
     
+    // NTT_NUMBER is NUMBER restricted to what nttagg admits: nonnegative, no
+    // percent, no inf. It exists so the nttagg transformer callbacks receive the
+    // token TEXT (the NUMBER terminal callback converts to binary64 tree-wide);
+    // used only inside the ntt_* productions, where NUMBER is never expected, so
+    // the dynamic lexer cannot see the two compete.
+    NTT_NUMBER: /(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)*)?/
+    
     // ID is the catch-all identifier — priority 1 (default).
     // Two negative lookaheads at the start of the match make the grammar
     // unambiguous:
@@ -878,7 +926,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

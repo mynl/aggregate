@@ -22,6 +22,7 @@
 # O. Novelties (the logo mixed distribution)
 # Y. Renewal frequencies (Sparre-Andersen wait clause)
 # Z. Aggregate and portfolio references as severities
+# NTT. Exact compounds via the number-theoretic transform (nttagg)
 #    (P..X are reserved by decl-testers.agg)
 
 
@@ -335,3 +336,20 @@ agg Z.Ref.UsesSigned    dfreq [1] ssev agg.Z.Ref.Signed note{ssev over a signed 
 
 port Z.Ref.Units agg Z.Ref.UnitA 500 claims sev agg.Z.SplitLimit.Policy poisson agg Z.Ref.UnitB 10 claims sev lognorm 50 cv 1 poisson
 
+
+# NTT. Exact compounds via the number-theoretic transform (nttagg)
+# ================================================================
+# A bounded discrete compound computed exactly (rational numbers) over prime
+# finite fields with CRT reconstruction, alongside the float FFT pipeline.
+# Probabilities are text-exact: 0.3 is exactly 3/10, a/b is Fraction(a, b),
+# and an omitted probability list is the exact uniform 1/m. Outcomes are
+# nonnegative integers (clear denominators and rescale the lattice yourself).
+# See dev/plan-nttagg.md.
+
+nttagg NTT.DiceOfDice   dfreq [1:6] dsev [1:6] note{exact dice of dice, the 6 x 6 warm-up}
+
+nttagg NTT.Skewed       dfreq [0 1 2] [1/4 1/2 1/4] dsev [1 2 10] [0.3 0.5 0.2] note{explicit rationals both ways: fractions and exact decimals}
+
+nttagg NTT.Stepped as "Even Counts" dfreq [2:10:2] dsev [5] [1/1] note{range-with-step outcomes, degenerate severity, display label}
+
+nttagg NTT.Scientific   dfreq [1] dsev [1 2] [3e-1 7e-1] note{scientific-notation literals are exact: 3e-1 is 3/10}

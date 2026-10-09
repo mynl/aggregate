@@ -212,7 +212,7 @@ class AggLexer(RegexLexer):
             # siblings rather than with the FREQ distribution names: it
             # declares an outcome-and-probability pair, it is not a named
             # distribution.
-            (words(('dfreq', 'dsev', 'dbvsev', 'dwait'),
+            (words(('dfreq', 'dsev', 'dbvsev', 'dwait', 'nttagg'),
                    suffix=_KW), Name.Label),
 
             # Every remaining reserved word in the grammar's ID exclusion list.

@@ -126,6 +126,8 @@ _TERMINAL_LABELS: dict[str, str] = {
     "DBVSEV": "'dbvsev'",
     "DFREQ": "'dfreq'",
     "DSEV": "'dsev'",
+    "NTTAGG": "'nttagg' (exact discrete compound)",
+    "NTT_NUMBER": "a number (nttagg: nonnegative, no percent, no inf)",
     "DWAIT": "'dwait' (discrete renewal waiting time)",
     "WAIT": "'wait' (renewal waiting time)",
     "YEARS": "'years' (or 'year'; renewal horizon)",

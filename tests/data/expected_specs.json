@@ -6094,5 +6094,128 @@
       "note": "",
       "hints": ""
     }
+  },
+  "nttagg NTT.DiceOfDice   dfreq  [1:6]  dsev  [1:6]  note{exact dice of dice, the 6 x 6 warm-up}": {
+    "kind": "nttagg",
+    "name": "NTT.DiceOfDice",
+    "spec": {
+      "name": "NTT.DiceOfDice",
+      "ntt_freq_outcomes": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "ntt_freq_probs": [
+        "1/6",
+        "1/6",
+        "1/6",
+        "1/6",
+        "1/6",
+        "1/6"
+      ],
+      "ntt_sev_outcomes": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ],
+      "ntt_sev_probs": [
+        "1/6",
+        "1/6",
+        "1/6",
+        "1/6",
+        "1/6",
+        "1/6"
+      ],
+      "note": "exact dice of dice, the 6 x 6 warm-up",
+      "hints": ""
+    }
+  },
+  "nttagg NTT.Skewed       dfreq  [0 1 2]   [1/4 1/2 1/4]  dsev  [1 2 10]   [0.3 0.5 0.2]  note{explicit rationals both ways: fractions and exact decimals}": {
+    "kind": "nttagg",
+    "name": "NTT.Skewed",
+    "spec": {
+      "name": "NTT.Skewed",
+      "ntt_freq_outcomes": [
+        0,
+        1,
+        2
+      ],
+      "ntt_freq_probs": [
+        "1/4",
+        "1/2",
+        "1/4"
+      ],
+      "ntt_sev_outcomes": [
+        1,
+        2,
+        10
+      ],
+      "ntt_sev_probs": [
+        "3/10",
+        "1/2",
+        "1/5"
+      ],
+      "note": "explicit rationals both ways: fractions and exact decimals",
+      "hints": ""
+    }
+  },
+  "nttagg NTT.Stepped as \"Even Counts\" dfreq  [2:10:2]  dsev  [5]   [1/1]  note{range-with-step outcomes, degenerate severity, display label}": {
+    "kind": "nttagg",
+    "name": "NTT.Stepped",
+    "spec": {
+      "name": "NTT.Stepped",
+      "label": "Even Counts",
+      "ntt_freq_outcomes": [
+        2,
+        4,
+        6,
+        8,
+        10
+      ],
+      "ntt_freq_probs": [
+        "1/5",
+        "1/5",
+        "1/5",
+        "1/5",
+        "1/5"
+      ],
+      "ntt_sev_outcomes": [
+        5
+      ],
+      "ntt_sev_probs": [
+        "1/1"
+      ],
+      "note": "range-with-step outcomes, degenerate severity, display label",
+      "hints": ""
+    }
+  },
+  "nttagg NTT.Scientific   dfreq  [1]  dsev  [1 2]   [3e-1 7e-1]  note{scientific-notation literals are exact: 3e-1 is 3/10}": {
+    "kind": "nttagg",
+    "name": "NTT.Scientific",
+    "spec": {
+      "name": "NTT.Scientific",
+      "ntt_freq_outcomes": [
+        1
+      ],
+      "ntt_freq_probs": [
+        "1/1"
+      ],
+      "ntt_sev_outcomes": [
+        1,
+        2
+      ],
+      "ntt_sev_probs": [
+        "3/10",
+        "7/10"
+      ],
+      "note": "scientific-notation literals are exact: 3e-1 is 3/10",
+      "hints": ""
+    }
   }
 }

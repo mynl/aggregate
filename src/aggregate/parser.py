@@ -42,6 +42,7 @@ from __future__ import annotations
 
 import logging
 import re
+from fractions import Fraction
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Iterator
@@ -514,6 +515,11 @@ class UnderwritingTransformer(Transformer):
     def FREQ(self, tok):
         return str(tok)
 
+    def NTT_NUMBER(self, tok):
+        # Keep the TEXT: nttagg consumes exact literals (0.3 is exactly 3/10),
+        # so the conversion happens in the ntt_* rule callbacks, never here.
+        return str(tok)
+
     # ----- answer dispatch ------------------------------------------
     def answer_sev(self, c):
         return c[0]
@@ -525,6 +531,9 @@ class UnderwritingTransformer(Transformer):
         return c[0]
 
     def answer_distortion(self, c):
+        return c[0]
+
+    def answer_nttagg(self, c):
         return c[0]
 
     def answer_expr(self, c):
@@ -2016,6 +2025,137 @@ class UnderwritingTransformer(Transformer):
             "freq_b": b,
             "exp_en": -1,
         }
+
+    # ----- nttagg (exact discrete compound, dev/plan-nttagg.md) ------
+    # These callbacks never touch ``_check_vectorizable`` or float
+    # conversion: they read NTT_NUMBER token TEXT, so a literal ``0.3`` is
+    # exactly ``3/10`` and ``a/b`` is ``Fraction(a, b)``. The happy fact that
+    # ``float(Fraction(...))`` is correctly rounded means the inner float
+    # Aggregate can later be driven from this exact spec with no input
+    # divergence: the exact-vs-float comparison isolates pure algorithm error.
+    @staticmethod
+    def _ntt_outcome(text):
+        """Parse one nttagg outcome token as a nonnegative base-10 integer."""
+        try:
+            return int(text.replace('_', ''))
+        except ValueError:
+            raise ValueError(
+                f'nttagg outcomes must be nonnegative integers, got {text!r}; '
+                f'clear denominators and rescale the lattice yourself'
+            ) from None
+
+    @staticmethod
+    def _ntt_clause(clause, outcomes, probs):
+        """Validate and normalize one exact (outcomes, probabilities) clause.
+
+        A missing probability list means the exact uniform ``1/m``. Duplicate
+        outcomes are combined by summing their probabilities and the result
+        is sorted ascending, mirroring dhistogram semantics. The sum check is
+        exact: anything other than ``Fraction(1)`` raises, printing the exact
+        shortfall as a fraction.
+        """
+        m = len(outcomes)
+        if probs is None:
+            probs = [Fraction(1, m)] * m
+        if len(probs) != m:
+            raise ValueError(
+                f'nttagg {clause}: {m} outcomes against {len(probs)} '
+                f'probabilities')
+        combined = {}
+        for x, q in zip(outcomes, probs):
+            if q <= 0:
+                raise ValueError(
+                    f'nttagg {clause}: probabilities must be positive, '
+                    f'got {q}')
+            combined[x] = combined.get(x, Fraction(0)) + q
+        total = sum(combined.values())
+        if total != 1:
+            raise ValueError(
+                f'nttagg {clause}: probabilities must sum to exactly 1; '
+                f'shortfall is {Fraction(1) - total}')
+        xs = sorted(combined)
+        prefix = 'ntt_freq' if clause == 'frequency' else 'ntt_sev'
+        return {f'{prefix}_outcomes': xs,
+                f'{prefix}_probs': [combined[x] for x in xs]}
+
+    def nttagg_out(self, c):
+        _, name, as_label, freq_clause, sev_clause, trailer = c
+        return ("nttagg", name,
+                {"name": name, **as_label, **freq_clause, **sev_clause,
+                 **trailer})
+
+    def ntt_dfreq(self, c):
+        _dfreq, outcomes, probs = c
+        return self._ntt_clause('frequency', outcomes, probs)
+
+    def ntt_dsev(self, c):
+        _dsev, outcomes, probs = c
+        return self._ntt_clause('severity', outcomes, probs)
+
+    def ntt_doutcomes_list(self, c):
+        return [self._ntt_outcome(t) for t in c[0]]
+
+    def ntt_doutcomes_range(self, c):
+        start, _range, end = c
+        a, b = self._ntt_outcome(start), self._ntt_outcome(end)
+        if b < a:
+            raise ValueError(f'nttagg outcome range [{a}:{b}] is empty')
+        return list(range(a, b + 1))
+
+    def ntt_doutcomes_range_step(self, c):
+        start, _range1, end, _range2, step = c
+        a, b = self._ntt_outcome(start), self._ntt_outcome(end)
+        s = self._ntt_outcome(step)
+        if s == 0:
+            raise ValueError('nttagg outcome range step must be positive')
+        if b < a:
+            raise ValueError(f'nttagg outcome range [{a}:{b}:{s}] is empty')
+        return list(range(a, b + 1, s))
+
+    def ntt_dprobs_list(self, c):
+        return c[0]
+
+    def ntt_dprobs_none(self, c):
+        # the exact uniform; resolved in _ntt_clause once the count is known
+        return None
+
+    def ntt_intl_cons(self, c):
+        return c[0] + [c[1]]
+
+    def ntt_intl_one(self, c):
+        return [c[0]]
+
+    def ntt_ratl_cons(self, c):
+        return c[0] + [c[1]]
+
+    def ntt_ratl_one(self, c):
+        return [c[0]]
+
+    def ntt_rat_number(self, c):
+        # Fraction(token text) is exact for decimal and scientific literals:
+        # '0.3' is 3/10, '3e-2' is 3/100, '7' is 7.
+        text = c[0].replace('_', '')
+        try:
+            return Fraction(text)
+        except (ValueError, ZeroDivisionError):
+            raise ValueError(
+                f'nttagg probabilities must be rational numbers, '
+                f'got {c[0]!r}') from None
+
+    def ntt_rat_fraction(self, c):
+        numerator, _divide, denominator = c
+        try:
+            n = int(numerator.replace('_', ''))
+            d = int(denominator.replace('_', ''))
+        except ValueError:
+            raise ValueError(
+                f'nttagg a/b probabilities take integers, got '
+                f'{numerator}/{denominator}') from None
+        if d == 0:
+            raise ValueError(
+                f'nttagg probability {numerator}/{denominator} has a zero '
+                f'denominator')
+        return Fraction(n, d)
 
     # ----- wait / dwait (renewal waiting-time clause) ----------------
     @staticmethod

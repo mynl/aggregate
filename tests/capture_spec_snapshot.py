@@ -21,6 +21,7 @@ Run with:
 
 import json
 import math
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -38,6 +39,10 @@ NAN_SENTINEL = "__nan__"
 
 
 def jsonify(obj):
+    if isinstance(obj, Fraction):
+        # exact nttagg probabilities; tests/test_decl_parser.py mirrors this
+        # "a/b" string form in its _normalize
+        return f"{obj.numerator}/{obj.denominator}"
     if isinstance(obj, np.ndarray):
         return [jsonify(x) for x in obj.tolist()]
     if isinstance(obj, dict):

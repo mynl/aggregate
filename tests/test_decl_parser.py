@@ -14,6 +14,7 @@ Two test functions:
 
 import json
 import math
+from fractions import Fraction
 from pathlib import Path
 
 import numpy as np
@@ -24,7 +25,7 @@ from aggregate.parser import UnderwritingLexer
 TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
 SNAPSHOT_PATH = Path(__file__).parent / "data" / "expected_specs.json"
 
-VALID_KINDS = {"agg", "sev", "port", "distortion", "expr"}
+VALID_KINDS = {"agg", "sev", "port", "distortion", "expr", "nttagg"}
 
 # Sentinels used by tests/capture_spec_snapshot.py for non-JSON floats.
 POS_INF_SENTINEL = "__inf__"
@@ -64,6 +65,10 @@ def _normalize(obj):
     Converts numpy arrays/scalars to plain Python lists/numbers so that
     ``assert actual == expected`` works against JSON-loaded data.
     """
+    if isinstance(obj, Fraction):
+        # exact nttagg probabilities; capture_spec_snapshot.jsonify writes
+        # the same "a/b" string form
+        return f"{obj.numerator}/{obj.denominator}"
     if isinstance(obj, np.ndarray):
         return [_normalize(x) for x in obj.tolist()]
     if isinstance(obj, (np.integer, np.floating)):

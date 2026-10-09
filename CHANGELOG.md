@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.1.0a2 - 2026-10-09
+
+**[NTT-DecL] the `nttagg` DecL kind parses: grammar, transformer, writer, corpus.** `nttagg NAME dfreq [...] [...] dsev [...] [...] trailer` declares an exact bounded discrete compound: probabilities are text-exact (`0.3` is exactly `3/10`, `a/b` is `Fraction(a, b)`, scientific literals are exact, an omitted list is the exact uniform `1/m`), outcomes are nonnegative integers, duplicates combine and sort as in `dhistogram`. New grammar terminals `NTTAGG` and `NTT_NUMBER`; `nttagg` joins the reserved words (ID exclusion, Pygments, Sublime, parse-error labels). `spec_to_decl` renders the new kind with exact `a/b` probabilities and round-trips exactly. Four `NTT.*` lines join `_test_suite.agg` and the spec snapshot (pure additions); the snapshot machinery serializes `Fraction` as `"a/b"`. `build('nttagg ...')` raises NotImplementedError until the `[NTT-Class]` stage wires `AggregateNTT`.
+
 ## 1.1.0a1 - 2026-10-09
 
 **[NTT-Engine] new module `aggregate.ntt`: exact bounded discrete compounds via the number-theoretic transform.** Engine functions only, first stage of `dev/plan-nttagg.md`: `exact_compound` (vectorized numpy NTT over 32-bit prime fields with incremental CRT reconstruction, returning exact integer numerators and denominator), `exact_compound_poly` (the slow direct bigint polynomial reference, the tests' independent oracle), `ntt`, `ntt_primes`, and `is_prime_u64` (deterministic Miller-Rabin). Submodule access only, no top-level re-export. New `tests/test_ntt.py` covers primality, prime supply, transform round trips, convolution against numpy, the polynomial oracle, and closed-form rational probabilities of the 100 x 100 dice-of-dice case. The DecL `nttagg` kind and `AggregateNTT` class arrive in later stages.

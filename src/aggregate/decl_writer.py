@@ -1201,6 +1201,38 @@ def _render_distortion(name: str, spec: dict, trailer: bool = True) -> _Block:
                   _render_trailer(spec, trailer))
 
 
+def _fmt_ntt_rat(q) -> str:
+    """Format one exact nttagg probability: ``a/b``, or ``a`` when ``b == 1``."""
+    return str(q.numerator) if q.denominator == 1 else \
+        f'{q.numerator}/{q.denominator}'
+
+
+def _render_ntt_clause(keyword: str, outcomes, probs) -> str:
+    """Render one exact ``dfreq`` / ``dsev`` clause of an ``nttagg``.
+
+    Outcomes render as an explicit integer list (range sugar is not
+    reconstructed, matching :func:`_fmt_seq`); probabilities render as exact
+    ``a/b`` fractions and are omitted entirely when uniform, which re-parses
+    to the identical exact uniform ``1/m``. Round-trip exactness is pinned by
+    tests/test_ntt.py.
+    """
+    s = f'{keyword} [' + ' '.join(str(x) for x in outcomes) + ']'
+    if len(set(probs)) > 1:
+        s += ' [' + ' '.join(_fmt_ntt_rat(q) for q in probs) + ']'
+    return s
+
+
+def _render_nttagg(name: str, spec: dict, trailer: bool = True) -> _Block:
+    """Render an ``nttagg`` exact-compound declaration (dev/plan-nttagg.md)."""
+    return _Block(
+        f'nttagg {name}{_render_label(spec.get("label"))}',
+        [_render_ntt_clause('dfreq', spec['ntt_freq_outcomes'],
+                            spec['ntt_freq_probs']),
+         _render_ntt_clause('dsev', spec['ntt_sev_outcomes'],
+                            spec['ntt_sev_probs']),
+         *_render_trailer(spec, trailer)])
+
+
 _KIND_RENDERERS = {
     'agg': lambda name, spec, trailer: _render_agg_or_pnl('agg', name, spec, trailer),
     'pnl': lambda name, spec, trailer: _render_agg_or_pnl('pnl', name, spec, trailer),
@@ -1208,6 +1240,7 @@ _KIND_RENDERERS = {
     'sev': _render_sev_out,
     'port': _render_port,
     'bvagg': _render_bvagg,
+    'nttagg': _render_nttagg,
     'distortion': _render_distortion,
 }
 

@@ -40,6 +40,19 @@
   on 2026-10-07: the README and the ~30 worked reproductions already say what
   the library does, so no scope-disclaimer section is owed.
 
+## In flight
+
+- **[NTT-Speed]** (`dev/plan-ntt-speed.md`) — make large `nttagg` cases fast.
+  Stage 1 `[NTT-Uniform-Geometric]` landed at **1.2.0a1**: equal-weight outcome
+  runs are summed as a geometric series, 37.5x on the spectral walk and the
+  dense 400 x 400 case from 119 s to 25.1 s serial. Stage 2
+  `[NTT-Inplace-Kernels]` is next. Stage 3 `[NTT-Numba-Kernel]`, a compiled
+  Montgomery engine, is **held pending measurement**: the author ruled on
+  2026-10-09 that the stage 2 numbers decide between it and
+  `[NTT-CRT-ProcessPool]`, because the serial pure-Python CRT is already half
+  the wall clock of a dense case and becomes nearly all of it once the
+  transforms are this fast.
+
 ## Recently landed
 
 - **[NTT-Exact-Aggregate]** DONE at **1.1.0** (2026-10-09,

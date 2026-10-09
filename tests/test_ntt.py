@@ -15,8 +15,10 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
+import aggregate.ntt as ntt_module
 from aggregate.ntt import (is_prime_u64, ntt, ntt_primes, exact_compound,
-                           exact_compound_poly)
+                           exact_compound_poly, _clear_denominators,
+                           _outcome_runs)
 
 
 # ---------------------------------------------------------------- [primality]
@@ -122,6 +124,26 @@ def _random_clause(rng, max_outcome=12):
     return outcomes, probs
 
 
+def _random_run_clause(rng, max_runs=3):
+    """Random piecewise-uniform (outcomes, probs) built from maximal runs.
+
+    Run lengths mix singletons, short runs below ``_GEOMETRIC_RUN_MIN`` and
+    long runs above it, separated by gaps, so one case exercises the
+    geometric closed form, the short-run walk and the gap bridge together.
+    """
+    outcomes = []
+    weights = []
+    k = rng.choice([0, 1, 2])
+    for _ in range(rng.randint(2, max_runs)):
+        run_length = rng.choice([1, 1, 3, 9, 11])
+        w = rng.randint(1, 7)
+        outcomes.extend(range(k, k + run_length))
+        weights.extend([w] * run_length)
+        k += run_length + rng.randint(1, 3)
+    total = sum(weights)
+    return outcomes, [Fraction(w, total) for w in weights]
+
+
 @pytest.mark.parametrize('seed', range(8))
 def test_exact_compound_matches_polynomial_oracle(seed):
     rng = random.Random(seed)
@@ -186,6 +208,102 @@ def test_dice_of_dice_closed_form():
     assert meta['transform_length'] == 2 ** 14
     assert meta['primes_used'] in (21, 22)
 
+
+# ------------------------------- [geometric] ([NTT-Uniform-Geometric] stage)
+
+def test_outcome_runs_decomposition():
+    """Maximal runs: consecutive integers sharing one cleared weight."""
+    runs = _outcome_runs([0, 1, 2, 5, 6, 7, 8, 9, 10, 11, 12, 20],
+                         [3, 3, 3, 1, 1, 1, 1, 1, 1, 1, 1, 7])
+    assert runs == [(0, 3, 3), (5, 8, 1), (20, 1, 7)]
+    # A weight change breaks a run even with no gap in the outcomes.
+    assert _outcome_runs([4, 5, 6], [2, 5, 5]) == [(4, 1, 2), (5, 2, 5)]
+    # Uniform [1:F] is the single run the geometric path exists for.
+    assert _outcome_runs(list(range(1, 51)), [1] * 50) == [(1, 50, 1)]
+
+
+def test_spectral_walk_degenerate_cell_is_always_present():
+    """``b_0 = A(1) / Ds = 1`` on every prime, so the geometric mask is hot.
+
+    The ``b == 1`` cells take the degenerate series ``run_length (mod p)``
+    rather than the closed form. Frequency index 0 is such a cell on every
+    prime and in every case, because the severity polynomial evaluated at 1
+    is exactly its cleared denominator. Constructing a second degenerate
+    cell deliberately is not cheap (it asks for a spectral point where
+    ``A`` takes a prescribed value), and index 0 makes the mask load
+    bearing for every check of the totals, so this pins index 0 only.
+    """
+    sev_outcomes, sev_probs = [1, 2, 7], [Fraction(1, 6), Fraction(1, 3),
+                                          Fraction(1, 2)]
+    ds, big_q = _clear_denominators(sev_probs)
+    prime, root = ntt_primes(16, 10 ** 6)[0]
+    a = np.zeros(16, dtype=np.uint64)
+    a[np.array(sev_outcomes)] = [q % prime for q in big_q]
+    a_hat = ntt(a, prime, root)
+    b = int(a_hat[0]) * pow(ds, prime - 2, prime) % prime
+    assert b == 1
+
+
+@pytest.mark.parametrize('seed', range(6))
+def test_exact_compound_piecewise_uniform_matches_oracle(seed):
+    """Several runs of distinct lengths, singletons and gaps, against the oracle.
+
+    The frequency clause is built from maximal runs by construction, so the
+    geometric path and the short-run walk both fire within one case, and
+    seed 0 starts its first run at outcome 0 (where ``b**0 = 1`` carries the
+    only surviving term on the ``b == 0`` cells).
+    """
+    rng = random.Random(1000 + seed)
+    fo, fp = _random_run_clause(rng)
+    so, sp = _random_clause(rng, max_outcome=6)
+    fast, d_fast, _ = exact_compound(fo, fp, so, sp)
+    slow, d_slow, _ = exact_compound_poly(fo, fp, so, sp)
+    assert d_fast == d_slow
+    assert fast == slow
+
+
+def test_geometric_path_matches_forced_walk(monkeypatch):
+    """The closed-form run sum equals the per-outcome walk, exactly.
+
+    Raising ``_GEOMETRIC_RUN_MIN`` above every run length forces the plain
+    ascending walk on the same case. Both paths are integer arithmetic in
+    the same field, so the numerators must agree bit for bit; this is the
+    strongest available check on the geometric series and its mask.
+    """
+    outcomes = list(range(2, 22)) + [40]
+    weights = [2] * 20 + [5]
+    total = sum(weights)
+    probs = [Fraction(w, total) for w in weights]
+    sev_outcomes, sev_probs = [1, 3], [Fraction(1, 4), Fraction(3, 4)]
+    geometric = exact_compound(outcomes, probs, sev_outcomes, sev_probs)
+    monkeypatch.setattr(ntt_module, '_GEOMETRIC_RUN_MIN', 10 ** 6)
+    walked = exact_compound(outcomes, probs, sev_outcomes, sev_probs)
+    assert geometric[1] == walked[1]
+    assert geometric[0] == walked[0]
+
+
+def test_prime_dividing_severity_denominator_stays_exact():
+    """``Ds`` need not be invertible: the walk covers the primes dividing it.
+
+    The geometric path folds the severity denominator into the spectral
+    point through ``Ds**(-1) mod p``, which does not exist when ``p``
+    divides ``Ds``. Here the severity denominator is 4294967291, the largest
+    prime below ``2**32`` and the first prime chosen at transform length 2,
+    so the first CRT prime is exactly a divisor of ``Ds`` and the singular
+    walk has to carry that prime's residues.
+    """
+    big_prime = 4294967291
+    sev_probs = [Fraction(1, big_prime), Fraction(big_prime - 1, big_prime)]
+    fast, d_fast, meta = exact_compound(
+        [0, 1], [Fraction(1, 2), Fraction(1, 2)], [0, 1], sev_probs)
+    slow, d_slow, _ = exact_compound_poly(
+        [0, 1], [Fraction(1, 2), Fraction(1, 2)], [0, 1], sev_probs)
+    assert meta['transform_length'] == 2
+    assert d_fast == d_slow
+    assert fast == slow
+    # P(A = 1) = 1/2 * (p - 1)/p, which the plain walk alone can reach.
+    assert Fraction(fast[1], d_fast) == \
+        Fraction(1, 2) * Fraction(big_prime - 1, big_prime)
 
 # ----------------------------------------------- [decl] ([NTT-DecL] stage)
 

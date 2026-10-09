@@ -328,17 +328,232 @@ def _clear_denominators(probs):
     return d, [int(p * d) for p in probs]
 
 
+# The geometric path pays one shared Fermat inverse per prime, so it only
+# earns its keep on runs long enough to amortize it; shorter runs keep the
+# per-outcome walk and a fully irregular outcome set pays nothing new.
+_GEOMETRIC_RUN_MIN = 8
+
+
+def _outcome_runs(outcomes, weights):
+    """
+    Decompose sorted outcomes into maximal equal-weight consecutive runs.
+
+    Parameters
+    ----------
+    outcomes : sequence of int
+        Strictly ascending nonnegative integers, as returned by
+        :func:`_validate_exact_inputs`.
+    weights : sequence of int
+        The cleared integer weight of each outcome, same length.
+
+    Returns
+    -------
+    list of (int, int, int)
+        ``(start, run_length, weight)`` triples in ascending order, covering
+        every outcome exactly once. A run is maximal: consecutive integers
+        carrying one common weight.
+
+    Notes
+    -----
+    Prime independent, so it is computed once in :func:`exact_compound` and
+    shared by every prime. Uniform ``[1:F]`` collapses to the single triple
+    ``(1, F, 1)``, which is the case the geometric spectral path exists for;
+    an irregular outcome set degenerates to one singleton triple per
+    outcome, recovering the plain walk.
+    """
+    runs = []
+    start = outcomes[0]
+    weight = weights[0]
+    run_length = 1
+    for k, f in zip(outcomes[1:], weights[1:]):
+        if k == start + run_length and f == weight:
+            run_length += 1
+        else:
+            runs.append((start, run_length, weight))
+            start, weight, run_length = k, f, 1
+    runs.append((start, run_length, weight))
+    return runs
+
+
+def _array_pow(base, exponent, prime):
+    """
+    Elementwise ``base**exponent mod prime`` for a uint64 residue array.
+
+    Notes
+    -----
+    Vectorized binary exponentiation, ascending over the bits of
+    ``exponent``, skipping the final squaring (its result would never be
+    used). About ``2 * log2(exponent)`` full-array modular multiplies.
+    Products of two residues below ``2**32`` fit in uint64.
+    """
+    p64 = np.uint64(prime)
+    result = None
+    current = base
+    e = int(exponent)
+    first = True
+    while e:
+        if not first:
+            current = current * current % p64
+        first = False
+        if e & 1:
+            result = current.copy() if result is None else result * current % p64
+        e >>= 1
+    if result is None:
+        return np.ones(len(base), dtype=np.uint64)
+    return result
+
+
+def _spectral_walk(a_hat, freq_runs, ds, kmax, prime):
+    """
+    Spectral evaluation of ``H`` with the severity denominator folded in.
+
+    Parameters
+    ----------
+    a_hat : numpy.ndarray
+        Forward NTT of the cleared severity polynomial, uint64 residues.
+    freq_runs : list of (int, int, int)
+        Frequency outcome runs from :func:`_outcome_runs`.
+    ds : int
+        Least common denominator of the severity clause, invertible mod
+        ``prime``; the caller checks and routes the divisible case to
+        :func:`_spectral_walk_singular`.
+    kmax : int
+        Largest frequency outcome.
+    prime : int
+        The working prime.
+
+    Returns
+    -------
+    numpy.ndarray
+        ``H_hat mod prime``, uint64, same length as ``a_hat``.
+
+    Notes
+    -----
+    The target is
+
+        ``H_hat_r = sum_i F_i * Ds**(Kmax - k_i) * a_hat_r**(k_i)``.
+
+    Folding the denominator into the spectral point, with
+    ``b = a_hat * Ds**(-1) (mod p)`` from one scalar Fermat inverse, gives
+    ``Ds**Kmax * b**(k_i) = Ds**(Kmax - k_i) * a_hat**(k_i)``, so
+
+        ``H_hat = Ds**Kmax * sum_i F_i * b**(k_i)``,
+
+    a weighted power sum of the single array ``b``, with the scalar
+    ``Ds**Kmax`` factored out to one closing multiply (the per-outcome
+    ``pow(ds, kmax - k, p)`` of the plain walk disappears with it).
+
+    A maximal run of consecutive outcomes ``u..v`` carrying one weight
+    ``W`` then contributes a geometric series,
+
+        ``W * b**u * (b**(v - u + 1) - 1) * (b - 1)**(-1)``,
+
+    costing ``log2(run_length)`` array multiplies for ``b**run_length``
+    against ``run_length`` for the walk. The inverse ``(b - 1)**(-1)`` is
+    one vectorized binary exponentiation to ``p - 2``, computed lazily and
+    shared by every run of the prime. Runs shorter than
+    ``_GEOMETRIC_RUN_MIN`` keep the per-outcome walk, which is cheaper than
+    the two exponentiations the series needs.
+
+    The ``b == 1`` cells need the degenerate series ``run_length (mod p)``,
+    and this is every case rather than an edge case: ``a_hat_0 = A(1) = Ds``
+    makes ``b_0 = 1`` at frequency index 0 on every prime, so any check of
+    the totals exercises the mask. The ``b == 0`` cells need nothing
+    special, including a run starting at outcome 0, where ``b**0 = 1``
+    carries the lone surviving term.
+    """
+    p64 = np.uint64(prime)
+    one = np.uint64(1)
+    b = a_hat * np.uint64(pow(ds % prime, prime - 2, prime)) % p64
+    unit = b == one
+    total = np.zeros(len(b), dtype=np.uint64)
+    # ``power`` holds ``b**held``; every run bridges from the exponent in
+    # hand by vectorized square-and-multiply over the gap.
+    power = np.ones(len(b), dtype=np.uint64)
+    held = 0
+    inv_bm1 = None
+    for start, run_length, weight in freq_runs:
+        gap = start - held
+        if gap:
+            base = b
+            first = True
+            while gap:
+                if not first:
+                    base = base * base % p64
+                first = False
+                if gap & 1:
+                    power = power * base % p64
+                gap >>= 1
+            held = start
+        w = np.uint64(weight % prime)
+        if run_length < _GEOMETRIC_RUN_MIN:
+            for j in range(run_length):
+                total = (total + w * power % p64) % p64
+                if j + 1 < run_length:
+                    power = power * b % p64
+                    held += 1
+        else:
+            if inv_bm1 is None:
+                inv_bm1 = _array_pow((b + p64 - one) % p64, prime - 2, prime)
+            series = (_array_pow(b, run_length, prime) + p64 - one) % p64
+            series = series * inv_bm1 % p64
+            series[unit] = run_length % prime
+            total = (total + w * (power * series % p64) % p64) % p64
+    return total * np.uint64(pow(ds, kmax, prime)) % p64
+
+
+def _spectral_walk_singular(a_hat, freq_runs, ds, kmax, prime):
+    """
+    Spectral evaluation of ``H`` when ``prime`` divides ``ds``.
+
+    Same contract as :func:`_spectral_walk`: returns ``H_hat mod prime``.
+
+    Notes
+    -----
+    The geometric path needs ``Ds**(-1) mod p``, which does not exist when
+    ``p`` divides the severity denominator ``Ds``. That requires the least
+    common denominator of the severity clause to carry a prime factor of
+    the form ``c * L + 1`` just below ``2**32``, so it is exotic, but it is
+    reachable and the answer must still be right. This is the plain
+    ascending walk on ``a_hat`` with the explicit ``Ds**(Kmax - k)``
+    coefficient, under which ``Ds ≡ 0`` simply kills every term below the
+    largest outcome. Runs are expanded back to their outcomes, costing one
+    array multiply each, exactly as before the geometric path existed.
+    """
+    p64 = np.uint64(prime)
+    total = np.zeros(len(a_hat), dtype=np.uint64)
+    power = np.ones(len(a_hat), dtype=np.uint64)
+    held = 0
+    for start, run_length, weight in freq_runs:
+        for j in range(run_length):
+            k = start + j
+            gap = k - held
+            base = a_hat
+            first = True
+            while gap:
+                if not first:
+                    base = base * base % p64
+                first = False
+                if gap & 1:
+                    power = power * base % p64
+                gap >>= 1
+            held = k
+            coefficient = weight % prime * pow(ds, kmax - k, prime) % prime
+            total = (total + np.uint64(coefficient) * power % p64) % p64
+    return total
+
+
 def _residues_mod_prime(prime, root, length, support, sev_index, big_q,
-                        freq_outcomes, big_f, ds, kmax):
+                        freq_runs, ds, kmax):
     """
     One prime's slice of the pipeline: ``H mod p`` on the padded lattice.
 
     Forward NTT of the severity polynomial, spectral evaluation of ``H``
-    walking the frequency outcomes with a running power array (square and
-    multiply per gap, skipping the final square), inverse NTT. Pure function
-    of its arguments plus read-only numpy work, so it is safe to run on a
-    thread pool: the uint64 ufuncs release the GIL, which is what makes
-    threads worth having here.
+    over the frequency outcome runs (:func:`_spectral_walk`, or
+    :func:`_spectral_walk_singular` on the primes dividing ``ds``), inverse
+    NTT. Pure function of its arguments plus read-only numpy work, so it is
+    safe to run on a thread pool: the uint64 ufuncs release the GIL, which
+    is what makes threads worth having here.
 
     Returns ``(head, seconds)`` where ``head`` is the uint64 residue vector
     truncated to the support. Raises if any residue beyond the support is
@@ -348,24 +563,8 @@ def _residues_mod_prime(prime, root, length, support, sev_index, big_q,
     a = np.zeros(length, dtype=np.uint64)
     a[sev_index] = [q % prime for q in big_q]
     a_hat = ntt(a, prime, root)
-    p64 = np.uint64(prime)
-    h_hat = np.zeros(length, dtype=np.uint64)
-    power = np.ones(length, dtype=np.uint64)
-    previous_k = 0
-    for k, f in zip(freq_outcomes, big_f):
-        gap = k - previous_k
-        base = a_hat
-        first = True
-        while gap:
-            if not first:
-                base = base * base % p64
-            first = False
-            if gap & 1:
-                power = power * base % p64
-            gap >>= 1
-        previous_k = k
-        coefficient = f % prime * pow(ds, kmax - k, prime) % prime
-        h_hat = (h_hat + np.uint64(coefficient) * power % p64) % p64
+    walk = _spectral_walk if ds % prime else _spectral_walk_singular
+    h_hat = walk(a_hat, freq_runs, ds, kmax, prime)
     residues = ntt(h_hat, prime, root, inverse=True)
     if not np.all(residues[support + 1:] == 0):
         raise AssertionError(
@@ -424,10 +623,15 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     ``H mod p`` for enough NTT primes ``p ≡ 1 (mod L)`` below ``2**32``
     (product exceeding ``D``) and reconstructing with an incremental CRT.
     Per prime: forward NTT of ``A`` padded to ``L = 2**ceil(log2(N + 1))``
-    (which prevents circular aliasing), spectral evaluation of ``H`` walking
-    the frequency outcomes in ascending order with a running power array
-    (each gap bridged by vectorized square-and-multiply, so a sparse outcome
-    set costs about ``log2(gap)`` array multiplies per gap), inverse NTT.
+    (which prevents circular aliasing), spectral evaluation of ``H`` in
+    ascending outcome order with a running power array (each gap bridged by
+    vectorized square-and-multiply, so a sparse outcome set costs about
+    ``log2(gap)`` array multiplies per gap), inverse NTT. The frequency
+    outcomes are first decomposed into maximal equal-weight consecutive
+    runs by :func:`_outcome_runs`, and a long run is summed in closed form
+    by :func:`_spectral_walk` at ``log2(run_length)`` array multiplies
+    instead of ``run_length``: a uniform claim count is one such run, so the
+    dominant phase of a dense case collapses by an order of magnitude.
 
     Three end-to-end checks always run and raise on failure: the
     reconstructed coefficients sum to exactly ``D``, every coefficient is
@@ -468,10 +672,13 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     # any single prime, so reduction mod p happens per prime in the worker.
     sev_index = np.array(sev_outcomes, dtype=np.int64)
 
+    # The run decomposition is prime independent: compute it once and share.
+    freq_runs = _outcome_runs(freq_outcomes, big_f)
+
     def run(pair):
         prime, root = pair
         return _residues_mod_prime(prime, root, length, support, sev_index,
-                                   big_q, freq_outcomes, big_f, ds, kmax)
+                                   big_q, freq_runs, ds, kmax)
 
     pool = None
     if workers is not None and workers > 1:

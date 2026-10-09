@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a1 - 2026-10-09
+
+**[NTT-Uniform-Geometric] the `nttagg` spectral walk sums equal-weight outcome runs in closed form.** The frequency outcomes are decomposed once into maximal runs of consecutive integers sharing one cleared weight, and a run of eight or more is evaluated as a geometric series in the spectral variable rather than one modular array multiply per outcome, costing `log2(run_length)` array multiplies instead of `run_length`. A uniform claim count is a single such run, so the dominant phase of a dense case collapses: measured 37.5x on the spectral walk of the 1000 x 1000 uniform dice shape (8.62 s to 0.23 s per prime at transform length 2**20), taking the dense 400 x 400 case end to end from 119 s to 25.1 s serial. Shorter runs and irregular outcome sets keep the per-outcome walk and pay nothing new. Answers are unchanged: same integer arithmetic in the same prime fields, pinned by the polynomial oracle and by a direct test that the closed form and the forced per-outcome walk agree bit for bit.
+
+One correctness fix rides along, found while reviewing the algebra. The geometric path folds the severity denominator `Ds` into the spectral point through `Ds**(-1) mod p`, which does not exist on a prime dividing `Ds`. Such a prime is now routed to the plain walk. Reaching it needs a severity denominator carrying a prime factor of the form `c * L + 1` just below `2**32`, so no previously computed answer moves, but the case is constructible and is now covered by a test.
+
 ## 1.1.0 - 2026-10-09
 
 **[Reproductions-Corpus] the wheel ships `reproductions.agg` and `library.agg` drops the broken `PnLBook` recipe.** `src/aggregate/agg/reproductions.agg` carries every DecL program from *Reproductions*, the book of worked examples rebuilding published actuarial and numerical results with `aggregate`: 124 canonical-form programs from 27 chapters, each noting its source paper, named `<CitationKey>.<name>`, generated from the book by `make_agg.py` (read back with `build.load("reproductions.agg")`). The broken `PnLBook` recipe (book-level P&L, a deliberate NotImplementedError demonstration) left `library.agg` in the same cleanup, and `tests/test_library_entries.py` `CANNOT_BUILD` no longer lists it.

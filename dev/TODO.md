@@ -40,6 +40,17 @@
   on 2026-10-07: the README and the ~30 worked reproductions already say what
   the library does, so no scope-disclaimer section is owed.
 
+## In flight
+
+- **[NTT-Exact-Aggregate]** (executing from `dev/plan-nttagg.md`, started
+  2026-10-09): a new DecL kind `nttagg` computing bounded discrete compounds
+  exactly (rational numbers) via the number-theoretic transform over prime
+  fields with CRT reconstruction, side by side with the float FFT pipeline
+  (`accuracy_df`, `ntt_audit`), the computational answer to Wilson and Keich.
+  Landed so far: `[NTT-Engine]` at 1.1.0a1 (`aggregate.ntt` engine functions
+  and `tests/test_ntt.py`). Remaining stages: DecL grammar, `AggregateNTT`,
+  exact moments into validation, measured parallelism, docs, 1.1.0 final.
+
 ## Correctness
 
 - **[Zero-Share-Layer-Moments]** (found a352) — a `0% po` layer cedes nothing,

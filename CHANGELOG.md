@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.1.0a1 - 2026-10-09
+
+**[NTT-Engine] new module `aggregate.ntt`: exact bounded discrete compounds via the number-theoretic transform.** Engine functions only, first stage of `dev/plan-nttagg.md`: `exact_compound` (vectorized numpy NTT over 32-bit prime fields with incremental CRT reconstruction, returning exact integer numerators and denominator), `exact_compound_poly` (the slow direct bigint polynomial reference, the tests' independent oracle), `ntt`, `ntt_primes`, and `is_prime_u64` (deterministic Miller-Rabin). Submodule access only, no top-level re-export. New `tests/test_ntt.py` covers primality, prime supply, transform round trips, convolution against numpy, the polynomial oracle, and closed-form rational probabilities of the 100 x 100 dice-of-dice case. The DecL `nttagg` kind and `AggregateNTT` class arrive in later stages.
+
 ## 1.0.1 - 2026-10-07
 
 **[Packaging-Subpackages] the wheel ships `aggregate.charts`, `aggregate.plots` and `aggregate.exhibits`, which 1.0.0 omitted.** `[tool.setuptools]` declared `packages = ["aggregate"]`, which names only the top level package: setuptools does not recurse, so 34 of 85 modules were left out of the built artifact. In that wheel `a.plot()` raised `ModuleNotFoundError: No module named 'aggregate.charts'`. Packaging now uses automatic discovery (`[tool.setuptools.packages.find]`, `where = ["src"]`, `include = ["aggregate*"]`). No library code changed.

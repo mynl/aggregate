@@ -106,7 +106,7 @@
   is right, so it wants a per-engine default if it is worth doing at all.
   Its reflected half is `dev/plan-rust-engine.md` in that repo.
 
-- **[NTT-CRT]** (`dev/plan-ntt-crt.md`) — stage 1
+- **[NTT-CRT]** (**CLOSED**, `dev/done/plan-ntt-crt.md`) — stage 1
   `[NTT-CRT-ProductTree]` landed at **1.2.0a4**: the reconstruction is a
   balanced product tree built as an online merge stack, taking the headline
   1000 x 1000 case from 594 s to 212 s and its reconstruction phase from

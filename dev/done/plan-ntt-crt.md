@@ -1,10 +1,17 @@
 # [NTT-CRT] the CRT reconstruction is now the whole cost, and it is quadratic
 
-Status: PROPOSED 2026-10-09, written against 1.2.0a2 (commit f40f26c). Nothing
-implemented. Supersedes the `[NTT-CRT-ProcessPool]` note carried in
-`dev/done/plan-nttagg.md`, and replaces the dropped `[NTT-Numba-Kernel]` stage
-of `dev/done/plan-ntt-speed.md`. **Two open questions for the author at the
-foot of this file.**
+Status: stage 1 `[NTT-CRT-ProductTree]` **DONE** at 1.2.0a4. Stage 3
+`[NTT-CRT-Gmpy2]` is specified, measured at 2.0x, and **SHELVED** as a
+fallback behind the Rust engine. Stage 2 `[NTT-CRT-ProcessPool]` is
+**superseded** by that engine, since threads without a GIL are what it tried
+to approximate with processes and pickling. The `ntt_workers` default that this plan
+deferred was settled separately at 1.2.0a5, `[NTT-Workers-Default]`.
+Originally written against 1.2.0a2 (commit f40f26c). Supersedes the
+`[NTT-CRT-ProcessPool]` note carried in `dev/done/plan-nttagg.md`, and
+replaces the dropped `[NTT-Numba-Kernel]` stage of
+`dev/done/plan-ntt-speed.md`. The two open questions at the foot of this file
+were answered by the author on 2026-10-09; the execution log at the end
+records what landed.
 
 ## Goal
 
@@ -157,6 +164,155 @@ final answer, pickled once.
 
 Not specified further here. If stage 1's measurement says this is wanted, it
 earns its own section with its own numbers.
+
+## Stage 3, [NTT-CRT-Gmpy2]
+
+Status: **SHELVED 2026-10-09, do not implement.** Specified and measured at
+2.0x, then set aside the same day in favor of a compiled Rust engine in the
+sibling repository `V:\dev\aggregate-ntt`, which targets an order of
+magnitude rather than a factor of two. See
+`dev/plan-ntt-rust-integration.md`. This section is kept, complete, as the
+**fallback**: if the Rust engine stalls, this is a day of work for 2.0x with
+no new build system and no compiled artifact. Nothing below has been
+implemented; `_CRT_MPZ_CUTOVER` does not exist in the code.
+
+### Goal
+
+Use `gmpy2` for the wide bigint arithmetic of the reconstruction when it is
+installed, and CPython integers when it is not. Measured 2.02x on the
+reconstruction phase of the headline 1000 x 1000 uniform dice case and 1.60x
+on the 500 x 500 case, which takes the headline case from 212 s to about
+115 s end to end, so 594 s at 1.2.0a3 to about 115 s, 5.2x across the stages
+of this plan.
+
+### Why, and why the obvious form of it is wrong
+
+The product tree of stage 1 spends its time in one step, the reduction of a
+product modulo the right-hand modulus in `_crt_merge`. CPython's division is
+schoolbook at every size, which is why stage 1 landed a constant-factor 3.1x
+rather than the asymptotic win the plan first claimed. GMP's division is
+subquadratic, so this is exactly the step it should fix.
+
+**Measured: replacing `int` with `mpz` throughout gives only 1.37x.** The
+reason is visible in a profile of the headline case by tree level, where
+`drain256` is the single final merge and weight `k` is a merge of two
+partials of `k` primes each. Timings are for 1,000 coefficients.
+
+| level | merges | int | mpz | ratio |
+|---|---|---|---|---|
+| drain256 | 1 | 0.035 s | 0.005 s | **7.0x** |
+| 128 | 1 | 0.032 s | 0.004 s | **8.0x** |
+| 64 | 2 | 0.020 s | 0.003 s | 6.7x |
+| 32 | 5 | 0.014 s | 0.003 s | 4.7x |
+| 16 | 10 | 0.009 s | 0.003 s | 3.0x |
+| 8 | 20 | 0.008 s | 0.005 s | 1.6x |
+| 4 | 40 | 0.009 s | 0.008 s | 1.1x |
+| 2 | 80 | 0.014 s | 0.016 s | 0.9x |
+| 1 | 160 | 0.023 s | 0.025 s | 0.9x |
+| conversion | 321 | 0.012 s | 0.027 s | **0.4x** |
+| total | | 0.178 s | 0.104 s | 1.37x |
+
+GMP wins 7x to 8x where the numbers are wide and **loses** where they are
+narrow, because at one or two primes the cost is object allocation and
+interpreter dispatch rather than arithmetic, and an `mpz` is more expensive to
+build than a small `int`. All-`mpz` pays that penalty on 300 of the 320 merges
+and on all 321 conversions from the residue arrays, which is 78 percent of its
+own run time.
+
+### The design: int at the bottom, mpz above a cutover
+
+Promote a partial reconstruction to `mpz` only when the merge consuming it
+produces a partial of at least `_CRT_MPZ_CUTOVER` primes. Below that, merges
+stay in CPython integers. Measured, with the cutover swept:
+
+| cutover | 500 x 500 | 1000 x 1000 |
+|---|---|---|
+| int only | 13.6 s | 175.7 s |
+| 2 | 10.8 s | 104.3 s |
+| 4 | 9.6 s | 94.1 s |
+| 8 | 8.7 s | 88.7 s |
+| **16** | **8.5 s, 1.60x** | **86.8 s, 2.02x** |
+| 32 | 8.6 s | 88.5 s |
+| 64 | 9.1 s | 94.1 s |
+
+The optimum is broad and flat from 8 to 32, so **16** is the choice and the
+constant needs no per-case tuning. Promotion costs one pass per promoted
+partial, 40 passes at cutover 16 against the 321 pushes, and that cost is
+inside the measurement above.
+
+### Decisions
+
+1. **`_CRT_MPZ_CUTOVER = 16`, a module-level constant**, matching
+   `_GEOMETRIC_RUN_MIN` and `_CRT_TREE_MIN`. Raising it above the prime count
+   disables promotion entirely, which is how the conformance test forces the
+   pure-Python path on a machine that has `gmpy2` installed.
+2. **The return type stays CPython `int`.** `mpz` registers as
+   `numbers.Integral` and would mostly work, but it must not leak into the
+   public contract: `p_exact` builds `Fraction` objects from these, callers
+   pickle them, and the type would otherwise differ between machines according
+   to whether an optional package happens to be present. Converting the
+   finished answer back costs 0.9 s on 10^6 coefficients, under 1 percent, so
+   it is paid.
+3. **A new `exact` extra**, `pip install aggregate[exact]`, following the
+   `numba` precedent exactly: an opt-in accelerator with a working fallback,
+   declared so that a bare `uv sync` does not treat it as removable. Added to
+   the self-referencing `all` extra. The alternative name is `gmp`; `exact`
+   says what it accelerates rather than how, which is the house preference,
+   but this is the author's call and is cheap to change before implementation.
+4. **The engine is reported, never silent.** `meta` gains a `bigint` key,
+   `'gmpy2'` or `'python'`, and `ntt_audit` gains the matching row. A result
+   whose speed depended on an optional package should say so, otherwise two
+   machines disagree about what produced a number and nobody can tell which.
+5. **No guardrail change.** Peak memory is unchanged in shape; an `mpz` of
+   10,000 bits is slightly smaller than the equivalent CPython `int`, not
+   larger.
+
+### Licensing, stated because this is a dependency decision
+
+`gmpy2` wraps GMP and is LGPL-2.1+. As an **optional, separately installed,
+dynamically imported** runtime dependency it imposes nothing on this library,
+which stays BSD: `aggregate` neither distributes nor links GMP, and the
+fallback means it does not require it in order to function. Keep it that way,
+which means never making it a plain dependency and never vendoring it.
+
+### Correctness
+
+The three end-to-end checks are untouched and still run, on the converted
+CPython integers. Beyond those, the pin is the one stage 1 used: the `mpz`
+path and the pure-Python path must reconstruct **identical integers**. Add
+`test_crt_mpz_matches_forced_python`, parametrized over the oracle corpus and
+the 100 x 100 dice, raising `_CRT_MPZ_CUTOVER` above the prime count to force
+the pure path, and compare. Guard it with `pytest.importorskip('gmpy2')` so
+the suite is green either way, and confirm the fast suite passes both with
+`gmpy2` installed and with it absent. `test_crt_tree_matches_forced_fold`
+continues to pin the tree against the linear fold, so all three
+reconstructions are chained to one another.
+
+### Acceptance
+
+- Reconstruction phase of the 1000 x 1000 case at or below 100 s, against
+  197.7 s at 1.2.0a4, read from `meta['crt_seconds']`.
+- End to end for that case at or below 125 s at the default worker count,
+  against 212.3 s.
+- Bit-identical answers on the oracle corpus, both paths.
+- Full suite green with `gmpy2` present and with it absent.
+- `ntt_audit` names the engine.
+
+### Files
+
+`src/aggregate/ntt.py` (the optional import, `_CRT_MPZ_CUTOVER`, `_crt_merge`
+and the merge stack in `exact_compound`, the `meta` dict,
+`AggregateNTT.ntt_audit`, docstring Notes), `tests/test_ntt.py`,
+`pyproject.toml` (the `exact` extra, and `all`), `CLAUDE.md` (its extras list
+says five, and becomes six).
+
+### Names vetted 2026-10-09
+
+`rg` across `src/` and `tests/` for `_CRT_MPZ_CUTOVER`, `_mpz`, `bigint` and
+`gmpy` returns nothing, so there is no collision with an existing callable,
+attribute, DecL keyword or spec key. `bigint` as a `meta` key and an
+`ntt_audit` row label sits beside the existing `workers`, `primes_used` and
+`crt_seconds`.
 
 ## Explicitly not in this plan
 

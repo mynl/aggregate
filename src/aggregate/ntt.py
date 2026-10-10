@@ -966,7 +966,8 @@ def _residues_mod_prime(prime, root, length, support, sev_index, big_q,
 
 
 # Minimum prime count at which the Chinese remainder reconstruction uses the
-# merge stack (dev/plan-ntt-crt.md, [NTT-CRT-ProductTree]). Below it, and
+# merge stack (dev/done/plan-ntt-crt.md, [NTT-CRT-ProductTree]). Below it,
+# and
 # whenever a test raises this above the prime count, the linear fold it
 # replaced runs instead; the two produce identical integers, which is what
 # test_crt_tree_matches_forced_fold pins.
@@ -1194,7 +1195,7 @@ def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
     if workers is None:
         # Ruled 2026-10-09 (dev/plan-ntt-speed.md): the serial default
         # surprised the author on the first big run. Narrowed from 8 to 4 at
-        # 1.2.0a5 (dev/plan-ntt-crt.md) once the product tree shortened the
+        # 1.2.0a5 (dev/done/plan-ntt-crt.md) once the product tree shortened
         # CRT: the eighth thread then bought 2 percent of wall clock for
         # twice the CPU, because what threads mostly buy here is overlap
         # with the serial reconstruction rather than parallel speedup.

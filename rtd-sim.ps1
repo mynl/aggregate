@@ -103,9 +103,9 @@ param(
 $ErrorActionPreference = 'Stop'
 $repoRoot = $PSScriptRoot
 
-# Per CLAUDE.md: uv's default hardlink mode falls back with a warning on this
-# path, so copy mode is the supported choice.
-$env:UV_LINK_MODE = "copy"
+# No UV_LINK_MODE override: the uv cache and the venvs are both on V: as of
+# 2026-10-10, so hardlinking works and uv needs no help. See the note in
+# doc-test-uv.ps1.
 
 function Assert-LastExit {
     param([string]$What)

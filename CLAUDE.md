@@ -12,7 +12,11 @@ Published at https://aggregate.readthedocs.io/ and https://github.com/mynl/aggre
 
 Use `uv` for all environment and dependency management.
 
-**Set `UV_LINK_MODE=copy` whenever invoking `uv`.** The repo lives on a path where uv's default hardlink mode falls back with a warning; copy mode is the supported choice here. The repo's `.claude/settings.local.json` sets this automatically for the Claude harness; in a regular shell run `export UV_LINK_MODE=copy` (POSIX) or `$env:UV_LINK_MODE = "copy"` (PowerShell).
+**`UV_LINK_MODE=copy` is no longer needed.** It was required when the uv cache and the venv sat on different drives and hardlinking fell back with a warning. Both are on V: as of 2026-10-10 (`uv cache dir` reports `V:\uv\cache`, the venv is a real directory in the worktree), and a forced reinstall links silently, so the override was dropped from `doc-test-uv.ps1` and `rtd-sim.ps1`. Setting it anyway is harmless, and `.claude/settings.local.json` still does; if the cache ever moves off V:, uv falls back to copying on its own.
+
+**`uv sync` removes the optional compiled engine.** `aggregate-ntt` is discovered, never declared, so it is extraneous to the lockfile and `uv sync --all-extras` **deletes it** (measured: it also took `gmpy2`, `rich` and `csv-grid`). Use **`uv sync --all-extras --inexact`** in a checkout that has it installed. To run without installing it at all, `uv run --with V:/dev/aggregate-ntt ...` adds it to one invocation and leaves `.venv` untouched. To force either path from Python, pass `ntt_engine='python'` or `'rust'`; see `aggregate.ntt._resolve_engine`.
+
+**Doc scripts put `UV_PROJECT_ENVIRONMENT` back.** `doc-test-uv.ps1` sets it to `.doc-venv` and runs in the caller's scope, so until 2026-10-10 it leaked into the shell and every later `uv run` there silently resolved to `.doc-venv`. It now restores the caller's value on the normal path and before every error exit (`Restore-UvProjectEnvironment`). The two-venv warning below still applies to any shell where it is set by hand.
 
 **Sync environment — use `--all-extras` for a dev checkout:**
 ```

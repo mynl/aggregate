@@ -156,15 +156,40 @@ if ($Format -contains 'pdf' -and -not (Get-Command tectonic -ErrorAction Silentl
 }
 
 # ---- uv environment knobs ---------------------------------------------------
-# Per CLAUDE.md: the repo lives on a path where uv's default hardlink mode
-# falls back with a warning. Copy mode is the supported choice here.
-$env:UV_LINK_MODE = "copy"
+# No UV_LINK_MODE here. It was "copy" until 2026-10-10, from when the uv cache
+# and the venv sat on different drives and hardlinking fell back with a
+# warning. Both are on V: now (`uv cache dir` reports V:\uv\cache), and a
+# forced reinstall links silently, so the override is gone. Should the cache
+# ever move, uv falls back to copying by itself; nothing breaks.
 
-# Tell uv to use a doc-specific venv directory instead of the default `.venv`.
-# Both `uv sync` and `uv run` honour this env var. Result: doc builds and
-# day-to-day development stay out of each other's way, and they can use
-# different Python versions independently.
+# Tell uv to use a doc-specific venv directory instead of the default `.venv`,
+# so doc builds and day-to-day development stay out of each other's way and
+# can use different Python versions. Both `uv sync` and `uv run` honour it.
+#
+# This script runs in the CALLER's scope, so the variable has to be put back:
+# left set, every later `uv run` in that shell silently resolves to
+# `.doc-venv`, which then looks like a missing package or a stale version and
+# is very hard to see. Restore-UvProjectEnvironment below is called on the
+# normal path and before every error exit.
+$script:PriorUvProjectEnvironment = $env:UV_PROJECT_ENVIRONMENT
 $env:UV_PROJECT_ENVIRONMENT = ".doc-venv"
+
+function Restore-UvProjectEnvironment {
+    <#
+    .SYNOPSIS
+    Put UV_PROJECT_ENVIRONMENT back exactly as the caller had it.
+
+    .DESCRIPTION
+    Removes the variable when the caller did not have one, rather than
+    setting it to an empty string, which uv would read as a request for an
+    environment named "". Safe to call more than once.
+    #>
+    if ($null -eq $script:PriorUvProjectEnvironment) {
+        Remove-Item Env:\UV_PROJECT_ENVIRONMENT -ErrorAction SilentlyContinue
+    } else {
+        $env:UV_PROJECT_ENVIRONMENT = $script:PriorUvProjectEnvironment
+    }
+}
 
 # ---- Optional clean --------------------------------------------------------
 # Only the requested formats are cleaned, so `-Format pdf -Clean` does not
@@ -210,6 +235,7 @@ if (-not $NoSync) {
     uv sync --all-extras --python $PythonVersion
     if ($LASTEXITCODE -ne 0) {
         Write-Error "uv sync failed."
+        Restore-UvProjectEnvironment
         exit $LASTEXITCODE
     }
 }
@@ -260,6 +286,7 @@ foreach ($f in $Format) {
             Write-Warning "Sphinx reported warnings/errors for $f (exit $sphinxExit); continuing because -Lenient is set."
         } else {
             Write-Error "$f build failed."
+            Restore-UvProjectEnvironment
             exit $sphinxExit
         }
     }
@@ -271,6 +298,7 @@ foreach ($f in $Format) {
         $tex = Join-Path $outDir 'aggregate.tex'
         if (-not (Test-Path $tex)) {
             Write-Error "Expected $tex but the latex builder did not write it."
+            Restore-UvProjectEnvironment
             exit 1
         }
         Write-Host "Compiling PDF with tectonic..." -ForegroundColor Cyan
@@ -287,6 +315,7 @@ foreach ($f in $Format) {
         }
         if ($tectonicExit -ne 0) {
             Write-Error "tectonic failed (exit $tectonicExit). See $outDir\aggregate.log."
+            Restore-UvProjectEnvironment
             exit $tectonicExit
         }
         $results += [pscustomobject]@{ Format = $f; Path = (Join-Path $outDir 'aggregate.pdf') }
@@ -310,3 +339,8 @@ if ($Format -contains 'html') {
     Write-Host ""
     Write-Host "(Ctrl-C in the serving terminal to stop the server.)"
 }
+
+# ---- Restore the caller's environment ---------------------------------------
+# Last statement on the success path. See Restore-UvProjectEnvironment above
+# for why this matters more than it looks.
+Restore-UvProjectEnvironment

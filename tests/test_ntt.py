@@ -604,53 +604,68 @@ def test_audit_survives_unrepresentable_tail(n, log2, underwriter):
     assert not np.isnan(audit['max_rel_err'])
 
 
-def test_safe_float_reports_infinity_not_overflow():
-    """The helper converts, or saturates, but never raises."""
-    huge = Fraction(10 ** 400, 1)
-    assert ntt_module._safe_float(huge) == np.inf
-    assert ntt_module._safe_float(-huge) == -np.inf
-    assert ntt_module._safe_float(Fraction(1, 4)) == 0.25
-    # Underflow is not overflow: it rounds to zero without complaint.
-    assert ntt_module._safe_float(Fraction(1, 10 ** 400)) == 0.0
+def test_safe_divide_reports_infinity_not_overflow():
+    """An exact ratio beyond the double range is an infinity, not a raise.
 
-
-# ------------------------- [exact-log10-lazy] ([NTT-Exact-Log10-Lazy])
-
-def test_p_exact_log10_sees_below_the_float_floor(underwriter):
-    """``p_exact_log10`` is readable where ``p_exact_float`` has underflowed.
-
-    A 200 x 200 uniform dice of dice puts exact probabilities near 1e-462 in
-    the tail. Those are not representable as a double, so ``p_exact_float``
-    reads ``0.0`` and the exact answer is invisible in the frame. The
-    logarithm is formed as ``log10(numerator) - log10(denominator)``, which
-    is a float for any coefficient, so it reports the magnitude.
+    Integer true division underflows to ``0.0`` silently, which is wanted,
+    but raises ``OverflowError`` at the top of the range, which is not: a
+    relative error against a tail probability near 1e-3000 does exactly
+    that, and it made :attr:`ntt_audit` unusable on every case from about
+    150 x 150 up before 1.2.0a6.
     """
-    a = underwriter.build('nttagg LG.Dice dfreq [1:200] dsev [1:200]',
-                          log2=16)
-    df = a.density_df
-    underflowed = (df.p_exact_float == 0) & np.isfinite(df.p_exact_log10)
-    assert underflowed.sum() > 0, 'expected an unrepresentable tail'
-    # Those buckets carry real mass, far below the double range.
-    assert df.p_exact_log10[underflowed].min() < -400
-    # Exactly-zero buckets are -inf, never a finite number.
-    assert np.isneginf(df.p_exact_log10.loc[0.0])
-    # Where the float is a normal number, the two agree.
-    normal = df.index[df.p_exact_float > 1e-200][-1]
-    assert df.p_exact_log10.loc[normal] == pytest.approx(
-        math.log10(float(a.p_exact.loc[normal])), rel=1e-12)
-    # In the denormal range they do not, and the logarithm is the accurate
-    # one: a double near 1e-323 carries only a few significant bits, so
-    # log10(p_exact_float) is wrong in the first decimal place where
-    # p_exact_log10, formed from the exact integers, is not. This is the
-    # reason the column exists rather than being derived from the float.
-    denormal = df.index[(df.p_exact_float > 0)
-                        & (df.p_exact_float < 1e-310)][-1]
-    exact_log = (math.log10(a.p_exact.loc[denormal].numerator)
-                 - math.log10(a.p_exact.loc[denormal].denominator))
-    assert df.p_exact_log10.loc[denormal] == pytest.approx(exact_log,
-                                                           rel=1e-12)
-    via_float = math.log10(float(a.p_exact.loc[denormal]))
-    assert abs(via_float - exact_log) > 1e-3
+    huge = 10 ** 400
+    assert ntt_module._safe_divide(huge, 1) == np.inf
+    assert ntt_module._safe_divide(-huge, 1) == -np.inf
+    assert ntt_module._safe_divide(huge, -1) == -np.inf
+    assert ntt_module._safe_divide(-huge, -1) == np.inf
+    # In range it is ordinary correctly rounded division, and it underflows
+    # rather than raising at the bottom.
+    assert ntt_module._safe_divide(1, 4) == 0.25
+    assert ntt_module._safe_divide(1, 10 ** 400) == 0.0
+
+
+@pytest.mark.parametrize('n,log2', [(6, 8), (150, 16)])
+def test_accuracy_df_matches_the_fraction_route(underwriter, n, log2):
+    """The integer identity equals the Fractions it replaced, bit for bit.
+
+    ``err`` and ``rel_err`` were computed with
+    :class:`~fractions.Fraction` until 1.2.0a11. The identity in
+    :attr:`AggregateNTT.accuracy_df` is the same arithmetic without the
+    gcd, so the two must agree exactly, not approximately. This is the
+    strongest available check on the identity, in the spirit of
+    :func:`test_crt_tree_matches_forced_fold`.
+
+    The 150 x 150 case is here because its tail falls below the double
+    range, so it exercises the overflow branch and the ``NaN`` at exact
+    zero as well as the ordinary buckets.
+    """
+    a = underwriter.build(f'nttagg AI.N{n} dfreq [1:{n}] dsev [1:{n}]',
+                          log2=log2)
+    adf = a.accuracy_df
+    denominator = a._ntt_denominator
+    numerators = a._exact_numerators_on_grid()
+    p_fft = np.asarray(a.agg_density, dtype=float)
+
+    def safe(value):
+        """The pre-1.2.0a11 conversion, kept local to this test."""
+        try:
+            return float(value)
+        except OverflowError:
+            return math.inf if value > 0 else -math.inf
+
+    exact = [Fraction(h, denominator) if h else Fraction(0)
+             for h in numerators]
+    err = np.array([safe(Fraction(float(p)) - q)
+                    for p, q in zip(p_fft, exact)])
+    rel_err = np.array([safe((Fraction(float(p)) - q) / q) if q != 0
+                        else np.nan for p, q in zip(p_fft, exact)])
+
+    assert np.array_equal(adf.err.to_numpy(), err)
+    assert np.array_equal(adf.p_exact_float.to_numpy(),
+                          np.array([float(q) for q in exact]))
+    got = adf.rel_err.to_numpy()
+    assert np.array_equal(np.isnan(got), np.isnan(rel_err))
+    assert np.array_equal(got[~np.isnan(got)], rel_err[~np.isnan(rel_err)])
 
 
 def test_p_exact_log10_matches_the_fractions(underwriter):

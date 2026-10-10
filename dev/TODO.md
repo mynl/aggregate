@@ -58,6 +58,22 @@
   `dev/done/`.**
 
 
+- **[NTT-Exact-Object-Layer]** (`accuracy_df` done at **1.2.0a11**;
+  `p_exact` open) — the Python object layer around the exact answer, which
+  became the bottleneck once the compiled engine made the computation
+  cheap. `accuracy_df` is fixed: the Fractions are gone for an exact
+  integer identity, 14.66 s to 0.92 s at 500 x 500, bit-identical. **What
+  is left is `p_exact`**, the full Series of reduced Fractions, 5.44 s at
+  500 x 500 and about 44 s at 1000 x 1000, irreducibly one gcd per bucket
+  against a 9,976-bit denominator. It is already lazy and cached, so
+  nothing pays for it unless it is asked for, which makes this a question
+  about the API rather than a performance bug: a million `Fraction` objects
+  is probably not what anyone wants, and a cheap per-bucket accessor plus
+  the existing opt-in Series probably is. The author's call on the shape;
+  see the discussion of 2026-10-10. Note the sum-to-1 invariant needs no
+  Fractions at all, since `sum(numerators) == denominator` is already one of
+  the three decisive checks inside `exact_compound`.
+
 - **[NTT-Rust-Integration]** (**DONE**,
   `dev/done/plan-ntt-rust-integration.md`, phases landed at **1.2.0a8**,
   **1.2.0a9** and **1.2.0a10**) — use the compiled engine in

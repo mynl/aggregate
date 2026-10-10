@@ -1027,37 +1027,38 @@ def _crt_merge(left, left_modulus, right, right_modulus):
             for a, b in zip(left, right)]
 
 
-def _safe_float(value):
+def _safe_divide(numerator, denominator):
     """
-    ``float(value)`` with overflow reported as an infinity, never a raise.
+    ``numerator / denominator`` for integers, overflow as an infinity.
 
     Parameters
     ----------
-    value : Fraction or int
-        An exact quantity whose magnitude may exceed the double range.
+    numerator, denominator : int
+        Exact integers; ``denominator`` must be nonzero.
 
     Returns
     -------
     float
-        The rounded value, or ``+inf`` / ``-inf`` when it is too large to
-        represent, carrying the sign of ``value``.
+        The correctly rounded quotient, or a signed infinity when it is too
+        large for a double.
 
     Notes
     -----
-    Exact tail probabilities here run far below the smallest double: a
-    1000 x 1000 compound reaches about 1e-3000. A relative error formed
-    against one of those, ``(p_float - q) / q``, therefore has a magnitude
-    like 1e2700, and ``float()`` on it raises ``OverflowError`` rather than
-    returning an infinity, because the quotient of two integers has no
-    representable result. The honest report is an infinity: the float
-    pipeline's value is unboundedly larger than the exact one. Raising
-    instead made :attr:`AggregateNTT.ntt_audit` unusable on every case from
-    about 150 x 150 up, which is the range the exact engine exists for.
+    Integer true division in CPython is correctly rounded and does not
+    materialize the quotient, so this is the cheap way to land an exact
+    ratio in a float. It underflows to ``0.0`` silently, which is wanted,
+    but *raises* rather than returning an infinity when the magnitude
+    exceeds the double range, which is not: a relative error against a tail
+    probability near 1e-3000 does exactly that. Taking the two integers
+    rather than the :class:`~fractions.Fraction` they would have formed is
+    the whole point: that Fraction was the cost the identity in
+    :attr:`AggregateNTT.accuracy_df` exists to avoid.
     """
     try:
-        return float(value)
+        return numerator / denominator
     except OverflowError:
-        return math.inf if value > 0 else -math.inf
+        negative = (numerator < 0) != (denominator < 0)
+        return -math.inf if negative else math.inf
 
 
 def exact_compound(freq_outcomes, freq_probs, sev_outcomes, sev_probs,
@@ -1849,31 +1850,73 @@ class AggregateNTT(Aggregate):
         Indexed by loss over the whole output grid, columns
         ``p_exact_float``, ``p_fft`` (the raw algorithm float,
         ``agg_density``, before any display fuzz removal), ``err`` (signed,
-        computed as ``float(Fraction(p_fft) - exact)`` so the subtraction is
-        exact before the single rounding), ``abs_err``, and ``rel_err``
+        the exact difference with a single rounding at the end, never a
+        subtraction of two floats, which would cancel away every digit that
+        matters here), ``abs_err``, and ``rel_err``
         (exact ratio, NaN where the exact value is zero, and an infinity
         where the exact value is nonzero but so far below the double range
         that the ratio has no representable value; see :attr:`ntt_audit`,
         whose ``max_rel_err`` is restricted to the buckets where the
         comparison has an answer).
+
+        Notes
+        -----
+        Both errors are exact quantities rounded once, and both come from
+        one integer. A double is exactly ``m / 2**k``
+        (:meth:`float.as_integer_ratio`) and the exact probability is
+        ``H / D``, so with
+
+            ``excess = m * D - H * 2**k``
+
+        the signed error is ``excess / (2**k * D)`` and the relative error
+        is ``excess / (2**k * H)``, the second because dividing by ``H / D``
+        cancels ``D`` outright. Each is then one integer true division,
+        which CPython rounds correctly without materializing the quotient.
+
+        Until 1.2.0a11 this was written with :class:`~fractions.Fraction`,
+        which is the same arithmetic plus a gcd against a denominator of
+        9,976 bits on a 1000 x 1000 case, twice per bucket, for a
+        normalization the answer then discards. Dropping it is **18.6x** at
+        500 x 500 (14.48 s to 0.78 s) and about 24x at 1000 x 1000 (roughly
+        127 s to 5.34 s), bit-for-bit identical on both columns, and the
+        ratio grows with the denominator because that is what the gcd is
+        fighting. This frame had become the most expensive thing in an exact
+        computation by a wide margin, 20x the transform and reconstruction
+        together.
+
+        ``err`` needs no overflow guard: both are probabilities, so
+        ``|err| <= 1``. ``rel_err`` needs one, because the ratio against a
+        probability below the double range has no representable value
+        (:func:`_safe_divide`, and ``max_rel_err`` in :attr:`ntt_audit`).
         """
         if self._ntt_numerators is None:
             raise ValueError(
                 f'{self.name}: update the object before reading accuracy_df')
         if self._accuracy_df is None:
-            exact = self._exact_on_grid()
+            numerators = self._exact_numerators_on_grid()
+            denominator = self._ntt_denominator
             p_fft = np.asarray(self.agg_density, dtype=float)
-            # Both errors go through _safe_float: the subtraction is exact
-            # before the single rounding, and a ratio against a tail
-            # probability below the double range reports an infinity rather
-            # than raising ([NTT-Accuracy-Overflow]).
-            err = np.array([_safe_float(Fraction(float(p)) - q)
-                            for p, q in zip(p_fft, exact)])
-            rel_err = np.array([_safe_float((Fraction(float(p)) - q) / q)
-                                if q != 0 else np.nan
-                                for p, q in zip(p_fft, exact)])
+            count = len(numerators)
+            err = np.empty(count)
+            rel_err = np.empty(count)
+            for i, (p, h) in enumerate(zip(p_fft, numerators)):
+                # A float is exactly m / 2**k, so with the shared integer
+                # `excess = m * D - H * 2**k` both errors are one division:
+                #     err     = excess / (2**k * D)
+                #     rel_err = excess / (2**k * H)
+                # the second because dividing by H/D cancels D. See Notes.
+                m, two_k = float(p).as_integer_ratio()
+                excess = m * denominator - (h * two_k)
+                # |err| <= 1, both operands positive, so this cannot
+                # overflow and needs no guard.
+                err[i] = excess / (two_k * denominator)
+                rel_err[i] = (_safe_divide(excess, two_k * h) if h
+                              else np.nan)
             self._accuracy_df = pd.DataFrame(
-                {'p_exact_float': [float(q) for q in exact],
+                # The same cheap, correctly rounded division density_df
+                # uses, and the last Fraction to leave this frame.
+                {'p_exact_float': [h / denominator if h else 0.0
+                                   for h in numerators],
                  'p_fft': p_fft,
                  'err': err,
                  'abs_err': np.abs(err),

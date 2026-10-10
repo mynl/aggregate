@@ -20,6 +20,29 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a11
+
+**[NTT-Accuracy-Integer] `accuracy_df` drops its Fractions for an identity
+and is 16x faster.** A double is exactly `m / 2**k` and the exact
+probability is `H / D`, so with `excess = m * D - H * 2**k` the signed error
+is `excess / (2**k * D)` and the relative error is `excess / (2**k * H)`,
+dividing by `H / D` having cancelled `D` outright. Two integer true
+divisions, each correctly rounded, in place of two `Fraction` operations
+whose gcd against a 9,976-bit denominator was the entire cost. **Values are
+bit-for-bit identical**, which a new test pins against the route it
+replaced.
+
+Measured on first access: 500 x 500 from 14.66 s to **0.92 s**,
+1000 x 1000 from about 127 s to **5.34 s**, the ratio growing with the
+denominator. This frame had become the most expensive part of an exact
+computation by a wide margin, 20x the transform and reconstruction
+together; getting everything at 500 x 500 (build, `density_df`,
+`accuracy_df`, `ntt_audit`) is now 3.43 s against 17.3 s.
+
+`_safe_float` is removed, having no caller left; `_safe_divide` replaces it
+one level lower, taking the two integers instead of the `Fraction` they
+would have formed.
+
 ## 1.2.0a10
 
 **[Rust-Engine-Phases] the compiled engine now owns both heavy phases, and

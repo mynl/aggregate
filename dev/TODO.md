@@ -58,21 +58,22 @@
   `dev/done/`.**
 
 
-- **[NTT-Exact-Object-Layer]** (`accuracy_df` done at **1.2.0a11**;
-  `p_exact` open) — the Python object layer around the exact answer, which
-  became the bottleneck once the compiled engine made the computation
-  cheap. `accuracy_df` is fixed: the Fractions are gone for an exact
-  integer identity, 14.66 s to 0.92 s at 500 x 500, bit-identical. **What
-  is left is `p_exact`**, the full Series of reduced Fractions, 5.44 s at
-  500 x 500 and about 44 s at 1000 x 1000, irreducibly one gcd per bucket
-  against a 9,976-bit denominator. It is already lazy and cached, so
-  nothing pays for it unless it is asked for, which makes this a question
-  about the API rather than a performance bug: a million `Fraction` objects
-  is probably not what anyone wants, and a cheap per-bucket accessor plus
-  the existing opt-in Series probably is. The author's call on the shape;
-  see the discussion of 2026-10-10. Note the sum-to-1 invariant needs no
-  Fractions at all, since `sum(numerators) == denominator` is already one of
-  the three decisive checks inside `exact_compound`.
+- **[NTT-Exact-Object-Layer]** (**DONE**, **1.2.0a11** and **1.2.0a12**) —
+  the Python object layer around the exact answer, which became the
+  bottleneck once the compiled engine made the computation cheap. Two
+  fixes, both measured on a 500 x 500 case. `accuracy_df` lost its
+  Fractions for an exact integer identity, 14.66 s to 0.92 s, bit-identical
+  (`[NTT-Accuracy-Integer]`). And `p_exact_at(loss)` answers for named
+  buckets in 12 microseconds against 5.65 s for the full `p_exact`, which
+  stays as the opt-in Series it already was (`[NTT-Exact-At]`). Getting
+  everything on a 500 x 500 case went from 22.8 s to 3.4 s, of which the
+  exact computation is 0.7 s. The remaining cost is intrinsic: a full
+  `p_exact` is one gcd per bucket against a 9,976-bit denominator, and the
+  ruling of 2026-10-10 is that the caller who wants a million reduced
+  rationals is the right one to pay for it. A compiled query object
+  answering moments and tail probabilities without materializing
+  coefficients is `[Rust-Query-Object]` in the sibling repo, deferred there
+  and not needed by anything here.
 
 - **[NTT-Rust-Integration]** (**DONE**,
   `dev/done/plan-ntt-rust-integration.md`, phases landed at **1.2.0a8**,

@@ -1494,7 +1494,8 @@ class AggregateNTT(Aggregate):
       logarithm, which stays readable in the tail where the float
       underflows to zero); the reduced :class:`~fractions.Fraction` per
       bucket is the :attr:`p_exact` property, built on demand because it
-      costs a gcd per bucket;
+      costs a gcd per bucket, with :meth:`p_exact_at` for the usual case of
+      wanting a few buckets rather than all of them;
     - :attr:`accuracy_df` compares the exact and float answers per bucket;
     - :attr:`ntt_audit` records sizes, primes, timings and error summaries.
 
@@ -1778,19 +1779,34 @@ class AggregateNTT(Aggregate):
             :attr:`density_df`, ``Fraction(0)`` off support. Summing it is
             exactly 1.
 
+        See Also
+        --------
+        p_exact_at : The same values at named buckets, without building the
+            whole vector. Prefer it unless every bucket is genuinely wanted.
+
         Notes
         -----
-        This was a ``density_df`` column until 1.2.0a7 and moved here
-        because it was built eagerly whenever that frame was touched, at
-        77.7 s on a 1000 x 1000 case where every other column is
-        effectively free. Reading it is the same work it always was; the
-        difference is that reading the frame no longer pays for it. Cached
-        after the first access, and discarded with the rest of the cached
-        state on ``update``.
+        **This is the expensive view, deliberately opt in.** Reducing one
+        bucket means a gcd against a denominator of 9,976 bits on a
+        1000 x 1000 case, so the whole vector costs 5.44 s at 500 x 500 and
+        about 44 s at 1000 x 1000. Nothing else in the class touches it:
+        :attr:`density_df`, :attr:`accuracy_df` and :attr:`ntt_audit` all
+        work from the raw integer numerators, so the cost falls only on a
+        caller who asks for a million reduced rationals. It was a
+        ``density_df`` column until 1.2.0a7, which is how everyone ended up
+        paying it.
 
-        For the common questions use the frame instead:
-        ``p_exact_float`` for a value to compute with, ``p_exact_log10``
-        for the magnitude in the tail where the float underflows.
+        ``self.sum() == 1`` needs no checking. It is not merely true, it is
+        one of the three decisive checks :func:`exact_compound` makes before
+        returning, where it costs one bigint sum over the numerators rather
+        than a gcd per bucket: an object that exists at all has already
+        passed it.
+
+        Cached after the first access, and discarded with the rest of the
+        cached state on ``update``. For the common questions use the frame
+        instead: ``p_exact_float`` for a value to compute with,
+        ``p_exact_log10`` for the magnitude in the tail where the float
+        underflows.
         """
         if self._ntt_numerators is None:
             raise ValueError(
@@ -1801,6 +1817,91 @@ class AggregateNTT(Aggregate):
                 index=pd.Index(np.asarray(self.xs, dtype=float), name='loss'),
                 name='p_exact', dtype=object)
         return self._p_exact_series
+
+    def p_exact_at(self, loss):
+        """
+        Exact probability at one loss, or at several, as reduced Fractions.
+
+        Parameters
+        ----------
+        loss : int or float or sequence of them
+            Loss amounts on the exact lattice, which is the integers: the
+            value must be integral and lie within ``density_df``'s index.
+            A scalar asks for one bucket; anything with a length asks for
+            that many.
+
+        Returns
+        -------
+        fractions.Fraction or pandas.Series
+            A single reduced :class:`~fractions.Fraction` for a scalar
+            ``loss``, or a Series of them indexed by loss, matching
+            :attr:`p_exact`'s values exactly. ``Fraction(0)`` beyond the
+            support.
+
+        Raises
+        ------
+        ValueError
+            If the object has not been updated, or a loss is not an integer
+            on the grid.
+
+        Examples
+        --------
+        >>> from aggregate import build
+        >>> a = build('nttagg Dice dfreq [1:6] dsev [1:6]')
+        >>> a.p_exact_at(2)
+        Fraction(7, 216)
+        >>> list(a.p_exact_at([2, 36]))
+        [Fraction(7, 216), Fraction(1, 279936)]
+
+        Notes
+        -----
+        The reason this exists. Reducing ``H_n / D`` costs one gcd against a
+        denominator that is 9,976 bits on a 1000 x 1000 case, so
+        :attr:`p_exact` over a million buckets takes about 44 s, while the
+        question people actually ask is about a handful of buckets. One
+        bucket is microseconds, so this is the exact answer at interesting
+        losses for free, and :attr:`p_exact` stays available for the rare
+        caller who wants the whole vector.
+
+        Does not touch, populate or need the :attr:`p_exact` cache, so
+        reading a few buckets never commits the object to the full
+        reduction.
+        """
+        if self._ntt_numerators is None:
+            raise ValueError(
+                f'{self.name}: update the object before reading p_exact_at')
+        numerators = self._ntt_numerators
+        denominator = self._ntt_denominator
+        limit = len(self.xs)
+
+        def one(value):
+            try:
+                index = int(value)
+                integral = index == value
+            except (TypeError, ValueError):
+                raise ValueError(
+                    f'{self.name}: p_exact_at needs a loss on the exact '
+                    f'lattice, got {value!r}') from None
+            if not integral or not 0 <= index < limit:
+                raise ValueError(
+                    f'{self.name}: loss {value} is not an integer bucket in '
+                    f'0..{limit - 1}; the exact lattice is the integers, so '
+                    f'p_exact_at takes a whole number within '
+                    f'density_df.index')
+            # Beyond the support the probability is exactly zero, and the
+            # numerator vector stops there rather than being padded.
+            if index >= len(numerators):
+                return Fraction(0)
+            h = numerators[index]
+            return Fraction(h, denominator) if h else Fraction(0)
+
+        if hasattr(loss, '__len__') and not isinstance(loss, (str, bytes)):
+            values = [v for v in np.asarray(loss).ravel()]
+            return pd.Series(
+                [one(v) for v in values],
+                index=pd.Index(np.asarray(values, dtype=float), name='loss'),
+                name='p_exact', dtype=object)
+        return one(loss)
 
     @property
     def density_df(self):

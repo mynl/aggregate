@@ -20,6 +20,25 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a12
+
+**[NTT-Exact-At] new `AggregateNTT.p_exact_at(loss)`, the exact probability
+at the buckets you name.** A scalar loss gives one reduced
+`Fraction`, a sequence gives a Series of them, both identical to the
+corresponding entries of `p_exact`, and `Fraction(0)` beyond the support. A
+loss that is not an integer on the grid raises rather than being rounded.
+Measured on a 500 x 500 case: **12 microseconds against 5.65 s** for the
+full `p_exact`, and reading buckets never populates or needs that cache.
+
+`p_exact` itself is unchanged, still the full Series of reduced Fractions,
+still lazy and cached. Its docstring now says plainly that it is the
+expensive view: one gcd per bucket against a 9,976-bit denominator, about
+44 s on a 1000 x 1000 case, and nothing else in the class touches it, since
+`density_df`, `accuracy_df` and `ntt_audit` all work from the raw integer
+numerators. Also recorded there: `p_exact.sum() == 1` never needs checking,
+because `sum(numerators) == denominator` is one of the three decisive
+checks `exact_compound` makes before returning.
+
 ## 1.2.0a11
 
 **[NTT-Accuracy-Integer] `accuracy_df` drops its Fractions for an identity

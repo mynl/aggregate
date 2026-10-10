@@ -12,6 +12,7 @@ denominator, nonnegative, zero beyond the support) that every call exercises.
 import math
 import os
 import random
+import time
 import warnings
 from fractions import Fraction
 
@@ -1037,3 +1038,98 @@ def test_prime_width_follows_the_engine():
                                 ntt_engine='rust')
     assert wide['prime_bits_max'] == ntt_module._ENGINE_PRIME_MAX_BITS == 63
     assert wide['primes_used'] < slim['primes_used']
+
+
+# ------------------------------ [exact-at] ([NTT-Exact-At], 1.2.0a12)
+
+
+def test_p_exact_at_matches_p_exact_bucket_for_bucket(underwriter):
+    """The cheap accessor agrees with the expensive Series everywhere.
+
+    The whole point of :meth:`AggregateNTT.p_exact_at` is to answer the
+    same question without reducing a million buckets, so equality with
+    :attr:`p_exact` is the property that makes it trustworthy. Reduced
+    Fractions compare exactly, so this is not approximate.
+    """
+    a = underwriter.build('nttagg EA.Dice dfreq [1:6] dsev [1:6]')
+    for loss, q in a.p_exact.items():
+        assert a.p_exact_at(loss) == q
+        assert a.p_exact_at(int(loss)) == q
+
+
+def test_p_exact_at_takes_a_sequence(underwriter):
+    """A sequence gives a Series aligned the way ``p_exact`` is."""
+    a = underwriter.build('nttagg EA.Seq dfreq [1:6] dsev [1:6]')
+    got = a.p_exact_at([2, 36, 7])
+    assert list(got.index) == [2.0, 36.0, 7.0]
+    assert got.name == 'p_exact'
+    assert got.loc[2.0] == Fraction(7, 216)
+    assert got.loc[36.0] == Fraction(1, 6) ** 7
+    assert all(got[x] == a.p_exact.loc[x] for x in got.index)
+
+
+def test_p_exact_at_is_zero_beyond_the_support(underwriter):
+    """Off support the probability is exactly zero, not an error.
+
+    The numerator vector stops at the support while the grid runs on, so
+    this is the one place the accessor answers without an index to read.
+    """
+    a = underwriter.build('nttagg EA.Tail dfreq [1:6] dsev [1:6]')
+    assert a.p_exact_at(36) > 0              # the last supported bucket
+    assert a.p_exact_at(37) == 0
+    assert a.p_exact_at(37) == Fraction(0)
+    assert a.p_exact_at(len(a.xs) - 1) == 0
+
+
+@pytest.mark.parametrize('bad', [2.5, -1, -0.5, 10 ** 9, 'x', None])
+def test_p_exact_at_rejects_a_loss_off_the_lattice(underwriter, bad):
+    """The lattice is the integers, so a non-integer loss is an error.
+
+    Rounding silently would answer a question the caller did not ask, and
+    the exact machinery exists precisely so that does not happen.
+    """
+    a = underwriter.build('nttagg EA.Bad dfreq [1:6] dsev [1:6]')
+    with pytest.raises(ValueError, match='p_exact_at|integer bucket'):
+        a.p_exact_at(bad)
+
+
+def test_p_exact_at_does_not_build_the_full_series(underwriter):
+    """Reading a few buckets never commits the object to the reduction.
+
+    This is the behavior that makes the accessor worth having: on a large
+    case :attr:`p_exact` costs about 44 s, and asking about one bucket must
+    not trigger it, nor leave it half built.
+    """
+    a = underwriter.build('nttagg EA.Lazy dfreq [1:6] dsev [1:6]')
+    assert a._p_exact_series is None
+    a.p_exact_at(12)
+    a.p_exact_at([1, 2, 3])
+    assert a._p_exact_series is None
+    # And the full Series still works afterwards, unaffected.
+    assert a.p_exact.sum() == 1
+    assert a._p_exact_series is not None
+
+
+def test_p_exact_at_before_update_raises(underwriter):
+    a = underwriter.build('nttagg EA.Pending dfreq [1:6] dsev [1:6]',
+                          update=False)
+    with pytest.raises(ValueError, match='update the object'):
+        a.p_exact_at(2)
+
+
+def test_p_exact_at_is_cheap_on_a_case_where_p_exact_is_not(underwriter):
+    """The reason the method exists, stated as a measurement.
+
+    A single bucket must not scale with the number of buckets. At 150 x 150
+    the full reduction is seconds; a handful of lookups is milliseconds. The
+    bound is loose on purpose, since this is a wall-clock assertion, but it
+    fails loudly if the accessor ever starts reducing the whole vector.
+    """
+    a = underwriter.build('nttagg EA.Big dfreq [1:150] dsev [1:150]',
+                          log2=16)
+    t0 = time.perf_counter()
+    for loss in (1, 150, 11250, 22500):
+        assert a.p_exact_at(loss) > 0
+    elapsed = time.perf_counter() - t0
+    assert a._p_exact_series is None
+    assert elapsed < 0.5, f'four lookups took {elapsed:.3f}s'

@@ -20,6 +20,22 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a13 - 2026-10-10
+
+**[NTT-Grid-Cap] an `nttagg` sizes its grid to its support instead of filling
+the underwriter's cap.** `log2` on `AggregateNTT.update` is now a cap in the
+same sense `bs_window` uses the word: any value at or above the required
+`ceil(log2(N + 1))`, where `N = max(freq) * max(sev)`, resolves to exactly
+that required value, and so does `0`. `build('nttagg ... dfreq [1:6] dsev
+[1:6]')` returns `log2=6` and 64 buckets where it returned `log2=16` and
+65,536, taking `density_df` from 7.9 MB to 7.7 KB and `accuracy_df` from
+3.1 MB to 3.1 KB; the 100 x 100 case moves from 16 to 14. An explicit larger
+`log2` is trimmed as well, because with `bs` pinned to 1 and the support
+exactly 0..N there is one correct grid and the extra buckets are exact zeros.
+A cap below the required value still raises and names the value to pass,
+unchanged, and `build(..., log2=0)`, which could never reach this kind,
+is no longer needed for anything.
+
 ## 1.2.0a12
 
 **[NTT-Exact-At] new `AggregateNTT.p_exact_at(loss)`, the exact probability

@@ -1588,13 +1588,15 @@ class AggregateNTT(Aggregate):
         Parameters
         ----------
         log2 : int, default 0
-            Grid-size cap, as for :meth:`Aggregate.update`. ``0`` uses the
-            smallest transform covering the support,
-            ``ceil(log2(N + 1))`` where ``N = max(freq) * max(sev)``. A cap
-            below that required value raises, naming the value to pass (the
-            underwriter's ``build`` supplies its default cap of 16, so a case
-            needing more asks for an explicit ``build(..., log2=r)`` or a
-            ``hints{log2=r}`` clause).
+            Grid-size **cap**, as for :meth:`Aggregate.update`, and a cap in
+            the same sense :func:`aggregate._bucket_window.bs_window` uses:
+            this method may use fewer buckets but never more. Any value at or
+            above the required ``ceil(log2(N + 1))``, where
+            ``N = max(freq) * max(sev)``, resolves to exactly that required
+            value, and so does ``0``. A cap below it raises, naming the value
+            to pass (the underwriter's ``build`` supplies its default cap of
+            16, so a case needing more asks for an explicit
+            ``build(..., log2=r)`` or a ``hints{log2=r}`` clause).
         bs : {0, 1}, default 0
             The lattice is the integers: anything other than 0 (choose) or 1
             raises, and 0 is pinned to 1.
@@ -1634,7 +1636,14 @@ class AggregateNTT(Aggregate):
                 f'must be 0 or 1, got {bs}')
         sizes = self._ntt_sizes()
         required = max(sizes['support'].bit_length(), 1)
-        if log2 == 0:
+        # log2 is a cap, not a grid size. With bs pinned to 1 and the support
+        # exactly 0..N there is only one correct grid: buckets above `required`
+        # hold exact zeros, carry no information, and cannot reduce aliasing,
+        # because an exact answer of finite support has nothing to alias. The
+        # underwriter cannot pass 0 here either (build_many resolves 0 to its
+        # configured default, 16, before this method is called), so trimming
+        # unconditionally is the only rule that gives `build` the right grid.
+        if log2 == 0 or log2 > required:
             log2 = required
         elif log2 < required:
             raise ValueError(

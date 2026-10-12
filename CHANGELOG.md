@@ -20,6 +20,30 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a14 - 2026-10-12
+
+**[Moment-Deficit-Genuine-Only] `est_skew`, `est_cv` and the empirical rows
+of `stats_df` stop parking deleted tail and rounding at the top of the grid.**
+The moment sites in `Aggregate.update_work` (and its stage helper),
+`Portfolio.update` and `create_from_sample` now clean the density with
+`remove_fuzz(raw, eps=noise_floor(raw))`, where the new
+`utilities.noise_floor` is the density's largest negative magnitude capped at
+machine epsilon, and `xsden_to_mwrangler(xs, den, deficit=None)` gains the
+`deficit` keyword and relocates to the grid top only a deficit above
+`VALIDATION_NOISE` (1e-12), measured on the raw array; negative and
+rounding-level deficits no longer relocate for any caller, severity and
+reinsurance views included. Numbers move on thick-tailed laws and tall grids:
+GEMAct's Table 2 model at `log2=22` reads 7.282 against theory 7.284 where it
+read 11.916, ten dice on a 2**20 grid read 0 where they read 4.875, and
+`J.Re14` at its default grid reads -7.691 where it read -6.060. The heavy
+tailed `Mata2005.M.v3`/`.v4`, `G.Mixed10`/`11` and `Mack2003.S.v9` read lower
+and steadier; `Bruno2006.B7` is the one case that moves further from theory,
+0.0039446 to 0.0039976. Two library validation baselines move: `RawLognorm`
+clears `SEV_SKEW` (the stage column no longer disagrees with the main site)
+and `ThickThickPortfolio` gains `AGG_SKEW` on a unit whose grid cannot hold
+its tail. The baseline parquet, spotchecks and exhibit snapshots are
+recaptured; `scripts/moment_rule_sweep.py` compares the rules per object.
+
 ## 1.2.0a13 - 2026-10-10
 
 **[NTT-Grid-Cap] an `nttagg` sizes its grid to its support instead of filling

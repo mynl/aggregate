@@ -37,7 +37,7 @@ from .moments import (MomentAggregator, MomentWrangler,
 from .utilities import (ft, ift, below_grid_fill,
                         round_bucket,
                         balanced_window,
-                        agg_help, remove_fuzz, value_type_role)
+                        agg_help, remove_fuzz, noise_floor, value_type_role)
 from ._grid_distribution import GridDistribution, return_period_map, period_to_p
 from ._labeled import LabeledMixin
 from .decl_writer import spec_to_decl
@@ -4554,19 +4554,30 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # bucket. In the plain mass sum this cancels (mass is conserved), but
         # the raw moments weight each bucket by ``x**k``, so on a wide grid the
         # far-tail fuzz at large ``x`` is amplified by ``x**3`` and corrupts
-        # the empirical skew -- e.g. a symmetric die's skew drifts from ~1e-15
-        # to ~1e-4 as log2 grows, purely from fuzz at buckets the distribution
-        # never reaches. The fuzz is genuine fp noise: the FFT is exact up to
-        # rounding and the exact aggregate has no negative density even under
-        # aliasing (aliasing only wraps *positive* mass), so every stray value
-        # is small and zeroing ``|x| < eps`` is safe and lossless. We do this
-        # on a throwaway copy and deliberately leave ``self.agg_density`` as
-        # the raw output (kept consistent with ``ftagg_density``); the curated
-        # view ``density_df.p_total`` applies the identical ``remove_fuzz``
-        # separately. (We cannot source the moments from ``density_df.p_total``
+        # the empirical skew: ten dice on a 2**20 grid read a skew of 1.2
+        # from the raw density, purely from fuzz at buckets the distribution
+        # never reaches. The fuzz is sign-indefinite (a lognormal aggregate at
+        # log2=22 has 813,214 negative buckets), so the most negative value
+        # measures its amplitude and ``noise_floor`` cuts at that, capped at
+        # machine epsilon. The cap means the cut never discards more than the
+        # absolute ``remove_fuzz`` default did, and below epsilon it keeps
+        # genuine thick tail the default threw away (2e-11 of mass on that
+        # lognormal grid, which then counted as truncation).
+        #
+        # WHY the deficit is measured on the raw array: the wrangler
+        # relocates the shortfall to the top of the grid, where x**3 makes a
+        # little mass a large third moment. That is right for mass the padded
+        # inverse FFT dropped, and wrong for mass the cleaning step deleted
+        # in place, which lived inside the grid. The raw sum sees only the
+        # first kind. We do this on a throwaway copy and deliberately leave
+        # ``self.agg_density`` as the raw output (kept consistent with
+        # ``ftagg_density``); the curated view ``density_df.p_total`` applies
+        # the plain ``remove_fuzz`` separately, where an absolute cutoff does
+        # no harm. (We cannot source the moments from ``density_df.p_total``
         # here: building ``density_df`` needs ``est_m``, computed just below.)
-        agg_clean = remove_fuzz(self.agg_density)
-        _mw = xsden_to_mwrangler(self.xs, agg_clean)
+        agg_raw = self.agg_density
+        agg_clean = remove_fuzz(agg_raw, eps=noise_floor(agg_raw))
+        _mw = xsden_to_mwrangler(self.xs, agg_clean, deficit=1 - agg_raw.sum())
         agg_ex1, agg_ex2, agg_ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
         # var/sd straight off the wrangler (var = central[1]), never via
@@ -4673,15 +4684,16 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         else:
             after_occ_agg = None
 
-        # De-fuzzed moment helper: same |x| < eps zeroing the main
-        # empirical block uses (see WHY comment above), wrapped so we can
-        # reuse it on subject / after-occ densities.
+        # De-fuzzed moment helper: the same noise-floor cut and raw-array
+        # deficit the main empirical block uses (see WHY comment above),
+        # wrapped so we can reuse it on subject / after-occ densities.
         def _moments(arr, grid):
             # ``grid`` is xs_sev for severity densities, xs for aggregates
             # (they coincide on the default 0-based grid).
             if arr is None:
                 return (np.nan,) * 6
-            mw = xsden_to_mwrangler(grid, remove_fuzz(arr))
+            mw = xsden_to_mwrangler(grid, remove_fuzz(arr, eps=noise_floor(arr)),
+                                    deficit=1 - arr.sum())
             return (*mw.noncentral, *mw.mcvsk)
 
         sub_sev_mom = _moments(subject_sev, self.xs_sev)

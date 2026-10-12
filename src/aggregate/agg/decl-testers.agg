@@ -1391,4 +1391,18 @@ agg CAN.Layered 10 claims sev cantor occurrence net of 0.3 xs 0.2 poisson       
 agg CS.BoundedSev 5 claims sev 40 * uniform occurrence net of 15 xs 5 poisson                                      note{bounded in itself: the window reaches 40 with no limit clause to read};
 agg CS.BoundedAgg dfreq [1 2 3] sev 40 * uniform aggregate net of 30 xs 30                                         note{bounded both ways, so the aggregate is bounded at 3 * 40};
 agg CS.Atomic 5 claims dsev [10 20 30] occurrence net of 3 xs 6 poisson                                            note{support starts at 10, and the retention below it is still drawn from 0};
-agg CS.Unbounded 5 claims sev lognorm 10 cv .75 occurrence net of 15 xs 5 poisson aggregate net of 20 xs 0         note{nothing bounds either stage, so both keep the union of tower and law}
+agg CS.Unbounded 5 claims sev lognorm 10 cv .75 occurrence net of 15 xs 5 poisson aggregate net of 20 xs 0         note{nothing bounds either stage, so both keep the union of tower and law};
+
+
+# MD. Empirical-moment deficit regressions           (tests/test_moment_deficit.py)
+# ===========================================================================
+# [Moment-Deficit-Genuine-Only]: the moment sites clean at the density's own
+# noise floor and relocate only a genuine, positive deficit measured on the
+# raw array. Each program is built on the tall or tight grid the plan
+# measured on (bs and log2 in the test), where the old absolute cutoff and
+# unconditional relocation read 4.9 for ten dice and 11.9 for GEMAct's 7.28.
+agg MD.TenDice dfreq [10] dsev [1:6]                                                                             note{symmetric, skew 0; bs=1 log2=20};
+agg MD.PoiDie 10 claims dsev [1:6] poisson                                                                       note{bs=1 log2=20};
+agg MD.Lognorm 1 claim sev lognorm 200 cv 2 fixed                                                                note{skew 14; bs=6.427 log2=21};
+agg MD.GEMAct 3 claims sev lognorm 84541.68 cv 2.1022565437545127 poisson                                        note{Pittarello 2024 Table 2 on GEMAct's own grid, bs=500 log2=22};
+agg MD.Probe 10 claims sev lognorm 100 cv 3 poisson                                                              note{bs=50 log2=8, deficit 1e-4 is genuine truncation and still relocates}

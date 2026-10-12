@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     'ft', 'ift',
     'subsets',
-    'remove_fuzz',
+    'remove_fuzz', 'noise_floor',
     'round_bucket',
     'nice_multiple',
     'qd', 'mv',
@@ -154,13 +154,23 @@ def remove_fuzz(data, eps=None):
     The raw inverse-FFT density carries sub-machine-epsilon fuzz (tiny +/-
     values) in essentially every bucket. In a plain mass sum this cancels, but
     moment calculations weight each bucket by ``x**k``, so far-tail fuzz at
-    large ``x`` is amplified and corrupts the empirical skew. Zeroing
-    ``|x| < eps`` is safe and lossless: the exact aggregate has no genuine
-    density below machine epsilon.
+    large ``x`` is amplified and corrupts the empirical skew.
+
+    The absolute default cutoff is not lossless. A thick-tailed aggregate on a
+    tall grid has genuine density between ``1e-26`` and ``2e-16`` over
+    millions of buckets, and the default zeroes all of it: on a lognormal
+    aggregate at ``log2=22`` it removed ``2e-11`` of real mass. That is
+    harmless in a probability view, where ``2e-11`` is invisible, and harmful
+    in a moment calculation, where the lost tail sits at the largest ``x``.
+    The moment sites therefore pass ``eps=noise_floor(data)``, a cut read
+    from the density's own negative values and capped at the default, so that
+    they never discard more than this default does and usually discard much
+    less. See :func:`noise_floor`.
 
     The one-sided ``Frequency.pmf`` clip and the plot-cosmetic ``1e-15`` clip in
     the reinsurance occurrence plot are deliberate carve-outs that do NOT route
-    through this helper -- they have different (one-sided / looser) semantics.
+    through this helper, because they have different (one-sided, looser)
+    semantics.
     """
     if eps is None:
         eps = np.finfo(float).eps
@@ -170,6 +180,49 @@ def remove_fuzz(data, eps=None):
         out[float_cols] = out[float_cols].mask(out[float_cols].abs() < eps, 0.0)
         return out
     return np.where(np.abs(data) < eps, 0.0, data)
+
+
+def noise_floor(den):
+    """Noise amplitude of an inverse-FFT density, read from its negative values.
+
+    Parameters
+    ----------
+    den : numpy.ndarray
+        A raw density as the inverse FFT produced it, before any cleaning.
+
+    Returns
+    -------
+    float
+        The next float above the largest negative magnitude in ``den``,
+        capped at machine epsilon; ``0.0`` when no entry is negative.
+        Intended as the ``eps`` of :func:`remove_fuzz` at a site that feeds
+        a moment calculation. The step up is there because that cut is
+        strict (``|x| < eps``): at the magnitude itself the most negative
+        bucket would survive, and on a 2**20 grid one such bucket at
+        ``-4e-18`` moved the skewness of ten dice by ``1.5e-3``.
+
+    Notes
+    -----
+    The true law is non-negative and inverse-FFT round-off is sign-indefinite,
+    so the most negative bucket measures the amplitude of the noise, and
+    every bucket below that magnitude, of either sign, is indistinguishable
+    from noise. Measured floors run from ``4e-19`` to ``6e-17`` on ordinary
+    grids, below the ``2.22e-16`` default of :func:`remove_fuzz`, so the cut
+    keeps genuine far tail that the absolute default throws away. With no
+    negative entry there is no information, the floor is ``0`` and the raw
+    density is used as it stands.
+
+    The cap matters. Zeroing below ``min(eps_machine, floor)`` always zeroes
+    a subset of what the default zeroes, so this cut can never lose more
+    genuine tail than the default does. Without the cap a single artifact
+    bucket sets the floor: a binomial with a zero-modified ``p0`` has one
+    negative bucket at ``4.5e-4`` on a ``log2=4`` grid, and a signed lump
+    carries one at ``7e-15``, and uncapped either would zero real mass.
+    """
+    neg = den[den < 0]
+    if len(neg) == 0:
+        return 0.0
+    return float(min(np.finfo(float).eps, np.nextafter(-neg.min(), np.inf)))
 
 
 #: Mantissa ladder for ``bs >= 1``: the "nice" bucket sizes within each decade.

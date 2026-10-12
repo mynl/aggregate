@@ -48,6 +48,7 @@ and Kaplan-Meier estimators.
    ift
    round_bucket
    remove_fuzz
+   noise_floor
    qd
    mv
    oep

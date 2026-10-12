@@ -44,7 +44,7 @@ from . import _program
 from .utilities import (ft, ift, below_grid_fill,
                         round_bucket,
                         agg_help, explain_validation,
-                        remove_fuzz as remove_fuzz_util)
+                        remove_fuzz as remove_fuzz_util, noise_floor)
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
 from ._aggregate import (return_period_frame, SUMMARY_PERCENTILES,
@@ -371,11 +371,14 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         logger.info('Updating total statistics (WARNING: these are now empirical)')
         port.independent_stats_df = port.stats_df.copy()
         # Same de-fuzzed ``xsden_to_mwrangler`` convention as
-        # ``Portfolio.update`` and ``Aggregate.update_work``.
+        # ``Portfolio.update`` and ``Aggregate.update_work``: the noise-floor
+        # cut, and the deficit measured on the array before cleaning. Here
+        # ``p_total`` is the sample's own column after the switcheroo, so the
+        # array in hand is the raw one.
         _xs = port.density_df['loss'].values
         _p = port.density_df['p_total'].values
-        _p_clean = remove_fuzz_util(_p)
-        _mw = xsden_to_mwrangler(_xs, _p_clean)
+        _p_clean = remove_fuzz_util(_p, eps=noise_floor(_p))
+        _mw = xsden_to_mwrangler(_xs, _p_clean, deficit=1.0 - float(_p.sum()))
         _ex1, _ex2, _ex3 = _mw.noncentral
         port.est_m, port.est_cv, port.est_skew = _mw.mcvsk
         port.ex = port.est_m
@@ -2865,6 +2868,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             # the non-signed path would silently drop that wrapped tail.
             self.density_df['p_total'] = np.roll(ift(ft_all, 0), -j0_tot)[:N]
             self._signed_window = (x_min_tot, x_min_tot + N * self.bs)
+            # Raw mass shortfall, read before ``remove_fuzz`` below mutates
+            # ``p_total`` in place; see the empirical-moments block.
+            raw_deficit = 1.0 - float(self.density_df['p_total'].sum())
         else:
             # ---- non-signed path (combine unchanged, byte-for-byte) -------
             # Use self.bs (resolved above): build_many now passes bs through
@@ -2889,6 +2895,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 else:
                     ft_all *= agg.ftagg_density
             self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
+            raw_deficit = 1.0 - float(self.density_df['p_total'].sum())
 
         self.remove_fuzz(log='update')
 
@@ -2937,15 +2944,19 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                         key='defective-construction', stacklevel=3)
 
         # Empirical portfolio-total agg moments from the FFT output, via
-        # ``xsden_to_mwrangler`` on a de-fuzzed copy -- mirrors
+        # ``xsden_to_mwrangler`` on a de-fuzzed copy, mirroring
         # ``Aggregate.update_work`` so both modules share one moment
-        # convention (meta.3 D4/D8). The de-fuzz zeroes |p| < eps before the
-        # ``x**k`` weighting, otherwise far-tail fp noise gets amplified to
-        # spurious skew on wide grids.
+        # convention (meta.3 D4/D8). The de-fuzz zeroes |p| below the
+        # density's own noise floor before the ``x**k`` weighting, otherwise
+        # far-tail fp noise gets amplified to spurious skew on wide grids.
+        # The deficit relocated to the grid top is the one measured on the
+        # raw ``p_total`` above, before ``self.remove_fuzz`` mutated it, so
+        # that mass the cleaning deleted inside the grid is not relocated as
+        # if it lay beyond it. See the WHY comment in ``update_work``.
         _xs = self.density_df['loss'].values
         _p = self.density_df['p_total'].values
-        _p_clean = remove_fuzz_util(_p)
-        _mw = xsden_to_mwrangler(_xs, _p_clean)
+        _p_clean = remove_fuzz_util(_p, eps=noise_floor(_p))
+        _mw = xsden_to_mwrangler(_xs, _p_clean, deficit=raw_deficit)
         _ex1, _ex2, _ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
         self.ex = self.est_m

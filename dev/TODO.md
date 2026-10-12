@@ -178,41 +178,21 @@
   **Proposed for 1.0** in `dev/done/plan-a400-v1-loose-ends.md`; if it does not make
   the cut it lands here.
 - **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
-  **diagnosed 2026-10-07**, full account in
-  `dev/done/plan-a400-v1-loose-ends.md` phase 3) — on a tall grid
-  `utilities.remove_fuzz` zeroes *genuine* far-tail density, and
-  `moments.xsden_to_mwrangler` then relocates the shortfall to the top of the
-  grid, where `x**3` turns it into a large number. On `lognorm 200 cv 2` at
-  `bs=6.427`, `log2=21`: genuine far-tail density is ~`1e-26`, well under
-  `remove_fuzz`'s **absolute** `eps=2.22e-16`, so it zeroes 1,977,176 of
-  2,097,152 buckets and removes `4.632e-12` of real mass; the wrangler reads
-  that as a truncation deficit and adds `pg * (xs[-1]+bs)**3 = 4.632e-12 *
-  2.449e21 = +1.134e10` to an `ex3` of `3.0e10`. Result: central third moment
-  +113%, `est_skew` **7.537** against an exact **3.5355**, and a spurious
-  `AGG_SKEW` validation flag. The **raw** density gives 3.5354, correct, so the
-  FFT is innocent. The original entry blamed `1 - cdf` and the raw third
-  moment; both are wrong, and the raw third moment is accurate to ~1e-5 at
-  every grid.
-  **Fix needs a ruling, because all three candidates move `est_skew` and can
-  move validation flags corpus-wide.** Recommended: make `remove_fuzz`'s
-  threshold relative to the density's own scale instead of an absolute epsilon
-  of 1.0, which is the root error, as its own plan with a blast-radius pass.
-  Cheap interim: stop the wrangler relocating a fuzz-attributable shortfall to
-  the grid top. Not recommended without more work: dropping the `remove_fuzz`
-  call in `_aggregate.py` (measured better at every grid tested, but that call
-  exists *because* fuzz once corrupted the skew, and that case was not
-  re-found).
-  **Owed either way:** two comments assert things now measured to be false.
-  `remove_fuzz`'s docstring says "the exact aggregate has no genuine density
-  below machine epsilon", and the comment above the call in `_aggregate.py`
-  adds that the aggregate "has no negative density even under aliasing" (795,744
-  buckets are negative at `log2=21`).
-  **Second occurrence 2026-10-11**, GEMAct's Table 2 model at `log2=22`:
-  `est_skew` 11.916 against 7.2841. Measured there: the raw density also fails,
-  on wide grids over small supports (ten dice at `log2=20`: 2.01 against 0), so
-  dropping the call is ruled out. A threshold set from the density's own
-  negative values fixes all six cases tried. See
-  `dev/note-fuzz-removal-phantom-tail-mass.md`.
+  diagnosed 2026-10-07, second occurrence 2026-10-11, full account in
+  `dev/done/plan-a400-v1-loose-ends.md` phase 3 and
+  `dev/plan-1.2.0a14-moment-deficit.md`): **landed 1.2.0a14** as
+  `[Moment-Deficit-Genuine-Only]`: the moment sites clean at the density's
+  own noise floor (`utilities.noise_floor`, capped at machine epsilon) and
+  `xsden_to_mwrangler` relocates only a positive deficit above
+  `VALIDATION_NOISE`, measured on the raw array. The plan and its note move to
+  `dev/done/` when the author says so. **Residual:** a positive rounding
+  deficit above 1e-12 still relocates (`Bruno2006.B7`'s mirror image, `J.Re14` at
+  `log2` 18 and 20), today's behavior. The principled fix is for
+  `freq_sev_convolution` (`_aggregate_compute.py`) to report the mass the
+  padding slice discards, the only direct measurement of truncation, and for
+  `update_work` to pass that as the deficit; the Portfolio path builds `p_total`
+  from a product of transforms and needs its own measurement. Not worth the
+  plumbing until it bites.
 
 - **[Matrix-Verdict-Colorblind]** (measured 2026-10-07) — the `matrix` panel
   encodes its verdict on a red/green diverging ramp whose two ends have a

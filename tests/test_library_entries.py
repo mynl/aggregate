@@ -168,11 +168,18 @@ VALIDATION_BASELINE = {
     # the thick portfolios are chosen to sit at the edge of what the grid can
     # carry. Both are the subject of their sections.
     'GrossCatXOL': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|INFEASIBLE',
-    'RawLognorm': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV',
+    # 1.2.0a14 [Moment-Deficit-Genuine-Only]: the severity stage moment no
+    # longer parks deleted tail at the grid top, so SEV_SKEW clears here.
+    'RawLognorm': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
     'BodoffFour': 'SEV_MEAN|SEV_CV|AGG_MEAN',
     'PIRCatNonCatGross': 'SEV_SKEW',
     'PropertyCasualty': 'SEV_MEAN|AGG_MEAN',
-    'ThickThickPortfolio': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|INFEASIBLE',
+    # 1.2.0a14 [Moment-Deficit-Genuine-Only]: unit A's grid holds the whole
+    # density (raw deficit -4e-15) but not its tail's third moment; the old
+    # rule parked 9e-13 of deleted tail at the top and read 3.158 against
+    # 3.162 by luck. Every honest reading is 3.124 to 3.127, so AGG_SKEW now
+    # reports what the severity flags already said about this unit.
+    'ThickThickPortfolio': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|INFEASIBLE',
     'ThickThinPortfolio': 'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW',
 }
 

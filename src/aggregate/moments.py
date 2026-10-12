@@ -549,17 +549,17 @@ class MomentWrangler:
         self._factorial = (ex1, ex2 - ex1, ex3 - 3 * ex2 + 2 * ex1)
 
 
-def xsden_to_mwrangler(xs, den):
+def xsden_to_mwrangler(xs, den, deficit=None):
     """
     Build a :class:`MomentWrangler` from a discretized density.
 
     The single entry point for turning ``(xs, den)`` into moments: it
     populates a :class:`MomentWrangler` with the non-central moments, from
     which the caller reads ``.noncentral`` (raw moments), ``.mcvsk`` (mean,
-    CV, skew), ``.central``, or ``.factorial`` as needed -- computing the
+    CV, skew), ``.central``, or ``.factorial`` as needed, computing the
     sums only once. The convenience wrappers :func:`xsden_to_meancv` and
     :func:`xsden_to_meancvskew` route through here, so every caller treats the
-    tail mass identically -- **prefer them when you need only the single
+    tail mass identically. **Prefer them when you need only the single
     ``(m, cv)`` or ``(m, cv, skew)`` view**, and use this function directly when
     you need more than one view (or the raw ``.noncentral`` moments).
 
@@ -571,6 +571,12 @@ def xsden_to_mwrangler(xs, den):
     den : array-like
         Probability mass on each bucket of ``xs``. For a proper distribution
         ``den.sum() == 1``.
+    deficit : float, optional
+        The mass the grid could not hold, to be relocated to the implied
+        maximum loss. ``None`` (the default) measures it as
+        ``1 - den.sum()``. Callers that clean ``den`` before passing it
+        should measure the deficit on the array *before* cleaning, so that
+        mass the cleaning deleted is not mistaken for truncation.
 
     Returns
     -------
@@ -580,16 +586,33 @@ def xsden_to_mwrangler(xs, den):
 
     Notes
     -----
-    Defective distributions (``den.sum() < 1``) are tolerated: the missing
-    mass ``pg = 1 - den.sum()`` is placed at the *implied maximum loss*
-    ``xsm + bs`` (the right edge of the final bucket), contributing
-    ``pg * (xsm + bs)**k`` to the k-th non-central moment. For a proper
-    distribution ``pg = 0`` and these terms vanish, so the result is
-    unaffected. A genuine deficit (``pg > VALIDATION_NOISE``) is reported at
-    INFO level; deficits at the floating-point noise floor are ignored.
+    Defective distributions are tolerated: a positive deficit ``pg`` is placed
+    at the *implied maximum loss* ``xsm + bs`` (the right edge of the final
+    bucket), contributing ``pg * (xsm + bs)**k`` to the k-th non-central
+    moment. The reading behind this is that the shortfall is mass the grid
+    could not hold, so the moments reported are those of ``X ^ m`` for the
+    grid top ``m``: the padded inverse FFT drops mass past the grid, and a
+    severity built with ``normalize=False`` may sum below one. Both are
+    genuine truncation and relocating them to the edge is right.
+
+    The relocation is wrong whenever the shortfall is not truncation, so the
+    deficit is gated one-sided: anything at or below ``VALIDATION_NOISE`` is
+    treated as exactly zero. That removes three cases that used to relocate.
+    A negative deficit (the density sums above one, which with a large claim
+    count can reach ``1e-12`` through PGF rounding) would otherwise place
+    negative mass at the edge, which no reading of the density supports.
+    A rounding-level positive deficit on a wide grid is multiplied by the
+    cube of the grid top, so ``7e-16`` of rounding on a ``2**20`` grid added
+    several hundred to the third moment of ten dice. And a deficit measured
+    on a density some cleaning step has already zeroed counts mass that lived
+    inside the grid as if it lay beyond it; passing ``deficit`` measured on
+    the raw array avoids that. A genuine deficit is reported at INFO level
+    with the same gate, so the log and the relocation agree.
     """
     # allow for defective distributions
-    pg = 1 - den.sum()
+    pg = deficit if deficit is not None else 1 - den.sum()
+    if pg <= VALIDATION_NOISE:
+        pg = 0.0
     xd = xs * den
     # figure the max observed x for defective distribution adjustment
     if isinstance(xs, np.ndarray):

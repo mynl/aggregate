@@ -207,6 +207,12 @@
   below machine epsilon", and the comment above the call in `_aggregate.py`
   adds that the aggregate "has no negative density even under aliasing" (795,744
   buckets are negative at `log2=21`).
+  **Second occurrence 2026-10-11**, GEMAct's Table 2 model at `log2=22`:
+  `est_skew` 11.916 against 7.2841. Measured there: the raw density also fails,
+  on wide grids over small supports (ten dice at `log2=20`: 2.01 against 0), so
+  dropping the call is ruled out. A threshold set from the density's own
+  negative values fixes all six cases tried. See
+  `dev/note-fuzz-removal-phantom-tail-mass.md`.
 
 - **[Matrix-Verdict-Colorblind]** (measured 2026-10-07) — the `matrix` panel
   encodes its verdict on a red/green diverging ramp whose two ends have a

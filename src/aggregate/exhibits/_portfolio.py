@@ -44,10 +44,25 @@ def _tail_insurer_portfolio(obj, blocks):
 @validation.insurer.register(Portfolio)
 def _validation_insurer_portfolio(obj, blocks):
     block_name, df, kw = blocks[0]
-    caption = ('Moment QA per unit plus the portfolio total: reference vs '
-               'realized FFT estimate with noise aware relative errors (the '
-               'economic view when any unit cedes). Rows failing validation '
-               'at each object\'s validation_eps gate are emphasized.')
+    caption = (
+        'Moment-based validation per unit plus the portfolio total: computes '
+        'the theoretical mean (EX), CV and skewness (Sk) of each unit\'s '
+        'severity and compound distribution from the relationships between '
+        'frequency, severity and compound moments, and the total\'s by '
+        'combining the units as independent, which is how the FFT convolves '
+        'them. The theoretical calculation uses analytic expressions for the '
+        'frequency and for lognormal, gamma, exponential and Pareto '
+        'severities, and high-accuracy numerical integration for other '
+        'severities. The FFT approximation\'s moments (Est) are compared to the '
+        'theoretical ones, and Err is the noise-aware relative error between '
+        'them. The theoretical calculation is independent of the FFT, so close '
+        'agreement is strong evidence the approximation is valid. When any '
+        'unit can take negative values, SD replaces CV throughout. Rows failing '
+        'a unit\'s validation_eps gate, or the portfolio\'s for the total, are '
+        'emphasized. If any unit cedes, every block switches to the cession '
+        'view: EX, Est and Err become Subject, Net (or Ceded) and Change, the '
+        'effect of the cession, so the table no longer validates: validate '
+        'the gross portfolio.')
     by_unit = {a.name: a.valid for a in obj}
     by_unit['total'] = obj.valid
     flags = _moment_validation_emphasis(df, by_unit.get)

@@ -47,10 +47,20 @@ def _tail_insurer_aggregate(obj, blocks):
 @validation.insurer.register(Aggregate)
 def _validation_insurer_aggregate(obj, blocks):
     block_name, df, kw = blocks[0]
-    caption = ('Moment QA: reference vs realized FFT estimate with noise '
-               'aware relative errors (the economic Gross / Net / Ceded view '
-               'when reinsurance is present). Rows failing validation at the '
-               'object\'s validation_eps gate are emphasized.')
+    caption = (
+        'Moment-based validation: computes the theoretical mean (EX), CV or SD and '
+        'skewness (Sk) of the gross severity and gross compound distribution '
+        'from the relationships between frequency, severity and compound '
+        'moments. The theoretical calculation uses analytic expressions for the '
+        'frequency and for lognormal, gamma, exponential and Pareto severities, '
+        'and high-accuracy numerical integration for other severities. The FFT '
+        'approximation\'s moments (Est) are compared to the theoretical ones, '
+        'and Err is the noise-aware relative error between them. The '
+        'theoretical calculation is independent of the FFT, so close agreement '
+        'is strong evidence the approximation is valid. Rows failing the '
+        'object\'s validation_eps gate are emphasized. With reinsurance, Est and '
+        'Err become Net (or Ceded) and Change, the effect of the cession, so '
+        'the table no longer validates: validate the gross object.')
     flags = _moment_validation_emphasis(df, lambda unit: obj.valid)
     return [(block_name, df, dict(kw, caption=caption, row_flags=flags))]
 

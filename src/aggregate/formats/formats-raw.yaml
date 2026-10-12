@@ -66,6 +66,15 @@ columns:
   CV: ratio
   Skew: '.3g'          # three significant figures over a wide dynamic range
 
+  # --- reinsurance summary
+  limit: money
+  attach: money
+  loss: money
+  pr_attach: probability
+  pr_detach: probability
+  share: ratio
+  lol: '.3f'
+
   # --- the pentagon octet (L, P, M, a, Q, lr, pq, coc) and its neighbours
   L: money
   M: money

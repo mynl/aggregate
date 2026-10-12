@@ -506,3 +506,65 @@ def test_apply_reins_work_layer_math():
     # the returned ceder / netter callables agree with the frame
     assert np.allclose(ceder(x), expected_ceded)
     assert np.allclose(netter(x), x - expected_ceded)
+
+
+# ----------------------------------------------------------------------------
+# [Zero-Share-Layer-Moments]: a layer that cedes nothing reports exact zeros
+# ----------------------------------------------------------------------------
+
+ZERO_SHARE_OCC = (
+    'agg RR.ZeroOcc 10 claims sev lognorm 50 cv 1.5 '
+    'occurrence net of 20 xs 20 and 0% po 20 xs 40 and inf xs 60 poisson'
+)
+
+
+def _assert_zero_column(col):
+    """Raw moments and mean exactly 0; cv and skew ``nan`` (zero mean)."""
+    for m in ('ex1', 'ex2', 'ex3', 'mean'):
+        assert col[m] == 0.0, m
+    assert np.isnan(col['cv'])
+    assert np.isnan(col['skew'])
+
+
+def test_zero_share_occ_layer_reports_zeros():
+    """A ``0% po`` occurrence layer: no noise moments, no exploding ratios.
+
+    Before the fix its agg mean was ``5e-9`` with cv and skew ``2.5e6``,
+    computed from the subject's truncation deficit relocated to the grid top.
+    """
+    df = build(ZERO_SHARE_OCC).reins_stats_df
+    _assert_zero_column(df[('occ', 'layer.2')]['sev'])
+    _assert_zero_column(df[('occ', 'layer.2')]['agg'])
+    assert df[('occ', 'layer.2')][('meta', 'pr_loss')] == 0.0
+    # The live layers are untouched: finite, positive cv.
+    for layer in ('layer.1', 'layer.3'):
+        assert df[('occ', layer)][('agg', 'cv')] > 0
+
+
+def test_zero_share_program_ceded_total_and_output():
+    """A program that cedes nothing: the Ceded total, and the realized
+    aggregate of a ``ceded to`` program, are the exact point mass at 0."""
+    a = build('agg RR.ZeroCeded 10 claims sev lognorm 50 cv 1.5 '
+              'occurrence ceded to 0% po 20 xs 40 poisson')
+    df = a.reins_stats_df
+    _assert_zero_column(df[('occ', 'Ceded')]['agg'])
+    assert a.est_m == 0.0
+    assert np.isnan(a.est_cv) and np.isnan(a.est_skew)
+
+
+def test_zero_share_agg_layer_reports_zeros():
+    """The aggregate-stage loop takes the same path."""
+    df = build('agg RR.ZeroAgg 10 claims sev lognorm 50 cv 1.5 poisson '
+               'aggregate net of 0% po 200 xs 400 and 100 xs 600'
+               ).reins_stats_df
+    _assert_zero_column(df[('agg', 'layer.1')]['agg'])
+    assert df[('agg', 'layer.2')][('agg', 'cv')] > 0
+
+
+def test_cedes_nothing():
+    """Zero share or zero limit cedes nothing; ``0% of inf`` is not ``nan``."""
+    from aggregate._reinsurance import cedes_nothing
+    assert cedes_nothing([(0.0, 20, 40)])
+    assert cedes_nothing([(0.0, np.inf, 40)])
+    assert cedes_nothing([(0.0, 20, 0), (0.0, np.inf, 20)])
+    assert not cedes_nothing([(0.0, 20, 0), (0.5, 20, 20)])

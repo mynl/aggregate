@@ -169,11 +169,17 @@ VALIDATION_BASELINE = {
     # the thick portfolios are chosen to sit at the edge of what the grid can
     # carry. Both are the subject of their sections.
     'GrossCatXOL': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|INFEASIBLE',
-    'RawLognorm': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV',
+    # SEV_SKEW cleared by [Fuzz-Removal-Phantom-Tail-Mass]: the gross
+    # empirical sev skew was 14.151 against 14 only because de-fuzzed tail
+    # mass was relocated to the grid top; it now reads 13.956.
+    'RawLognorm': 'SEV_MEAN|SEV_CV|AGG_MEAN|AGG_CV',
     'BodoffFour': 'SEV_MEAN|SEV_CV|AGG_MEAN',
     'PIRCatNonCatGross': 'SEV_SKEW',
     'PropertyCasualty': 'SEV_MEAN|AGG_MEAN',
-    'ThickThickPortfolio': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|INFEASIBLE',
+    # AGG_SKEW added by [Fuzz-Removal-Phantom-Tail-Mass]: unit A's agg skew
+    # is 3.124 against 3.162, matching the raw FFT output (3.128). The old
+    # 3.159 was relocated de-fuzz mass offsetting the severity truncation.
+    'ThickThickPortfolio': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|INFEASIBLE',
     'ThickThinPortfolio': 'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW',
 }
 

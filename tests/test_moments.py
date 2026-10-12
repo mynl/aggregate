@@ -87,6 +87,44 @@ def test_proper_distribution_no_defective_log(caplog):
     assert "defective" not in caplog.text.lower()
 
 
+def test_mass_kwarg_relocates_only_true_truncation():
+    """``mass=`` measures the deficit before de-fuzzing.
+
+    Zeroing mass inside the support (as ``remove_fuzz`` does to far-tail
+    density) is not truncation: with ``mass=1`` nothing is relocated to the
+    implied max, while the default still relocates the whole shortfall.
+    """
+    ps = DIE_PS.copy()
+    ps[5] = 0.0  # mass removed in place, not truncated off the top
+    ex1, _, _ = xsden_to_mwrangler(DIE_XS, ps, mass=1.0).noncentral
+    assert np.isclose(ex1, float(np.sum(DIE_XS * ps)), rtol=1e-12)
+    ex1_default, _, _ = xsden_to_mwrangler(DIE_XS, ps).noncentral
+    assert np.isclose(ex1_default, float(np.sum(DIE_XS * ps)) + 7.0 / 6.0,
+                      rtol=1e-12)
+
+
+def test_fuzz_removal_does_not_inflate_tall_grid_skew():
+    """``[Fuzz-Removal-Phantom-Tail-Mass]``: the reproducer from the TODO.
+
+    At ``log2 = 21`` the de-fuzz zeroes ~4.6e-12 of genuine far-tail mass.
+    Relocating it to the grid top reported an aggregate skew of 7.54 and a
+    gross empirical severity skew of 142.5 against exact values of 3.5355 and
+    14, and raised spurious ``SEV_CV | SEV_SKEW | AGG_SKEW`` flags.
+    """
+    from aggregate.constants import Validation
+    a = build('agg FuzzTail 10 claims sev lognorm 200 cv 2 poisson',
+              bs=6.427, log2=21)
+    exact_agg_skew = 125 / (np.sqrt(10) * 5 ** 1.5)  # compound Poisson
+    assert np.isclose(a.est_skew, exact_agg_skew, rtol=1e-3)
+    # Looser: the absolute ``remove_fuzz`` threshold still zeroes genuine
+    # severity tail density, biasing this skew about 0.1% low. That is the
+    # relative-threshold root fix the TODO leaves for its own plan.
+    sev_skew = float(a.stats_df['gross_empirical'][('sev', 'skew')])
+    assert np.isclose(sev_skew, 14.0, rtol=5e-3)
+    assert not a.valid & (Validation.SEV_CV | Validation.SEV_SKEW
+                          | Validation.AGG_SKEW)
+
+
 def test_zero_mean_gives_nan_cv():
     """A mean-zero distribution yields cv = nan (no division by zero)."""
     xs = np.array([-1.0, 0.0, 1.0])

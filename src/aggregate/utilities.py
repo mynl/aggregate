@@ -154,9 +154,16 @@ def remove_fuzz(data, eps=None):
     The raw inverse-FFT density carries sub-machine-epsilon fuzz (tiny +/-
     values) in essentially every bucket. In a plain mass sum this cancels, but
     moment calculations weight each bucket by ``x**k``, so far-tail fuzz at
-    large ``x`` is amplified and corrupts the empirical skew. Zeroing
-    ``|x| < eps`` is safe and lossless: the exact aggregate has no genuine
-    density below machine epsilon.
+    large ``x`` is amplified and corrupts the empirical skew.
+
+    Zeroing ``|x| < eps`` is **not** lossless. On a tall grid a heavy-tailed
+    aggregate has genuine far-tail density far below machine epsilon (about
+    1e-26 for ``agg 10 claims sev lognorm 200 cv 2 poisson`` at
+    ``log2 = 21``), so the result can sum to a few 1e-12 less than the input.
+    A caller taking moments of the result should pass the input's total to
+    :func:`~aggregate.moments.xsden_to_mwrangler` as ``mass``, or that
+    shortfall is relocated to the top of the grid as if it were truncation
+    (``[Fuzz-Removal-Phantom-Tail-Mass]``).
 
     The one-sided ``Frequency.pmf`` clip and the plot-cosmetic ``1e-15`` clip in
     the reinsurance occurrence plot are deliberate carve-outs that do NOT route

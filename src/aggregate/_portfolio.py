@@ -375,7 +375,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         _xs = port.density_df['loss'].values
         _p = port.density_df['p_total'].values
         _p_clean = remove_fuzz_util(_p)
-        _mw = xsden_to_mwrangler(_xs, _p_clean)
+        _mw = xsden_to_mwrangler(_xs, _p_clean, mass=float(np.sum(_p)))
         _ex1, _ex2, _ex3 = _mw.noncentral
         port.est_m, port.est_cv, port.est_skew = _mw.mcvsk
         port.ex = port.est_m
@@ -2890,6 +2890,9 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                     ft_all *= agg.ftagg_density
             self.density_df['p_total'] = np.real(ift(ft_all, self.padding))
 
+        # Total mass before any de-fuzz, so the moment step below relocates
+        # only true truncation (``[Fuzz-Removal-Phantom-Tail-Mass]``).
+        p_total_mass = float(self.density_df['p_total'].sum())
         self.remove_fuzz(log='update')
 
         # Objective allocation columns (kappa + direct sums) — now valid on
@@ -2945,7 +2948,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         _xs = self.density_df['loss'].values
         _p = self.density_df['p_total'].values
         _p_clean = remove_fuzz_util(_p)
-        _mw = xsden_to_mwrangler(_xs, _p_clean)
+        _mw = xsden_to_mwrangler(_xs, _p_clean, mass=p_total_mass)
         _ex1, _ex2, _ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
         self.ex = self.est_m

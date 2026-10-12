@@ -549,7 +549,7 @@ class MomentWrangler:
         self._factorial = (ex1, ex2 - ex1, ex3 - 3 * ex2 + 2 * ex1)
 
 
-def xsden_to_mwrangler(xs, den):
+def xsden_to_mwrangler(xs, den, mass=None):
     """
     Build a :class:`MomentWrangler` from a discretized density.
 
@@ -571,6 +571,13 @@ def xsden_to_mwrangler(xs, den):
     den : array-like
         Probability mass on each bucket of ``xs``. For a proper distribution
         ``den.sum() == 1``.
+    mass : float, optional
+        Total probability carried by the density *before* any de-fuzzing,
+        usually ``raw.sum()`` when ``den = remove_fuzz(raw)``. Only
+        ``1 - mass`` is treated as a truncation deficit, and only when it
+        exceeds ``VALIDATION_NOISE``; the mass the de-fuzz zeroed is dropped
+        where it lay. Defaults to ``None``: the deficit is ``1 - den.sum()``,
+        relocated at any size, as before.
 
     Returns
     -------
@@ -587,9 +594,30 @@ def xsden_to_mwrangler(xs, den):
     distribution ``pg = 0`` and these terms vanish, so the result is
     unaffected. A genuine deficit (``pg > VALIDATION_NOISE``) is reported at
     INFO level; deficits at the floating-point noise floor are ignored.
+
+    The relocation is right only for genuine right truncation. On a tall
+    grid :func:`~aggregate.utilities.remove_fuzz` zeroes real far-tail
+    density spread through the whole tail; placing that shortfall at the top
+    of the grid, where ``xsm**3`` is huge, inflated the third central moment
+    of ``agg 10 claims sev lognorm 200 cv 2 poisson`` at ``log2 = 21`` by
+    113% (``[Fuzz-Removal-Phantom-Tail-Mass]``). Passing ``mass`` measures
+    the deficit before the de-fuzz, so only true truncation is relocated.
+
+    The raw mass carries the FFT's own rounding, about ``1e-14`` on a 64k
+    grid, which the de-fuzz otherwise cancels. Relocated to the top of a grid
+    much wider than the support (a small signed portfolio on ``log2 = 16``)
+    that rounding alone moves the skew, so a pre-de-fuzz deficit within
+    ``VALIDATION_NOISE`` of zero is read as rounding and not relocated.
     """
     # allow for defective distributions
-    pg = 1 - den.sum()
+    if mass is None:
+        pg = 1 - den.sum()
+    else:
+        # deficit measured before the de-fuzz; at the noise floor it is
+        # rounding, not truncation
+        pg = 1 - mass
+        if abs(pg) <= VALIDATION_NOISE:
+            pg = 0.0
     xd = xs * den
     # figure the max observed x for defective distribution adjustment
     if isinstance(xs, np.ndarray):

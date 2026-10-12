@@ -4556,17 +4556,21 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # far-tail fuzz at large ``x`` is amplified by ``x**3`` and corrupts
         # the empirical skew -- e.g. a symmetric die's skew drifts from ~1e-15
         # to ~1e-4 as log2 grows, purely from fuzz at buckets the distribution
-        # never reaches. The fuzz is genuine fp noise: the FFT is exact up to
-        # rounding and the exact aggregate has no negative density even under
-        # aliasing (aliasing only wraps *positive* mass), so every stray value
-        # is small and zeroing ``|x| < eps`` is safe and lossless. We do this
+        # never reaches. The de-fuzz is NOT lossless: on a tall grid genuine
+        # far-tail density sits far below eps (about 1e-26 for lognorm 200 cv
+        # 2 at log2 = 21, where the raw output also has 795,744 negative
+        # buckets), and zeroing it removes a few 1e-12 of real mass. That
+        # mass is spread through the tail, so ``mass=`` hands the wrangler the
+        # raw total and only true truncation is relocated to the grid top
+        # (``[Fuzz-Removal-Phantom-Tail-Mass]``). We do this
         # on a throwaway copy and deliberately leave ``self.agg_density`` as
         # the raw output (kept consistent with ``ftagg_density``); the curated
         # view ``density_df.p_total`` applies the identical ``remove_fuzz``
         # separately. (We cannot source the moments from ``density_df.p_total``
         # here: building ``density_df`` needs ``est_m``, computed just below.)
         agg_clean = remove_fuzz(self.agg_density)
-        _mw = xsden_to_mwrangler(self.xs, agg_clean)
+        _mw = xsden_to_mwrangler(self.xs, agg_clean,
+                                 mass=float(np.sum(self.agg_density)))
         agg_ex1, agg_ex2, agg_ex3 = _mw.noncentral
         self.est_m, self.est_cv, self.est_skew = _mw.mcvsk
         # var/sd straight off the wrangler (var = central[1]), never via
@@ -4681,7 +4685,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             # (they coincide on the default 0-based grid).
             if arr is None:
                 return (np.nan,) * 6
-            mw = xsden_to_mwrangler(grid, remove_fuzz(arr))
+            mw = xsden_to_mwrangler(grid, remove_fuzz(arr),
+                                    mass=float(np.sum(arr)))
             return (*mw.noncentral, *mw.mcvsk)
 
         sub_sev_mom = _moments(subject_sev, self.xs_sev)

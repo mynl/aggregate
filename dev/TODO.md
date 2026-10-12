@@ -42,54 +42,32 @@
 
 ## Correctness
 
-- **[Zero-Share-Layer-Moments]** (found a352) — a `0% po` layer cedes nothing,
-  so all its ceded moments are pure floating-point noise, and every ratio
-  derived from them is meaningless. The defect has **two faces** depending on
-  which way the noise falls. When the second moment lands just below zero,
-  `moments.mcvsk` square-roots it and `reins_stats_df` reports `cv` and `skew`
-  as `nan` beside a mean of `-1.8e-11`. When it lands just above, there is no
-  `nan` and no warning, and the ratios explode instead: measured 2026-10-07 on
-  `agg Z 10 claims sev lognorm 50 cv 1.5 occurrence net of 20 xs 20 and 0% po
-  20 xs 40 and inf xs 60 poisson`, the zero-share layer reports `agg` `cv` and
-  `skew` of **2.51e+06** against a mean of `5.2e-09`, and `sev` `cv` / `skew`
-  of `nan`. The second face is the worse one: a plausible-looking number in a
-  reported frame with nothing flagging it. Fix is not an `np.errstate` guard:
-  recognize a zero-share layer and report it as such (zeros or blanks across
-  the column, the author's call) rather than publishing ratios computed from
-  noise. Partly masked because the gapped program is exercised on the declared
-  tier only; see the `_EVERY_TIER` comment in `tests/test_chart_structure.py`.
-  **Proposed for 1.0** in `dev/done/plan-a400-v1-loose-ends.md`; if it does not make
-  the cut it lands here.
-- **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
-  **diagnosed 2026-10-07**, full account in
-  `dev/done/plan-a400-v1-loose-ends.md` phase 3) — on a tall grid
-  `utilities.remove_fuzz` zeroes *genuine* far-tail density, and
-  `moments.xsden_to_mwrangler` then relocates the shortfall to the top of the
-  grid, where `x**3` turns it into a large number. On `lognorm 200 cv 2` at
-  `bs=6.427`, `log2=21`: genuine far-tail density is ~`1e-26`, well under
-  `remove_fuzz`'s **absolute** `eps=2.22e-16`, so it zeroes 1,977,176 of
-  2,097,152 buckets and removes `4.632e-12` of real mass; the wrangler reads
-  that as a truncation deficit and adds `pg * (xs[-1]+bs)**3 = 4.632e-12 *
-  2.449e21 = +1.134e10` to an `ex3` of `3.0e10`. Result: central third moment
-  +113%, `est_skew` **7.537** against an exact **3.5355**, and a spurious
-  `AGG_SKEW` validation flag. The **raw** density gives 3.5354, correct, so the
-  FFT is innocent. The original entry blamed `1 - cdf` and the raw third
-  moment; both are wrong, and the raw third moment is accurate to ~1e-5 at
-  every grid.
-  **Fix needs a ruling, because all three candidates move `est_skew` and can
-  move validation flags corpus-wide.** Recommended: make `remove_fuzz`'s
-  threshold relative to the density's own scale instead of an absolute epsilon
-  of 1.0, which is the root error, as its own plan with a blast-radius pass.
-  Cheap interim: stop the wrangler relocating a fuzz-attributable shortfall to
-  the grid top. Not recommended without more work: dropping the `remove_fuzz`
-  call in `_aggregate.py` (measured better at every grid tested, but that call
-  exists *because* fuzz once corrupted the skew, and that case was not
-  re-found).
-  **Owed either way:** two comments assert things now measured to be false.
-  `remove_fuzz`'s docstring says "the exact aggregate has no genuine density
-  below machine epsilon", and the comment above the call in `_aggregate.py`
-  adds that the aggregate "has no negative density even under aliasing" (795,744
-  buckets are negative at `log2=21`).
+- **[Zero-Share-Layer-Moments]** (found a352) **DONE, pending a version
+  bump.** A cession that is identically zero (`cedes_nothing`: zero share or
+  zero limit on every layer) now gets the exact point mass at zero
+  (`zero_cession_density`), so a `0% po` layer, and the Ceded total or `ceded
+  to` output of a program that cedes nothing, report raw moments of exactly 0
+  with `cv` and `skew` of `nan`. The old noise was the subject's truncation
+  deficit relocated to the grid top by `xsden_to_mwrangler`, not FFT fuzz. The
+  aggregate-stage loop had the same defect. Tests in
+  `tests/test_reins_reporting.py`. The `_EVERY_TIER` note in
+  `tests/test_chart_structure.py` can now be revisited.
+- **[Fuzz-Removal-Phantom-Tail-Mass]** (diagnosed 2026-10-07 in
+  `dev/done/plan-a400-v1-loose-ends.md` phase 3) **interim fix DONE, pending a
+  version bump; root fix open.** The cheap interim landed:
+  `xsden_to_mwrangler(..., mass=raw.sum())` relocates only the deficit measured
+  before the de-fuzz, and only above `VALIDATION_NOISE` (raw FFT rounding is
+  about 1e-14 and would otherwise move the skew of a small signed portfolio on
+  a wide grid). Wired into `Aggregate.update_work`, the stage moment helper,
+  `Portfolio.update` and the switcheroo. The reproducer's `est_skew` is now
+  3.5359 (was 7.537); `lognorm 50 cv 3` at `bs=80, log2=20` went from 145.4 to
+  3.124 against 3.162. Both false comments are corrected. **Still open, the
+  root fix (A):** the absolute `eps` zeroes genuine tail density, now dropped
+  rather than relocated, which biases heavy-tail skew low by about 0.1% to 1%
+  (ThickThickPortfolio unit A reads 3.124 against 3.162, raw FFT 3.128, and
+  gained a deliberate `AGG_SKEW` baseline flag; RawLognorm lost a spurious
+  `SEV_SKEW`). A threshold relative to the density's scale, as its own plan
+  with a blast-radius pass.
 
 - **[Matrix-Verdict-Colorblind]** (measured 2026-10-07) — the `matrix` panel
   encodes its verdict on a red/green diverging ramp whose two ends have a
@@ -222,11 +200,17 @@
 - **[Distortion-Production-vs-Research]** — separate the production distortions
   from the research zoo (CLL, CLin, LEP, LY) in the docs, and possibly in the
   namespace, so a new user meets the handful they should reach for.
-- **[Allocation-Bounds-Gold-Standard-Tests]** — extend the gold-standard
-  testing style past the engine into allocation and bounds: closed-form checks
-  wherever an analytic allocation exists, plus `hypothesis` invariants (`q`
-  monotone, TVaR at least VaR, allocation sums to the total, net at most
-  gross).
+- **[Allocation-Bounds-Gold-Standard-Tests]** **DONE, pending a version
+  bump.** `tests/test_allocation_gold_standard.py`: closed forms for Poisson
+  thinning (unit share `lambda_A / lambda` of L, P and M under any distortion,
+  to 1e-10), common-scale gamma shapes, and a constant unit priced at its
+  value; plus `hypothesis` invariants over random discrete programs (`q`
+  monotone, TVaR at least VaR, unit premiums sum to the total, net first-order
+  dominated by gross and priced no higher). `hypothesis` joins the `dev` extra.
+  Bounds already carried hand-calculated cases in `test_allocation_bounds.py`
+  and `test_pricing_bounds.py`. Found along the way, filed separately: unit
+  capital stops reconciling at far-tail asset levels and `unit_capital_at`
+  raises above the augmented frame's top.
 - **[Two-Surfaces-Blessed-Path]** (rider on the docs work) — there are two
   expressive surfaces, DecL and the objects. Document the blessed path per
   task, DecL to construct and objects to analyze, so users do not infer it.

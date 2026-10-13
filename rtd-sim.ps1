@@ -51,7 +51,7 @@
 #
 # USAGE
 # -----
-#   .\rtd-sim.ps1                       # build the REFACTOR branch, local clone
+#   .\rtd-sim.ps1                       # build the dev branch, local clone
 #   .\rtd-sim.ps1 -Ref master           # after the merge, this is the real one
 #   .\rtd-sim.ps1 -FromGitHub           # clone from GitHub: tests what is PUSHED
 #   .\rtd-sim.ps1 -Mode refresh         # reuse the venv, re-clone and rebuild
@@ -67,9 +67,9 @@
 
 param(
     # Branch or tag to build. RTD builds whatever its default version points
-    # at, which is `master` here. Default is REFACTOR because that is where the
+    # at, which is `master` here. Default is dev because that is where the
     # content lives until the merge lands.
-    [string]$Ref = "REFACTOR",
+    [string]$Ref = "dev",
 
     # Clone from github.com/mynl/aggregate instead of this local repository.
     # Local is the default so the build can be rehearsed BEFORE pushing; use
@@ -92,7 +92,7 @@ param(
     [switch]$Tex,
 
     # Where the throwaway build lives. One directory per ref and interpreter,
-    # so a REFACTOR rehearsal and a master rehearsal do not overwrite each
+    # so a dev rehearsal and a master rehearsal do not overwrite each
     # other.
     [string]$BuildRoot = "C:\tmp",
 

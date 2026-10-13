@@ -187,12 +187,28 @@
   `VALIDATION_NOISE`, measured on the raw array. The plan and its note move to
   `dev/done/` when the author says so. **Residual:** a positive rounding
   deficit above 1e-12 still relocates (`Bruno2006.B7`'s mirror image, `J.Re14` at
-  `log2` 18 and 20), today's behavior. The principled fix is for
-  `freq_sev_convolution` (`_aggregate_compute.py`) to report the mass the
-  padding slice discards, the only direct measurement of truncation, and for
-  `update_work` to pass that as the deficit; the Portfolio path builds `p_total`
-  from a product of transforms and needs its own measurement. Not worth the
-  plumbing until it bites.
+  `log2` 18 and 20), today's behavior. The principled fix is
+  `[Padding-Discard-Measurement]`, next.
+- **[Padding-Discard-Measurement]** (proposed 2026-10-12, the residual of
+  `[Moment-Deficit-Genuine-Only]`): when the padded inverse transform slices
+  its result to the grid, remember how much probability the slice discarded
+  and pass that, not the raw-sum shortfall, to `xsden_to_mwrangler` as the
+  deficit. The choke point is `utilities.ift`, not the convolution: every
+  path, Aggregate and Portfolio alike, takes its inverse through `ift`, and
+  `temp[0:len(temp) >> padding]` is the one line that drops mass, so if `ift`
+  reports `temp[n:].real.sum()` beside the density (a second return or an
+  attribute on the result) both paths get the measurement for free and the
+  Portfolio caveat (`p_total` is a product of transforms) disappears.
+  Relocation then becomes "put back exactly what the padding dropped", so the
+  one-sided 1e-12 gate in the wrangler, which exists only because the raw-sum
+  deficit mixes truncation with rounding, retires, and `J.Re14` at tall grids
+  and `Bruno2006.B7` fall out as consequences. With `padding=0` the
+  measurement reads 0, which is right: nothing was dropped, the tail wrapped
+  instead, and aliasing is the separate problem the existing checks report.
+  Acceptance: the `test_moment_deficit.py` residual test flips from
+  documenting the old value to matching the no-relocation reading, and the
+  sweep in `scripts/moment_rule_sweep.py` shows no case worse than theory
+  by more than today's.
 
 - **[Matrix-Verdict-Colorblind]** (measured 2026-10-07) — the `matrix` panel
   encodes its verdict on a red/green diverging ramp whose two ends have a

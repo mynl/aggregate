@@ -1,7 +1,7 @@
 # Plan 1.2.0a15: DecL help pages, an anatomy and a one-page card, shipped with the library
 
-Status: **executed 2026-10-13 at 1.2.0a15**; awaiting the author's acceptance (JupyterLab, and
-the api's contract run against this worktree). See "Execution log" at the end. Drafted
+Status: **executed 2026-10-13 at 1.2.0a15**, retired to `dev/done/` by the author the same day.
+See "Execution log" at the end. Drafted
 2026-10-13, revised the same day after the author's review, cross-reviewed with the api's
 `V:\dev\aggregate-api\dev\plan-1.7.0-decl-help.md`. One bump,
 **[DecL-Help-Pages]**. The help rolls into the 1.2.0 release: it lands as 1.2.0a15 first, and

@@ -132,7 +132,7 @@
 ## Recently landed
 
 - **[DecL-Help-Pages]** DONE at **1.2.0a15** (2026-10-13,
-  `dev/plan-1.2.0a15-decl-help.md`, in `dev/` until the author retires it):
+  `dev/done/plan-1.2.0a15-decl-help.md`):
   `decl_help()` and `decl_help('card')` ship the anatomy and the one-page card
   as HTML fragments from `data/decl-help/`, every program built by
   `tests/test_decl_help.py`. The api half is

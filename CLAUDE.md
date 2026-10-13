@@ -285,6 +285,11 @@ before a bump.
 
 ## Release & housekeeping workflow
 
+**Working on a contributor's fork? Follow the Contributions section of
+`README.md` instead of this one.** Branch from and target `dev`, and leave the
+version, `CHANGELOG.md` and `dev/TODO.md` alone: the rules below are the
+maintainer's, applied at merge.
+
 These are standing rules — follow them without being re-asked:
 
 - **Every plan-based code change bumps the version.** Any code change executed

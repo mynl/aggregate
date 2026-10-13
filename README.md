@@ -226,6 +226,23 @@ All contributions, bug reports, bug fixes, documentation improvements,
 enhancements and ideas are welcome. Create a pull request on github and/or
 email me.
 
-Social media: <https://www.reddit.com/r/AggregateDistribution/>.
+### Working on the code:
 
-Blog: <https://blog.mynl.com>
+* Branch from `dev` and open pull requests against `dev`. `master` carries
+  releases only and can lag `dev` by many versions.
+* Open an issue to agree the design before changing the DecL grammar
+  (`decl.lark`) or adding a public name.
+* One change per pull request, named with a descriptive bracketed label in the
+  style of `dev/TODO.md`, for example `[Zero-Share-Layer-Moments]`.
+* Do not bump the version or edit `CHANGELOG.md` or `dev/TODO.md`; all three
+  are updated at merge.
+* Sync with `uv sync --all-extras` and run `uv run pytest` before submitting.
+  Some snapshot tests were captured on the maintainer's machine and can differ
+  in the last digit elsewhere; report such failures in the pull request rather
+  than recapturing the snapshots.
+* `CLAUDE.md` sets out the house conventions (naming, docstrings, test tiers)
+  and is worth reading whether or not you work with an AI assistant.
+
+### Social media: <https://www.reddit.com/r/AggregateDistribution/>.
+
+### Blog: <https://blog.mynl.com>

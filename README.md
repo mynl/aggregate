@@ -226,7 +226,7 @@ All contributions, bug reports, bug fixes, documentation improvements,
 enhancements and ideas are welcome. Create a pull request on github and/or
 email me.
 
-### Working on the code:
+**Working on the code**
 
 * Branch from `dev` and open pull requests against `dev`. `master` carries
   releases only and can lag `dev` by many versions.
@@ -243,6 +243,6 @@ email me.
 * `CLAUDE.md` sets out the house conventions (naming, docstrings, test tiers)
   and is worth reading whether or not you work with an AI assistant.
 
-### Social media: <https://www.reddit.com/r/AggregateDistribution/>.
+Social media: <https://www.reddit.com/r/AggregateDistribution/>.
 
-### Blog: <https://blog.mynl.com>
+Blog: <https://blog.mynl.com>

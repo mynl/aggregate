@@ -50,7 +50,7 @@ uv run python scripts\freeze_knowledge.py check  <DIR> [--atol 1e-12]
 
 Build every `agg` program in the chosen knowledge bases and recompute `est_skew`
 / `est_cv` from the raw `agg_density` under the shipped rule (`today`) and the
-rule of `dev/plan-1.2.0a14-moment-deficit.md` (`plan`), plus the plan's rejected
+rule of `dev/done/plan-1.2.0a14-moment-deficit.md` (`plan`), plus the plan's rejected
 first draft (`draft`). Prints mover counts against theoretical skewness and the
 full per-object mover table; writes a CSV. **Read every mover**: the plan names
 the expected ones and any other is a finding.

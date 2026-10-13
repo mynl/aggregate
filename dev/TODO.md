@@ -180,7 +180,7 @@
 - **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
   diagnosed 2026-10-07, second occurrence 2026-10-11, full account in
   `dev/done/plan-a400-v1-loose-ends.md` phase 3 and
-  `dev/plan-1.2.0a14-moment-deficit.md`): **landed 1.2.0a14** as
+  `dev/done/plan-1.2.0a14-moment-deficit.md`): **landed 1.2.0a14** as
   `[Moment-Deficit-Genuine-Only]`: the moment sites clean at the density's
   own noise floor (`utilities.noise_floor`, capped at machine epsilon) and
   `xsden_to_mwrangler` relocates only a positive deficit above

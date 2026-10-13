@@ -5,7 +5,7 @@ A standalone maintenance aid, sibling to ``bucket_baseline.py``. It builds every
 skewness and CV from the raw ``agg_density`` under several rules, so a change to
 the cleaning or deficit handling behind ``est_skew`` / ``est_cv`` can be read as
 a per-object table before it lands. It was written for the review of
-``dev/plan-1.2.0a14-moment-deficit.md`` and is that plan's acceptance check.
+``dev/done/plan-1.2.0a14-moment-deficit.md`` and is that plan's acceptance check.
 
 Each rule is a pair: how the density is cleaned, and what deficit is relocated
 to the top of the grid (``pg * edge**k`` added to the k-th raw moment, the

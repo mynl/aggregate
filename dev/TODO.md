@@ -131,6 +131,14 @@
 
 ## Recently landed
 
+- **[DecL-Help-Pages]** DONE at **1.2.0a15** (2026-10-13,
+  `dev/plan-1.2.0a15-decl-help.md`, in `dev/` until the author retires it):
+  `decl_help()` and `decl_help('card')` ship the anatomy and the one-page card
+  as HTML fragments from `data/decl-help/`, every program built by
+  `tests/test_decl_help.py`. The api half is
+  `aggregate-api/dev/plan-1.7.0-decl-help.md`. Divergences and the
+  measurements are in the plan's execution log.
+
 - **[NTT-Speed]** DONE at **1.2.0a1** and **1.2.0a2** (2026-10-09,
   `dev/done/plan-ntt-speed.md`): geometric spectral runs for equal-weight
   outcomes and `out=` kernels throughout took the 1000 x 1000 uniform dice case

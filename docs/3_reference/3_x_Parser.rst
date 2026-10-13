@@ -96,3 +96,11 @@ Because the mirror is hand-written it can drift from the grammar;
 ``tests/test_grammar_sync.py`` is the guard.
 
 .. automodule:: aggregate.decl_pygments
+
+DecL help pages
+---------------
+
+:func:`~aggregate.decl_help.decl_help` returns one page of DecL help as an HTML fragment, the anatomy or the one-page card, for Jupyter and the Loss Lab. It colors its examples with :class:`~aggregate.decl_pygments.AggLexer`. See :ref:`4_dec_Language_Reference:Help in Jupyter and the Loss Lab`.
+
+.. automodule:: aggregate.decl_help
+   :members: decl_help, DeclHelp, DECL_HELP_FORMS

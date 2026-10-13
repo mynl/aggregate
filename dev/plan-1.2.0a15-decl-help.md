@@ -1,7 +1,9 @@
 # Plan 1.2.0a15: DecL help pages, an anatomy and a one-page card, shipped with the library
 
-Status: draft 2026-10-13, revised the same day after the author's review, for a final
-cross-review with the api's `V:\dev\aggregate-api\dev\plan-1.7.0-decl-help.md`. One bump,
+Status: **executed 2026-10-13 at 1.2.0a15**; awaiting the author's acceptance (JupyterLab, and
+the api's contract run against this worktree). See "Execution log" at the end. Drafted
+2026-10-13, revised the same day after the author's review, cross-reviewed with the api's
+`V:\dev\aggregate-api\dev\plan-1.7.0-decl-help.md`. One bump,
 **[DecL-Help-Pages]**. The help rolls into the 1.2.0 release: it lands as 1.2.0a15 first, and
 the 1.2.0 release note is written after it (the draft roll-up was deleted 2026-10-13 for that
 reason).
@@ -347,3 +349,39 @@ Commit subject: `[DecL-Help-Pages] 1.2.0a15: decl_help ships the anatomy and car
   interfere, so the duplication is harmless.
 * **An HTML parser instead of regular expressions.** The source rules make the regular
   expressions safe, and the tests check those rules, so a parser buys nothing.
+
+## Execution log
+
+Executed 2026-10-13 as one bump, 1.2.0a14 to **1.2.0a15**, on the author's `/execute-plan`.
+
+### Review
+
+* The status line read "draft, for a final cross-review". The api plan records that cross-review as done on 2026-10-13, and the one open item (the api's Q4) is the api's, so the invocation was taken as the go-ahead.
+* Every path, symbol and token type in "Current behavior" checked out against 1.2.0a14. `decl_help`, `DeclHelp` and `DECL_HELP_FORMS` collide with nothing in `src/` or `tests/`.
+* The content source was read, not written, from `X:\decl-help\`, a drive outside the usual working set, because this plan names it as the source.
+* No `dev/TODO.md` entry existed for [DecL-Help-Pages]; one was added under "Recently landed".
+
+### Divergences
+
+1. **[Anatomy-Right-Column] `.dh-part { min-width: 0 }` added to the anatomy.** In the mockup the right column overran the section at any width between the 820px breakpoint and about 1,300px: the portfolio's longest line (73 characters) set the grid item's minimum width, so `overflow: hidden` on the section clipped the prose and the P&L equation. Measured at 1,100px, 521px of content sat in a 453px column, identically in the mockup and in the straight copy. With the rule, the prose wraps and the long line scrolls inside its `pre`, as that `pre`'s `overflow-x: auto` intends. Breaking the portfolio's unit lines in two, as the card does, would remove the scroll too; that is a content choice left to the author.
+2. **[Card-Header-Code] `.dh-head p code { font-size: .896em }` added to the card.** The base `code` rule converts to `.936em` of an 11px parent, but the header paragraph is 11.5px, so without this rule the header's inline code would grow from 10.3px to 10.8px. With it, the conversion is exact.
+3. **Dead rules dropped**: `.ln` (used only by the mockups' in-browser colorer), `.t-atom` and `--dh-atom` (the plan drops `t-atom`), and the card's duplicate `.tpl { margin-bottom }`.
+4. **What "sizes in em" covers.** Font sizes, padding, margins, gaps, offsets, widths, the gradient stripes in optional rows, and the container breakpoints are in `em`. Border widths, radii and the brace's stroke stay in `px`, so hairlines stay crisp when a host scales `--dh-size`. A container breakpoint in `em` is evaluated against the section's own font size, so the layout collapses in proportion when `--dh-size` changes. Rule 5 in the module docstring says this.
+5. **A `pre`'s `data-load` value drops the newline after `<pre>` and the one before `</pre>`.** HTML drops the first anyway, and the second would leave a blank last line in the editor.
+6. **`decl-testers.agg` is not extended**, although the project's `execute-plan` skill asks for every DecL program used in a pytest case to be mirrored there. The help sources are themselves the corpus, and the test reads them directly; a mirror would be the second copy this plan exists to avoid.
+7. **Docs: an `automodule` entry for `aggregate.decl_help`** in `docs/3_reference/3_x_Parser.rst`, beside `decl_pygments`. It is not in the plan's file list; without it the new module would be the only DecL module missing from the reference chapter. Docs are pending a rebuild.
+8. **The plan stays in `dev/`.** The project's `version-bump` skill moves a finished plan at the bump; this plan and the house rule say it moves when the author says it is done.
+
+### Measurements
+
+* `tests/test_decl_help.py`: 141 cases, about 4 s. The seven programs build (three in the anatomy, four on the card), and all 126 code snippets lex with no `Token.Error`. The tests also check that the rendered code, with its spans removed, is the source text exactly.
+* The rendered fragments were compared with the mockups in headless Edge, measuring every heading, table, row, cell, box, list item and `pre`. That covers 73 elements in the anatomy (at 1,100px and at 700px, where the container query collapses it to one column) and 178 on the card (at 1,056px and 800px). All agree within 0.4px, apart from divergence 1, which is intended.
+* The card at 1,056px is 812.8px tall, against a page height of 816px. That leaves **3px of headroom**: one more row on the card spills onto a second page.
+* The card was printed from headless Edge into an 11in sheet under `@page { size: letter landscape; margin: 0 }`. With and without `in-lab`, the result is one page of 792 by 612pt, with the box fills and token colors intact.
+* `uv build --wheel` lists `aggregate/data/decl-help/anatomy.html` and `card.html`.
+* Rendering both forms takes 6ms, once per process.
+
+### Left for the author
+
+* JupyterLab acceptance (render, hover linking, two fragments at their own sizes, `--dh-size` on one) and the api's contract run against this worktree. Neither was run here.
+* **A ripple for the api.** Every fragment rule now carries `.decl-help.dh-{form}`, so each rule outranks the unscoped mockup rule it replaces by one class, and the `in-lab` rules are (0,4,0). A host rule meant to override the fragment must outrank that. The mockups' print CSS, `body .decl-help.in-lab .dh-lab { display: none }`, is (0,3,1) and would no longer hide the Lab notes in print. The api plan's print path overrides no fragment rule, so nothing in it breaks.

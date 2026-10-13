@@ -1,0 +1,235 @@
+<section class="decl-help dh-anatomy" data-decl-version="">
+<style>
+/* DecL at a glance. Every rule is scoped to .decl-help.dh-anatomy, sizes are in em off
+   --dh-size, and colors come from the --dh-* properties. The source rules are in the
+   docstring of aggregate/decl_help.py; tests/test_decl_help.py enforces them. */
+.decl-help.dh-anatomy {
+    --dh-ink: #000; --dh-ink-2: #2b2b2b; --dh-mut: #5f5f5f; --dh-line: #d4d4d4; --dh-line-2: #ebebeb;
+    --dh-soft: #f6f6f6; --dh-accent: #a81313; --dh-hl: #fbeaea;
+    --dh-kw: #1f4e8a; --dh-num: #b87333; --dh-str: #2e7d32; --dh-com: #8a8f99;
+    --dh-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --dh-mono: "Cascadia Mono", SFMono-Regular, Consolas, Menlo, monospace;
+    container-type: inline-size;
+    font: var(--dh-size, 13.5px)/1.45 var(--dh-ui); color: var(--dh-ink-2); background: #fff; text-align: left;
+}
+.decl-help.dh-anatomy * { box-sizing: border-box; }
+.decl-help.dh-anatomy h2, .decl-help.dh-anatomy h3, .decl-help.dh-anatomy p { margin: 0; }
+.decl-help.dh-anatomy a { color: var(--dh-accent); }
+.decl-help.dh-anatomy code { font-family: var(--dh-mono); font-size: .9em; color: var(--dh-ink); white-space: nowrap; }
+.decl-help.dh-anatomy pre.dh-code { position: relative; font: .889em/1.5 var(--dh-mono); color: var(--dh-ink);
+    background: var(--dh-soft); border: 1px solid var(--dh-line-2); border-radius: 6px;
+    padding: .5em .833em; margin: 0; white-space: pre; overflow-x: auto; }
+.decl-help.dh-anatomy .t-kw { color: var(--dh-kw); font-weight: 600; }
+.decl-help.dh-anatomy .t-num { color: var(--dh-num); }
+.decl-help.dh-anatomy .t-str { color: var(--dh-str); }
+.decl-help.dh-anatomy .t-com { color: var(--dh-com); font-style: italic; }
+.decl-help.dh-anatomy .dh-lab { display: none; }
+.decl-help.dh-anatomy.in-lab .dh-lab { display: revert; }
+.decl-help.dh-anatomy.in-lab .dh-py { display: none; }
+
+.decl-help.dh-anatomy { border: 1px solid var(--dh-line); border-radius: 8px; overflow: hidden; }
+.decl-help.dh-anatomy .dh-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: .148em 1.037em;
+    padding: .741em 3.259em .741em 1.333em; border-bottom: 1px solid var(--dh-line); background: #f7f4f4; }
+.decl-help.dh-anatomy .dh-head h2 { font-size: 1.244em; font-weight: 700; color: var(--dh-ink); }
+.decl-help.dh-anatomy .dh-head p { font-size: .972em; color: var(--dh-mut); }
+.decl-help.dh-anatomy h3 { font-size: .782em; letter-spacing: .08em; text-transform: uppercase; color: var(--dh-mut);
+    font-weight: 700; margin: 0 0 .568em; }
+.decl-help.dh-anatomy .dh-top { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); }
+.decl-help.dh-anatomy .dh-anat { padding: .889em 1.333em 1.037em; border-right: 1px solid var(--dh-line-2); min-width: 0; }
+.decl-help.dh-anatomy .dh-parts { padding: .889em 1.333em 1.037em; min-width: 0; display: grid; gap: .889em; align-content: start; }
+
+/* the anatomy: code | slot | gloss */
+.decl-help.dh-anatomy .dh-anat-w { position: relative; }
+.decl-help.dh-anatomy table { border-collapse: collapse; width: 100%; }
+.decl-help.dh-anatomy .dh-anat-t { border: 1px solid var(--dh-line-2); }
+.decl-help.dh-anatomy .dh-anat-t td { padding: .156em .781em; border-top: 1px solid var(--dh-line-2); vertical-align: baseline;
+    font-size: .948em; }
+.decl-help.dh-anatomy .dh-anat-t tr:first-child td { border-top: 0; }
+.decl-help.dh-anatomy .dh-anat-t td.c { background: var(--dh-soft); width: 1%; padding-right: 1.406em; }
+.decl-help.dh-anatomy .dh-anat-t td.c code { font-size: .977em; line-height: 1.75; white-space: pre; }
+.decl-help.dh-anatomy .dh-anat-t td.s { font-weight: 700; color: var(--dh-ink); white-space: nowrap; width: 1%; }
+.decl-help.dh-anatomy .dh-anat-t tr.opt td.s { font-weight: 600; color: var(--dh-mut); }
+.decl-help.dh-anatomy .dh-anat-t tr.opt td.c { background: repeating-linear-gradient(135deg, #f6f6f6 0 .469em, #f1f1f1 .469em .938em); }
+.decl-help.dh-anatomy .dh-anat-t td.g b { color: var(--dh-ink); font-weight: 600; }
+/* Exposure is one slot with two parts, volume and an optional coverage: a
+   right brace gathers the two code rows and points at the slot name. */
+.decl-help.dh-anatomy .dh-anat-t td.s.grp { position: relative; vertical-align: middle; padding-left: 1.875em; }
+.decl-help.dh-anatomy .dh-anat-t .brace { position: absolute; left: .469em; top: .391em; width: .859em; height: calc(100% - .781em); }
+.decl-help.dh-anatomy .dh-anat-t .brace path { fill: none; stroke: var(--dh-ink); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
+
+/* the two wrappers; min-width 0 lets a long program line scroll inside its pre
+   rather than widen the column past the section's clipped edge */
+.decl-help.dh-anatomy .dh-part { min-width: 0; }
+.decl-help.dh-anatomy .dh-part p { font-size: .948em; margin-top: .391em; }
+.decl-help.dh-anatomy .dh-part .dh-kind { font-size: 1.019em; font-weight: 700; color: var(--dh-ink); margin-bottom: .291em; }
+.decl-help.dh-anatomy .dh-part .dh-kind span { font-weight: 400; color: var(--dh-mut); font-size: .93em; }
+.decl-help.dh-anatomy .dh-eq { display: flex; flex-wrap: wrap; align-items: center; gap: .313em .469em; font-size: .948em; margin: .156em 0 .469em; }
+.decl-help.dh-anatomy .dh-eq .box { border: 1px solid var(--dh-line); border-radius: 4px; padding: 0 .469em; background: #fff; }
+.decl-help.dh-anatomy .dh-eq .op { color: var(--dh-mut); font-family: var(--dh-mono); font-size: .975em; }
+
+/* the alternative forms */
+.decl-help.dh-anatomy .dh-forms { padding: .741em 1.333em .889em; border-top: 1px solid var(--dh-line-2); }
+.decl-help.dh-anatomy .dh-forms-t { table-layout: fixed; }
+.decl-help.dh-anatomy .dh-forms-t col.vol, .decl-help.dh-anatomy .dh-forms-t col.cov { width: 17%; }
+.decl-help.dh-anatomy .dh-forms-t col.sev { width: 22%; }
+.decl-help.dh-anatomy .dh-forms-t col.frq { width: 14%; }
+.decl-help.dh-anatomy .dh-forms-t col.rei { width: 30%; }
+.decl-help.dh-anatomy .dh-forms-t th { font-size: .877em; text-align: left; color: var(--dh-ink); padding: .253em .676em;
+    border-bottom: 1.5px solid var(--dh-ink); vertical-align: bottom; }
+.decl-help.dh-anatomy .dh-forms-t th.grp { border-bottom: 1px solid var(--dh-ink); text-align: center; padding-bottom: .084em; }
+.decl-help.dh-anatomy .dh-forms-t th.sub { font-weight: 600; font-size: .83em; color: var(--dh-mut); padding: .268em .714em; }
+.decl-help.dh-anatomy .dh-forms-t td { padding: .253em .676em; vertical-align: top; font-size: .877em; color: var(--dh-mut); line-height: 1.3; }
+.decl-help.dh-anatomy .dh-forms-t td .it { padding: .084em 0; }
+.decl-help.dh-anatomy .dh-forms-t td code { font-size: 1.014em; margin-right: .2em; white-space: normal; }
+.decl-help.dh-anatomy .dh-forms-t td .g { color: #8a8a8a; font-size: .946em; }
+.decl-help.dh-anatomy .dh-forms-t tr.div td { padding: .391em .781em 0; border-top: 1px solid var(--dh-line); font-size: .759em;
+    letter-spacing: .08em; text-transform: uppercase; color: #999; }
+.decl-help.dh-anatomy .dh-foot { padding: .641em 1.442em .801em; border-top: 1px solid var(--dh-line-2); font-size: .924em; background: #fbfbfb; }
+.decl-help.dh-anatomy .dh-foot code { background: #efefef; border-radius: 3px; padding: 0 .356em; }
+.decl-help.dh-anatomy .dh-foot .sep { color: #bbb; margin: 0 .35em; }
+
+/* Hover any slot, in the anatomy or the table, and both light up. Pure
+   CSS, so it works wherever the fragment lands. Slots are space-separated
+   tokens, so the Exposure header answers to volume and coverage both. */
+.decl-help.dh-anatomy:has([data-slot~=volume]:hover)      [data-slot~=volume],
+.decl-help.dh-anatomy:has([data-slot~=coverage]:hover)    [data-slot~=coverage],
+.decl-help.dh-anatomy:has([data-slot~=severity]:hover)    [data-slot~=severity],
+.decl-help.dh-anatomy:has([data-slot~=frequency]:hover)   [data-slot~=frequency],
+.decl-help.dh-anatomy:has([data-slot~=reinsurance]:hover) [data-slot~=reinsurance] { background: var(--dh-hl); }
+.decl-help.dh-anatomy:has([data-slot~=volume]:hover)      tr[data-slot~=volume] td,
+.decl-help.dh-anatomy:has([data-slot~=coverage]:hover)    tr[data-slot~=coverage] td,
+.decl-help.dh-anatomy:has([data-slot~=severity]:hover)    tr[data-slot~=severity] td,
+.decl-help.dh-anatomy:has([data-slot~=frequency]:hover)   tr[data-slot~=frequency] td,
+.decl-help.dh-anatomy:has([data-slot~=reinsurance]:hover) tr[data-slot~=reinsurance] td { background: var(--dh-hl); }
+
+@container (max-width: 60.741em) {
+    .decl-help.dh-anatomy .dh-top { grid-template-columns: 1fr; }
+    .decl-help.dh-anatomy .dh-anat { border-right: 0; border-bottom: 1px solid var(--dh-line-2); }
+    .decl-help.dh-anatomy .dh-forms { overflow-x: auto; }
+    .decl-help.dh-anatomy .dh-forms-t { min-width: 59.259em; }
+}
+</style>
+
+<header class="dh-head">
+  <h2>DecL at a glance</h2>
+  <p>Common DecL clauses.
+    <span class="dh-py">In Python: <code>build('agg Book ...')</code> or an <code>%%agg</code> cell.</span></p>
+</header>
+
+<div class="dh-top">
+  <div class="dh-anat">
+    <h3>Anatomy of an aggregate</h3>
+    <div class="dh-anat-w" data-load>
+    <table class="dh-anat-t">
+      <tr><td class="c"><code class="dh dh-l">agg Book</code></td><td class="s">label</td><td class="g">keyword, then a label you choose</td></tr>
+      <tr data-slot="volume"><td class="c"><code class="dh dh-l">  250 claims</code></td>
+        <td class="s grp" rowspan="2"><svg class="brace" viewBox="0 0 12 100" preserveAspectRatio="none" aria-hidden="true"><path d="M1 1 C7 1 6 6 6 14 L6 40 C6 47 8 50 11 50 C8 50 6 53 6 60 L6 86 C6 94 7 99 1 99"/></svg>exposure</td>
+        <td class="g"><b>volume</b>: amount of business</td></tr>
+      <tr data-slot="coverage" class="opt"><td class="c"><code class="dh dh-l">  1000 xs 0</code></td><td class="g">optional <b>coverage</b>: limit xs deductible</td></tr>
+      <tr data-slot="severity"><td class="c"><code class="dh dh-l">  sev lognorm 100 cv 1.5</code></td><td class="s">severity</td><td class="g">severity curve: family, mean, cv</td></tr>
+      <tr data-slot="reinsurance" class="opt"><td class="c"><code class="dh dh-l">  occurrence net of 250 xs 750</code></td><td class="s">occurrence reinsurance</td><td class="g">optional, before frequency</td></tr>
+      <tr data-slot="frequency"><td class="c"><code class="dh dh-l">  poisson</code></td><td class="s">frequency</td><td class="g">claim count distribution</td></tr>
+      <tr data-slot="reinsurance" class="opt"><td class="c"><code class="dh dh-l">  aggregate net of 5000 xs 30000</code></td><td class="s">aggregate reinsurance</td><td class="g">optional, after frequency</td></tr>
+      <tr class="opt"><td class="c"><code class="dh dh-l">  note{main book}</code></td><td class="s">trailer</td><td class="g">optional note</td></tr>
+      <tr class="opt"><td class="c"><code class="dh dh-l">  hints{bs=1;log2=16;}</code></td><td class="s">trailer</td><td class="g">optional update hints</td></tr>
+    </table>
+    </div>
+  </div>
+
+  <div class="dh-parts">
+    <div class="dh-part">
+      <div class="dh-kind">Portfolio <span>several aggregates, one total</span></div>
+      <pre class="dh-code" data-load>
+port Two.Books
+  agg Book 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson
+  agg Casualty 20 claims 2000 xs 0 sev lognorm 250 cv 2 mixed gamma 0.4
+</pre>
+      <p>Units are independent and share one grid; each may carry its own reinsurance. A unit can come from
+        the library, <code class="dh">agg.BasicBook</code>. Pricing allocates the total to the units.</p>
+    </div>
+    <div class="dh-part">
+      <div class="dh-kind">Profit and loss <span>premium, less losses, less expenses</span></div>
+      <div class="dh-eq"><span class="box"><code class="dh">38000 premium</code></span><span class="op">less</span>
+        <span class="box"><code class="dh">agg Book ...</code></span><span class="op">less</span>
+        <span class="box"><code class="dh">25% premium expense</code></span><span class="op">=</span><b>margin</b></div>
+      <pre class="dh-code" data-load>
+xpnl Book.PnL
+  38000 premium    # or inherit premium or derive premium
+  less
+    agg Book 250 claims 1000 xs 0 sev lognorm 100 cv 1.5
+      occurrence net of 250 xs 250 deposit 3400
+                    and 500 xs 500 deposit 1600
+      poisson
+  less 25% premium expense as "G&amp;A"
+       1000 fixed expense as "Overhead"
+  peel top-down    # or bottom-up
+</pre>
+    </div>
+  </div>
+</div>
+
+<div class="dh-forms">
+  <h3>Alternative forms</h3>
+  <table class="dh-forms-t">
+    <colgroup><col class="vol"><col class="cov"><col class="sev"><col class="frq"><col class="rei"></colgroup>
+    <thead>
+      <tr><th colspan="2" class="grp" data-slot="volume coverage">Exposure</th>
+        <th rowspan="2" data-slot="severity">Severity</th><th rowspan="2" data-slot="frequency">Frequency</th>
+        <th rowspan="2" data-slot="reinsurance">Reinsurance</th></tr>
+      <tr><th class="sub" data-slot="volume">volume</th><th class="sub" data-slot="coverage">coverage (optional)</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td data-slot="volume">
+          <div class="it"><code class="dh">250 claims</code> <span class="g">expected count</span></div>
+          <div class="it"><code class="dh">25000 loss</code> <span class="g">expected loss</span></div>
+          <div class="it"><code class="dh">40000 premium at 65% lr</code></div>
+          <div class="it"><code class="dh">1000 exposure at 25 rate</code> <span class="g">units × rate</span></div></td>
+        <td data-slot="coverage">
+          <div class="it"><code class="dh">1000 xs 0</code> <span class="g">limit xs deductible</span></div>
+          <div class="it">omit for unlimited</div>
+          <div class="it"><code class="dh">[500 1000] xs [0 0]</code> <span class="g">a mix</span></div></td>
+        <td data-slot="severity">
+          <div class="it"><code class="dh">sev lognorm 100 cv 1.5</code> <span class="g">mean, cv</span></div>
+          <div class="it"><code class="dh">sev gamma 100 cv 1</code> <span class="g">any scipy.stats</span></div>
+          <div class="it"><code class="dh">sev 50 * invgamma 2.5</code> <span class="g">scale, shape</span></div>
+          <div class="it"><code class="dh">sev ... !</code> <span class="g">unconditional</span></div></td>
+        <td data-slot="frequency">
+          <div class="it"><code class="dh">poisson</code></div>
+          <div class="it"><code class="dh">mixed gamma 0.3</code> <span class="g">mixing cv 0.3</span></div>
+          <div class="it"><code class="dh">fixed</code> <span class="g">exactly the count</span></div></td>
+        <td data-slot="reinsurance">
+          <div class="it"><code class="dh">occurrence net of 75% po 600 xs 400</code> <span class="g">partial placement</span></div>
+          <div class="it"><code class="dh">aggregate ceded to 250 xs 250 and 500 xs 500</code> <span class="g">limit xs attachment, lowest first</span></div>
+          <div class="it"><code class="dh">aggregate net of 66% po inf xs 0 rate 100% cede 30%</code> <span class="g">66% quota share w 30% ceding commission</span></div></td>
+      </tr>
+      <tr class="div"><td colspan="5">less common</td></tr>
+      <tr>
+        <td data-slot="volume">
+          <div class="it"><code class="dh">[100 200 50] claims</code> <span class="g">vectorized exposure</span></div>
+          <div class="it"><code class="dh">dfreq [1 2 3] [.5 .3 .2]</code> <span class="g">listed counts and probabilities (optional, default equally likely)</span></div></td>
+        <td data-slot="coverage">
+          <div class="it"><code class="dh">4000 xs 1000</code> <span class="g">an excess layer</span></div></td>
+        <td data-slot="severity">
+          <div class="it"><code class="dh">dsev [1 2 10] [.4 .4 .2]</code> <span class="g">listed</span></div>
+          <div class="it"><code class="dh">sev 40 * expon + 10</code> <span class="g">scale and shift</span></div>
+          <div class="it"><code class="dh">picks [250 1000] [20000 4500]</code> <span class="g">adjust expected loss by layer</span></div></td>
+        <td data-slot="frequency">
+          <div class="it"><code class="dh">negbin 2</code> <span class="g">variance multiple</span></div>
+          <div class="it"><code class="dh">binomial 0.5</code></div></td>
+        <td data-slot="reinsurance">
+          <div class="it"><code class="dh">50% po 500 xs 500</code> <span class="g">partial placement</span></div>
+          <div class="it"><code class="dh">tower [0 250 500 1000]</code> <span class="g">program breakpoints</span></div>
+          <div class="it"><code class="dh">rol 5%</code> <code class="dh">deposit 600</code> <code class="dh">reinstatements 1 at 100%</code></div></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<footer class="dh-foot">
+  Separate statements with a blank line or <code>;</code> at the end of a line<span class="sep">·</span><code class="dh"># comment</code><span class="sep">·</span>
+  labels start with a letter, dots group them<span class="sep">·</span><code class="dh">10_000</code> <code class="dh">65%</code>, arithmetic within
+  parentheses <code class="dh">(3 * exp(4) / 2)</code><span class="sep">·</span><code class="dh">agg.BasicBook</code> reuses the library<span class="dh-lab"> (Ctrl+K searches it)</span><span class="sep">·</span>see
+  also <code class="dh">distortion</code> <code class="dh">bivariate</code> <code class="dh">grossnet</code> <code class="dh">nttagg</code><span class="sep">·</span><a href="https://aggregate.readthedocs.io/en/latest/4_dec_Language_Reference.html" target="_blank" rel="noopener">full reference</a>
+</footer>
+</section>

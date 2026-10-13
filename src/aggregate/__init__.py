@@ -38,6 +38,7 @@ from .config        import *  # noqa: F401,F403
 from .constants     import *  # noqa: F401,F403
 from .random_agg    import *  # noqa: F401,F403
 from .decl_pygments import *  # noqa: F401,F403
+from .decl_help     import *  # noqa: F401,F403
 # tweedie depends on Aggregate / build / qd already being bound on the
 # package, so import last.
 from .tweedie       import *  # noqa: F401,F403

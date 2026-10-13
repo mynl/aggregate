@@ -14,6 +14,19 @@ This section describes how a DecL program is pre-processed, lexed, and parsed ac
 
 The :doc:`Aggregate Overview <2_Aggregate_Overview>` describes DecL's design and purpose.
 
+Help in Jupyter and the Loss Lab
+================================
+
+One page of DecL help ships with the library, in two forms. ``decl_help()`` returns the anatomy, "DecL at a glance": one ``agg`` statement taken apart slot by slot, a portfolio and a profit and loss built on it, and the alternative forms each slot accepts. ``decl_help('card')`` returns the card, "DecL on one page": a ten-box reference card that prints to one Letter landscape page. Both display in a Jupyter cell, and the aggregate Loss Lab opens them from the ``?`` in its program box and from its menu.
+
+.. code-block:: python
+
+    from aggregate import decl_help
+    decl_help()          # the anatomy
+    decl_help('card')    # the card
+
+The return is a ``str`` holding an HTML fragment with its own scoped styles and no script, so a web page can serve it as is; ``DECL_HELP_FORMS`` lists the forms. The test suite builds every program in both pages, so the help follows the grammar.
+
 Pre-Processing
 ==============
 

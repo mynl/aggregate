@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.0a15 - 2026-10-13
+
+**[DecL-Help-Pages] `decl_help()` returns one page of DecL help as HTML**, for Jupyter and for the aggregate Loss Lab to serve at `GET /v1/decl/help`. `decl_help()` is the anatomy (one `agg` statement taken apart slot by slot, a portfolio and a P&L built on it, and the alternative forms for each slot); `decl_help('card')` is a ten-box reference card that prints to one Letter landscape page. The return is a `str` (`DeclHelp`) with `_repr_html_`; the forms are listed in `DECL_HELP_FORMS`; the sources are package data in `data/decl-help/`. Every program in both pages builds, and every snippet lexes clean, under `tests/test_decl_help.py`. Plan `dev/plan-1.2.0a15-decl-help.md`.
+
 ## 1.2.0a14 - 2026-10-12
 
 **[Moment-Deficit-Genuine-Only] `est_skew`, `est_cv` and the empirical rows

@@ -1,0 +1,229 @@
+<section class="decl-help dh-card" data-decl-version="">
+<style>
+/* DecL on one page. Every rule is scoped to .decl-help.dh-card, sizes are in em off
+   --dh-size, and colors come from the --dh-* properties. At the default size the card
+   fills one Letter landscape page (1056 by 816 CSS px). The source rules are in the
+   docstring of aggregate/decl_help.py; tests/test_decl_help.py enforces them. */
+.decl-help.dh-card {
+    --dh-ink: #000; --dh-ink-2: #2b2b2b; --dh-mut: #5f5f5f; --dh-line: #d4d4d4; --dh-line-2: #ebebeb;
+    --dh-soft: #f6f6f6; --dh-accent: #a81313;
+    --dh-kw: #1f4e8a; --dh-num: #b87333; --dh-str: #2e7d32; --dh-com: #8a8f99;
+    --dh-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --dh-mono: "Cascadia Mono", SFMono-Regular, Consolas, Menlo, monospace;
+    container-type: inline-size;
+    font: var(--dh-size, 11px)/1.4 var(--dh-ui); color: var(--dh-ink-2); background: #fff; text-align: left;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+}
+.decl-help.dh-card * { box-sizing: border-box; }
+.decl-help.dh-card h2, .decl-help.dh-card h3, .decl-help.dh-card p, .decl-help.dh-card ul { margin: 0; }
+.decl-help.dh-card a { color: var(--dh-accent); }
+.decl-help.dh-card code { font-family: var(--dh-mono); font-size: .936em; color: var(--dh-ink); white-space: nowrap; }
+.decl-help.dh-card pre.dh-code { position: relative; font: .936em/1.42 var(--dh-mono); color: var(--dh-ink);
+    margin: .291em 0 .583em; white-space: pre; overflow-x: auto; }
+.decl-help.dh-card .t-kw { color: var(--dh-kw); font-weight: 600; }
+.decl-help.dh-card .t-num { color: var(--dh-num); }
+.decl-help.dh-card .t-str { color: var(--dh-str); }
+.decl-help.dh-card .t-com { color: var(--dh-com); font-style: italic; }
+.decl-help.dh-card .dh-lab { display: none; }
+.decl-help.dh-card.in-lab .dh-lab { display: revert; }
+.decl-help.dh-card.in-lab .dh-py { display: none; }
+
+/* One color per object, from the logo palette the PDF cheat sheets use. */
+.decl-help.dh-card { --c-agg: #73171F; --c-re: #355078; --c-port: #168C6B; --c-pnl: #7A2D5E; --c-rule: #263940; --c-more: #CB7C13;
+    max-width: 96em; padding: 2em 2.545em 1.818em; }
+.decl-help.dh-card .dh-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 1.818em;
+    border-bottom: 2px solid var(--c-agg); padding-bottom: .545em; margin-bottom: 1.455em; }
+.decl-help.dh-card .dh-head h2 { font-size: 2em; font-weight: 800; color: var(--c-agg); letter-spacing: -.01em; line-height: 1.1; }
+.decl-help.dh-card .dh-head p { font-size: 1.045em; margin-top: .174em; }
+.decl-help.dh-card .dh-head p code { font-size: .896em; }
+.decl-help.dh-card .dh-meta { font: .909em/1.4 var(--dh-mono); color: var(--dh-mut); text-align: right; white-space: nowrap; }
+.decl-help.dh-card .dh-cols { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 1.455em; }
+.decl-help.dh-card .dh-col { display: grid; gap: 1.455em; align-content: start; min-width: 0; }
+.decl-help.dh-card .dh-box { position: relative; border: 1.5px solid var(--c); border-radius: 3px; padding: 1.182em .818em .636em;
+    background: color-mix(in srgb, var(--c) 4%, #fff); min-width: 0; }
+.decl-help.dh-card .dh-box h3 { position: absolute; top: -.857em; left: .762em; background: var(--c); color: #fff; font-size: .955em;
+    font-weight: 700; padding: .095em .667em; border-radius: 2px; line-height: 1.45; }
+.decl-help.dh-card .dh-box pre.dh-code { background: #fff; border: 1px solid color-mix(in srgb, var(--c) 25%, #fff);
+    border-radius: 2px; padding: .388em .68em; }
+.decl-help.dh-card .tpl { font: .936em/1.5 var(--dh-mono); color: var(--dh-ink); margin-bottom: .194em; }
+.decl-help.dh-card .tpl i { font-style: normal; font-family: var(--dh-ui); font-size: .874em; font-weight: 700;
+    letter-spacing: .05em; color: var(--c); }
+.decl-help.dh-card table { border-collapse: collapse; width: 100%; }
+.decl-help.dh-card td { padding: .136em 0; vertical-align: baseline; }
+.decl-help.dh-card td:first-child { padding-right: .818em; white-space: nowrap; width: 1%; }
+.decl-help.dh-card td + td, .decl-help.dh-card .g { color: var(--dh-mut); }
+.decl-help.dh-card tr.sub td { font-size: .818em; font-weight: 700; letter-spacing: .07em; text-transform: uppercase;
+    color: var(--c); padding: .444em 0 .111em; }
+.decl-help.dh-card tr.sub:first-child td { padding-top: 0; }
+.decl-help.dh-card .tpl .opt { opacity: .6; }
+.decl-help.dh-card td code + code { margin-left: .5em; }
+.decl-help.dh-card .note { margin-top: .364em; }
+.decl-help.dh-card ul { padding-left: 1.05em; }
+.decl-help.dh-card li { margin: .136em 0; }
+.decl-help.dh-card li code { margin-right: .3em; }
+@container (max-width: 80em) { .decl-help.dh-card .dh-cols { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container (max-width: 52.727em) { .decl-help.dh-card .dh-cols { grid-template-columns: minmax(0, 1fr); } }
+</style>
+
+<header class="dh-head">
+  <div>
+    <h2>DecL on one page</h2>
+    <p class="dh-py">In Python: <code>build('...')</code> or an <code>%%agg</code> cell.</p>
+  </div>
+  <div class="dh-meta">aggregate {{version}}<br>aggregate.readthedocs.io</div>
+</header>
+
+<div class="dh-cols">
+
+  <div class="dh-col">
+    <div class="dh-box" style="--c: var(--c-agg)"><h3>1 · An aggregate</h3>
+      <div class="tpl">agg <i>LABEL VOLUME</i> <i class="opt">COVERAGE</i> <i>SEVERITY FREQUENCY</i></div>
+      <pre class="dh-code">
+agg Book                  # label
+  250 claims              # volume
+  1000 xs 0               # coverage
+  sev lognorm 100 cv 1.5  # severity
+  poisson                 # frequency
+</pre>
+      <p>Clauses in this order, coverage optional.</p>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-agg)"><h3>2 · Exposure</h3>
+      <table>
+        <tr class="sub"><td colspan="2">volume</td></tr>
+        <tr><td><code class="dh">250 claims</code></td><td>expected claim count</td></tr>
+        <tr><td><code class="dh">25000 loss</code></td><td>expected loss</td></tr>
+        <tr><td><code class="dh">40000 premium at 65% lr</code></td><td>premium times loss ratio</td></tr>
+        <tr><td><code class="dh">1000 exposure at 25 rate</code></td><td>units × rate</td></tr>
+        <tr><td><code class="dh">dfreq [1 2 3] [.5 .3 .2]</code></td><td>listed counts and probabilities</td></tr>
+        <tr class="sub"><td colspan="2">coverage (optional)</td></tr>
+        <tr><td><code class="dh">1000 xs 0</code></td><td>limit xs deductible, per claim</td></tr>
+        <tr><td><i>omit</i></td><td>for unlimited, from the ground up</td></tr>
+        <tr><td><code class="dh">[500 1000] xs [0 0]</code></td><td>lists build a mixed book</td></tr>
+      </table>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-agg)"><h3>3 · Severity</h3>
+      <table>
+        <tr><td><code class="dh">sev lognorm 100 cv 1.5</code></td><td>family, mean, cv</td></tr>
+        <tr><td><code class="dh">sev 50 * lognorm 1.2</code></td><td>scale times shape</td></tr>
+        <tr><td><code class="dh">sev 40 * lomax 2.5 + 40</code></td><td>shifted</td></tr>
+        <tr><td colspan="2"><code class="dh">sev lognorm [80 400] cv [1 2] wts [.7 .3]</code> <span class="g">a mixture</span></td></tr>
+        <tr><td><code class="dh">dsev [1 2 10] [.4 .4 .2]</code></td><td>listed outcomes</td></tr>
+        <tr><td><code class="dh">picks [250 1000] [20000 4500]</code></td><td>adjust expected loss by layer</td></tr>
+      </table>
+      <p class="note g">Common families: lognorm, gamma, pareto, expon, lomax, or any scipy.stats continuous family.</p>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-agg)"><h3>4 · Frequency</h3>
+      <table>
+        <tr><td><code class="dh">poisson</code></td><td>the textbook choice</td></tr>
+        <tr><td><code class="dh">mixed gamma 0.3</code></td><td>gamma mixing, cv 0.3</td></tr>
+        <tr><td><code class="dh">negbin 2</code></td><td>variance twice the mean</td></tr>
+        <tr><td><code class="dh">fixed</code></td><td>exactly the expected count</td></tr>
+        <tr><td><code class="dh">binomial 0.5</code></td><td>success probability 0.5</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="dh-col">
+    <div class="dh-box" style="--c: var(--c-re)"><h3>5 · Reinsurance</h3>
+      <pre class="dh-code">
+agg Book.Net 250 claims 1000 xs 0
+  sev lognorm 100 cv 1.5
+  occurrence net of 250 xs 750
+  poisson
+  aggregate net of 5000 xs 30000
+</pre>
+      <table>
+        <tr><td><code class="dh">occurrence</code></td><td>each claim, before frequency</td></tr>
+        <tr><td><code class="dh">aggregate</code></td><td>after frequency</td></tr>
+        <tr><td><code class="dh">net of</code>, <code class="dh">ceded to</code></td><td>view output</td></tr>
+        <tr><td><code class="dh">250 xs 250 and 500 xs 500</code></td><td>limit xs attachment, lowest first</td></tr>
+        <tr><td><code class="dh">50% po 500 xs 500</code></td><td>partial placement</td></tr>
+        <tr><td><code class="dh">tower [0 250 500 1000]</code></td><td>program breakpoints</td></tr>
+        <tr><td><code class="dh">as "Cat XL"</code></td><td>label a layer</td></tr>
+      </table>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-re)"><h3>6 · Reinsurance terms</h3>
+      <table>
+        <tr><td><code class="dh">rol 5%</code></td><td>rate on line</td></tr>
+        <tr><td><code class="dh">deposit 600</code></td><td>premium as an amount</td></tr>
+        <tr><td><code class="dh">rate 100%</code></td><td>share of subject premium</td></tr>
+        <tr><td><code class="dh">cede 30%</code></td><td>ceding commission</td></tr>
+        <tr><td><code class="dh">reinstatements 1 at 100%</code></td><td>or <code class="dh">no reinstatements</code></td></tr>
+        <tr><td><code class="dh">swing</code><code class="dh">slide</code><code class="dh">pc</code><code class="dh">corridor</code></td><td>variable terms, aggregate covers</td></tr>
+      </table>
+      <p class="note">Terms follow a layer's limit and flow into a P&amp;L, as in
+        <code class="dh">500 xs 500 rol 5% cede 30%</code>.</p>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-port)"><h3>7 · A portfolio</h3>
+      <pre class="dh-code">
+port Two.Books
+  agg Book 250 claims 1000 xs 0
+    sev lognorm 100 cv 1.5 poisson
+  agg Casualty 20 claims 2000 xs 0
+    sev lognorm 250 cv 2 mixed gamma 0.4
+</pre>
+      <p>Units are independent, share one grid, and sum to the total. A unit is any <code class="dh">agg</code>,
+        with its own reinsurance, or a stored one such as <code class="dh">agg.BasicBook</code>. Pricing allocates by unit.</p>
+    </div>
+  </div>
+
+  <div class="dh-col">
+    <div class="dh-box" style="--c: var(--c-pnl)"><h3>8 · A profit and loss</h3>
+      <div class="tpl">xpnl <i>LABEL PREMIUM</i> less <i>ENGINE</i> less <i>EXPENSES</i></div>
+      <pre class="dh-code">
+xpnl Book.PnL
+  38000 premium  # or inherit or derive
+  less agg Book 250 claims 1000 xs 0
+    sev lognorm 100 cv 1.5
+    occurrence net of 250 xs 250 deposit 3400
+      and 500 xs 500 deposit 1600
+    poisson
+  less 25% premium expense as "G&amp;A"
+    1000 fixed expense as "Overhead"
+  peel top-down  # or bottom-up
+</pre>
+      <table>
+        <tr><td><code class="dh">38000 premium</code></td><td>the premium booked</td></tr>
+        <tr><td><code class="dh">inherit premium</code></td><td>the engine's own premium</td></tr>
+        <tr><td><code class="dh">derive premium</code></td><td>grossed up for expenses</td></tr>
+        <tr><td><code class="dh">agg.Label</code></td><td>a stored engine</td></tr>
+        <tr><td><code class="dh">port.Label</code></td><td>a stored portfolio, with <code class="dh">pnl</code> only</td></tr>
+        <tr><td><code class="dh">5% loss expense</code></td><td>other bases</td></tr>
+        <tr><td><code class="dh">500 fixed expense</code></td><td>optionally joined with <code class="dh">and</code></td></tr>
+        <tr><td><code class="dh">peel top-down</code></td><td>one block per layer (or bottom-up)</td></tr>
+        <tr><td><code class="dh">pnl</code></td><td>same syntax, one consolidated block</td></tr>
+      </table>
+      <p class="note dh-lab">The PnL button wraps last object built.</p>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-rule)"><h3>9 · Writing rules</h3>
+      <ul>
+        <li>A blank line, or <code>;</code> at the end of a line, separates statements.</li>
+        <li>Line breaks and indentation are free. <code class="dh"># comment</code></li>
+        <li>Labels start with a letter; dots group them: <code class="dh">Book.Net</code>.</li>
+        <li><code class="dh">10_000</code> <code class="dh">65%</code> <code class="dh">inf</code>; arithmetic within
+          parentheses, <code class="dh">(3 * exp(4) / 2)</code>.</li>
+        <li>Lists <code class="dh">[1 2 3]</code><code class="dh">[1:6]</code><code class="dh">[2:12:2]</code>.</li>
+        <li>Trailer, last: <code class="dh">note{...}</code><code class="dh">tags{...}</code><code class="dh">hints{log2=16;}</code>.</li>
+      </ul>
+    </div>
+
+    <div class="dh-box" style="--c: var(--c-more)"><h3>10 · The library, and more</h3>
+      <ul>
+        <li><code class="dh">agg.BasicBook</code>, <code class="dh">port.TwoLineBook</code> reuse shipped objects<span class="dh-lab">; Ctrl+K searches them</span>.</li>
+        <li><code class="dh">distortion D wang 0.3</code> a pricing risk measure.</li>
+        <li><code class="dh">bivariate</code><code class="dh">clash</code> two dependent lines.</li>
+        <li><code class="dh">grossnet agg ...</code> gross and net as one joint view.</li>
+        <li><code class="dh">nttagg</code> exact answers for small discrete books.</li>
+        <li>Everything else: <a href="https://aggregate.readthedocs.io/en/latest/4_dec_Language_Reference.html" target="_blank" rel="noopener">the DecL reference</a>.</li>
+      </ul>
+    </div>
+  </div>
+
+</div>
+</section>

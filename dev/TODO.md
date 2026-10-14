@@ -148,15 +148,6 @@
   Franchise PR first, then disappearing, each with a DecL reference section
   and a Twenty Minutes example.
 
-- **[Allocation-Bounds-Gold-Standard-Tests]** (#8): already written by the
-  contributor, 21 tests: Poisson thinning identities under PH, Wang, TVaR and
-  dual, common scale gamma, a constant unit, and `hypothesis` invariants (`q`
-  monotone, TVaR at least VaR, unit premiums sum to the total, net dominated by
-  gross). Asked to resubmit against `dev` as its own PR, without snapshot
-  recaptures. **Promised:** `hypothesis` joins the `dev` extra; we recapture
-  snapshots here if anything moves; we close #8 if they do not. Do not write
-  these tests ourselves.
-
 - **[Snapshot-Portability]** (promised in #8): untouched `master` at 1.0.1
   fails 56 fast tests on macOS (Apple Silicon): 44 exhibit snapshots, chart
   renders, `test_baseline`, and the renewal and peg regressions, apparently
@@ -165,6 +156,14 @@
   Linux without losing their value as change detectors. Promised, so owed.
 
 ## Recently landed
+
+- **[Allocation-Bounds-Gold-Standard-Tests]** DONE (2026-10-14, #10,
+  squash-merged as `35a0624`, no version bump): the contributor's 21 tests in
+  `tests/test_allocation_gold_standard.py`, Poisson thinning identities under
+  PH, Wang, TVaR and dual, common scale gamma, a constant unit, and
+  `hypothesis` invariants. `hypothesis` joined the `dev` extra, so sync with
+  `uv sync --all-extras --inexact`. No snapshots moved and #8 is closed, so
+  nothing promised is still owed.
 
 - **[NTT-Exact-Tail-Chart]** DONE at **1.5.0** (2026-10-14,
   `dev/done/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 2): the `exact_tail`
@@ -224,12 +223,16 @@
 
 ## Correctness
 
-- **[Unit-Capital-Far-Tail]** (reported in #8, not yet reproduced here):
-  per-unit capital stops reconciling at far tail asset levels, with
-  `unit_capital_at` giving `sum Q_i = 77.7` against `48.8` at `a = 60` on a
-  small book, and it raises a broadcast `ValueError` above the augmented
-  frame's top. The contributor was asked to file an issue with a reproducer;
-  put its number here when it arrives.
+- **[Unit-Capital-Above-Frame]** (#12, was `[Unit-Capital-Far-Tail]`;
+  reproduced on 1.5.0, 2026-10-14): `unit_capital_at` raises a numpy
+  broadcast `ValueError` when `a` is above the augmented frame's top. Accepted:
+  use the last row and warn, as `pricing_at` does; the contributor may send
+  the PR. The far tail half is declined: where `S <= VALIDATION_NOISE` the
+  density frame zeroes alpha, so on the linear frame unit margins stop summing
+  to the total and the reconciliation warning fires. That warning is the
+  intended signal; no renormalizing by the sum of unit margins and no share
+  inheritance. Optional with the fix: the check is skipped for
+  `pentagon_at(unit=...)`, which also swaps in the last row without a warning.
 - **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
   diagnosed 2026-10-07, second occurrence 2026-10-11, full account in
   `dev/done/plan-a400-v1-loose-ends.md` phase 3 and

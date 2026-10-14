@@ -211,6 +211,58 @@ def make_ceder_netter(reins_list, debug=False):
 # Apply engine: ceder/netter convolution onto the model grid
 # ====================================================================
 
+def cedes_nothing(reins_list):
+    """True when every layer in ``reins_list`` has zero share or zero limit.
+
+    Parameters
+    ----------
+    reins_list : list of tuple
+        ``(share, limit, attach)`` layers, as for :func:`make_ceder_netter`.
+
+    Returns
+    -------
+    bool
+        Whether the program's ceded loss is identically zero.
+
+    Notes
+    -----
+    Tested on ``share == 0 or limit == 0`` rather than ``share * limit == 0``
+    because ``0 * inf`` is ``nan`` for a 0% share of an unlimited layer.
+    """
+    return all(s == 0 or y == 0 for (s, y, _a) in reins_list)
+
+
+def zero_cession_density(agg):
+    """The exact point mass at a ceded loss of zero, on ``agg.xs``.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The owning aggregate; supplies the grid and the rebucketing origin.
+
+    Returns
+    -------
+    numpy.ndarray
+        Probability vector with a single 1.0 in the bucket holding zero.
+
+    Notes
+    -----
+    A cession that is identically zero must get exactly this vector, not the
+    subject mass swept into bucket 0. The swept vector carries the subject's
+    deficit, and when that deficit is genuine truncation (above
+    ``VALIDATION_NOISE``) :func:`~aggregate.moments.xsden_to_mwrangler`
+    relocates it to the top of the grid. That is right for the subject but
+    wrong for the cession: subject loss beyond the grid cedes nothing through
+    a zero layer. On ``aggregate net of 0% po 200 xs 400`` over a lognormal
+    book the subject deficit is ``3.6e-11``, so the zero layer reported a mean
+    of ``1.2e-6`` and a cv and skew of ``1.7e5`` (``[Zero-Share-Layer-Moments]``).
+    With the exact vector the moments are ``(0, 0, 0)``, the mean is zero, and
+    the cv and skew are ``nan``, the library's convention for a distribution
+    with zero mean.
+    """
+    return agg._rebucket_to_grid(np.zeros(1), np.ones(1))
+
+
 def apply_reins_work(agg, reins_list, base_density, debug=False):
     """
     Actually do the work. Called by apply_reins.
@@ -240,7 +292,10 @@ def apply_reins_work(agg, reins_list, base_density, debug=False):
     # ``reins_bucket`` scheme. See _rebucket_to_grid for the mass identity.
     p_subject = np.asarray(base_density, dtype=float)
     p_net = agg._rebucket_to_grid(reins_df['loss_net'].to_numpy(), p_subject)
-    p_ceded = agg._rebucket_to_grid(reins_df['loss_ceded'].to_numpy(), p_subject)
+    if cedes_nothing(reins_list):
+        p_ceded = zero_cession_density(agg)
+    else:
+        p_ceded = agg._rebucket_to_grid(reins_df['loss_ceded'].to_numpy(), p_subject)
     reins_df['p_net'] = p_net
     reins_df['p_ceded'] = p_ceded
     # F_* columns were vestigial from the old interp1d-of-CDF algorithm;
@@ -1056,8 +1111,12 @@ def reins_stats_df(agg):
             return 0.0
         return mean / placed_limit if placed_limit > 0 else np.nan
 
-    def _layer_ceded(ceder, subject):
-        """Rebucketed ceded density: subject mass through one layer."""
+    def _layer_ceded(layer, ceder, subject):
+        """Rebucketed ceded density: subject mass through one layer. A layer
+        that cedes nothing gets the exact point mass at zero, see
+        :func:`zero_cession_density`."""
+        if cedes_nothing([layer]):
+            return zero_cession_density(agg)
         return agg._rebucket_to_grid(
             np.asarray(ceder(xs), dtype=float),
             np.asarray(subject, dtype=float))
@@ -1102,7 +1161,7 @@ def reins_stats_df(agg):
     if agg.occ_reins is not None:
         for k, (s, y, a) in enumerate(agg.occ_reins, 1):
             ceder_k, _ = make_ceder_netter([(s, y, a)])
-            ceded_k = _layer_ceded(ceder_k, p_sev_gross)
+            ceded_k = _layer_ceded((s, y, a), ceder_k, p_sev_gross)
             # One number, three uses, one basis: P(subject > a) per modeled
             # claim from the grid is the displayed pr_attach, the divisor
             # conditioning the layer severity on a loss to the layer, and
@@ -1161,7 +1220,7 @@ def reins_stats_df(agg):
 
         for k, (s, y, a) in enumerate(agg.agg_reins, 1):
             ceder_k, _ = make_ceder_netter([(s, y, a)])
-            ceded_k = _layer_ceded(ceder_k, p_subject)
+            ceded_k = _layer_ceded((s, y, a), ceder_k, p_subject)
             agg6 = reins_density6(agg, ceded_k)
             data[('agg', f'layer.{k}')] = col(
                 share=s, limit=y, attach=a, pr_attach=_pr_agg(a),

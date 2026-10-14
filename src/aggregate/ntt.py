@@ -24,7 +24,8 @@ used for the reconstruction phase when it happens to be installed and ignored
 when it is not. It is discovered rather than declared: this library does not
 depend on it, is never slower or less correct for its absence, and computes
 the same integers either way. See :func:`_resolve_engine` and
-``dev/plan-ntt-rust-integration.md``.
+``dev/plan-ntt-rust-integration.md``; :func:`engine_status` reports whether
+the engine would be used, and why not, without warning.
 
 Access is by submodule only, matching ``ft.py`` and ``tweedie.py``: there is
 no top-level re-export.
@@ -44,7 +45,7 @@ import pandas as pd
 from .distributions import Aggregate
 
 __all__ = ['is_prime_u64', 'ntt_primes', 'ntt', 'exact_compound',
-           'exact_compound_poly', 'AggregateNTT']
+           'exact_compound_poly', 'AggregateNTT', 'engine_status']
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +134,11 @@ def _resolve_engine(requested='auto'):
             f"{requested!r}")
     if requested == 'python':
         return 'python'
+    # The decision itself is shared with engine_status, so the report and
+    # the computation cannot disagree; what remains here is the reaction to
+    # it, which differs by request.
+    if _auto_engine()[0] == 'rust':
+        return 'rust'
     if _engine is None:
         if requested == 'rust':
             raise ValueError(
@@ -142,33 +148,107 @@ def _resolve_engine(requested='auto'):
                 "engine when it is present and the pure-Python path when it "
                 "is not.")
         return 'python'
+    # Installed, but speaking a seam protocol this library does not know.
+    protocol = getattr(_engine, 'PROTOCOL_VERSION', None)
+    version = getattr(_engine, '__version__', 'unknown')
+    if requested == 'rust':
+        raise ValueError(
+            f"ntt_engine='rust' refuses aggregate-ntt {version}: it "
+            f"speaks seam protocol {protocol!r} and this library speaks "
+            f"{_ENGINE_PROTOCOL}. Upgrade whichever of the two is "
+            f"older. Computing across a seam that has moved risks a "
+            f"wrong answer, so this refuses instead.")
+    if not _PROTOCOL_WARNED:
+        # UserWarning, not RuntimeWarning: the library emits no
+        # RuntimeWarning of its own ([RuntimeWarning-Census], 1.0.0a220)
+        # so that -W error::RuntimeWarning is a numerics gate. A
+        # mismatched package is not a numerical event and must not trip
+        # it. UserWarning is also what the rest of the library uses to
+        # tell the user something about how a computation was set up.
+        _PROTOCOL_WARNED = True
+        warnings.warn(
+            f'aggregate-ntt {version} speaks seam protocol '
+            f'{protocol!r} and this library speaks {_ENGINE_PROTOCOL}, '
+            f'so the compiled engine is being ignored and the exact '
+            f'answers come from the pure-Python path. Upgrade whichever '
+            f'of the two is older to use it.',
+            UserWarning, stacklevel=3)
+    return 'python'
+
+
+def _auto_engine():
+    """
+    What ``ntt_engine='auto'`` resolves to, and why, with no side effects.
+
+    Returns
+    -------
+    tuple of (str, str or None)
+        ``(engine, reason)``. ``engine`` is ``'rust'`` or ``'python'``;
+        ``reason`` is ``None`` when the compiled engine is used, else one
+        line: ``'not installed'``, or ``'protocol 1, library speaks 2'``.
+
+    Notes
+    -----
+    The pure half of :func:`_resolve_engine`, shared with
+    :func:`engine_status` so the report and the computation cannot
+    disagree. It never warns: the once-per-process protocol warning stays
+    in :func:`_resolve_engine`, where a computation commits to an engine.
+    """
+    if _engine is None:
+        return 'python', 'not installed'
     protocol = getattr(_engine, 'PROTOCOL_VERSION', None)
     if protocol != _ENGINE_PROTOCOL:
-        version = getattr(_engine, '__version__', 'unknown')
-        if requested == 'rust':
-            raise ValueError(
-                f"ntt_engine='rust' refuses aggregate-ntt {version}: it "
-                f"speaks seam protocol {protocol!r} and this library speaks "
-                f"{_ENGINE_PROTOCOL}. Upgrade whichever of the two is "
-                f"older. Computing across a seam that has moved risks a "
-                f"wrong answer, so this refuses instead.")
-        if not _PROTOCOL_WARNED:
-            # UserWarning, not RuntimeWarning: the library emits no
-            # RuntimeWarning of its own ([RuntimeWarning-Census], 1.0.0a220)
-            # so that -W error::RuntimeWarning is a numerics gate. A
-            # mismatched package is not a numerical event and must not trip
-            # it. UserWarning is also what the rest of the library uses to
-            # tell the user something about how a computation was set up.
-            _PROTOCOL_WARNED = True
-            warnings.warn(
-                f'aggregate-ntt {version} speaks seam protocol '
-                f'{protocol!r} and this library speaks {_ENGINE_PROTOCOL}, '
-                f'so the compiled engine is being ignored and the exact '
-                f'answers come from the pure-Python path. Upgrade whichever '
-                f'of the two is older to use it.',
-                UserWarning, stacklevel=3)
-        return 'python'
-    return 'rust'
+        return 'python', (f'protocol {protocol!r}, library speaks '
+                          f'{_ENGINE_PROTOCOL}')
+    return 'rust', None
+
+
+def engine_status():
+    """
+    What ``ntt_engine='auto'`` would use, and why. Never warns, never raises.
+
+    Returns
+    -------
+    dict
+        ``engine``
+            ``'rust'`` or ``'python'``, what ``ntt_engine='auto'``
+            resolves to.
+        ``installed``
+            ``bool``, whether ``aggregate_ntt`` imported.
+        ``engine_version``
+            ``aggregate_ntt.__version__``, or ``None``.
+        ``engine_protocol``
+            Its ``PROTOCOL_VERSION``, or ``None``.
+        ``library_protocol``
+            :data:`_ENGINE_PROTOCOL`, the seam version this library speaks.
+        ``reason``
+            ``None`` when the compiled engine is used, else one line:
+            ``'not installed'``, or ``'protocol 1, library speaks 2'``.
+
+    Notes
+    -----
+    Installed is not the same as used. The library ignores an engine whose
+    seam protocol it does not speak, so a caller that imports
+    ``aggregate_ntt`` itself (an About panel, a bug report) can show the
+    version of an engine that computes nothing. This reports the decision
+    instead, through the same :func:`_auto_engine` that
+    :func:`_resolve_engine` consults.
+
+    It neither warns nor sets the once-per-process warning latch: asking is
+    not computing, and a later computation that does fall back must still
+    say so.
+
+    It describes ``'auto'`` only. ``ntt_engine='python'`` always takes the
+    pure-Python path, and ``ntt_engine='rust'`` succeeds exactly when
+    ``engine`` here is ``'rust'`` and raises otherwise.
+    """
+    engine, reason = _auto_engine()
+    return {'engine': engine,
+            'installed': _engine is not None,
+            'engine_version': getattr(_engine, '__version__', None),
+            'engine_protocol': getattr(_engine, 'PROTOCOL_VERSION', None),
+            'library_protocol': _ENGINE_PROTOCOL,
+            'reason': reason}
 
 
 def _engine_provenance(engine):

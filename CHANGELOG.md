@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.3.0 - 2026-10-14
+
+**[NTT-Engine-Status] `aggregate.ntt.engine_status()` says whether the compiled engine would be used, and why not.** It returns a dict: `engine` (`'rust'` or `'python'`, what `ntt_engine='auto'` resolves to), `installed`, `engine_version`, `engine_protocol`, `library_protocol`, and `reason` (`None` when the engine is used, else `'not installed'` or `'protocol 1, library speaks 2'`). It never warns and never raises, and it leaves the once-per-process protocol-mismatch warning for the first computation, so a caller such as an About panel can tell an engine installed and used from one installed and ignored without reaching for private names. Submodule access only, like the rest of `aggregate.ntt`. Plan `dev/done/plan-1.3.0-ntt-engine-status.md`.
+
 ## 1.2.1 - 2026-10-14
 
 **[Version-Source] the version is written once and read live.**

@@ -776,6 +776,62 @@ def test_resolve_engine_warns_once_per_process(monkeypatch, unwarned):
         assert ntt_module._resolve_engine('auto') == 'python'
 
 
+def _quiet_engine_status():
+    """``engine_status()`` with every warning raised as an error."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        return ntt_module.engine_status()
+
+
+def test_engine_status_not_installed(monkeypatch):
+    monkeypatch.setattr(ntt_module, '_engine', None)
+    assert _quiet_engine_status() == {
+        'engine': 'python', 'installed': False, 'engine_version': None,
+        'engine_protocol': None,
+        'library_protocol': ntt_module._ENGINE_PROTOCOL,
+        'reason': 'not installed'}
+
+
+def test_engine_status_matching_protocol(monkeypatch):
+    protocol = ntt_module._ENGINE_PROTOCOL
+    monkeypatch.setattr(ntt_module, '_engine', _FakeEngine(protocol))
+    assert _quiet_engine_status() == {
+        'engine': 'rust', 'installed': True, 'engine_version': '9.9.9',
+        'engine_protocol': protocol, 'library_protocol': protocol,
+        'reason': None}
+
+
+def test_engine_status_mismatched_protocol(monkeypatch, unwarned):
+    """Reported without warning, and the latch is left for a computation.
+
+    Asking is not computing: a later call that does fall back must still
+    warn, so the status call may not spend the once-per-process warning.
+    """
+    protocol = ntt_module._ENGINE_PROTOCOL
+    monkeypatch.setattr(ntt_module, '_engine', _FakeEngine(99))
+    assert _quiet_engine_status() == {
+        'engine': 'python', 'installed': True, 'engine_version': '9.9.9',
+        'engine_protocol': 99, 'library_protocol': protocol,
+        'reason': f'protocol 99, library speaks {protocol}'}
+    assert ntt_module._PROTOCOL_WARNED is False
+    with pytest.warns(UserWarning, match='seam protocol'):
+        ntt_module._resolve_engine('auto')
+
+
+def test_engine_status_agrees_with_resolution(monkeypatch, unwarned):
+    """One shared decision, so the report and the computation agree.
+
+    The first case is whatever this environment really has installed.
+    """
+    for fake in (ntt_module._engine, None,
+                 _FakeEngine(ntt_module._ENGINE_PROTOCOL), _FakeEngine(99)):
+        monkeypatch.setattr(ntt_module, '_engine', fake)
+        status = _quiet_engine_status()
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            assert status['engine'] == ntt_module._resolve_engine('auto')
+
+
 def test_resolve_engine_rejects_an_unknown_request():
     with pytest.raises(ValueError, match="must be 'auto', 'python' or 'rust'"):
         ntt_module._resolve_engine('fortran')

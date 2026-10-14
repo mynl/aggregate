@@ -1578,7 +1578,12 @@ class AggregateNTT(Aggregate):
       costs a gcd per bucket, with :meth:`p_exact_at` for the usual case of
       wanting a few buckets rather than all of them;
     - :attr:`accuracy_df` compares the exact and float answers per bucket;
-    - :attr:`ntt_audit` records sizes, primes, timings and error summaries.
+    - :attr:`ntt_audit` records sizes, primes, timings and error summaries;
+    - the ``exact_tail`` chart draws the exact mass and survival function as
+      base-10 logarithms down to the last bucket of the support, beside the
+      float FFT answer. In Jupyter, ``from aggregate.charts import
+      build_chart_doc`` and ``from aggregate.plots import plot_chartdoc``,
+      then ``plot_chartdoc(build_chart_doc(a, 'exact_tail'))``.
 
     Parameters
     ----------
@@ -1857,6 +1862,43 @@ class AggregateNTT(Aggregate):
         log_denominator = math.log10(self._ntt_denominator)
         return [math.log10(n) - log_denominator if n else -math.inf
                 for n in self._exact_numerators_on_grid()]
+
+    def _exact_survival_log10_on_grid(self):
+        """``log10`` of the exact survival function per bucket, ``-inf`` at zero.
+
+        Returns
+        -------
+        list of float
+            ``log10 P(X > x)`` for each ``x`` in ``self.xs``. Private to the
+            ``exact_tail`` chart (``aggregate.charts._emit_ntt``).
+
+        Notes
+        -----
+        With integer numerators ``H_j`` over the common denominator ``D``,
+
+            ``S(x_i) = P(X > x_i) = sum_{j > i} H_j / D``,
+
+        so one reverse cumulative pass over the integers gives every tail sum
+        exactly, at the cost of one big-integer addition per bucket, and
+
+            ``log10 S(x_i) = log10(sum_{j > i} H_j) - log10(D)``
+
+        is a float however small the tail, by the same device as
+        :meth:`_exact_log10_on_grid` and with the same roughly 1e-13
+        relative error in the logarithm from ``math.log10`` of an integer.
+        The sums are complete because :meth:`update` guarantees the grid
+        covers the whole support, so no mass sits past the last bucket.
+        """
+        log_denominator = math.log10(self._ntt_denominator)
+        numerators = self._exact_numerators_on_grid()
+        out = [-math.inf] * len(numerators)
+        tail = 0
+        for i in range(len(numerators) - 1, -1, -1):
+            # tail is sum_{j > i} H_j here, before H_i joins it
+            if tail:
+                out[i] = math.log10(tail) - log_denominator
+            tail += numerators[i]
+        return out
 
     @property
     def p_exact(self):

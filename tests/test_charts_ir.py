@@ -383,6 +383,8 @@ def test_tex_is_total_over_every_emitted_document():
         build('agg IR.TexBv 10 claims 500 xs 0 sev lognorm 50 cv 1.5 '
               'occurrence net of 50 xs 50 poisson').occ_bivariate(
                   views=('gross', 'ceded')),
+        # an exact aggregate, for the exact_tail chart
+        build('nttagg IR.TexN dfreq [1:3] dsev [1:3]'),
     ]
     swept = set()
     for obj in objs:
@@ -878,6 +880,7 @@ def test_load_chart_doc_round_trips_every_emitted_document():
                  agg B dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5
                  copula gumbel 0.4
                  poisson'''),
+        build('nttagg IR.ReadN dfreq [1:3] dsev [1:3]'),
     ]
     seen = []
     for obj in objs:
@@ -888,6 +891,7 @@ def test_load_chart_doc_round_trips_every_emitted_document():
             assert back == doc, name
             seen.append(name)
     assert 'agg' in seen and 'reins' in seen and 'joint_surface' in seen
+    assert 'exact_tail' in seen
 
 
 def test_load_chart_doc_restores_the_fields_the_wire_drops():

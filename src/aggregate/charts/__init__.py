@@ -262,6 +262,7 @@ from ._emit_approximation import (chart_approximation,  # noqa: E402
 from ._emit_bivariate import chart_joint_surface, chart_kappa  # noqa: E402
 from ._emit_bounds import chart_envelope  # noqa: E402
 from ._emit_distortion import chart_distortion  # noqa: E402
+from ._emit_ntt import chart_exact_tail  # noqa: E402
 from ._emit_pnl import chart_pnl  # noqa: E402
 from ._emit_portfolio import chart_port  # noqa: E402
 from ._emit_reins import chart_reins  # noqa: E402
@@ -270,6 +271,7 @@ from ._emit_severity import chart_severity  # noqa: E402
 from ._emit_structure import chart_structure  # noqa: E402
 
 __all__ += ['chart_agg', 'chart_approximation', 'chart_approximation_tails',
-            'chart_distortion', 'chart_envelope', 'chart_joint_surface',
+            'chart_distortion', 'chart_envelope', 'chart_exact_tail',
+            'chart_joint_surface',
             'chart_kappa', 'chart_pnl', 'chart_reins', 'chart_port',
             'chart_ruin', 'chart_severity', 'chart_structure']

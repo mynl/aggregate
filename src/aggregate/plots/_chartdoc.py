@@ -486,7 +486,18 @@ def _draw_atomic(ax, x, y, label, x_axis, y_axis, window,
         return
     seen, pixels = _atom_room(ax, window, x)
     unit = getattr(y_axis, 'unit', None)
-    if unit == 'probability':
+    if unit == 'log10_density':
+        # A logarithm of a mass, with its exact zeros omitted because their
+        # logarithm is not a number: markers only. A line or a step would
+        # bridge the omitted buckets and draw mass the law does not have,
+        # and a log axis has no floor for a stem to stand on. Small markers
+        # once the atoms crowd, so 65,536 of them read as a curve and not a
+        # smear.
+        ax.plot(x, y, ls='none', marker='o', label=label,
+                ms=2.5 if seen <= LOLLIPOP_ATOMS else 1.0,
+                **(dict(color=color) if color else {}))
+        return
+    if unit in ('probability', 'log10_probability'):
         ax.plot(x, y, label=label,
                 drawstyle='steps-post' if pixels >= STEP_PIXELS else 'default')
         return

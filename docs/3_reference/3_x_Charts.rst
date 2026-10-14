@@ -45,6 +45,8 @@ The registry
 
 The ``structure`` chart is the one whose subject is a **contract** rather than a law: a gross slab, then one tower of labeled rectangles per cession stage, each layer's band its attachment to its exhaustion point and its width its share, with the retention below and above, the unplaced fraction beside it and any uncovered band drawn as a gap. It is available *before* ``update()``, because a program's shape is declared and not computed, and it enriches in three tiers under one ``annotate`` tuple: geometry from the declaration, risk statistics off ``reins_stats_df`` once there is a grid, and the economics (ceded premium at 100% terms, rate on line, loss ratio, ceding commission, reinstatements) on a :class:`~aggregate.PnL` only, since a plain ``agg`` has no premium context and strips those clauses. A field whose source is absent is omitted rather than blanked, so one tuple serves every tier. ``lee=True`` adds the quantile curve of the distribution each tower is read against, sharing its loss axis, so every boundary reads off as a return period.
 
+The ``exact_tail`` chart, available for an updated exact aggregate (``nttagg``) only, draws the exact probability mass and survival function as base-10 logarithms over the whole support, beside the float FFT answer, using two axis units whose values are exponents: ``log10_density`` (drawn as markers only, because exact zeros are omitted) and ``log10_probability`` (drawn as ``probability`` is), so a bucket at 1e-462, which no double can hold, still reads.
+
 The chart IR
 ------------
 

@@ -116,6 +116,20 @@ __all__ = [
 #: same reading as version 3: a reader that knows neither sees a panel kind it
 #: cannot realize and a series carrying no coordinates it recognizes, so the
 #: panel is missing rather than plainer.
+#:
+#: **The log10 units did not move it** (1.5.0, decided by the author on
+#: 2026-10-14), and the case is arguable by the rule above: a reader that
+#: ignores 'log10_density' draws the mass series as steps or a line, which
+#: bridges its omitted exact zeros, and that is drawing something wrong. But
+#: the version is global, stamped on every document, and a reader refuses
+#: anything above its own, so a bump makes **every** chart undrawable in any
+#: reader not yet upgraded. The two units appear only in ``exact_tail``
+#: documents, which a reader receives only by asking for that name, and the
+#: readers that ask (:func:`~aggregate.plots.plot_chartdoc` and the app's
+#: leaf for it) learn the units in the same release. Not bumping draws
+#: nothing wrong in any shipped combination; bumping risks blanking every
+#: chart. This is the precedent for **a unit used only by a chart a reader
+#: must request by name**: it does not bump the version.
 CHART_IR_VERSION = 4
 
 #: Panel kinds. 'xy' is a family of curves over a shared pair of axes;
@@ -167,8 +181,19 @@ _PAIRED_READINGS = ('reciprocal_of', 'complement_of')
 #: 'currency' (a loss or outcome amount), 'probability', 'density'
 #: (a mass or an ordinate), 'return_period', 'ratio' (a unitless share,
 #: alpha and beta curves), 'index' (an ordinal position).
+#:
+#: 'log10_density' and 'log10_probability' are the base-10 logarithms of a
+#: 'density' and of a 'probability' (cumulative or exceedance). The values
+#: are exponents, so a tick at -400 means 1e-400, which is how a document
+#: carries a probability no double can hold (the ``exact_tail`` chart of an
+#: exact aggregate). A 'log10_density' series has its exact zeros omitted,
+#: since their logarithm is not a number, so every renderer draws it as
+#: **markers only**: a line or a step would bridge the omitted buckets and
+#: claim mass where there is none, and a log axis has no floor for a stem to
+#: stand on. A 'log10_probability' series draws exactly as 'probability'
+#: does. Both read on a linear scale, the logarithm being already taken.
 AXIS_UNITS = ('currency', 'probability', 'density', 'return_period',
-              'ratio', 'index')
+              'ratio', 'index', 'log10_density', 'log10_probability')
 
 #: Series roles, the working vocabulary (open; documented additions only):
 #: 'density', 'survival', 'cdf', 'identity' (the diagonal), 'distortion'

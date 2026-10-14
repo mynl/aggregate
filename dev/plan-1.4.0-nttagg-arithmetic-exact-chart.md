@@ -389,7 +389,18 @@ nttagg joins its object list. Add `build('nttagg IR.TexN dfreq [1:3] dsev
 
 ## Results
 
-(Filled in at execution: timings and document sizes from step 2's acceptance.)
+Measured 2026-10-14 at 1.5.0 on this machine, `build(..., log2=16)`, chart build time the best of three `build_chart_doc` calls, size `len(canonical_json(doc))`.
+
+| object | chart | build | JSON size | points |
+|---|---|---|---|---|
+| `ExactDiceOfDice` (`library.agg`) | `agg` | 0.3 ms | 3,958 bytes | 114 |
+| `ExactDiceOfDice` | `exact_tail` | 0.3 ms | 4,881 bytes | 172 |
+| `Wilson2016a.Wilson` | `agg` | 0.3 ms | 2,296 bytes | 21 |
+| `Wilson2016a.Wilson` | `exact_tail` | 0.2 ms | 1,762 bytes | 18 |
+| `Wilson2017.DiceOfDice` (aLL's headline case) | `agg` | 21.3 ms | 1,071,269 bytes | 51,696 |
+| `Wilson2017.DiceOfDice` | `exact_tail` | 57.0 ms | 2,557,940 bytes | 131,062 |
+
+On the acceptance case the two documents are the same size, as expected. On the 200 x 200 dice of dice `exact_tail` is 2.4 times `agg`'s, because it ships 131,062 points against 51,696: the exact mass and the exact survival each run the full 40,000 buckets of the support, and the two float series add 51,062 between them. Nothing is rounded or thinned, by the payload module's rule, so a smaller document would mean a design change (fewer digits, or thinning the deep tail), which is aLL's to ask for if the fetch proves slow. The deepest exact bucket reads -462.51. `plot_chartdoc` drew each document in under 0.15 s, and the PNGs were eyeballed on all four objects above (`Wilson2016a.Wilson`, `ExactDiceOfDice`, the gapped case of the tests, and the 200 x 200 case): exact markers run to the end of the support, the gaps stay empty, and the float series stops where the float answer is no longer positive.
 
 ## Execution log
 
@@ -408,3 +419,23 @@ Grammar and callbacks exactly as specified. Every case in the plan's test list w
 - **Snapshot diff** is one new key, `NTT.Arithmetic`, which both parametrized cases read; nothing else moved. `dev/FEATURES.csv` regenerated with no diff.
 - **`dev/TODO.md`** holds the author's uncommitted edits. Only the new `[NTT-Rational-Arithmetic]` entry was staged (the HEAD blob plus that hunk, written to the index directly); the author's edits stay unstaged in the working copy.
 - **This plan file** was untracked. It is committed in place, with this log, in the step 1 commit. It stays in `dev/`, not `dev/done/`, because the plan says the author moves it.
+
+Gate: tier 3, `UV_PROJECT_ENVIRONMENT=.venv uv run pytest -m 'slow or not slow'`, 6014 passed in 130 s.
+
+### Step 2 [NTT-Exact-Tail-Chart], 1.5.0
+
+Contract names exactly as specified: registry `exact_tail`, emitter `chart_exact_tail` in `charts/_emit_ntt.py`, units `log10_density` and `log10_probability`, axes `outcome`, `log10_mass`, `log10_survival`, panels `mass` and `survival`, series `Exact` and `Float FFT`, no marks, `CHART_IR_VERSION` 4 with the reasoning recorded in its comment.
+
+**Divergences.**
+
+- **The log10 window never collapses.** `lo` is the smallest finite exact value rounded down to a multiple of 10, as specified, but capped at -10 (`_window_floor`). A law with one atom of probability 1 has every exponent at 0, and `(0, 0)` is a window with no height. Also -10 for an empty series.
+- **Registration order.** The import sits alphabetically among the others in `charts/__init__.py` (after `_emit_distortion`), not at the very bottom, so `exact_tail` registers before `pnl`. Order only affects `available_charts`'s listing order; an nttagg lists `['agg', 'approximation', 'approximation_tails', 'exact_tail']`.
+- **The lattice step is `a.bs`**, which `update` pins to 1, rather than the literal `1.0`, matching `_emit_aggregate.py`.
+- **Marker size by room.** `_draw_atomic` draws `'log10_density'` with `marker='o'` at `ms=2.5` when at most `LOLLIPOP_ATOMS` atoms are in view (the density lollipop's size) and `ms=1.0` beyond, which reads as a curve at 40,000 points. It honors a group color like the other branches.
+- **Extra tests** beyond the plan's list: `test_document_shape` (ids, units, windows, no marks, every value finite) and `test_mass_draws_as_markers_only` (no line style and no stem collection on the mass panel, which pins the drawing rule in the matplotlib renderer).
+- **`docs/3_reference/3_x_Charts.rst`** gains the sentence; `chart_exact_tail` is not added to that page's autosummary, which is curated and already omits `chart_ruin`, `chart_kappa` and others.
+- **The renderer gate ran with `-W error::RuntimeWarning`** too, since the emitter takes logarithms; the float series are masked before `np.log10`, never after.
+
+Gates: tier 3, `UV_PROJECT_ENVIRONMENT=.venv uv run pytest -m 'slow or not slow'`, 6022 passed in 131 s; the numerics gate, the same with `-W error::RuntimeWarning`, 6022 passed in 147 s. `dev/FEATURES.csv` regenerated with no diff.
+
+**Finding for the aLL plan.** `aggregate-api/dev/plan-1.13.0-exact-tail-leaf.md` describes the panel titles as "log10 probability mass" and "log10 exceedance probability". Those are the **y axis labels**. The panel titles, per this plan, are "Exact probability mass" and "Exact survival function", and that is what ships. Nothing in the aLL plan's code or tests reads a title, so nothing breaks; its contract paragraph wants correcting.

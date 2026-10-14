@@ -131,6 +131,12 @@
 
 ## Recently landed
 
+- **[NTT-Exact-Tail-Chart]** DONE at **1.5.0** (2026-10-14,
+  `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 2): the `exact_tail`
+  chart draws an nttagg's exact log10 mass and survival beside the float FFT,
+  with the new axis units `log10_density` and `log10_probability`. The aLL
+  leaf is `aggregate-api/dev/plan-1.13.0-exact-tail-leaf.md`.
+
 - **[NTT-Rational-Arithmetic]** DONE at **1.4.0** (2026-10-14,
   `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 1): nttagg
   probabilities accept parenthesized arithmetic and `**` with a whole-number

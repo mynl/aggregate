@@ -1406,3 +1406,16 @@ agg MD.PoiDie 10 claims dsev [1:6] poisson                                      
 agg MD.Lognorm 1 claim sev lognorm 200 cv 2 fixed                                                                note{skew 14; bs=6.427 log2=21};
 agg MD.GEMAct 3 claims sev lognorm 84541.68 cv 2.1022565437545127 poisson                                        note{Pittarello 2024 Table 2 on GEMAct's own grid, bs=500 log2=22};
 agg MD.Probe 10 claims sev lognorm 100 cv 3 poisson                                                              note{bs=50 log2=8, deficit 1e-4 is genuine truncation and still relocates}
+
+
+# NTA. Exact arithmetic in nttagg probabilities ([NTT-Rational-Arithmetic], 1.4.0)
+# ============================================================
+# A separate path from PA: nttagg's ntt_* callbacks evaluate the paren island
+# exactly as Fraction, never in binary64. Ten claims of 1, 2 or 8 put the
+# smallest mass at loss 80, (2**-k)**10 / 10. At k = 30 that is about 4.9e-92,
+# a double but far below the float FFT's noise; at k = 110 it is about
+# 7.4e-333, past the smallest subnormal, so p_exact_float reads 0 and only
+# p_exact_log10 reaches it. At k = 110 the float inputs cannot even see the
+# middle probability: 1/2 - 2**-110 rounds to 1/2. See tests/test_ntt.py.
+nttagg NTA.Deep      dfreq [1:10] dsev [1 2 8] [1/2 (1/2-2**-30) 2**-30]    note{smallest mass 2**-300/10: a double, but past the float FFT};
+nttagg NTA.Underflow dfreq [1:10] dsev [1 2 8] [1/2 (1/2-2**-110) 2**-110]  note{smallest mass 2**-1100/10: past any double}

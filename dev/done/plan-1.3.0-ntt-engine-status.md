@@ -60,7 +60,7 @@ Executed 2026-10-14 at **1.3.0**, one bump, one commit. Gate: tier 3, `UV_PROJEC
 
 **Divergences.**
 
-- **Version.** The plan called its number a placeholder. Took 1.3.0, the filename's number, which `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md` already assumes lands first.
+- **Version.** The plan called its number a placeholder. Took 1.3.0, the filename's number, which `dev/done/plan-1.4.0-nttagg-arithmetic-exact-chart.md` already assumes lands first.
 - **Mismatch fixture.** The test uses `_FakeEngine(99)`, matching the existing resolution tests, so its asserted reason is `'protocol 99, library speaks 2'` rather than the plan's illustrative `protocol 1`.
 - **Two checks beyond the three asked for.** The mismatch test also asserts that `_PROTOCOL_WARNED` stays `False` and that a following `_resolve_engine('auto')` still warns, since a status call must not spend the warning. A fourth test, `test_engine_status_agrees_with_resolution`, asserts `engine_status()['engine'] == _resolve_engine('auto')` for the real installed engine, none, a matching fake and a mismatched fake.
 - **No `dev/TODO.md` tick.** No tracked item existed for this plan, and the file holds the author's uncommitted edits, so it was left out of the commit.

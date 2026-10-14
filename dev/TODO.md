@@ -129,16 +129,51 @@
   `[NTT-Workers-Default]`, narrowing from `min(8, ...)` to `min(4, ...)`
   on the measurement that four threads match eight for half the CPU.
 
+## Outside contributions
+
+> Work an outside contributor is doing, and what we promised them in return.
+> Rulings and promises were posted on GitHub on 2026-10-13. Contributors leave
+> the version, `CHANGELOG.md` and this file alone; we add all three at merge.
+
+- **[Deductible-Vocabulary]** (#9): rulings posted, contributor implementing.
+  **Declined:** a policy-side annual aggregate deductible, which is exactly
+  `aggregate net of D xs 0`; wanted instead a `library.agg` entry and one
+  sentence in the Twenty Minutes "Anatomy" section. **Accepted:** `y xs a
+  franchise` and `y xs d1 to d2 disappearing`, modifiers on the layers clause.
+  The ground-up top stays at `a + y` (maximum covered loss), so `1000 xs 50
+  franchise` pays `min(X, 1050)` for `X > 50`, and disappearing requires
+  `d1 <= d2 <= d1 + y`. One transform on the continuous severity, a sibling of
+  the `make_layer_attachment_*` wrappers, with `d2` as its parameter (`inf`
+  ordinary, `d1` franchise); not rebucketing through `make_ceder_netter`.
+  Franchise PR first, then disappearing, each with a DecL reference section
+  and a Twenty Minutes example.
+
+- **[Allocation-Bounds-Gold-Standard-Tests]** (#8): already written by the
+  contributor, 21 tests: Poisson thinning identities under PH, Wang, TVaR and
+  dual, common scale gamma, a constant unit, and `hypothesis` invariants (`q`
+  monotone, TVaR at least VaR, unit premiums sum to the total, net dominated by
+  gross). Asked to resubmit against `dev` as its own PR, without snapshot
+  recaptures. **Promised:** `hypothesis` joins the `dev` extra; we recapture
+  snapshots here if anything moves; we close #8 if they do not. Do not write
+  these tests ourselves.
+
+- **[Snapshot-Portability]** (promised in #8): untouched `master` at 1.0.1
+  fails 56 fast tests on macOS (Apple Silicon): 44 exhibit snapshots, chart
+  renders, `test_baseline`, and the renewal and peg regressions, apparently
+  last-digit float differences from snapshots captured on this machine. Make
+  the comparisons tolerant enough that a clean checkout passes on macOS and
+  Linux without losing their value as change detectors. Promised, so owed.
+
 ## Recently landed
 
 - **[NTT-Exact-Tail-Chart]** DONE at **1.5.0** (2026-10-14,
-  `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 2): the `exact_tail`
+  `dev/done/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 2): the `exact_tail`
   chart draws an nttagg's exact log10 mass and survival beside the float FFT,
   with the new axis units `log10_density` and `log10_probability`. The aLL
   leaf is `aggregate-api/dev/plan-1.13.0-exact-tail-leaf.md`.
 
 - **[NTT-Rational-Arithmetic]** DONE at **1.4.0** (2026-10-14,
-  `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 1): nttagg
+  `dev/done/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 1): nttagg
   probabilities accept parenthesized arithmetic and `**` with a whole-number
   power, evaluated exactly as `Fraction`.
 
@@ -149,6 +184,17 @@
   `tests/test_decl_help.py`. The api half is
   `aggregate-api/dev/plan-1.7.0-decl-help.md`. Divergences and the
   measurements are in the plan's execution log.
+
+- **[Zero-Share-Layer-Moments]** DONE at **1.2.0a14**, as a side effect of
+  `[Moment-Deficit-Genuine-Only]` (verified 2026-10-13): the zero-share layer
+  in `agg Z 10 claims sev lognorm 50 cv 1.5 occurrence net of 20 xs 20 and 0%
+  po 20 xs 40 and inf xs 60 poisson`, and a `cv 10` variant at `log2=10` whose
+  grid cannot hold its tail, report raw moments of exactly 0 with `cv` and
+  `skew` of `nan` and no `RuntimeWarning`. Reopen if the #8 contributor sends a
+  case that still reports noise; their explicit `cedes_nothing` recognition is
+  then the fix. **Follow-up:** the `_EVERY_TIER` exclusion of `CS.Gapped` in
+  `tests/test_chart_structure.py` exists only because of this defect; try
+  lifting it under the numerics gate.
 
 - **[NTT-Speed]** DONE at **1.2.0a1** and **1.2.0a2** (2026-10-09,
   `dev/done/plan-ntt-speed.md`): geometric spectral runs for equal-weight
@@ -178,24 +224,12 @@
 
 ## Correctness
 
-- **[Zero-Share-Layer-Moments]** (found a352) — a `0% po` layer cedes nothing,
-  so all its ceded moments are pure floating-point noise, and every ratio
-  derived from them is meaningless. The defect has **two faces** depending on
-  which way the noise falls. When the second moment lands just below zero,
-  `moments.mcvsk` square-roots it and `reins_stats_df` reports `cv` and `skew`
-  as `nan` beside a mean of `-1.8e-11`. When it lands just above, there is no
-  `nan` and no warning, and the ratios explode instead: measured 2026-10-07 on
-  `agg Z 10 claims sev lognorm 50 cv 1.5 occurrence net of 20 xs 20 and 0% po
-  20 xs 40 and inf xs 60 poisson`, the zero-share layer reports `agg` `cv` and
-  `skew` of **2.51e+06** against a mean of `5.2e-09`, and `sev` `cv` / `skew`
-  of `nan`. The second face is the worse one: a plausible-looking number in a
-  reported frame with nothing flagging it. Fix is not an `np.errstate` guard:
-  recognize a zero-share layer and report it as such (zeros or blanks across
-  the column, the author's call) rather than publishing ratios computed from
-  noise. Partly masked because the gapped program is exercised on the declared
-  tier only; see the `_EVERY_TIER` comment in `tests/test_chart_structure.py`.
-  **Proposed for 1.0** in `dev/done/plan-a400-v1-loose-ends.md`; if it does not make
-  the cut it lands here.
+- **[Unit-Capital-Far-Tail]** (reported in #8, not yet reproduced here):
+  per-unit capital stops reconciling at far tail asset levels, with
+  `unit_capital_at` giving `sum Q_i = 77.7` against `48.8` at `a = 60` on a
+  small book, and it raises a broadcast `ValueError` above the augmented
+  frame's top. The contributor was asked to file an issue with a reproducer;
+  put its number here when it arrives.
 - **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
   diagnosed 2026-10-07, second occurrence 2026-10-11, full account in
   `dev/done/plan-a400-v1-loose-ends.md` phase 3 and
@@ -349,22 +383,12 @@
 > (`dev/beta-review-2026-06-21.md`) are both **deleted** and recoverable from
 > git history; this section is the record.
 
-- **[Deductible-Vocabulary]** — franchise and disappearing deductibles, and an
-  annual aggregate deductible, as first-class constructs. Corridor landed on
-  the reinsurance side, so these are what remains of the review's
-  richer-deductibles ask. Nothing in the grammar or engine matches `franchise`,
-  `disappearing` or an aggregate deductible today.
 - **[Esscher-Exponential-Premium]** — the one classical premium principle the
   distortion framework does not subsume. Exists only inside `pedagogy.py`'s
   premium-principle comparison figure, not on the pricing surface.
 - **[Distortion-Production-vs-Research]** — separate the production distortions
   from the research zoo (CLL, CLin, LEP, LY) in the docs, and possibly in the
   namespace, so a new user meets the handful they should reach for.
-- **[Allocation-Bounds-Gold-Standard-Tests]** — extend the gold-standard
-  testing style past the engine into allocation and bounds: closed-form checks
-  wherever an analytic allocation exists, plus `hypothesis` invariants (`q`
-  monotone, TVaR at least VaR, allocation sums to the total, net at most
-  gross).
 - **[Two-Surfaces-Blessed-Path]** (rider on the docs work) — there are two
   expressive surfaces, DecL and the objects. Document the blessed path per
   task, DecL to construct and objects to analyze, so users do not infer it.
@@ -414,6 +438,11 @@
 - **[Input-Guards]** — zero `lb` not consistent with attachment equals zero;
   flag **fixed** frequency with a non-integer expected value; flag **mixing**
   with an inconsistent frequency distribution.
+- **[Sdist-Prune-Tests]** The sdist ships setuptools' default
+  `tests/test_*.py` (139 files since 1.0.1) without `conftest.py` or
+  `tests/data`, so the tests cannot run from it. Add `prune tests` to
+  `MANIFEST.in` at the next release, then drop the matching exception in the
+  leak check of `release-aggregate.ps1`.
 - **[Library-Round-Two]**, **[Showcase-Examples-Tune]** — library curation
   calls, each needing an author ruling rather than a rule.
 - **[bs_describe-Wart]**, **[DecL-Colorizer-Resync]**, **[Colorizer-Style-Choice]**,

@@ -439,3 +439,9 @@ Contract names exactly as specified: registry `exact_tail`, emitter `chart_exact
 Gates: tier 3, `UV_PROJECT_ENVIRONMENT=.venv uv run pytest -m 'slow or not slow'`, 6022 passed in 131 s; the numerics gate, the same with `-W error::RuntimeWarning`, 6022 passed in 147 s. `dev/FEATURES.csv` regenerated with no diff.
 
 **Finding for the aLL plan.** `aggregate-api/dev/plan-1.13.0-exact-tail-leaf.md` describes the panel titles as "log10 probability mass" and "log10 exceedance probability". Those are the **y axis labels**. The panel titles, per this plan, are "Exact probability mass" and "Exact survival function", and that is what ships. Nothing in the aLL plan's code or tests reads a title, so nothing breaks; its contract paragraph wants correcting.
+
+### After execution
+
+Section `NTA.` of `decl-testers.agg` (`NTA.Deep` at `2**-30`, `NTA.Underflow` at `2**-110`) and its mirror `test_nttagg_arithmetic_deep_tail` in `tests/test_ntt.py` were added at the author's request, with no bump. That answers the step 1 divergence on mirroring for the arithmetic path. Retired to `dev/done/` 2026-10-14 on the author's say-so.
+
+The author ruled on the payload 2026-10-14: the 2.56 MB `exact_tail` document on the 200 x 200 case stands as is, with no thinning or rounding.

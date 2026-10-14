@@ -414,6 +414,29 @@ def test_nttagg_arithmetic_builds(underwriter):
     assert '[1/2 980835/1961674 1/980837]' in spec_to_decl(spec, kind, name)
 
 
+@pytest.mark.parametrize('k', [30, 110])
+def test_nttagg_arithmetic_deep_tail(k):
+    """Exact arithmetic reaches a mass no float holds.
+
+    Mirrors ``decl-testers.agg`` section NTA (``NTA.Deep``, ``NTA.Underflow``).
+    A separate path from ``agg``'s paren arithmetic, which evaluates in
+    binary64. Ten claims of 1, 2 or 8 put the smallest mass at loss 80,
+    ``(2**-k)**10 / 10``: a double at k = 30, past the smallest subnormal at
+    k = 110, where ``p_exact_float`` underflows and only ``p_exact_log10``
+    reaches it.
+    """
+    from aggregate import build
+    small = Fraction(1, 2 ** k)
+    a = build(f'nttagg NTA dfreq [1:10] dsev [1 2 8] '
+              f'[1/2 (1/2-2**-{k}) 2**-{k}]')
+    assert a.ntt_sev_probs == [Fraction(1, 2), Fraction(1, 2) - small, small]
+    assert a.p_exact_at(80) == small ** 10 / 10
+    assert a.density_df.p_exact_log10[80] == pytest.approx(
+        -10 * k * math.log10(2) - 1, abs=1e-10)
+    # a double holds 2**-300/10 and cannot hold 2**-1100/10
+    assert (a.density_df.p_exact_float[80] > 0) == (k == 30)
+
+
 def test_nttagg_uniform_default_and_ranges(underwriter):
     _, _, spec = _parse(underwriter, 'nttagg T dfreq [1:6] dsev [2:10:2]')
     assert spec['ntt_freq_outcomes'] == [1, 2, 3, 4, 5, 6]

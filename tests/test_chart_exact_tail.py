@@ -1,6 +1,6 @@
 """The ``exact_tail`` chart: an nttagg's exact answer as base-10 logarithms.
 
-[NTT-Exact-Tail-Chart] (1.5.0), dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md
+[NTT-Exact-Tail-Chart] (1.5.0), dev/done/plan-1.4.0-nttagg-arithmetic-exact-chart.md
 step 2. The chart exists for the deep tail, so the headline test is one number
 the float FFT answer cannot represent against a body of order 1.
 """

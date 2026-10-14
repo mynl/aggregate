@@ -167,3 +167,24 @@ in its pin (`>=1.0.1`), all of which carry this defect. This plan follows at
 the library's pace. Once a release carrying it is the api's floor, the api's
 startup read is no longer needed for correctness but is still worth keeping,
 since it moves the three second read off the first request.
+
+## Execution log
+
+Executed 2026-10-14 as **1.5.2** (1.5.1 went to `[Zero-Share-Layer-Moments]` before this ran). Rulings taken from the author at review, 2026-10-14: a failed configured read **retries with rollback**; `__getstate__` / `__setstate__` **are added**; the api acceptance check is run from a **scratch script** in a fresh process, no edits to the api repo.
+
+### Divergences
+
+1. **[failed read] retry with rollback, not the plan's sketch.** The sketch left `_loaded` False over the partial base, so each retry read again on top of it and `databases` listed `library.agg` once more per attempt. `load()` now saves `_recipes`, `databases` and `_seq_next` before the configured read and restores them if it raises (any `BaseException`, so a `KeyboardInterrupt` mid-read is rolled back too). Consequence, accepted at review: a broken file in the configured request makes every access raise until it is fixed, where before the second access quietly used the partial base. An explicit `load(path)` is unchanged and does not roll back.
+2. **Pickling is a live use, not hypothetical.** At review, `pickle` and `deepcopy` of a bare `Underwriter`, of `build`, and of a loaded underwriter with its parser built all succeeded, so a bare `RLock` would have broken them. `__getstate__` drops the lock (taking it first, so a pickle waits out a read) and `__setstate__` recreates it with `_loading` False.
+3. **[fork under the lock] relies on `__setstate__` for the fork's own lock.** `copy.copy` goes through `__getstate__` / `__setstate__`, so the fork already gets a fresh lock and a clear `_loading`; restating them in `fork()` would be a second source for the same fact. A comment in `fork()` says where they come from.
+4. **[reset under the lock] the guarantee is narrower than the plan states.** The plan says no reader sees the empty base during `reload()`. The `_loaded` guards do not take the lock, so a reader already past its guard when `reload()` clears the base can still look up in the new, partly filled dict: a window of microseconds that ends in a loud `RecipeNotFound`, never in a fork. Putting every reader under the lock was judged not worth it; the `load()` docstring states the exact guarantee, and that concurrent `build()` on one instance is still unsafe (shared parser and `_sev_ref_stack`), with `fork()` as the answer.
+5. **Race tests use one bounded join.** Thread B gets `join(timeout=0.5)` before thread A's read is released, so on the unfixed code B provably acts mid-read; on the fixed code B is blocked on the lock and the outcome does not depend on the timing. Both race tests were run against the unfixed 1.5.1 code first and failed (an empty fork, and `RecipeNotFound` for `Capstone.ExposureRating`).
+6. **Two tests beyond the plan's four:** a pickle and deepcopy round trip, and a fork owning its own lock.
+7. **No `dev/TODO.md` entry existed**; one was added under Recently landed as `[Thread-Safe-Load]`.
+8. **Retired as `dev/done/plan-1.5.2-thread-safe-load.md`**, the version prefix recent retirements carry on both sides. The api plan's pointer to `dev/plan-thread-safe-load.md` goes stale with the move.
+
+### Acceptance
+
+- **Race tests detect the defect:** `test_fork_waits_for_the_read` and `test_lookup_waits_for_the_read` failed on the unfixed 1.5.1 code and pass on 1.5.2, five repeated runs each.
+- **aLL fresh server, startup read absent:** a scratch script run in the api's own `.venv` (which resolves `aggregate` editable to this worktree) does what the SPA's first page load does, with `create_app()` never called: one thread calls `aggregate_api.library.get_underwriter()`, and a second, fired once the read is under way, takes a session fork through `SessionRegistry.underwriter`. On 1.5.2 the second request arrived with 14 recipes read and `_loaded` False, got a fork of all 198, and built `Capstone.ExposureRating`. The same script against an export of the unfixed HEAD source forked 8 of 198 and failed. The real server and browser check was not run.
+- **Full LIB suite:** tier 3, recorded in the CHANGELOG commit's gate run.

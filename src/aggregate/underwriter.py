@@ -7,6 +7,7 @@ import logging
 import numbers
 from pathlib import Path
 import re
+import threading
 from typing import NamedTuple
 import warnings
 
@@ -776,9 +777,15 @@ class Underwriter(HelpMixin):
         # what bounds it. See :meth:`_resolve_sev_ref`.
         self._sev_ref_stack: list[tuple] = []
         # `databases` (public) reports the resolved file Paths actually loaded;
-        # `_loaded` is the honest "configured request has been read" flag.
+        # `_loaded` is the honest "configured request has been read" flag, set
+        # only once the read has finished. `_loading` is True while it runs and
+        # is the same-thread re-entry guard. `_load_lock` serializes load, fork
+        # and reload across threads; reentrant because the reading thread
+        # re-enters load() through its own lookups. See load().
         self.databases: list = []
         self._loaded = False
+        self._loading = False
+        self._load_lock = threading.RLock()
 
     @property
     def lexer(self):
@@ -947,7 +954,7 @@ class Underwriter(HelpMixin):
 
         The single load verb. ``request=None`` reads the **configured** request
         (``self._request``, from the constructor or ``config.build.databases``)
-        exactly once — this is the lazy path that :attr:`recipes` triggers on
+        exactly once: this is the lazy path that :attr:`recipes` triggers on
         first access. A given ``request`` (filename, glob, collection name, or
         list thereof) is resolved and read **additively**: its files are added
         to the recipe base and appended to :attr:`databases`.
@@ -970,20 +977,61 @@ class Underwriter(HelpMixin):
         list[pathlib.Path]
             The files read by this call (empty if the configured request was
             already loaded).
-        """
-        if request is None:
-            if self._loaded:
-                return []
-            paths = self._resolve_database_request(self._request, explicit=False)
-            self._loaded = True
-        else:
-            paths = self._resolve_database_request(request, explicit=True)
 
-        read = []
-        for p in paths:
-            if self._read_file(p):
-                read.append(p)
-        return read
+        Notes
+        -----
+        **Thread safety.** The whole call runs under ``_load_lock``, and
+        ``_loaded`` turns True only once the configured read has *finished*.
+        Every reader of the base (:meth:`recipe`, :attr:`recipes`,
+        :meth:`fork`, the ``.agg`` writer) is guarded by ``if not
+        self._loaded: self.load()``, so a thread arriving while another thread
+        reads calls this method, waits on the lock, then finds ``_loaded`` True
+        and returns. Nobody gets past a guard early, so no thread can look up
+        in, or fork, a half-read base. :meth:`fork` and :meth:`reload` take
+        the same lock.
+
+        **The lock is reentrant because the reading thread re-enters.** A
+        ``sev.X`` or ``agg.X`` reference in the file being read resolves
+        through :meth:`recipe`, whose guard calls this method again, on the
+        same thread, before ``_loaded`` is True. The ``RLock`` lets that call
+        in, and ``_loading`` turns it into a no-op rather than a second,
+        recursive read of the same file.
+
+        **Not covered.** Concurrent :meth:`build` calls on one underwriter
+        share its parser, its ``sev agg.NAME`` cycle guard and its recipe
+        dict, and are not safe: give each thread its own :meth:`fork`. A
+        reader that passed its ``_loaded`` guard just before a
+        :meth:`reload` cleared the base can still see the base being
+        re-read; the window is the time between the guard and the lookup,
+        and the symptom is a loud :class:`RecipeNotFound`, never a fork.
+
+        **A failed configured read is rolled back.** The recipe base,
+        :attr:`databases` and the sequence counter are saved before the read
+        and restored if it raises, and ``_loaded`` stays False. The next
+        access therefore retries from a clean base and raises again until the
+        cause is fixed, rather than working quietly against the half that was
+        read. An explicit ``load(request)`` is additive and is not rolled
+        back.
+        """
+        with self._load_lock:
+            if request is not None:
+                paths = self._resolve_database_request(request, explicit=True)
+                return [p for p in paths if self._read_file(p)]
+            if self._loaded or self._loading:
+                return []
+            saved = (dict(self._recipes), list(self.databases), self._seq_next)
+            self._loading = True
+            try:
+                paths = self._resolve_database_request(self._request, explicit=False)
+                read = [p for p in paths if self._read_file(p)]
+            except BaseException:
+                # KeyboardInterrupt too: a half-read base is never kept.
+                self._recipes, self.databases, self._seq_next = saved
+                raise
+            finally:
+                self._loading = False
+            self._loaded = True
+            return read
 
     def _read_file(self, path):
         """Read and interpret one ``.agg`` file; record it in :attr:`databases`.
@@ -1059,12 +1107,21 @@ class Underwriter(HelpMixin):
         -------
         list[pathlib.Path]
             The files re-read.
+
+        Notes
+        -----
+        The reset and the re-read run under one hold of ``_load_lock``
+        (:meth:`load` re-enters it), so a thread that checks ``_loaded`` after
+        the reset waits for the re-read instead of using the empty base, and
+        a :meth:`fork` cannot land between the two. See :meth:`load` for what
+        the lock does not cover.
         """
-        self._recipes = {}
-        self._seq_next = 0
-        self.databases = []
-        self._loaded = False
-        return self.load()
+        with self._load_lock:
+            self._recipes = {}
+            self._seq_next = 0
+            self.databases = []
+            self._loaded = False
+            return self.load()
 
     def fork(self, name=None):
         """Return an isolated copy sharing this underwriter's parsed recipes.
@@ -1133,23 +1190,75 @@ class Underwriter(HelpMixin):
         ``build`` in place, so forks taken before a reload keep the base they
         were taken from; and the module alias ``build_many`` stays bound to the
         singleton's method, never to a fork's.
+
+        **Taken under the load lock.** Because a fork never catches up, a fork
+        of a half-read base would stay half-read for its whole life. The body
+        runs under ``_load_lock``, so a fork requested while another thread
+        reads the base waits for the read to finish, and the dict copy cannot
+        interleave with an additive ``load(path)`` or a :meth:`reload`. The
+        fork gets a lock of its own (see :meth:`__setstate__`).
         """
-        if not self._loaded:
-            self.load()
-        forked = _shallow_copy(self)
-        forked.name = f'{self.name}-fork' if name is None else name
-        forked._recipes = dict(self._recipes)
-        # Per-instance mutable state, none of it shareable. See Notes.
-        forked._parser = None
-        forked._lexer = None
-        forked._sev_ref_stack = []
-        forked.databases = list(self.databases)
-        # ``_request`` aliases the caller's list when one was passed to
-        # __init__; a fork gets its own so a later load() on either side
-        # cannot rewrite the other's request.
-        if isinstance(self._request, list):
-            forked._request = list(self._request)
-        return forked
+        with self._load_lock:
+            if not self._loaded:
+                self.load()
+            # Goes through __getstate__ / __setstate__, which give the fork its
+            # own load lock and a clear ``_loading``.
+            forked = _shallow_copy(self)
+            forked.name = f'{self.name}-fork' if name is None else name
+            forked._recipes = dict(self._recipes)
+            # Per-instance mutable state, none of it shareable. See Notes.
+            forked._parser = None
+            forked._lexer = None
+            forked._sev_ref_stack = []
+            forked.databases = list(self.databases)
+            # ``_request`` aliases the caller's list when one was passed to
+            # __init__; a fork gets its own so a later load() on either side
+            # cannot rewrite the other's request.
+            if isinstance(self._request, list):
+                forked._request = list(self._request)
+            return forked
+
+    def __getstate__(self):
+        """State for :mod:`pickle` and :mod:`copy`, without the load lock.
+
+        Returns
+        -------
+        dict
+            A shallow copy of the instance ``__dict__`` with ``_load_lock``
+            removed.
+
+        Notes
+        -----
+        An ``RLock`` can be neither pickled nor deep-copied, and an
+        underwriter, ``build`` included, could always be both: passing
+        ``build`` to a ``joblib`` or ``multiprocessing`` worker pickles it. The
+        lock is taken while the state is copied, so a pickle taken while
+        another thread reads the base waits for the read and never captures a
+        half-read base. :func:`copy.copy` comes through here too, which is how
+        :meth:`fork` gets a lock of its own.
+        """
+        with self._load_lock:
+            state = self.__dict__.copy()
+        del state['_load_lock']
+        return state
+
+    def __setstate__(self, state):
+        """Restore from :meth:`__getstate__` with a fresh load lock.
+
+        Parameters
+        ----------
+        state : dict
+            The instance dict, without ``_load_lock``.
+
+        Notes
+        -----
+        ``_loading`` is reset because it describes a read in progress on the
+        original object, and no read is in progress on the copy. Setting it
+        here also lets a pickle written before the flag existed load cleanly.
+        """
+        self.__dict__.update(state)
+        self._loading = False
+        self._load_lock = threading.RLock()
 
     def resolve_databases(self, request=None):
         """
@@ -3703,15 +3812,18 @@ def _refresh_default_underwriter():
     ``build`` object in place (rather than rebinding the name) so that any
     ``from aggregate import build`` references already held by callers see the
     new configured defaults. Cached recipes are cleared so reconfigured
-    databases reload lazily on next access.
+    databases reload lazily on next access. The reset runs under the load
+    lock, so it cannot interleave with a read or a fork on another thread
+    (see :meth:`Underwriter.load`).
     """
     s = get_settings().build
-    build.update = s.update
-    build.log2 = s.log2
-    build._request = list(s.databases) or None
-    # reset to as-created so the reconfigured request reloads lazily on next access
-    build._recipes = {}
-    build.databases = []
-    build._loaded = False
+    with build._load_lock:
+        build.update = s.update
+        build.log2 = s.log2
+        build._request = list(s.databases) or None
+        # reset to as-created so the reconfigured request reloads lazily on next access
+        build._recipes = {}
+        build.databases = []
+        build._loaded = False
 # uncomment to create debug build, add to __init__.py
 # debug_build = Underwriter(name='Debug', update=True, debug=True, log2=16)

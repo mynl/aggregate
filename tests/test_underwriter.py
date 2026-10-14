@@ -6,8 +6,11 @@ refactor lands and as the contract afterwards. Anything that changes here is an
 intentional, documented behavior change.
 """
 
+import copy
 import logging
 from pathlib import Path
+import pickle
+import threading
 
 import pytest
 
@@ -270,6 +273,139 @@ def test_reload_resets_to_as_created():
     uw.reload()
     assert ('agg', 'ReloadMe') not in uw._recipes
     assert len(uw._recipes) == n0
+
+
+# ---------------------------------------------------------------------------
+# thread safety of load / fork / reload  [Thread-Safe-Load]
+# ---------------------------------------------------------------------------
+# Each test takes a fresh Underwriter over library.agg, never the ``build``
+# singleton, so the suite's shared base is not disturbed.
+
+def _race_against_load(uw, call):
+    """Run ``uw.load()`` on one thread, paused at its read, and ``call()`` on another.
+
+    The instance's ``_read_file`` is wrapped to set ``started`` and then wait on
+    ``release``, so thread A holds the configured read open, deterministically,
+    while thread B runs ``call``. B is given a bounded join before A is
+    released: on the unfixed code B finishes inside it, against the half-read
+    base, which is the defect; on the fixed code B is blocked on the load lock,
+    the join times out, and B completes once the read does. The outcome the
+    tests assert does not depend on which.
+
+    Returns
+    -------
+    dict
+        ``{'value': ...}`` with B's result, or ``{'error': exc}`` if it raised.
+    """
+    started, release = threading.Event(), threading.Event()
+    real_read_file = uw._read_file
+
+    def paused_read_file(path):
+        started.set()
+        release.wait(timeout=60)
+        return real_read_file(path)
+
+    uw._read_file = paused_read_file
+    out = {}
+
+    def reader():
+        uw.load()
+
+    def caller():
+        try:
+            out['value'] = call()
+        except Exception as e:  # noqa: BLE001 (the test inspects it)
+            out['error'] = e
+
+    a = threading.Thread(target=reader)
+    a.start()
+    assert started.wait(timeout=60)
+    b = threading.Thread(target=caller)
+    b.start()
+    b.join(timeout=0.5)
+    release.set()
+    a.join(timeout=60)
+    b.join(timeout=60)
+    assert not a.is_alive() and not b.is_alive()
+    return out
+
+
+def test_fork_waits_for_the_read():
+    """A fork taken mid-read is a snapshot of the finished base, not the half."""
+    uw = Underwriter(databases='library')
+    out = _race_against_load(uw, uw.fork)
+    assert 'error' not in out, out.get('error')
+    fork = out['value']
+    assert set(fork._recipes) == set(uw._recipes)
+    assert ('agg', 'Capstone.Gross') in fork._recipes
+
+
+def test_lookup_waits_for_the_read():
+    """A lookup mid-read gets the recipe, not RecipeNotFound."""
+    uw = Underwriter(databases='library')
+    out = _race_against_load(uw, lambda: uw.recipe('Capstone.ExposureRating'))
+    assert 'error' not in out, out.get('error')
+    assert out['value'].name == 'Capstone.ExposureRating'
+
+
+def test_load_reentry_reads_library_once():
+    """The read re-enters load() through sev.X / agg.X lookups, without recursing."""
+    uw = Underwriter(databases='library')
+    real_load, calls = uw.load, []
+
+    def counted_load(request=None):
+        calls.append(request)
+        return real_load(request)
+
+    uw.load = counted_load
+    read = uw.load()
+    # More than one call proves the nested lookup path ran; one read proves
+    # the nested calls returned rather than reading the file again.
+    assert len(calls) > 1
+    assert [p.name for p in read] == ['library.agg']
+    assert [p.name for p in uw.databases] == ['library.agg']
+    assert uw._loaded and not uw._loading
+    assert ('agg', 'Capstone.Gross') in uw._recipes
+
+
+def test_failed_load_rolls_back_and_retries(tmp_path):
+    """A configured read that raises leaves the base as it was, and unloaded."""
+    good = tmp_path / 'good.agg'
+    good.write_text('agg Good 1 claim sev lognorm 10 cv 1 fixed\n', encoding='utf-8')
+    bad = tmp_path / 'bad.agg'
+    bad.write_text('agg Bad this is not decl\n', encoding='utf-8')
+    uw = Underwriter(databases=[str(good), str(bad)])
+    with pytest.raises(ValueError):
+        uw.load()
+    assert not uw._loaded and not uw._loading
+    assert uw._recipes == {} and uw.databases == [] and uw._seq_next == 0
+    # The next access retries from a clean base and fails the same way, rather
+    # than quietly working against the half that was read.
+    with pytest.raises(ValueError):
+        uw.recipe('Good')
+    assert uw._recipes == {} and uw.databases == []
+    bad.write_text('agg Bad 1 claim sev lognorm 10 cv 1 fixed\n', encoding='utf-8')
+    assert uw.recipe('Good').name == 'Good'
+    assert [p.name for p in uw.databases] == ['good.agg', 'bad.agg']
+
+
+def test_underwriter_pickles_and_deep_copies():
+    """The load lock is dropped on the way out and recreated on the way in."""
+    uw = Underwriter(databases='library')
+    uw.load()
+    _ = uw.parser
+    for twin in (pickle.loads(pickle.dumps(uw)), copy.deepcopy(uw)):
+        assert set(twin._recipes) == set(uw._recipes)
+        assert twin._loaded and not twin._loading
+        assert twin._load_lock is not uw._load_lock
+        assert ('agg', 'Capstone.Gross') in twin.fork()._recipes
+
+
+def test_fork_has_its_own_load_lock():
+    uw = Underwriter(databases='library')
+    fork = uw.fork()
+    assert fork._load_lock is not uw._load_lock
+    assert fork._loaded and not fork._loading
 
 
 def test_source_provenance():

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.5.2 - 2026-10-14
+
+**[Thread-Safe-Load] `Underwriter.load()`, `fork()` and `reload()` are thread safe.** A thread that looks up a recipe or takes a fork while another thread is reading the configured databases now waits for the read to finish. Before, it found the base already marked loaded part way through the read, and got `RecipeNotFound` or, worse, a fork that kept the partial base for good: this is what broke a freshly started aLL server, and any multi-threaded host could hit it. A configured read that raises is now rolled back and retried on the next access, so a broken file in the configured request raises every time until it is fixed, where before later calls quietly used whatever had been read. Underwriters, `build` included, still pickle and deep-copy. Concurrent `build()` calls on one underwriter remain unsafe; give each thread a `fork()`. Plan `dev/done/plan-1.5.2-thread-safe-load.md`.
+
 ## 1.5.1 - 2026-10-14
 
 **[Zero-Share-Layer-Moments] a cession that is identically zero reports exact zeros.** A layer, or a whole program, whose every layer has zero share or zero limit now gets the exact point mass at zero, at the occurrence and the aggregate stage alike: raw moments and mean exactly 0, `cv` and `skew` `nan`, `pr_loss` 0, and the same for the realized `est_*` of a `ceded to` program. Previously a genuine truncation deficit in the subject was relocated through the zero layer, so `aggregate net of 0% po 200 xs 400 and 100 xs 600` over `sev lognorm 50 cv 1.5` reported a layer mean of `1.19e-06` with `cv` and `skew` of `1.66e+05`. `CS.Gapped` in `tests/test_chart_structure.py` is now checked on every tier. Contributed by @KasraBashirioskooei (#11).

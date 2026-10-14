@@ -162,6 +162,15 @@
 
 ## Recently landed
 
+- **[Thread-Safe-Load]** DONE at **1.5.2** (2026-10-14,
+  `dev/done/plan-1.5.2-thread-safe-load.md`, raised from aLL): `load`, `fork`
+  and `reload` run under a per-instance `RLock`, and `_loaded` turns True only
+  once the read finishes, so no thread can look up in or fork a half-read
+  base; a failed configured read rolls back and retries. aLL's startup read
+  (api 1.13.4) stays, since it keeps the read off the first request, but its
+  comment in `create_app` describing the unlocked load goes stale once the
+  api's floor reaches 1.5.2.
+
 - **[Zero-Share-Layer-Moments]** DONE at **1.5.1** (2026-10-14, #11, the
   contributor's fix): 1.2.0a14 cleaned the occurrence reproducer only because
   its subject deficit was below `VALIDATION_NOISE`, and an aggregate stage

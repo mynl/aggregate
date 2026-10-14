@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.5.1 - 2026-10-14
+
+**[Zero-Share-Layer-Moments] a cession that is identically zero reports exact zeros.** A layer, or a whole program, whose every layer has zero share or zero limit now gets the exact point mass at zero, at the occurrence and the aggregate stage alike: raw moments and mean exactly 0, `cv` and `skew` `nan`, `pr_loss` 0, and the same for the realized `est_*` of a `ceded to` program. Previously a genuine truncation deficit in the subject was relocated through the zero layer, so `aggregate net of 0% po 200 xs 400 and 100 xs 600` over `sev lognorm 50 cv 1.5` reported a layer mean of `1.19e-06` with `cv` and `skew` of `1.66e+05`. `CS.Gapped` in `tests/test_chart_structure.py` is now checked on every tier. Contributed by @KasraBashirioskooei (#11).
+
 ## 1.5.0 - 2026-10-14
 
 **[NTT-Exact-Tail-Chart] a new chart, `exact_tail`, draws an nttagg's exact answer as base-10 logarithms down to the last bucket of the support.** Two panels over one loss axis, `mass` and `survival`, each with an `Exact` series computed from the integers and a `Float FFT` series beside it, so a bucket at 1e-462 reads where the float answer has long since gone to zero or noise. Exact zeros are omitted. Available for an updated `AggregateNTT` only and never primary, so `primary_chart` still answers `agg`; draw it with `plot_chartdoc(build_chart_doc(a, 'exact_tail'))`. The chart IR gains two axis units whose values are exponents, `log10_density` (drawn as markers only) and `log10_probability` (drawn as `probability` is), and `plot_chartdoc` draws both; `CHART_IR_VERSION` stays at 4. New `charts.chart_exact_tail`. Docs await a rebuild. Plan `dev/done/plan-1.4.0-nttagg-arithmetic-exact-chart.md`; the aLL leaf is `aggregate-api/dev/plan-1.13.0-exact-tail-leaf.md`.

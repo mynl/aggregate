@@ -154,8 +154,21 @@
   last-digit float differences from snapshots captured on this machine. Make
   the comparisons tolerant enough that a clean checkout passes on macOS and
   Linux without losing their value as change detectors. Promised, so owed.
+  Two more from #11, failing by tolerance alone:
+  `test_moment_deficit.py::test_signed_window_deficit_is_genuine_and_still_relocates`
+  compares a skew near zero at `rtol=1e-6`, and
+  `test_moments.py::test_deterministic_wait_realized_cv_is_zero` asserts
+  `est_cv == 0.0` exactly where macOS gets `2.4e-8`.
 
 ## Recently landed
+
+- **[Zero-Share-Layer-Moments]** DONE at **1.5.1** (2026-10-14, #11, the
+  contributor's fix): 1.2.0a14 cleaned the occurrence reproducer only because
+  its subject deficit was below `VALIDATION_NOISE`, and an aggregate stage
+  `0% po` layer over a subject with a genuine deficit still reported a mean of
+  `1.2e-6`. `_reinsurance.cedes_nothing` now gives any zero cession the exact
+  point mass at zero (`zero_cession_density`), and the `CS.Gapped` tier
+  exclusion in `tests/test_chart_structure.py` is lifted.
 
 - **[Allocation-Bounds-Gold-Standard-Tests]** DONE (2026-10-14, #10,
   squash-merged as `35a0624`, no version bump): the contributor's 21 tests in
@@ -183,17 +196,6 @@
   `tests/test_decl_help.py`. The api half is
   `aggregate-api/dev/plan-1.7.0-decl-help.md`. Divergences and the
   measurements are in the plan's execution log.
-
-- **[Zero-Share-Layer-Moments]** DONE at **1.2.0a14**, as a side effect of
-  `[Moment-Deficit-Genuine-Only]` (verified 2026-10-13): the zero-share layer
-  in `agg Z 10 claims sev lognorm 50 cv 1.5 occurrence net of 20 xs 20 and 0%
-  po 20 xs 40 and inf xs 60 poisson`, and a `cv 10` variant at `log2=10` whose
-  grid cannot hold its tail, report raw moments of exactly 0 with `cv` and
-  `skew` of `nan` and no `RuntimeWarning`. Reopen if the #8 contributor sends a
-  case that still reports noise; their explicit `cedes_nothing` recognition is
-  then the fix. **Follow-up:** the `_EVERY_TIER` exclusion of `CS.Gapped` in
-  `tests/test_chart_structure.py` exists only because of this defect; try
-  lifting it under the numerics gate.
 
 - **[NTT-Speed]** DONE at **1.2.0a1** and **1.2.0a2** (2026-10-09,
   `dev/done/plan-ntt-speed.md`): geometric spectral runs for equal-weight

@@ -74,22 +74,9 @@ _EVERY_PROGRAM = (_DECLARED, _NET_OF, _CEDED_TO, _QUOTA, _GAPPED, _PRICED,
                   _UNPRICED_PNL, _BOUNDED_SEV, _BOUNDED_AGG, _UNBOUNDED)
 
 #: Every (program, tier) pair the whole-set invariants are checked over.
-#:
-#: ``CS.Gapped`` is checked on the declared tier only, and the omission is
-#: deliberate. Building it walks ``reins_stats_df`` into its ``0% po``
-#: layer, whose ceded variance comes out as float noise below zero, so
-#: ``moments.mcvsk`` takes the square root of a negative number and the
-#: layer reports ``cv`` and ``skew`` as NaN. That is a real defect and it
-#: has nothing to do with the loss window, so it is tracked separately
-#: (``[Zero-Share-Layer-Moments]`` in ``dev/TODO.md``) rather than either
-#: fixed here or allowed to trip the ``-W error::RuntimeWarning`` gate. The
-#: window rule itself is tier independent on this program, since its
-#: support is bounded at 100 either way, so nothing about the window goes
-#: unchecked.
 _EVERY_TIER = [(program, update)
                for program in _EVERY_PROGRAM
-               for update in (False, True)
-               if not (program is _GAPPED and update)]
+               for update in (False, True)]
 
 
 @pytest.fixture(scope='module')

@@ -69,7 +69,7 @@ Then read everything the plan is attached to, because a plan is rarely alone:
 ```
 git -C V:/worktrees/aggregate_REFACTOR status
 git -C V:/worktrees/aggregate_REFACTOR log --oneline -8
-grep -n '^version' pyproject.toml
+grep -n '^__version__' src/aggregate/__init__.py
 ```
 
 The author commits frequently without announcing it, and a parallel session in
@@ -168,7 +168,7 @@ divergence is a good outcome. An unrecorded one is the failure.
 ## 6. Hygiene at each bump
 
 Call the `version-bump` skill and follow it. It owns the tier 3 gate, the
-`pyproject.toml` line, the CHANGELOG section, `dev/TODO.md`, the regens, the
+`__version__` line, the CHANGELOG section, `dev/TODO.md`, the regens, the
 one-line commit and the never-push rule.
 
 Three things this skill adds on top of it:

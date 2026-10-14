@@ -352,6 +352,40 @@ def test_entry_point_route_is_discovered_and_versioned(monkeypatch):
         _forget_good()
 
 
+@pytest.mark.parametrize('declared, expected', [('1.2.3', '1.2.3'), (None, '9.9.9')])
+def test_plugin_version_prefers_the_package_attribute(monkeypatch, declared, expected):
+    """The live ``__version__`` wins over metadata; without one, metadata stands.
+
+    Metadata is recorded at install time, so an editable plugin bumped since
+    reports its old version from it. The stub distribution says ``9.9.9``
+    throughout; only the package's attribute changes between the two cases.
+    """
+    import types
+    package = types.ModuleType('_toyplugin_pkg')
+    if declared is not None:
+        package.__version__ = declared
+    monkeypatch.setitem(sys.modules, '_toyplugin_pkg', package)
+
+    class _Dist:
+        version = '9.9.9'
+
+    class _EntryPoint:
+        name = 'toyplugin'
+        module = '_toyplugin_pkg.register'
+        dist = _Dist()
+
+        def load(self):
+            return good_fixture.register
+
+    monkeypatch.setattr(plugins, 'entry_points', lambda group=None: [_EntryPoint()])
+    try:
+        plugin, = plugins.load(env={}, force=True)
+        assert plugin.ok
+        assert plugin.version == expected
+    finally:
+        _forget_good()
+
+
 def test_entry_point_wins_over_the_same_name_in_the_environment(monkeypatch):
     """The packaged route is the destination; the variable is the experiment."""
     class _EntryPoint:

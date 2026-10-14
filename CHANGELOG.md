@@ -20,6 +20,15 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.2.1 - 2026-10-14
+
+**[Version-Source] the version is written once and read live.**
+
+- `aggregate.__version__` is a plain literal in `src/aggregate/__init__.py`, and `pyproject.toml` reads it (`dynamic = ["version"]`, through `[tool.setuptools.dynamic]`). It no longer comes from `importlib.metadata`, which in an editable install keeps the number recorded at install time until a reinstall.
+- A plugin's `LoadedPlugin.version` is the `__version__` of its top-level package when it declares one, falling back to distribution metadata. An editable plugin now reports the version in its source.
+- `[tool.uv] cache-keys` adds `src/aggregate/__init__.py`, so uv rebuilds the editable install when the version changes.
+- A bump edits one line and needs no sync. Plan: `dev/done/plan-1.2.1-version-source.md`, shared with aggregate-api, aggregate-relativity and aggregate-ntt.
+
 ## 1.2.0 - 2026-10-13
 
 **[NTT-Exact-Aggregate] exact compound distributions through the new `nttagg` DecL kind, the `reproductions.agg` corpus, and `decl_help()`.** The first release since 1.0.1, rolling up 1.1.0 and 1.2.0a1 to 1.2.0a15 below. `build('nttagg DiceOfDice dfreq [1:100] dsev [1:100]')` returns `aggregate.ntt.AggregateNTT`, an `Aggregate` that runs the usual FFT pipeline and computes the exact rational distribution beside it with the number-theoretic transform: `a.p_exact` (reduced Fractions, built on first access), `a.p_exact_at(loss)` for chosen buckets, `density_df` columns `p_exact_float` and `p_exact_log10` (finite far below the smallest double), per-bucket `accuracy_df`, the `ntt_audit` record, and an exact `stats_df` column that validation measures against. Probabilities are text-exact (`0.3` is `3/10`), outcomes are nonnegative integers, the grid sizes itself to the support, and the kind cannot appear in a portfolio, pnl or bivariate. The 1000 x 1000 uniform dice of dice runs in 216 s in pure Python, or 10.7 s with the optional compiled engine `aggregate-ntt` installed from <https://github.com/mynl/aggregate-ntt> (1.0.0a3 or later, never a dependency); `ntt_engine=` forces either path and answers are bit-identical. The wheel also ships `reproductions.agg`, 140 DecL programs rebuilding published actuarial and numerical results, read with `build.load("reproductions.agg")` (see <https://blog.mynl.com/posts/notes/2026-10-08-Aggregate-Reproductions/>); `library.agg` gains `ExactDiceOfDice` and drops the broken `PnLBook` recipe. New `decl_help()` returns one page of DecL help as HTML that renders in Jupyter: the anatomy of a statement by default, or a one-page reference card with `decl_help('card')`.

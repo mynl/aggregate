@@ -12,7 +12,6 @@ resolution-markers = [
 
 [[package]]
 name = "aggregate"
-version = "1.2.0"
 source = { editable = "." }
 dependencies = [
     { name = "greater-tables" },
@@ -77,7 +76,7 @@ viz = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aggregate", extras = ["notebook", "numba", "massive", "viz"], marker = "extra == 'all'" },
+    { name = "aggregate", extras = ["massive", "notebook", "numba", "viz"], marker = "extra == 'all'" },
     { name = "attrs", marker = "extra == 'notebook'" },
     { name = "bokeh", marker = "extra == 'viz'" },
     { name = "datashader", marker = "extra == 'viz'" },

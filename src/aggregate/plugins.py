@@ -79,6 +79,7 @@ about them.
 """
 
 import os
+import sys
 import traceback
 from dataclasses import dataclass, field
 from importlib import import_module
@@ -156,7 +157,10 @@ class LoadedPlugin:
         The entry point name, or for the environment route the module path as
         it was written, since there is no distribution metadata to name it.
     version : str or None
-        The distribution version where one is discoverable.
+        The ``__version__`` of the plugin's top-level package when it declares
+        one, else the distribution version where one is discoverable. The live
+        attribute comes first so an editable install reports the version in its
+        source, not the one recorded when it was installed.
     source : str
         ``'entry_point'`` or ``'env'``.
     leaves : tuple of PluginLeaf
@@ -213,6 +217,39 @@ def _distribution_version(dist_name):
         return version(dist_name)
     except (PackageNotFoundError, ValueError):
         return None
+
+
+def _live_version(candidate):
+    """The version to report for ``candidate``, read live where possible.
+
+    Parameters
+    ----------
+    candidate : _Discovered
+        A candidate whose ``register()`` has already been resolved, so its
+        top-level package is in :data:`sys.modules` if it imported at all.
+
+    Returns
+    -------
+    str or None
+        The top-level package's ``__version__`` when it is a string, otherwise
+        ``candidate.version``, the distribution metadata read at discovery.
+
+    Notes
+    -----
+    Distribution metadata is written once, when a package is installed, so an
+    editable plugin bumped since then reports its old version from metadata.
+    The package attribute is what the source says now. It is read from
+    :data:`sys.modules` rather than imported, so this never imports anything
+    that resolving the plugin did not already import.
+    """
+    module_path = candidate.module_path or getattr(
+        candidate.entry_point, 'module', None)
+    if module_path:
+        package = sys.modules.get(module_path.split('.', 1)[0])
+        live = getattr(package, '__version__', None)
+        if isinstance(live, str):
+            return live
+    return candidate.version
 
 
 def _discover(env):
@@ -289,12 +326,17 @@ def _run(candidate, charts_registry, exhibits_registry):
     """Run one candidate's ``register()`` and return its :class:`LoadedPlugin`."""
     before_charts = set(charts_registry)
     before_exhibits = set(exhibits_registry)
-    common = dict(name=candidate.name, version=candidate.version,
-                  source=candidate.source)
     try:
         leaves = list(_resolve(candidate)() or ())
     except Exception:
-        return LoadedPlugin(error=traceback.format_exc(), **common)
+        error = traceback.format_exc()
+    else:
+        error = None
+    # Read after resolving, so the plugin's own package is already imported.
+    common = dict(name=candidate.name, version=_live_version(candidate),
+                  source=candidate.source)
+    if error is not None:
+        return LoadedPlugin(error=error, **common)
     added_charts = tuple(sorted(set(charts_registry) - before_charts))
     added_exhibits = tuple(sorted(set(exhibits_registry) - before_exhibits))
     bad = [leaf for leaf in leaves if not isinstance(leaf, PluginLeaf)]

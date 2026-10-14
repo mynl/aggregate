@@ -294,7 +294,10 @@ These are standing rules — follow them without being re-asked:
 
 - **Every plan-based code change bumps the version.** Any code change executed
   from a plan (a `dev/plan-*.md`, or any multi-step feature/refactor) bumps the
-  `1.0.0a*` version in `pyproject.toml`. (Pure tidying — file moves, comment or
+  version. It is written in **one** place, the literal `__version__` in
+  `src/aggregate/__init__.py`; `pyproject.toml` reads it from there
+  (`dynamic = ["version"]`), and a bump needs no sync or reinstall, because
+  running code reports the live attribute. (Pure tidying — file moves, comment or
   doc-only edits with no behaviour change — does not.)
 - **Keep `CHANGELOG.md` current.** Each version bump adds a `## <version>`
   section to `CHANGELOG.md` (the running release-notes draft) at the close of
@@ -349,7 +352,7 @@ These are standing rules — follow them without being re-asked:
   summary will not fit on one line, either the commit is too big or the
   CHANGELOG entry is not doing its job.
 - **A version-bump commit is one coherent unit.** It carries the code change,
-  the `pyproject.toml` bump, the `CHANGELOG.md` section, and whatever release
+  the `__version__` bump in `src/aggregate/__init__.py`, the `CHANGELOG.md` section, and whatever release
   hygiene the change implies — `dev/TODO.md`, `dev/FEATURES.csv` (via
   `dev/regen_features.py`), grammar-reference regen, moving a finished plan to
   `dev/done/`. Never split those across commits, and never let a version land in

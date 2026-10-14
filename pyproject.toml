@@ -4,7 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "aggregate"
-version = "1.2.0"
+# Written once, as the literal `__version__` in src/aggregate/__init__.py, and
+# read from there by [tool.setuptools.dynamic]. A bump edits that one line and
+# touches no environment.
+dynamic = ["version"]
 description = "Tools for creating and working with aggregate probability distributions."
 readme = "README.md"
 authors = [
@@ -120,6 +123,17 @@ all = [
 [tool.setuptools]
 include-package-data = true
 package-dir = {"" = "src"}
+
+# Read statically: setuptools parses the literal rather than importing the
+# package, which would pull in pandas at build time.
+[tool.setuptools.dynamic]
+version = { attr = "aggregate.__version__" }
+
+# uv caches a local project's metadata keyed on pyproject.toml alone. With the
+# version dynamic it must also watch the file the version lives in, or a lock or
+# an install can carry the previous number.
+[tool.uv]
+cache-keys = [{ file = "pyproject.toml" }, { file = "src/aggregate/__init__.py" }]
 
 # Automatic discovery, NOT an explicit list. `packages = ["aggregate"]` names
 # only the top level package: setuptools does not recurse, so the subpackages

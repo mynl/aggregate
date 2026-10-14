@@ -57,8 +57,10 @@ __copyright__ = "2018-2026, Stephen J Mildenhall"
 __license__   = "BSD 3-Clause New License"
 __email__     = "stephen.j.mildenhall@gmail.com"
 __status__    = "beta"
-from importlib.metadata import version as _pkg_version
-__version__ = _pkg_version("aggregate")
+# The one place the version is written. A plain literal on purpose: setuptools
+# reads it statically for the wheel, and running code reports it live, so an
+# editable install never reports a stale number after a bump.
+__version__ = "1.2.1"
 
 
 __doc__ = """

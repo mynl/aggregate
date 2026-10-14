@@ -1,7 +1,7 @@
 ---
 name: version-bump
 description: Bump the aggregate 1.0.0a version and commit it as one coherent
-  unit: the gate run, pyproject.toml, the CHANGELOG section, dev/TODO.md, any
+  unit: the gate run, the __version__ line, the CHANGELOG section, dev/TODO.md, any
   regen the change implies, the finished plan moved to dev/done/, and a one-line
   commit message. Use when a plan-based change is finished, when asked to bump,
   ship, cut a version or commit a version, and to decide whether a given change
@@ -62,8 +62,11 @@ A version-bump commit is **one coherent unit**. It carries every item below that
 the change implies, and never splits them across commits:
 
 - The code change itself, with its tests.
-- `pyproject.toml`, the `version = "1.0.0a*"` line. Read the current value, do
-  not assume it. Recent history: `1.0.0a305`.
+- `src/aggregate/__init__.py`, the `__version__ = "x.y.z"` literal, which is
+  the **one** place the version is written since 1.2.1. `pyproject.toml` reads
+  it (`dynamic = ["version"]`) and carries no version line. Read the current
+  value, do not assume it. No sync or reinstall follows a bump: running code
+  reports the live attribute, so an editable install is never stale.
 - `CHANGELOG.md`, a new `## <version>` section at the top of the entries, below
   the standing "API stability" preamble and above the previous entry.
 - `dev/TODO.md`, tick the tracked item, noting the version and the

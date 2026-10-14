@@ -324,6 +324,8 @@ NTT_PROGRAMS = [
     'nttagg RT.Skewed dfreq [0 1 2] [1/4 1/2 1/4] dsev [1 2 10] [0.3 0.5 0.2]',
     'nttagg RT.Stepped as "Even Counts" dfreq [2:10:2] dsev [5]',
     'nttagg RT.Sci dfreq [1] dsev [1 2] [3e-1 7e-1] tags{exact, ntt}',
+    'nttagg RT.Arithmetic dfreq [1:3] dsev [1:3] '
+    '[1/2 (1/2-1/(13*11*(19**3))) (1/(13*11*(19**3)))]',
 ]
 
 
@@ -341,6 +343,75 @@ def test_nttagg_parses_text_exact(underwriter):
                                       Fraction(1, 4)]
     assert spec['ntt_sev_probs'] == [Fraction(3, 10), Fraction(1, 2),
                                      Fraction(1, 5)]
+
+
+# ------------------------------------- [NTT-Rational-Arithmetic] (1.4.0)
+
+def _sev_probs(uw, probs):
+    """The exact severity probabilities ``probs`` parses to, one per outcome."""
+    count = len(probs.strip('[]').split())
+    _, _, spec = _parse(
+        uw, f'nttagg T dfreq [1] dsev [1:{count}] {probs}')
+    return spec['ntt_sev_probs']
+
+
+def test_nttagg_arithmetic_example_is_exact(underwriter):
+    """The plan's example: a probability small enough to want a formula."""
+    assert _sev_probs(
+        underwriter,
+        '[1/2 (1/2-1/(13*11*(19**3))) (1/(13*11*(19**3)))]') == [
+            Fraction(1, 2), Fraction(980835, 1961674), Fraction(1, 980837)]
+
+
+@pytest.mark.parametrize('expression, expected', [
+    ('(1/2+1/4)', Fraction(3, 4)),
+    ('(1-1/3)', Fraction(2, 3)),
+    ('(2*1/8)', Fraction(1, 4)),
+    ('(1/2)/2', Fraction(1, 4)),
+    ('1/2/2', Fraction(1, 4)),          # left associative: (1/2)/2
+    ('2**-3', Fraction(1, 8)),          # unary minus right after **
+    ('2^-3', Fraction(1, 8)),
+    ('(-2**2+5)', Fraction(1)),         # -2**2 is -(2**2), as in Python
+    ('2**-2**2', Fraction(1, 16)),      # right associative: 2**(-(2**2))
+    ('((1/2)*(1/(1+1)))', Fraction(1, 4)),
+    ('(0.1+0.2)', Fraction(3, 10)),     # exact, which agg cannot say
+    ('(3e-1*1)', Fraction(3, 10)),
+])
+def test_nttagg_arithmetic_operators_and_precedence(underwriter, expression,
+                                                    expected):
+    # pad with the exact complement so the list passes the sum check
+    rest = 1 - expected
+    padding = f' {rest.numerator}/{rest.denominator}' if rest else ''
+    probs = _sev_probs(underwriter, f'[{expression}{padding}]')
+    assert probs[0] == expected
+    assert all(type(q) is Fraction for q in probs)
+
+
+@pytest.mark.parametrize('probs, message', [
+    ('[2**(1/2) 1/2]', 'whole number'),
+    ('[(1/0) 1]', 'zero denominator'),
+    ('[0**-1 1]', 'zero denominator'),
+    ('[10**10**10 1]', 'NTT_EXPONENT_MAX_BITS'),
+    ('[-1/2 3/2]', 'DecL parse error'),
+])
+def test_nttagg_arithmetic_rejections(underwriter, probs, message):
+    with pytest.raises(ValueError, match=message):
+        _parse(underwriter, f'nttagg T dfreq [1] dsev [1 2] {probs}')
+
+
+def test_nttagg_arithmetic_builds(underwriter):
+    """Acceptance: the example builds and reformats to reduced fractions."""
+    from aggregate import build
+    from aggregate.decl_writer import spec_to_decl
+    from aggregate.ntt import AggregateNTT
+    program = ('nttagg X dfreq [1:3] dsev [1:3] '
+               '[1/2 (1/2-1/(13*11*(19**3))) (1/(13*11*(19**3)))]')
+    a = build(program)
+    assert isinstance(a, AggregateNTT)
+    assert a.ntt_sev_probs == [Fraction(1, 2), Fraction(980835, 1961674),
+                               Fraction(1, 980837)]
+    kind, name, spec = _parse(underwriter, program)
+    assert '[1/2 980835/1961674 1/980837]' in spec_to_decl(spec, kind, name)
 
 
 def test_nttagg_uniform_default_and_ranges(underwriter):

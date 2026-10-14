@@ -52,6 +52,7 @@ from lark import Lark, Transformer
 from lark.exceptions import (UnexpectedCharacters, UnexpectedInput,
                              UnexpectedToken, VisitError)
 
+from .constants import NTT_EXPONENT_MAX_BITS
 from .parser_errors import format_error
 
 logger = logging.getLogger(__name__)
@@ -2131,7 +2132,14 @@ class UnderwritingTransformer(Transformer):
     def ntt_ratl_one(self, c):
         return [c[0]]
 
-    def ntt_rat_number(self, c):
+    # Exact arithmetic over one probability (the ntt_rat ladder in
+    # decl.lark). Every callback takes and returns Fraction; none touches a
+    # float. Deliberately not shared with agg's atom_* callbacks:
+    # atom_exponent returns a float for a fractional power and atom_exp is
+    # transcendental, so separate callbacks keep the "nttagg never touches a
+    # float" invariant local and checkable.
+
+    def ntt_number(self, c):
         # Fraction(token text) is exact for decimal and scientific literals:
         # '0.3' is 3/10, '3e-2' is 3/100, '7' is 7.
         text = c[0].replace('_', '')
@@ -2142,20 +2150,61 @@ class UnderwritingTransformer(Transformer):
                 f'nttagg probabilities must be rational numbers, '
                 f'got {c[0]!r}') from None
 
-    def ntt_rat_fraction(self, c):
-        numerator, _divide, denominator = c
-        try:
-            n = int(numerator.replace('_', ''))
-            d = int(denominator.replace('_', ''))
-        except ValueError:
+    def ntt_parens(self, c):
+        return c[0]
+
+    def ntt_add(self, c):
+        a, _, b = c
+        return a + b
+
+    def ntt_subtract(self, c):
+        a, _, b = c
+        return a - b
+
+    def ntt_multiply(self, c):
+        a, _, b = c
+        return a * b
+
+    def ntt_divide(self, c):
+        a, _, b = c
+        if b == 0:
             raise ValueError(
-                f'nttagg a/b probabilities take integers, got '
-                f'{numerator}/{denominator}') from None
-        if d == 0:
+                f'nttagg probability {a}/{b} has a zero denominator')
+        return a / b
+
+    def ntt_negate(self, c):
+        _, a = c
+        return -a
+
+    def ntt_exponent(self, c):
+        """Exact ``base ** power`` for a whole-number power.
+
+        Notes
+        -----
+        A fractional power of a rational is in general irrational, so there
+        is no exact answer to give and the power must be whole. ``Fraction``
+        computes ``base ** n`` exactly for an ``int`` ``n``, but the result
+        has about ``abs(n) * max(bits of numerator, bits of denominator)``
+        bits, so that size is checked against ``NTT_EXPONENT_MAX_BITS``
+        first: a typo such as ``10**10**10`` is refused rather than left to
+        run for hours.
+        """
+        base, _, power = c
+        if power.denominator != 1:
             raise ValueError(
-                f'nttagg probability {numerator}/{denominator} has a zero '
-                f'denominator')
-        return Fraction(n, d)
+                f'nttagg exponent must be a whole number, got {power}')
+        n = power.numerator
+        size = abs(n) * max(base.numerator.bit_length(),
+                            base.denominator.bit_length())
+        if size > NTT_EXPONENT_MAX_BITS:
+            raise ValueError(
+                f'nttagg power {base}**{n} would have about {size:,} bits, '
+                f'past the cap of {NTT_EXPONENT_MAX_BITS:,} '
+                f'(NTT_EXPONENT_MAX_BITS)')
+        if base == 0 and n < 0:
+            raise ValueError(
+                f'nttagg probability {base}**{n} has a zero denominator')
+        return base ** n
 
     # ----- wait / dwait (renewal waiting-time clause) ----------------
     @staticmethod

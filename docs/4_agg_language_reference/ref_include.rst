@@ -563,7 +563,10 @@
     // Fraction(a, b)), and the shared float paths stay untouched. NTT_NUMBER
     // exists because the transformer's NUMBER terminal callback converts every
     // NUMBER to binary64 before any rule callback runs; it admits no sign, no
-    // percent and no inf, so those are parse errors here. The dynamic Earley
+    // percent and no inf, so those are parse errors here. A probability may be
+    // parenthesized arithmetic (`+ - * /`, and `**` with a whole-number power),
+    // evaluated EXACTLY as Fraction by the ntt_* callbacks: no float, no exp, no
+    // transcendental, so `(0.1+0.2)` is exactly 3/10. The dynamic Earley
     // lexer never expects NUMBER and NTT_NUMBER at the same point, so the twin
     // terminals cannot collide. `nttagg` is NOT a port_item and cannot appear
     // inside a portfolio, pnl, or bivariate (v1). See dev/plan-nttagg.md.
@@ -587,8 +590,33 @@
     ntt_ratl: ntt_ratl ntt_rat   -> ntt_ratl_cons
             | ntt_rat            -> ntt_ratl_one
     
-    ntt_rat: NTT_NUMBER                    -> ntt_rat_number
-           | NTT_NUMBER DIVIDE NTT_NUMBER  -> ntt_rat_fraction
+    // One probability: the same ladder as agg's paren island, so one rule holds
+    // in both kinds. A bare item sees a literal, `/`, `**` / `^` and parentheses;
+    // `+`, `-` and `*` are legal only inside parentheses, which keeps a
+    // whitespace-separated list with a single reading. Unary minus is admitted
+    // inside parentheses and right after `**` (`2**-3`, `(1--1/2)`), never at the
+    // start of an item, so a probability still cannot be written with a sign.
+    // Precedence and associativity are Python's: `-2**2` is -4, `**` is right
+    // associative, `1/2/3` is `(1/2)/3`.
+    ?ntt_rat: ntt_rat DIVIDE ntt_power          -> ntt_divide
+            | ntt_power
+    
+    ?ntt_power: ntt_atom EXPONENT ntt_unary     -> ntt_exponent
+              | ntt_atom
+    
+    ntt_atom: NTT_NUMBER                        -> ntt_number
+            | "(" ntt_sum ")"                   -> ntt_parens
+    
+    ?ntt_sum: ntt_sum PLUS ntt_product          -> ntt_add
+            | ntt_sum MINUS ntt_product         -> ntt_subtract
+            | ntt_product
+    
+    ?ntt_product: ntt_product TIMES ntt_unary   -> ntt_multiply
+                | ntt_product DIVIDE ntt_unary  -> ntt_divide
+                | ntt_unary
+    
+    ?ntt_unary: MINUS ntt_unary                 -> ntt_negate
+              | ntt_power
     
     // ======================================================================
     // Layers

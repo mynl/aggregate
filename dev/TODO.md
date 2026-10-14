@@ -131,6 +131,11 @@
 
 ## Recently landed
 
+- **[NTT-Rational-Arithmetic]** DONE at **1.4.0** (2026-10-14,
+  `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md` step 1): nttagg
+  probabilities accept parenthesized arithmetic and `**` with a whole-number
+  power, evaluated exactly as `Fraction`.
+
 - **[DecL-Help-Pages]** DONE at **1.2.0a15** (2026-10-13,
   `dev/done/plan-1.2.0a15-decl-help.md`):
   `decl_help()` and `decl_help('card')` ship the anatomy and the one-page card

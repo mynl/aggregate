@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.4.0 - 2026-10-14
+
+**[NTT-Rational-Arithmetic] nttagg probability lists accept exact arithmetic.** A probability may be parenthesized arithmetic (`+ - * /`, and `**` or `^` with a whole-number power), evaluated exactly as a `Fraction` with no float anywhere: `dsev [1:3] [1/2 (1/2-1/(13*11*(19**3))) (1/(13*11*(19**3)))]` is exactly `[1/2 980835/1961674 1/980837]`, and `(0.1+0.2)` is exactly `3/10`. As in `agg`, a bare item sees only literals, `/`, `**` and parentheses, so `+`, `-` and `*` need parentheses and a probability still cannot start with a sign. A fractional power raises, as does a power whose result would exceed `NTT_EXPONENT_MAX_BITS` (new in `constants.py`, `2**20` bits). `a/b` now accepts decimal operands, so the message "nttagg a/b probabilities take integers" is gone; `1/0` reads as before. Reformatting prints the reduced fractions, not the expression. `_test_suite.agg` gains `NTT.Arithmetic` and the spec snapshot its entry. Docs await a rebuild. Plan `dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md`.
+
 ## 1.3.0 - 2026-10-14
 
 **[NTT-Engine-Status] `aggregate.ntt.engine_status()` says whether the compiled engine would be used, and why not.** It returns a dict: `engine` (`'rust'` or `'python'`, what `ntt_engine='auto'` resolves to), `installed`, `engine_version`, `engine_protocol`, `library_protocol`, and `reason` (`None` when the engine is used, else `'not installed'` or `'protocol 1, library speaks 2'`). It never warns and never raises, and it leaves the once-per-process protocol-mismatch warning for the first computation, so a caller such as an About panel can tell an engine installed and used from one installed and ignored without reaching for private names. Submodule access only, like the rest of `aggregate.ntt`. Plan `dev/done/plan-1.3.0-ntt-engine-status.md`.

@@ -60,7 +60,7 @@ __status__    = "beta"
 # The one place the version is written. A plain literal on purpose: setuptools
 # reads it statically for the wheel, and running code reports it live, so an
 # editable install never reports a stale number after a bump.
-__version__ = "1.3.0"
+__version__ = "1.4.0"
 
 
 __doc__ = """

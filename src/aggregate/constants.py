@@ -181,6 +181,13 @@ NTT_MAX_SUPPORT = 2 ** 20
 #: (support times denominator bits): 8 GB.
 NTT_MAX_BYTES = 8 * 2 ** 30
 
+#: Cap on the size of one exact power in an nttagg probability expression,
+#: ``abs(n) * max(bits of the base's numerator, bits of its denominator)``,
+#: about the bit length of ``base ** n``. A parse-time guard, not a soft cap:
+#: it turns a typo such as ``10**10**10`` into an error instead of a hang
+#: (dev/plan-1.4.0-nttagg-arithmetic-exact-chart.md).
+NTT_EXPONENT_MAX_BITS = 2 ** 20
+
 #: Narrative stems allowed to carry only ONE half of the description /
 #: explanation pair.
 #:

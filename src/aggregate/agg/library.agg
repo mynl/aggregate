@@ -892,6 +892,16 @@ agg AggregateStopLoss
   note{An aggregate stop loss attaching at the 60th percentile of the gross book and detaching at the 90th.}
   tags{topic:reinsurance, role:intermediate};
 
+agg AggregateDeductible
+  100 claims
+  1000 xs 0
+  sev lognorm 100 cv 2
+  poisson
+  aggregate net of
+    8000 xs 0
+  note{An annual aggregate deductible of 8000: the insured keeps the first 8000 of the year's losses and the policy pays whatever the year's total exceeds it by. DecL writes every annual aggregate term through the aggregate clause, so the deductible is net of 8000 xs 0.}
+  tags{topic:aggregate, role:intermediate};
+
 agg OccurrenceXOLProgram
   15 claims
   10_000 xs 0

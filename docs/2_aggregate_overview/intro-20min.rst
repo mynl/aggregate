@@ -92,7 +92,7 @@ severity
 frequency
     ``poisson``, or a mixed or contagion family. See :ref:`intro20 frequency`.
 reinsurance
-    occurrence (per claim, stated before the frequency) and aggregate (per year, after it), both optional. See :ref:`intro20 reinsurance`.
+    occurrence (per claim, stated before the frequency) and aggregate (per year, after it), both optional. See :ref:`intro20 reinsurance`. The aggregate clause also writes annual policy terms: ``aggregate net of 8000 xs 0`` is an annual aggregate deductible, as in the library entry ``AggregateDeductible``.
 
 The volume and coverage pair is not just pedagogy. It is the constructor's own vocabulary: :class:`Aggregate` takes ``exp_en``, ``exp_el``, ``exp_premium`` and ``exp_lr`` for volume, and ``exp_limit`` and ``exp_attachment`` for coverage.
 

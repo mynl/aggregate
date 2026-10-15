@@ -1164,7 +1164,8 @@ def severity_support(severity, reference: bool = False) -> tuple[float, float]:
     if signed:
         return lo, hi
 
-    limit = getattr(severity, 'limit', np.inf)
+    # payment_max, not limit: a franchise pays up to the ground-up top
+    limit = getattr(severity, 'payment_max', getattr(severity, 'limit', np.inf))
     limit = float(limit) if limit is not None else np.inf
     attach = getattr(severity, 'attachment', 0.0)
     attach = float(attach) if attach is not None else 0.0
@@ -1228,7 +1229,7 @@ def _severity_capped_note(severity, base: TailClass, right_tail: TailClass) -> s
     """
     if right_tail != TailClass.BOUNDED or base < TailClass.SUBEXPONENTIAL:
         return ''
-    limit = getattr(severity, 'limit', np.inf)
+    limit = getattr(severity, 'payment_max', getattr(severity, 'limit', np.inf))
     ub = getattr(severity, 'sev_ub', np.inf)
     cap = min(float(limit) if limit is not None else np.inf,
               float(ub) if ub is not None else np.inf)

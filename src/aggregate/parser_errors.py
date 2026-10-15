@@ -116,6 +116,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "SLIDE": "'slide' (sliding-scale commission)",
     "RETRO": "'retro' (retrospective rating)",
     "CORRIDOR": "'corridor' (loss-ratio corridor)",
+    "FRANCHISE": "'franchise' (franchise deductible)",
     "BASIC": "'basic' (collar base premium)",
     "LCM": "'lcm' (loss conversion multiplier)",
     "MIN": "'min' (collar floor)",

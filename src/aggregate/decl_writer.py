@@ -526,13 +526,20 @@ def _render_layers(spec: dict) -> str:
 
     A tower (``tower [breaks]``) is stored as limit/attachment vectors and
     renders in the explicit ``xs`` form, which re-parses to the same vectors.
+    A retention end equal to the attachment renders the ``franchise``
+    modifier (``[Franchise-Deductible]``), which re-parses to the same spec.
     """
     if 'exp_limit' in spec:
         # Interior ``layer`` label rides in ``label_map`` (dev/plan-labels.md S2),
         # appended after the ``xs`` clause.
         label = _render_label((spec.get('label_map') or {}).get('layer'))
+        retention = spec.get('exp_retention_end')
+        franchise = (' franchise' if retention is not None
+                     and np.array_equal(np.asarray(retention, dtype=float),
+                                        np.asarray(spec['exp_attachment'], dtype=float))
+                     else '')
         return (f'{_fmt_seq(spec["exp_limit"])} xs '
-                f'{_fmt_seq(spec["exp_attachment"])}{label}')
+                f'{_fmt_seq(spec["exp_attachment"])}{franchise}{label}')
     return ''
 
 

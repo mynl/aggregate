@@ -231,6 +231,8 @@ class AggLexer(RegexLexer):
                  'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
                  'and', 'as', 'exp', 'at', 'cv', 'lr', 'xs',
                  'of', 'to', 'po', 'zm', 'zt',
+                 # policy deductible modifiers
+                 'franchise',
                  # reinstatements
                  'reinstatements', 'reinstatement', 'free', 'no',
                  # variable rating

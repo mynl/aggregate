@@ -415,6 +415,14 @@ agg SevLayer.Unconditional
   note{Unconditional severity: the trailing ! keeps losses below the attachment of 5 in the count as zeros, so the layer mean is lower than in the conditional reading.}
   tags{topic:severity, role:intermediate};
 
+agg SevLayer.Franchise
+  1 claim
+  20 xs 5 franchise
+  sev lognorm 10 cv 0.5
+  fixed
+  note{Franchise deductible: once the loss exceeds the attachment of 5 the whole loss is paid, up to the layer top of 25, so the mean is exactly 5 more than in SevLayer.}
+  tags{topic:severity, role:intermediate};
+
 agg UnconditionalDiscreteSeverity
   5 claims
   4 xs 2

@@ -31,6 +31,9 @@ logger = logging.getLogger(__name__)
 # decomposition is reliable (the augmented-frame truncation cut). Resolved once
 # per session from config; mirrors the capture in ``_portfolio``.
 EXEQA_NOISE_FLOOR = get_settings().validation.exeqa_noise_floor
+# VALIDATION_NOISE: survival probabilities at or below it are noise, and the
+# density frame zeroes alpha there; see unit_capital_at.
+VALIDATION_NOISE = get_settings().validation.noise
 
 __all__ = []
 
@@ -256,7 +259,9 @@ def unit_capital_at(port, aug, a, dist, *, view='ask', units=None):
         An augmented frame from :meth:`Portfolio.apply_distortion` (carries
         ``S``/``gS``/``exa_*``/``exag_*``).
     a : float
-        Asset level on the grid (callers snap).
+        Asset level on the grid (callers snap). An ``a`` above the last
+        row of ``aug`` uses the last row, with a warning, as
+        :meth:`Portfolio.pricing_at` does.
     dist : Distortion
         The distortion that built ``aug``; supplies ``g'(1)`` for the
         L'Hôpital ROE limit at ``gS == 1`` layers (the fully
@@ -277,13 +282,37 @@ def unit_capital_at(port, aug, a, dist, *, view='ask', units=None):
     Reconciles ``Σ_i Q_i(a) == a - exag_total(a)`` exactly (asserted,
     scale-aware) whenever no layer hit the zero-margin guard; the
     identity carries the origin through ``exag_total``.
+
+    The reconciliation tests whether the unit columns add up to the total
+    columns, not the allocation itself, and it runs only when every unit
+    is requested. Where ``S <= VALIDATION_NOISE`` the density frame zeroes
+    alpha while the augmented frame runs on, so on the linear frame the
+    unit columns stop adding up and the split of capital between units is
+    not determined by the model (total capital ``a - exag_total`` stays
+    exact). A warning is therefore logged whenever ``a`` reaches a layer
+    with ``S <= VALIDATION_NOISE``, whichever units are requested, so a
+    single-unit read such as :meth:`Portfolio.pentagon_at` is flagged too.
+    The split itself is left as computed rather than smoothed over: the
+    warning is the signal that it is unreliable.
     """
     if units is None:
         units = list(port.unit_names)
     loss = aug.loss.to_numpy()
+    if a > loss[-1]:
+        logger.warning(
+            f'unit_capital_at: asset level {a} is above the augmented frame '
+            f'(last row {loss[-1]}); using last row.')
+        a = float(loss[-1])
     pos = int(np.searchsorted(loss, a))
     # layers [x_k, x_{k+1}) for k < pos lie below a
     S = aug.S.to_numpy()[:pos]
+    noise_layers = S <= VALIDATION_NOISE
+    if noise_layers.any():
+        logger.warning(
+            f'unit_capital_at: asset level {a} reaches layers with '
+            f'S <= {VALIDATION_NOISE:g} (from loss '
+            f'{loss[:pos][noise_layers][0]:g}); the split of capital between '
+            f'units is not reliable there. Total Q = a - P is exact.')
     gS = aug.gS.to_numpy()[:pos]
     denom = gS - S
     one_minus_gS = 1 - gS

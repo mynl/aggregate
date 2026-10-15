@@ -2420,6 +2420,18 @@ class UnderwritingTransformer(Transformer):
         return {"exp_attachment": attach, "exp_limit": limit,
                 "_layer_label": as_label.get("label")}
 
+    def layers_xs_franchise(self, c):
+        """``y xs a franchise``: the retention ends at the attachment.
+
+        The franchise is the retention family member with ``d2 = d1``
+        (``[Franchise-Deductible]``), so ``exp_retention_end`` copies the
+        attachment, scalar or vector, and vectorizes with it.
+        """
+        limit, _xs, attach, _franchise, as_label = c
+        return {"exp_attachment": attach, "exp_limit": limit,
+                "exp_retention_end": attach,
+                "_layer_label": as_label.get("label")}
+
     def layers_tower(self, c):
         tower = c[0]
         return {"exp_attachment": tower[1], "exp_limit": tower[0]}
@@ -2629,6 +2641,8 @@ class UnderwritingTransformer(Transformer):
             bid["sev_loc"] = _check_vectorizable(bid["sev_loc"]) * expr
         bid["exp_attachment"] = _check_vectorizable(bid.get("exp_attachment", 0)) * expr
         bid["exp_limit"] = _check_vectorizable(bid.get("exp_limit", np.inf)) * expr
+        if bid.get("exp_retention_end") is not None:
+            bid["exp_retention_end"] = _check_vectorizable(bid["exp_retention_end"]) * expr
         bid["exp_el"] = _check_vectorizable(bid.get("exp_el", 0)) * expr
         bid["exp_premium"] = _check_vectorizable(bid.get("exp_premium", 0)) * expr
         return bid

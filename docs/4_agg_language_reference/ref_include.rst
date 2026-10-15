@@ -627,7 +627,14 @@
     // ``sev_clause``: AS is disjoint from SEV/SSEV/dsev/BUILTIN_SEV (and from the
     // numbers a bare layer is otherwise followed by), so the split is Earley-safe --
     // guarded by an explicit ambiguity test.
+    //
+    // ``franchise`` after the layer reads the attachment as a franchise
+    // deductible: once the loss exceeds it the insured keeps nothing, and the
+    // payment is ``min(X, a + y)`` ([Franchise-Deductible]). The transformer
+    // stores it as ``exp_retention_end`` equal to the attachment, the d2 = d1
+    // member of the retention family in ``_severity.py``.
     layers: numbers XS numbers as_label   -> layers_xs
+          | numbers XS numbers FRANCHISE as_label -> layers_xs_franchise
           | tower                              -> layers_tower
           |                                    -> layers_none
     
@@ -859,6 +866,7 @@
     SLIDE.2:      /slide(?![a-zA-Z0-9._:~\-])/
     RETRO.2:      /retro(?![a-zA-Z0-9._:~\-])/
     CORRIDOR.2:   /corridor(?![a-zA-Z0-9._:~\-])/
+    FRANCHISE.2:  /franchise(?![a-zA-Z0-9._:~\-])/
     BASIC.2:      /basic(?![a-zA-Z0-9._:~\-])/
     LCM.2:        /lcm(?![a-zA-Z0-9._:~\-])/
     MIN.2:        /min(?![a-zA-Z0-9._:~\-])/
@@ -954,7 +962,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

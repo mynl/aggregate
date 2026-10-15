@@ -3983,6 +3983,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         if a in aug.index:
             row = aug.loc[a]
         else:
+            logger.warning(
+                f'pentagon_at: asset level {a} not in augmented_df.index; using last row.')
             row = aug.iloc[-1]
             a = float(row['loss'])
         peg = Pentagon(obj=self)

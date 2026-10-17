@@ -61,3 +61,25 @@ uv run python scripts\moment_rule_sweep.py [-d library -d reproductions ...] [-o
 
 About a minute for the three shipped corpora. The CSV defaults to the OS temp
 directory; it is a local aid, not tracked in git.
+
+## `check_wheel.py`: build the wheel and smoke test the installed artifact
+
+The test suite runs against the editable install, so a wheel that leaves a
+subpackage or data file behind passes every test; the 1.0.0 wheel shipped
+without `aggregate.charts`, `.plots` and `.exhibits` that way. This builds the
+wheel, checks that every `__init__.py`, module and `package-data` file from
+`src/aggregate` is in it, installs it into a throwaway venv, and from outside
+the repository confirms that `aggregate` was imported from the venv (not
+`src`), then runs `build`, `qd`, `.plot()`, an import of every subpackage and a
+`library.agg` recipe.
+
+```powershell
+uv run python scripts\check_wheel.py                   # build, then check
+uv run python scripts\check_wheel.py --wheel dist\aggregate-X.Y.Z-py3-none-any.whl
+uv run python scripts\check_wheel.py --keep            # keep the temp directory
+```
+
+Every check prints PASS or FAIL and the exit code is nonzero on any failure.
+A release-time command, like the numerics gate: not part of the test suite,
+since it needs a built artifact and a network for the dependency install.
+About a minute, most of it the install.

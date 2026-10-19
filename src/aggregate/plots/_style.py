@@ -138,6 +138,30 @@ def rc_params() -> dict:
     return dict(_STYLE_PARAMS)
 
 
+def _points(key):
+    """The size in points of the font size rcParam ``key``, as now in force.
+
+    Parameters
+    ----------
+    key : str
+        A font size rcParam, such as ``'xtick.labelsize'``.
+
+    Returns
+    -------
+    float
+        The size in points. A named size such as ``'small'`` is resolved
+        against ``font.size``, exactly as matplotlib resolves it when it draws.
+
+    Notes
+    -----
+    For layout arithmetic that has to agree with what is drawn, such as how
+    many label rows fit in a rectangle. Library code names no type size of its
+    own: the active style decides, and this reads its answer.
+    """
+    from matplotlib.font_manager import FontProperties
+    return FontProperties(size=mpl.rcParams[key]).get_size_in_points()
+
+
 # ---------------------------------------------------------------------------
 # The page a document draws library figures for
 # ---------------------------------------------------------------------------

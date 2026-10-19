@@ -89,7 +89,7 @@ def plot_fourier(ftools, suptitle='', xlim=None, verbose=True):
         ax.plot(x, p / b, label='Fourier', lw=1)
         if has_exact:
             ax.plot(xe, pe, ls='--', c='C3', label='exact', lw=1)
-        ax.legend(fontsize='x-small')
+        ax.legend()
     ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x')
     # mn = min(np.log10(exact).min(), np.log10(x).min())
     mn0 = np.log10(p / b).min() * 1.25
@@ -259,9 +259,9 @@ def plot_fourier_wraps(ftools, wraps=None, calc='survival', add_tail=False):
             title='Incremental - log scale',
             xlabel='Outcome, x',
             ylabel='Log density')
-    ax2.legend(fontsize='x-small', ncol=2)
+    ax2.legend(ncol=2)
     if add_tail:
-        ax1.legend(fontsize='x-small', ncol=2)
+        ax1.legend(ncol=2)
     if add_tail:
         if 0 not in wraps:
             wraps.append(0)

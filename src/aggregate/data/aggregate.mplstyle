@@ -1,17 +1,26 @@
-# aggregate house style — screen/PDF rendering, aligned to the apiweb SPA.
+# aggregate house style: screen and PDF rendering.
 #
-# Palette and type mirror web/src/styles/site.css: blue #0d6efd primary on a
-# white ground, muted #6c757d text, light #dee2e6 grid, system sans UI font.
-# Replaces the old serif-on-blue look. The previous style is preserved beside
-# this file as aggregate.mplstyle.original (and in git) for easy comparison.
+# Palette mirrors the aLL site (web/src/styles/site.css): blue #0d6efd primary
+# on a white ground, muted #6c757d text, light #dee2e6 grid.
+#
+# Type and face are the writing projects' house style (house-style kit 1.11.0,
+# house.mplstyle): 9pt labels and titles, 8pt ticks and legend, STIXGeneral to
+# sit beside STIX Two text. Ruled 2026-10-19 ("aggs own figure face =
+# STIXGeneral to match house"), so a library figure printed in a paper matches
+# the paper's own. STIXGeneral ships with matplotlib, so the face no longer
+# depends on the machine. Library code names no type size: every size is read
+# from here. Plan dev/done/plan-library-figures.md. The older serif-on-blue
+# style is preserved beside this file as aggregate.mplstyle.original.
 # Colors are 6-digit hex without the leading '#', per matplotlib style files.
 
 # --- fonts ---
-font.size:           8.5
-font.family:         sans-serif
+font.size:           9
+font.family:         serif
+font.serif:          STIXGeneral
 font.sans-serif:     Segoe UI, Helvetica Neue, Arial, DejaVu Sans
 font.monospace:      Cascadia Mono, SFMono-Regular, Consolas, DejaVu Sans Mono
-mathtext.fontset:    dejavusans
+mathtext.fontset:    stix
+pdf.fonttype:        42
 
 # --- color cycle (site-harmonized: blue primary, then complements) ---
 axes.prop_cycle: cycler('color', ['0d6efd', 'dc3545', '198754', 'eaab00', '6f42c1', '0aa2c0', 'd63384', '6c757d'])
@@ -20,12 +29,18 @@ axes.prop_cycle: cycler('color', ['0d6efd', 'dc3545', '198754', 'eaab00', '6f42c
 text.color:          212529
 axes.labelcolor:     212529
 axes.titlecolor:     212529
-axes.titlesize:      medium
-axes.titleweight:    semibold
-axes.labelsize:      small
+axes.titlesize:      9
+# bold, not semibold: STIXGeneral has no semibold, and asking for one prints
+# "findfont: Failed to find font weight semibold" into a notebook cell.
+axes.titleweight:    bold
+axes.labelsize:      9
 
 # --- legend ---
-legend.fontsize:     x-small
+legend.fontsize:     8
+legend.labelspacing: 0.25
+legend.borderpad:    0.3
+legend.handlelength: 1.6
+legend.handletextpad: 0.5
 legend.facecolor:    white
 legend.edgecolor:    dee2e6
 legend.framealpha:   0.9
@@ -61,7 +76,7 @@ lines.markersize:    4
 # --- ticks ---
 xtick.direction:     out
 ytick.direction:     out
-xtick.labelsize:     small
-ytick.labelsize:     small
+xtick.labelsize:     8
+ytick.labelsize:     8
 xtick.color:         6c757d
 ytick.color:         6c757d

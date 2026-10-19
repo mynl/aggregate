@@ -26,7 +26,7 @@ lit at any zoom instead of washing out of a plain block-sum.
 
 import numpy as np
 
-from ._style import make_mosaic, FIG_W, FIG_H, PLOT_FACE_COLOR
+from ._style import make_mosaic, mpl, FIG_W, FIG_H, PLOT_FACE_COLOR
 
 # glow tuning: boost starts when a block's max exceeds `_GLOW_ONSET` x the
 # block mean and saturates `_GLOW_DECADES` decades above that.
@@ -208,7 +208,8 @@ def _render_atom_strip(ax, xs, mass, *, vertical=False, color='C3'):
     ax.set_xticks([])
     ax.set_yticks([])
     ax.annotate(f'{total:.3g}', xy=(0.5, 0.5), xycoords='axes fraction',
-                fontsize=6, ha='center', va='center', color=color)
+                fontsize=mpl.rcParams['xtick.labelsize'], ha='center',
+                va='center', color=color)
     ax.margins(0)
 
 
@@ -319,12 +320,12 @@ def plot_bivariate_massive(bd, window=None, log=True, contours=False,
         e = _exceedance_grid(mass) / max(mass.sum(), 1e-300)
         cs = ax.contour(cx, cy, e.T, levels=[0.001, 0.01, 0.1, 0.25, 0.5],
                         colors='crimson', linewidths=0.9)
-        ax.clabel(cs, fmt='%g', fontsize=7)
+        ax.clabel(cs, fmt='%g', fontsize=mpl.rcParams['xtick.labelsize'])
 
     # exact marginal panels, windowed to the heatmap view
     _render_marginal(axd['T'], bd.xs0[bi0:bi1], bd.marg0[bi0:bi1])
     axd['T'].set_xlim(extent[0], extent[1])
-    axd['T'].set_title(bd.meta.get('name', ''), fontsize=9)
+    axd['T'].set_title(bd.meta.get('name', ''))
     _render_marginal(axd['M'], bd.xs1[bj0:bj1], bd.marg1[bj0:bj1],
                      vertical=True)
     axd['M'].set_ylim(extent[2], extent[3])
@@ -335,7 +336,8 @@ def plot_bivariate_massive(bd, window=None, log=True, contours=False,
     _render_atom_strip(axd['B'], bd.xs0, atom_y, vertical=False)
     if origin_p is not None and origin_p > _ATOM_MASS_FLOOR:
         ax.annotate(f'P(0,0) = {origin_p:.3g}', xy=(0.02, 0.02),
-                    xycoords='axes fraction', fontsize=7,
+                    xycoords='axes fraction',
+                    fontsize=mpl.rcParams['xtick.labelsize'],
                     bbox=dict(boxstyle='round', fc='w', alpha=0.7))
     axd['A'].set_ylim(extent[2], extent[3])
     axd['B'].set_xlim(extent[0], extent[1])

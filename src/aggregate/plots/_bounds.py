@@ -105,5 +105,5 @@ def plot_hull_bounds(engine, items=None, P=None, axs=None, max_t=None):
             ax.plot([P, P], [lo[0], hi[0]], lw=2.5, c='k', solid_capstyle='butt')
             ax.plot([P, P], [lo[0], hi[0]], 'o', ms=4, c='k')
         ax.set(title=u, xlabel=engine._xlabel, ylabel=engine._ylabel)
-        ax.legend(fontsize='x-small')
+        ax.legend()
     return axs

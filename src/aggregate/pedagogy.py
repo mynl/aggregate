@@ -1035,7 +1035,7 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
         f"rate {n_fail / n_plot:0.2%}\n"
         f"Simulated {n_ruin} of {n_sims} = {p_sim:0.0%}, "
         f"exact rate {psi_u0:0.2%}")
-    ax.legend(loc='upper left', fontsize='x-small')
+    ax.legend(loc='upper left')
 
     # --- psi(u) against initial surplus (right panel) -----------------
     # x-range capped where psi falls below 1e-5 (or the grid top) -- the
@@ -1059,8 +1059,7 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
     # one legend for both axes: merge the twin's handles into the host's
     h_lin, l_lin = ax_psi.get_legend_handles_labels()
     h_log, l_log = ax_log.get_legend_handles_labels()
-    ax_psi.legend(h_lin + h_log, l_lin + l_log, loc='upper right',
-                  fontsize='x-small')
+    ax_psi.legend(h_lin + h_log, l_lin + l_log, loc='upper right')
 
     # --- summary dataframe --------------------------------------------
     summary = pd.DataFrame({'value': {
@@ -1751,7 +1750,7 @@ def plot_twelve(port, fig, axs, distortion_name, p=0.999, p2=0.9999,
         for ax in axs.flat:
             try:
                 if ax is not a13:
-                    ax.legend(prop={'size': 7})
+                    ax.legend()
             except Exception:
                 pass
 

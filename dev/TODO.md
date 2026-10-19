@@ -42,16 +42,6 @@
 
 ## In flight
 
-- **[Library-Figures]** (`dev/plan-library-figures.md`, the library half of
-  house-style's plan of the same name): step `[Library-Figures-Fit-Page]`
-  landed at **1.6.0a2**, `aggregate.plots.fit_page(width, max_height)`;
-  step `[Library-Figures-House-Type]`, the house type and face in
-  `aggregate.mplstyle` and no type size in library code, is next. Found on
-  the way, not in scope: `Distortion.plot_affine(ax=)` accepts `ax` and
-  ignores it (`plots/_distortion.py`), and `pedagogy.similar_risks_example`
-  raises `TypeError` on `Portfolio.plot(figsize=)` and
-  `Bounds.plot_envelope(axs=)`, neither of which takes that argument.
-
 - **[NTT-Tail-Visibility]** (`dev/plan-ntt-tail-visibility.md`) — phase 1
   `[NTT-Accuracy-Overflow]` landed at **1.2.0a6**: `ntt_audit` and
   `accuracy_df` no longer raise on any case whose exact tail falls below the
@@ -171,6 +161,13 @@
   `est_cv == 0.0` exactly where macOS gets `2.4e-8`.
 
 ## Recently landed
+
+- **[Library-Figures]** DONE at **1.6.0a2** and **1.6.0a3** (2026-10-19,
+  `dev/done/plan-library-figures.md`, the library half of house-style's plan
+  of the same name): `aggregate.plots.fit_page(width, max_height)` fits every
+  library figure to a document's page, and `aggregate.mplstyle` takes the
+  house type and face with no type size left in library code. house-style
+  calls `fit_page` from its setup once 1.6.0 is on PyPI.
 
 - **[DecL-Word-List]** DONE at **1.6.0a1** (2026-10-19,
   `dev/done/plan-decl-word-list.md`): `aggregate.decl_words.decl_words()` is
@@ -455,6 +452,11 @@
 
 > Carried as a list, not as paragraphs. Each is detailed in the archive.
 
+- **[Plot-Argument-Warts]** (found at 1.6.0a2): `Distortion.plot_affine(ax=)`
+  accepts `ax` and ignores it (`plots/_distortion.py`); and
+  `pedagogy.similar_risks_example` raises `TypeError`, calling
+  `Portfolio.plot(figsize=)` and `Bounds.plot_envelope(axs=)`, neither of
+  which takes that argument.
 - **[Display-Surface-Punchups]** — `_repr_html_` is on the five first-class
   classes only; `_html_info_blob` exists on `Aggregate` alone while four other
   classes build the same intro inline (the obvious fourth mixin); and the P&L

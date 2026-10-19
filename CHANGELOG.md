@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.6.0 - 2026-10-19
+
+**[House-Style-Integration] one DecL word list for every colorizer, and library figures that fit a document's page in the house type.** Rolls up 1.6.0a1 to 1.6.0a3 below. `aggregate.decl_words.decl_words()` (and `python -m aggregate.decl_words` for JSON) is the single DecL word list, derived from `decl.lark` and the distortion registry, and `AggLexer` builds from it. `aggregate.plots.fit_page(width, max_height)` fits every library figure to a page, off by default. `aggregate.mplstyle` takes the house type and face (STIXGeneral, 9pt labels, 8pt ticks and legend), and no library code names a type size. aggregate-api, aggregate-asp and house-style each pick these up in their own plans once this is on PyPI.
+
 ## 1.6.0a3 - 2026-10-19
 
 **[Library-Figures-House-Type] library figures take the house type and face, and no library code names a type size.** `aggregate.mplstyle` now matches house-style's `house.mplstyle` (kit 1.11.0) on type: STIXGeneral with STIX math, labels and titles at 9pt, ticks and legend at 8pt, bold titles (STIXGeneral has no semibold), tighter legend spacing, and `pdf.fonttype: 42`; colors, grid, line widths, `figure.figsize` and dpi are unchanged. Every size in library code (tower block and tick labels, matrix cell text, legends, the massive bivariate annotations) is read from the active style, so a document's own style now reaches them; without `aggregate.style.use()` legends take matplotlib's default size where they were forced small. Tower block labels grow from 5.85pt to 8pt, so a thin band may lose a label that no longer fits. `FONT_SIZE` and `LEGEND_FONT` stay exported but are unused. aLL's chart base text moves from 10.5px to 11px, because `/v1/meta/style` serves `font.size` 9 where it was 8.5. The chartdoc pixel baselines are regenerated. Docs figures change face at the next build. Plan `dev/done/plan-library-figures.md`.

@@ -1,8 +1,8 @@
 # Plan: library figures fit a document's page and take its type
 
 `[Library-Figures]`, in two steps: `[Library-Figures-Fit-Page]` and `[Library-Figures-House-Type]`.
-Drafted 2026-10-19 at 1.5.3 (`d85f0c2`) at Steve's request, from the house-style review. Not yet
-ruled; the open questions are at the foot.
+Drafted 2026-10-19 at 1.5.3 (`d85f0c2`) at Steve's request, from the house-style review. Ruled
+2026-10-19, executed as 1.6.0a2 and 1.6.0a3; see Rulings and Execution log at the foot.
 
 This is the library half of a pair. The other half is
 `D:\Projects\house-style\dev\plan-library-figures.md`, in which the house style's setup calls the
@@ -207,3 +207,20 @@ on it (question 1).
 2. **Never enlarge.** The rule only shrinks, so a single-panel library figure stays 3.5in wide on
    a page whose own single figures are 3.0in (half width). Matching half exactly would put the
    house's size policy inside aggregate. The recommendation is to leave it.
+
+## Rulings
+
+2026-10-19, Steve: question 1 "yes". `fit_page` is accepted as a run-time call despite the 2026 rejection of a plotting config section. Question 2 was not asked again, so its recommendation stands: the rule only shrinks. Versioning: `[Library-Figures-Fit-Page]` lands as 1.6.0a2 and `[Library-Figures-House-Type]` as 1.6.0a3, rolled up with 1.6.0a1 (`[DecL-Word-List]`) into the 1.6.0 release. The choices above are rulings, not proposals.
+
+## Execution log
+
+Divergences from the plan:
+
+**[Library-Figures-Fit-Page], 1.6.0a2, 2026-10-19.**
+
+1. **Where the fit applies.** Inside `make_grid` and `make_mosaic`, to the size given or defaulted, which covers `plot_chartdoc` and every caller of the two helpers, and at each direct `plt.subplots`, `plt.figure` and pandas `figsize=` site: `ft.py` (4), `tweedie.py` (3), `plots/_bounds.py` (2), `plots/_fourier.py` (4), `plots/_portfolio.py` (1) and `pedagogy.py` (15). A size passed explicitly to `make_grid` or `make_mosaic` is fitted too: the page is the hard constraint.
+2. **A site the plan missed.** `_reinsurance.py:316`, `make_mosaic('AB\nCD', figsize=(12, 9))`, is fitted through `make_mosaic` with no edit.
+3. **`Portfolio.scatter` forwards all its arguments**, not just `figsize`: `plots/_portfolio.py` hard coded `marker`, `s`, `alpha` and `diagonal` as well.
+4. **`pedagogy.similar_risks_example` is broken, and stays so.** It calls `Portfolio.plot(figsize=(6, 4))`, which `Portfolio.plot` does not accept, and later `Bounds.plot_envelope(axs=...)`, which it does not accept either, so it raises `TypeError` before and after this step. Its `figsize` call is left as it was and the function is recorded in `dev/TODO.md`.
+5. **`fit_page` validates.** A width or cap that is not a positive number raises `ValueError`. `fit_page(max_height=...)` alone caps heights and leaves widths.
+6. **Acceptance.** The four chartdoc pixel baselines pass without regeneration, and `test_chartdoc_ladder.py` passes unchanged. `tests/test_fit_page.py` checks the plan's table, the house page and slide bounds, clearing, and `Portfolio.scatter(figsize=(4, 4))`. `Aggregate.plot()` on the house page measures 6.3 x 2.205in, the plan's 6.3 x 2.2.

@@ -42,6 +42,16 @@
 
 ## In flight
 
+- **[Library-Figures]** (`dev/plan-library-figures.md`, the library half of
+  house-style's plan of the same name): step `[Library-Figures-Fit-Page]`
+  landed at **1.6.0a2**, `aggregate.plots.fit_page(width, max_height)`;
+  step `[Library-Figures-House-Type]`, the house type and face in
+  `aggregate.mplstyle` and no type size in library code, is next. Found on
+  the way, not in scope: `Distortion.plot_affine(ax=)` accepts `ax` and
+  ignores it (`plots/_distortion.py`), and `pedagogy.similar_risks_example`
+  raises `TypeError` on `Portfolio.plot(figsize=)` and
+  `Bounds.plot_envelope(axs=)`, neither of which takes that argument.
+
 - **[NTT-Tail-Visibility]** (`dev/plan-ntt-tail-visibility.md`) — phase 1
   `[NTT-Accuracy-Overflow]` landed at **1.2.0a6**: `ntt_audit` and
   `accuracy_df` no longer raise on any case whose exact tail falls below the

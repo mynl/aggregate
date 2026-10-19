@@ -14,7 +14,7 @@ one-line delegating stubs, and the limit logic stays on it as
 
 import pandas as pd
 
-from ._style import make_mosaic, FIG_W, FIG_H
+from ._style import make_mosaic, FIG_W, FIG_H, _fit_to_page
 
 
 def plot_scatter(port, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde', **kwargs):
@@ -28,7 +28,8 @@ def plot_scatter(port, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde
     port : Portfolio
         The portfolio to plot.
     marker, s, alpha, figsize, diagonal, **kwargs
-        Forwarded to :func:`pandas.plotting.scatter_matrix`.
+        Forwarded to :func:`pandas.plotting.scatter_matrix`, ``figsize``
+        fitted to the page when :func:`~aggregate.plots.fit_page` has set one.
 
     Returns
     -------
@@ -37,8 +38,9 @@ def plot_scatter(port, marker='.', s=5, alpha=1, figsize=(10, 10), diagonal='kde
     from pandas.plotting import scatter_matrix
 
     bit = port.density_df.query('p_total > 0').filter(regex='exeqa_[a-zA-Z]')
-    ax = scatter_matrix(bit, marker='.', s=5, alpha=1,
-                        figsize=(10, 10), diagonal='kde', **kwargs)
+    ax = scatter_matrix(bit, marker=marker, s=s, alpha=alpha,
+                        figsize=_fit_to_page(figsize), diagonal=diagonal,
+                        **kwargs)
     return ax
 
 

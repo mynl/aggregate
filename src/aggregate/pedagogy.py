@@ -26,6 +26,7 @@ import scipy.stats as ss
 
 from .bounds import Bounds
 from .constants import FIG_W, FIG_H
+from .plots._style import _fit_to_page
 from .spectral import Distortion
 from .underwriter import Underwriter, build
 
@@ -135,7 +136,7 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     fka similar_risks_graphs_sa
     """
     if axd is None:
-        fig = plt.figure(constrained_layout=True, figsize=(12, 6))
+        fig = plt.figure(constrained_layout=True, figsize=_fit_to_page((12, 6)))
         axd = fig.subplot_mosaic(
             """
             AAAABBFF
@@ -254,7 +255,7 @@ def similar_risks_example():
     p_base.calibrate_distortions(roe, a=a)
     bounds = Bounds(p_base, premium=prem, a=a)
 
-    f, axs = plt.subplots(1, 3, figsize=(18.0, 6.0), layout='constrained')
+    f, axs = plt.subplots(1, 3, figsize=_fit_to_page((18.0, 6.0)), layout='constrained')
     bounds.plot_envelope(axs=axs.flatten(), n_resamples=0, alpha=1,
                          title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={bounds.p_star:.3f}',
                          distortions=[{k: p_base.distortions[k] for k in ['ccoc', 'tvar']},
@@ -272,7 +273,7 @@ def similar_risks_example():
     p_new.update(11, 1 / 1024, remove_fuzz=True)
     p_new.plot(figsize=(6, 4))
 
-    axd = plt.figure(constrained_layout=True, figsize=(16, 8)).subplot_mosaic(
+    axd = plt.figure(constrained_layout=True, figsize=_fit_to_page((16, 8))).subplot_mosaic(
         """
         AAAABBFF
         AAAACCFF
@@ -307,7 +308,7 @@ def adjusting_layer_losses():
 
     Used by ``docs/5_technical_guides/5_x_adjusting_losses.rst``.
     """
-    f, ax = plt.subplots(1, 1, figsize=(FIG_H, FIG_W), constrained_layout=True)
+    f, ax = plt.subplots(1, 1, figsize=_fit_to_page((FIG_H, FIG_W)), constrained_layout=True)
     fz = ss.lognorm(.4)
     xs = np.linspace(0, fz.isf(1e-3), 1001, endpoint=False)
     F = fz.cdf(xs)
@@ -346,7 +347,7 @@ def savings_charge():
 
     Used by ``docs/5_technical_guides/5_x_ir_pricing.rst``.
     """
-    f, ax = plt.subplots(1, 1, figsize=(FIG_H, FIG_W), constrained_layout=True)
+    f, ax = plt.subplots(1, 1, figsize=_fit_to_page((FIG_H, FIG_W)), constrained_layout=True)
     fz = ss.lognorm(.4)
     xs = np.linspace(0, fz.isf(1e-3), 1001, endpoint=False)
     F = fz.cdf(xs)
@@ -397,7 +398,7 @@ def mixing_convergence(freq_cv, sev_cv, bs=1 / 64):
         dfp[freq] = a.density_df[['p']]
         assert np.abs(a.est_m / a.actual_m - 1) < 1e-3
 
-    fig, axs = plt.subplots(2, 2, figsize=(2 * FIG_W, 2 * FIG_H),
+    fig, axs = plt.subplots(2, 2, figsize=_fit_to_page((2 * FIG_W, 2 * FIG_H)),
                             constrained_layout=True)
     axi = iter(axs.flat)
     for lbl, df in zip(['Poisson distribution', 'Mixed frequency distribution'],
@@ -433,7 +434,7 @@ def power_variance_family():
     alpha = np.linspace(-2, 2, 101)
     p = (alpha - 2) / (alpha - 1)
     alphabar = -(alpha + 1)
-    f, ax = plt.subplots(figsize=(FIG_W * 2, FIG_W * 2))
+    f, ax = plt.subplots(figsize=_fit_to_page((FIG_W * 2, FIG_W * 2)))
     ax.plot(alphabar, p, lw=3)
     ax.set(ylim=[-5, 10])
     ax.axhline(1, c='k', lw=1)
@@ -479,7 +480,7 @@ def plot_quantile_illustration():
     xsx[89:149] = xsx[89]
     F = fz.cdf(xsx)
 
-    fig, ax = plt.subplots(1, 1, figsize=(FIG_W, FIG_H),
+    fig, ax = plt.subplots(1, 1, figsize=_fit_to_page((FIG_W, FIG_H)),
                            constrained_layout=True, squeeze=True)
     lt = F < .6
     gt = F > .6
@@ -535,7 +536,7 @@ def plot_discrete_distribution_quantile():
     ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
     """
     ps, cps, xs, df = _discrete_example()
-    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W + .2))
+    fig, axs = plt.subplots(1, 2, figsize=_fit_to_page((2 * FIG_W, FIG_W + .2)))
     ax0, ax1 = axs.flat
     ax = ax0
     ax.plot(xs, cps, drawstyle='steps-post')
@@ -571,7 +572,7 @@ def plot_continuous_distribution_quantile():
     ``docs/5_technical_guides/5_x_nm_discrete_rep.rst``.
     """
     ps, cps, xs, df = _discrete_example()
-    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W + .2))
+    fig, axs = plt.subplots(1, 2, figsize=_fit_to_page((2 * FIG_W, FIG_W + .2)))
     ax0, ax1 = axs.flat
     ax = ax0
     ax.plot(df.x, df.F, c='C0')
@@ -616,7 +617,7 @@ def plot_tvar_quantile():
     tvar = ad.tvar(qps)
     ctvar = adc.tvar(qps)
 
-    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_H, FIG_W + .3), sharey=True)
+    fig, axs = plt.subplots(1, 2, figsize=_fit_to_page((2 * FIG_H, FIG_W + .3)), sharey=True)
     ax0, ax1 = axs.flat
 
     ax = ax0
@@ -898,7 +899,7 @@ def plot_ruin_surplus_paths(port):
     limit_dict = {f'Limit{n}': n * 1e6 for n in [1, 10]}
     n_big_dict = {'Limit1': 10000, 'Limit10': 50000}
     cp = ClassicalPremium({'gross': port}, 110)
-    fig, axs = plt.subplots(2, 2, figsize=(2 * 3.5, 2 * 2.45),
+    fig, axs = plt.subplots(2, 2, figsize=_fit_to_page((2 * 3.5, 2 * 2.45)),
                             constrained_layout=True)
     axi = iter(axs.flat)
     for unit_name in unit_names:
@@ -998,7 +999,7 @@ def ruin_example(agg, rho, u0, *, log2=None, n_sims=100_000, n_plot=50,
     n_steps, t_plot, ruin_time = rp.n_steps, rp.t_plot, rp.ruin_time
 
     # --- plot n_plot sample paths (left) + psi(u) (right) -------------
-    fig, (ax, ax_psi) = plt.subplots(1, 2, figsize=(FIG_W * 2, FIG_H),
+    fig, (ax, ax_psi) = plt.subplots(1, 2, figsize=_fit_to_page((FIG_W * 2, FIG_H)),
                                      width_ratios=[1, 1],
                                      layout='constrained')
     n_fail = 0
@@ -1275,7 +1276,7 @@ def plot_distortion_and_ins_stats(dist=None, s=0.3):
 
     Provenance: PIR Figure 10.3. Originally ``fig_10_3``.
     """
-    fig, axs = plt.subplots(1, 2, figsize=(2 * FIG_W, FIG_W), constrained_layout=True)
+    fig, axs = plt.subplots(1, 2, figsize=_fit_to_page((2 * FIG_W, FIG_W)), constrained_layout=True)
     if dist is None:
         dist = Distortion('ph', a=0.4)
 
@@ -1346,7 +1347,7 @@ def plot_spectral_three_panel(port=None, dist=None, s=0.3, x=None,
     [loss][margin][capital] horizontal bar. ``return_period_max`` sets the
     y-axis extent (in return-period years).
     """
-    fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_H, FIG_W), constrained_layout=True)
+    fig, axs = plt.subplots(1, 3, figsize=_fit_to_page((3 * FIG_H, FIG_W)), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
 
     if port is None:

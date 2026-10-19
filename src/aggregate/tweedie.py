@@ -927,10 +927,13 @@ class Tweedie:
                 #     ax.set(xlim=[-u/20, u])
             else:
                 if plot:
-                    self.ft.df.plot(figsize=(3, 2.25))
+                    from .plots._style import _fit_to_page
+                    self.ft.df.plot(figsize=_fit_to_page((3, 2.25)))
             if simpson:
                 self.ft.invert_simpson(log2=log2, x_min=x_min, bs=bs)
-                ax = self.ft.df.plot(figsize=(3,2.25), logy=True, title='2 methods')
+                from .plots._style import _fit_to_page
+                ax = self.ft.df.plot(figsize=_fit_to_page((3, 2.25)), logy=True,
+                                     title='2 methods')
                 if self.ft.fz is not None:
                     self.ft.df_exact.plot(ax=ax)
             return self.audit()
@@ -939,12 +942,13 @@ class Tweedie:
 def tweedie_illustration():
     """Make the usual graph of Tweedie distributions."""
     from .plots import plt, ticker
+    from .plots._style import _fit_to_page
 
     # redo with Jorg sign for alpha
     alpha = np.linspace(-4, 2, 101)
     p = (-alpha+2) / (-alpha+1)
 
-    f, ax = plt.subplots(figsize=(5,5))
+    f, ax = plt.subplots(figsize=_fit_to_page((5, 5)))
     # want to cut out the vertical line and color code by type of distribution
     idx = (1 <= p) * (p < 2)
     ax.plot(alpha[idx], p[idx], lw=3, c='C0')

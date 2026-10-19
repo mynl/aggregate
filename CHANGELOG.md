@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.6.0a2 - 2026-10-19
+
+**[Library-Figures-Fit-Page] `aggregate.plots.fit_page(width, max_height)` fits every library figure to a document's page.** A document calls it once with its text width in inches, and every figure aggregate draws afterwards, `Aggregate.plot()`, `Portfolio.plot()`, the `make_grid` and `make_mosaic` canvases and the rest, is drawn at a size that fits: a figure wider than the page shrinks to it, its height falls with it but not below 2in, and no figure is taller than `max_height`. A narrower figure keeps its size; nothing is ever enlarged. On a 6.3in page a two panel `Aggregate.plot()` is 6.3 x 2.2in where it was 7.0 x 2.45in, drawn at that size so its type prints at the style's size. `fit_page()` clears the page. Off by default, so nothing changes for anyone who does not call it. `Portfolio.scatter` now honors its `figsize`, `marker`, `s`, `alpha` and `diagonal`, which it ignored. Docs await a rebuild. Plan `dev/plan-library-figures.md`; house-style calls `fit_page` in its own plan once this is on PyPI.
+
 ## 1.6.0a1 - 2026-10-19
 
 **[DecL-Word-List] one DecL word list, `aggregate.decl_words.decl_words()`, for every program that colors DecL.** It returns the words by group: `reserved`, `frequencies`, `clauses` and `constants` read from `decl.lark`, `distortions` from `Distortion.available_distortions(pricing=False)`, and `declarations`, `severities` (name to shape parameter count) and `mixing` kept in the module and checked by `tests/test_decl_words.py`. `python -m aggregate.decl_words` prints it as JSON with the package version, for colorizers outside Python. `AggLexer` now builds its keyword rules from the list, and its tokens over the four shipped corpora are unchanged; the severity names `gilbrat` and `trapz`, which scipy no longer has, are gone, and `gibrat` is added. Submodule access only. aggregate-api, aggregate-asp and house-style pick the list up in their own `[DecL-Word-List]` plans once this is on PyPI. Docs await a rebuild. Plan `dev/done/plan-decl-word-list.md`.

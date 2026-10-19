@@ -35,7 +35,7 @@ __all__ = [
     'plt', 'mpl', 'ticker',
     'FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
     'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
-    'use', 'context', 'rc_params',
+    'use', 'context', 'rc_params', 'fit_page',
     'make_mosaic', 'make_grid',
 ]
 
@@ -139,6 +139,101 @@ def rc_params() -> dict:
 
 
 # ---------------------------------------------------------------------------
+# The page a document draws library figures for
+# ---------------------------------------------------------------------------
+
+#: The page set by :func:`fit_page`, ``[width, max_height]`` in inches. Either
+#: may be ``None``; both ``None``, the default, leaves every figure its size.
+_PAGE = [None, None]
+
+#: The height, in inches, a fitted figure keeps however far its width shrinks,
+#: unless its own height or the page's cap is lower.
+_FIT_MIN_HEIGHT = 2.0
+
+
+def fit_page(width=None, max_height=None):
+    """Fit every library figure to a page ``width`` inches wide.
+
+    A document calls this once in its setup, with the width of its text block,
+    and every figure aggregate draws afterwards (``Aggregate.plot()``,
+    ``Portfolio.plot()``, the canvases :func:`make_grid` and :func:`make_mosaic`
+    make, and the rest) is drawn at a size that fits. ``fit_page()`` with no
+    arguments clears the page and restores every figure's own size.
+
+    Parameters
+    ----------
+    width : float, optional
+        Page width in inches. A figure wider than this is shrunk to it.
+    max_height : float, optional
+        Height cap in inches. No figure is drawn taller.
+
+    Raises
+    ------
+    ValueError
+        If either value is given and is not a positive number.
+
+    Notes
+    -----
+    A figure of width :math:`w` and height :math:`h` is drawn at
+
+    .. math::
+
+        s = \\min(1, W / w), \\qquad
+        w' = s w, \\qquad
+        h' = \\min\\bigl(\\max(s h, \\min(h, 2)), H\\bigr)
+
+    for page width :math:`W` and cap :math:`H`. The rule only ever shrinks: a
+    figure narrower than the page keeps its size. The height falls with the
+    width but stops at 2in, because a row of three 3.5in panels scaled to a
+    6.3in page would otherwise be 1.5in high, and the cap always wins. On a
+    6.3in page a two panel ``Aggregate.plot()`` (7.0 x 2.45in) is drawn at
+    6.3 x 2.2in.
+
+    The figure is drawn at the fitted size, not drawn large and shrunk
+    afterwards, so its type prints at the size the style names. matplotlib has
+    no rcParam for this: ``figure.figsize`` is the size of one figure, which a
+    document sets to its own single figure width, while a library figure of two
+    or three panels needs the whole width it may take.
+
+    Examples
+    --------
+    >>> from aggregate.plots import fit_page
+    >>> fit_page(6.3, 8.0)     # a 6.3in text block            # doctest: +SKIP
+    >>> fit_page()             # back to each figure's own size # doctest: +SKIP
+    """
+    for name, value in (('width', width), ('max_height', max_height)):
+        if value is not None and not value > 0:
+            raise ValueError(f'fit_page: {name} must be a positive number of '
+                             f'inches or None, not {value!r}')
+    _PAGE[:] = [width, max_height]
+
+
+def _fit_to_page(figsize):
+    """The size to draw a figure of ``figsize`` at, given the :func:`fit_page` page.
+
+    Parameters
+    ----------
+    figsize : tuple of float
+        The figure's own ``(width, height)`` in inches.
+
+    Returns
+    -------
+    tuple of float
+        ``figsize`` itself when no page is set, else the fitted size. The rule
+        is in :func:`fit_page`.
+    """
+    width, max_height = _PAGE
+    if width is None and max_height is None:
+        return figsize
+    w, h = figsize
+    s = 1.0 if width is None else min(1.0, width / w)
+    h_fit = max(h * s, min(h, _FIT_MIN_HEIGHT))
+    if max_height is not None:
+        h_fit = min(h_fit, max_height)
+    return (w * s, h_fit)
+
+
+# ---------------------------------------------------------------------------
 # Generic canvas creators ("make the space")
 # ---------------------------------------------------------------------------
 
@@ -158,7 +253,8 @@ def make_mosaic(layout, *, figsize=None, **kwargs):
         Figure size in inches. Defaults to the house grid size
         ``(ncols * FIG_W, nrows * FIG_H)``, where the grid shape is read from
         ``layout`` (newline-separated rows for a string; nested rows for a
-        list) -- one panel-sized cell per mosaic position.
+        list) -- one panel-sized cell per mosaic position. Fitted to the
+        page when :func:`fit_page` has set one, whether given or defaulted.
     **kwargs
         Forwarded to :func:`matplotlib.pyplot.subplot_mosaic`.
 
@@ -177,7 +273,7 @@ def make_mosaic(layout, *, figsize=None, **kwargs):
             nrows = len(layout)
             ncols = max((len(r) for r in layout), default=1)
         figsize = (ncols * FIG_W, nrows * FIG_H)
-    return plt.subplot_mosaic(layout, figsize=figsize, **kwargs)
+    return plt.subplot_mosaic(layout, figsize=_fit_to_page(figsize), **kwargs)
 
 
 def make_grid(nrows, ncols, *, figsize=None, squeeze=True, **kwargs):
@@ -195,6 +291,8 @@ def make_grid(nrows, ncols, *, figsize=None, squeeze=True, **kwargs):
         Figure size in inches. Defaults to the house grid size
         ``(ncols * FIG_W, nrows * FIG_H)`` -- one panel-sized cell per grid
         position -- so ``make_grid(1, 3)`` is three panels wide by default.
+        Fitted to the page when :func:`fit_page` has set one, whether given or
+        defaulted.
     squeeze : bool, default True
         Passed through to :func:`matplotlib.pyplot.subplots`; pass ``False`` to
         always get a 2-D ``Axes`` array.
@@ -208,5 +306,5 @@ def make_grid(nrows, ncols, *, figsize=None, squeeze=True, **kwargs):
     """
     if figsize is None:
         figsize = (ncols * FIG_W, nrows * FIG_H)
-    return plt.subplots(nrows, ncols, figsize=figsize,
+    return plt.subplots(nrows, ncols, figsize=_fit_to_page(figsize),
                         constrained_layout=True, squeeze=squeeze, **kwargs)

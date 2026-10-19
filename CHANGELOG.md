@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.5.3 - 2026-10-19
+
+**[Unit-Capital-Above-Frame] unit capital above the augmented frame uses the last row, and far tail unit capital always warns.** `unit_capital_at`, behind `pricing_at`, `price` and `pentagon_at`, now treats an asset level above the last row of the augmented frame as `pricing_at` does: it uses the last row and warns, where it raised a numpy broadcast `ValueError`. `pentagon_at` now warns when it falls back to the last row. A new warning fires whenever the asset level reaches layers with `S <= VALIDATION_NOISE`, whichever units are requested, so a single unit `pentagon_at(unit=...)` in the far tail is no longer silent. The split is left as computed and total capital stays exact; nothing moves at ordinary asset levels. Contributed by @KasraBashirioskooei (#13, from #12).
+
 ## 1.5.2 - 2026-10-14
 
 **[Thread-Safe-Load] `Underwriter.load()`, `fork()` and `reload()` are thread safe.** A thread that looks up a recipe or takes a fork while another thread is reading the configured databases now waits for the read to finish. Before, it found the base already marked loaded part way through the read, and got `RecipeNotFound` or, worse, a fork that kept the partial base for good: this is what broke a freshly started aLL server, and any multi-threaded host could hit it. A configured read that raises is now rolled back and retried on the next access, so a broken file in the configured request raises every time until it is fixed, where before later calls quietly used whatever had been read. Underwriters, `build` included, still pickle and deep-copy. Concurrent `build()` calls on one underwriter remain unsafe; give each thread a `fork()`. Plan `dev/done/plan-1.5.2-thread-safe-load.md`.

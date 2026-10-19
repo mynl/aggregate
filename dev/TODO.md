@@ -234,16 +234,13 @@
 
 ## Correctness
 
-- **[Unit-Capital-Above-Frame]** (#12, was `[Unit-Capital-Far-Tail]`;
-  reproduced on 1.5.0, 2026-10-14): `unit_capital_at` raises a numpy
-  broadcast `ValueError` when `a` is above the augmented frame's top. Accepted:
-  use the last row and warn, as `pricing_at` does; the contributor may send
-  the PR. The far tail half is declined: where `S <= VALIDATION_NOISE` the
-  density frame zeroes alpha, so on the linear frame unit margins stop summing
-  to the total and the reconciliation warning fires. That warning is the
-  intended signal; no renormalizing by the sum of unit margins and no share
-  inheritance. Optional with the fix: the check is skipped for
-  `pentagon_at(unit=...)`, which also swaps in the last row without a warning.
+- **[Unit-Capital-Above-Frame]** DONE at **1.5.3** (2026-10-19, #13, from
+  #12; was `[Unit-Capital-Far-Tail]`): above the augmented frame,
+  `unit_capital_at` and `pentagon_at` use the last row and warn, and a warning
+  fires whenever `a` reaches layers with `S <= VALIDATION_NOISE`, whichever
+  units are requested. The far tail half stays declined: no renormalizing by
+  the sum of unit margins and no share inheritance, since the warning is the
+  intended signal.
 - **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
   diagnosed 2026-10-07, second occurrence 2026-10-11, full account in
   `dev/done/plan-a400-v1-loose-ends.md` phase 3 and

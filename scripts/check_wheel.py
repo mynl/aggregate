@@ -227,7 +227,9 @@ def smoke(wheel: Path, work: Path, python: str) -> list[dict]:
     """Install ``wheel`` into a fresh venv under ``work`` and run the smoke script there."""
     venv = work / 'venv'
     run(['uv', 'venv', '--python', python, str(venv)])
-    vpython = venv / ('Scripts' if os.name == 'nt' else 'bin') / 'python'
+    # Windows venvs put the interpreter at Scripts\python.exe; uv needs the .exe
+    vpython = (venv / 'Scripts' / 'python.exe' if os.name == 'nt'
+               else venv / 'bin' / 'python')
     run(['uv', 'pip', 'install', '--python', str(vpython), str(wheel)])
     script = work / 'smoke.py'
     script.write_text(SMOKE_SCRIPT, encoding='utf-8')

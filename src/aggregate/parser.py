@@ -2432,6 +2432,26 @@ class UnderwritingTransformer(Transformer):
                 "exp_retention_end": attach,
                 "_layer_label": as_label.get("label")}
 
+    def layers_xs_disappearing(self, c):
+        """``y xs d1 to d2 disappearing``: the retention ends at ``d2``.
+
+        The disappearing deductible is the retention family member with
+        ``d2 > d1`` (``[Disappearing-Deductible]``); ``d2`` is stored as
+        ``exp_retention_end``. A vector ``to [...]`` must have one entry per
+        attachment; a scalar applies to every layer. ``d1 <= d2`` is checked
+        per layer when the severity is built.
+        """
+        limit, _xs, attach, _to, retention_end, _disappearing, as_label = c
+        n_attach, n_end = np.size(attach), np.size(retention_end)
+        if n_end > 1 and n_end != n_attach:
+            raise ValueError(
+                f'disappearing deductible: to [...] has {n_end} entries but '
+                f'there are {n_attach} attachments; give one retention end '
+                f'per layer, or a single value for all of them.')
+        return {"exp_attachment": attach, "exp_limit": limit,
+                "exp_retention_end": retention_end,
+                "_layer_label": as_label.get("label")}
+
     def layers_tower(self, c):
         tower = c[0]
         return {"exp_attachment": tower[1], "exp_limit": tower[0]}

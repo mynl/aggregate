@@ -446,9 +446,13 @@
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against
   the published *Aggregate* paper and make the docs match. The switches-to-config
   half is done; the aliasing half shipped as `[Validation-Punchup]`.
-- **[Input-Guards]** — zero `lb` not consistent with attachment equals zero;
-  flag **fixed** frequency with a non-integer expected value; flag **mixing**
-  with an inconsistent frequency distribution.
+- **[Input-Guards]** (#18, ruled 2026-10-19): a **fixed** frequency whose
+  count is not whole (directly, or derived from loss or premium) builds
+  silently with negative probabilities; it will raise `ValueError` within a
+  small tolerance, pointing at `dfreq` and `poisson`. Contributor PR to
+  follow. The old "zero `lb`" and "mixing with an inconsistent frequency"
+  notes are dropped: neither could be reconstructed, and the grammar already
+  rejects mixing with a second frequency.
 - **[Sdist-Prune-Tests]** The sdist ships setuptools' default
   `tests/test_*.py` (139 files since 1.0.1) without `conftest.py` or
   `tests/data`, so the tests cannot run from it. Add `prune tests` to

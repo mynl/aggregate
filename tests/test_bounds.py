@@ -246,8 +246,10 @@ def test_frames_emit_no_runtime_warning():
 # PnL input ([Bounds-PnL-Engine]): Bounds sees through to the engine
 # ----------------------------------------------------------------------
 
+# 72% lr: 72 / mean severity 4 is a whole 18 claims, as a fixed count needs
+# ([Input-Guards]); 70% gave 17.5, a fractional fixed count
 PNL_PROGRAM = (
-    'pnl BoundsPnL 100 premium less agg BoundsPnL_e 100 premium at 70% lr '
+    'pnl BoundsPnL 100 premium less agg BoundsPnL_e 100 premium at 72% lr '
     'sev 10 * beta 2 3 occurrence net of 4 xs 4 deposit 10 fixed'
 )
 

@@ -23,6 +23,20 @@ severity rather than through counting. Discretization limits it to about 1e-7.
 so with assets above every outcome (no default) it is allocated premium
 exactly ``c`` and margin exactly zero, whatever the distortion.
 
+**Comonotonic units.** Units ``X_i = w_i X`` are functions of the total, so
+``E[X_i | X_total = t] = t w_i / sum(w)`` exactly, and every layer of the
+total splits in the same proportion. Each unit therefore receives exactly the
+fraction ``w_i / sum(w)`` of L, P, M **and** Q, under any distortion and at any
+asset level. Built with ``Portfolio.create_from_sample`` from a fixed sample.
+
+**Identical units.** Independent, identically distributed units are
+exchangeable, so each of ``n`` receives exactly ``1 / n`` of L, P, M and Q.
+
+The Q comparisons are absolute, scaled to the asset level, rather than ratios:
+a distortion can make total capital exactly zero (``TVaR_0.9`` at ``a =
+q(0.9)`` distorts every layer below ``a`` to ``gS = 1``, so ``P = a``), and
+then each unit's Q is zero to rounding and a ratio is meaningless.
+
 Invariants
 ----------
 Property tests draw small random discrete programs with ``hypothesis`` and
@@ -38,7 +52,7 @@ import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from aggregate import build
+from aggregate import Portfolio, build
 from aggregate.spectral import Distortion
 
 DISTORTIONS = [
@@ -48,6 +62,7 @@ DISTORTIONS = [
     Distortion('dual', 1.8),
 ]
 DIST_IDS = [str(d) for d in DISTORTIONS]
+COMONOTONIC_WEIGHTS = (1, 2, 5)
 
 
 @pytest.fixture(scope='module')
@@ -127,6 +142,55 @@ def test_unit_allocations_sum_to_total(thinning_port, dist):
     for stat in ('L', 'P', 'M'):
         assert units[stat].sum() == pytest.approx(rows.loc['total', stat],
                                                   rel=1e-11), stat
+
+
+@pytest.fixture(scope='module')
+def comonotonic_port():
+    """Units ``w_i X`` for ``w = (1, 2, 5)``, ``X`` uniform on ``1, ..., 40``."""
+    x = np.arange(1, 41, dtype=float)
+    sample = pd.DataFrame({f'U{i}': w * x
+                           for i, w in enumerate(COMONOTONIC_WEIGHTS)})
+    return Portfolio.create_from_sample('GS.Comonotonic', sample, bs=1, log2=10)
+
+
+@pytest.fixture(scope='module')
+def identical_port():
+    """Three independent copies of one compound Poisson unit."""
+    unit = '3 claims sev gamma 10 cv 1 poisson'
+    return build(f'port GS.Identical agg A {unit} agg B {unit} agg C {unit}',
+                 log2=13, bs=1 / 4)
+
+
+def _assert_shares(rows, shares, rel):
+    """Each unit's L, P, M and Q equal its share of the total.
+
+    Absolute tolerance scaled to the asset level, so a total that is zero to
+    rounding (see the module docstring on Q) is checked rather than divided by.
+    """
+    abs_tol = 1e-12 * float(rows.loc['total', 'a'])
+    for unit, share in shares.items():
+        for stat in ('L', 'P', 'M', 'Q'):
+            assert rows.loc[unit, stat] == pytest.approx(
+                share * rows.loc['total', stat], rel=rel, abs=abs_tol), \
+                (unit, stat)
+
+
+@pytest.mark.parametrize('p', [0.9, 0.95])
+@pytest.mark.parametrize('dist', DISTORTIONS, ids=DIST_IDS)
+def test_comonotonic_units_allocate_by_weight(comonotonic_port, dist, p):
+    """``w_i X`` receives exactly ``w_i / sum(w)`` of L, P, M and Q."""
+    rows = comonotonic_port.pricing_at(dist, p=p, allocation='linear')
+    total_w = sum(COMONOTONIC_WEIGHTS)
+    _assert_shares(rows, {f'U{i}': w / total_w
+                          for i, w in enumerate(COMONOTONIC_WEIGHTS)},
+                   rel=1e-12)
+
+
+@pytest.mark.parametrize('dist', DISTORTIONS, ids=DIST_IDS)
+def test_identical_units_share_equally(identical_port, dist):
+    """Exchangeable units each receive exactly 1/3 of L, P, M and Q."""
+    rows = identical_port.pricing_at(dist, p=0.99, allocation='linear')
+    _assert_shares(rows, {u: 1 / 3 for u in 'ABC'}, rel=1e-10)
 
 
 # ----------------------------------------------------------------------------

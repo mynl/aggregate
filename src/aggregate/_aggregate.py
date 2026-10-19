@@ -7272,9 +7272,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             return None
         s_his, s_los = [], []
         for s in self.sevs:
-            # payment_max, not limit: a franchise pays up to the ground-up top
-            cap = getattr(s, 'payment_max', s.limit)
-            hi = cap if np.isfinite(cap) else float(s.fz.support()[1])
+            hi = s.limit if np.isfinite(s.limit) else float(s.fz.support()[1])
             lo = float(s.fz.support()[0]) if getattr(s, 'signed', False) else 0.0
             s_his.append(hi)
             s_los.append(lo)

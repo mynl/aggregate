@@ -906,16 +906,56 @@ def make_layer_attachment_ppf(attachment, limit, pattach, pdetach, conditional):
 # [Franchise-Deductible]
 # ---------------------------------------------------------------------------
 #
-# A layer ``y xs d1`` has ground-up top ``top = d1 + y``. The retention is
-# ``d1`` up to ``d1``, ``d1 (d2 - x) / (d2 - d1)`` on ``(d1, d2]`` and zero
-# above ``d2``, where ``d2`` is ``retention_end``. ``d2 = inf`` is the ordinary
-# deductible, which keeps the ``make_layer_attachment_*`` wrappers; the
-# wrappers below serve a finite ``d2`` with ``d1 <= d2 <= top``. ``d2 = d1`` is
-# the franchise, ``d1 < d2`` the disappearing deductible.
+# A layer ``y xs d1`` retains ``r(x)``: ``d1`` up to ``d1``,
+# ``d1 (d2 - x) / (d2 - d1)`` on ``(d1, d2]`` and zero above ``d2``, where
+# ``d2`` is ``retention_end``. The payment is ``min(x - r(x), y)``: deductible
+# first, limit second, so ``y`` is the largest payment in every form.
+# ``d2 = inf`` is the ordinary deductible, which keeps the
+# ``make_layer_attachment_*`` wrappers; the wrappers below serve a finite
+# ``d2 >= d1``. ``d2 = d1`` is the franchise, ``d1 < d2`` the disappearing
+# deductible.
 
 
-def _retention_payment(x, attachment, retention_end, top):
-    """Payment ``g(x)`` on a ground-up loss under a finite retention end.
+def _retention_detachment(attachment, retention_end, limit):
+    """Ground-up loss at which the payment first reaches the limit.
+
+    Parameters
+    ----------
+    attachment : float
+        Deductible ``d1``.
+    retention_end : float
+        Loss ``d2 >= d1`` at which the retention reaches zero; ``inf`` is the
+        ordinary deductible.
+    limit : float
+        Largest payment ``y``, possibly ``inf``.
+
+    Returns
+    -------
+    float
+        ``d1 + y`` for the ordinary deductible, ``max(d1, y)`` for the
+        franchise, and for the disappearing deductible ``d1 + y / k`` when
+        ``y <= d2`` (``k = d2 / (d2 - d1)``), otherwise ``y``.
+
+    Notes
+    -----
+    The unlimited payment ``u(x) = x - r(x)`` is ``k (x - d1)`` on
+    ``(d1, d2]`` and ``x`` above, so it reaches ``y`` on the ramp when
+    ``y <= d2`` and on the identity piece otherwise. The ramp solution is
+    written ``d1 + y (d2 - d1) / d2`` so the franchise (``d2 = d1``, infinite
+    ``k``) gives ``d1``: every loss above the attachment pays at least ``d1``,
+    so a limit ``y <= d1`` is reached at once. ``d2 = 0`` forces ``d1 = 0``,
+    no retention at all, and the detachment is ``y``.
+    """
+    d1, d2, y = attachment, retention_end, limit
+    if not np.isfinite(d2):
+        return d1 + y
+    if y <= d2 and d2 > 0:
+        return d1 + y * ((d2 - d1) / d2)
+    return y
+
+
+def _retention_payment(x, attachment, retention_end, limit):
+    """Payment ``g(x) = min(x - r(x), y)`` on a ground-up loss, finite ``d2``.
 
     Parameters
     ----------
@@ -924,37 +964,35 @@ def _retention_payment(x, attachment, retention_end, top):
     attachment : float
         Deductible ``d1``.
     retention_end : float
-        Loss ``d2`` at which the retention reaches zero, finite, with
-        ``d1 <= d2 <= top``.
-    top : float
-        Ground-up top of the layer, ``d1 + y``.
+        Loss ``d2`` at which the retention reaches zero, finite, ``d2 >= d1``.
+    limit : float
+        Largest payment ``y``, possibly ``inf``.
 
     Returns
     -------
     numpy.ndarray
         ``0`` for ``x <= d1``, ``k (x - d1)`` on ``(d1, d2]`` with
-        ``k = d2 / (d2 - d1)``, ``x`` on ``(d2, top]`` and ``top`` above.
+        ``k = d2 / (d2 - d1)``, ``x`` above ``d2``, each capped at ``y``.
 
     Notes
     -----
     ``g`` is non-decreasing, which is what lets the quantile wrappers apply it
     to a ground-up quantile. At the franchise ``d2 = d1`` the ramp is empty
     (no ``x`` satisfies ``d1 < x <= d1``), so its slope, which would be
-    infinite, is never evaluated: the ramp is written as
-    ``(x - d1) d2 / (d2 - d1)`` and computed only where ``d1 < x <= d2``.
+    infinite, is never evaluated: the ramp is computed only where
+    ``d1 < x <= d2``.
     """
     x = np.asarray(x, dtype=float)
     d1, d2 = attachment, retention_end
-    xc = np.minimum(x, top)
-    ramp = np.zeros_like(xc)
-    on_ramp = (xc > d1) & (xc <= d2)
+    on_ramp = (x > d1) & (x <= d2)
+    u = np.where(x <= d1, 0.0, x)
     if d2 > d1:
-        ramp = np.where(on_ramp, (xc - d1) * (d2 / (d2 - d1)), 0.0)
-    return np.where(xc <= d1, 0.0, np.where(on_ramp, ramp, xc))
+        u = np.where(on_ramp, (x - d1) * (d2 / (d2 - d1)), u)
+    return np.minimum(u, limit)
 
 
 def _retention_inverse(t, attachment, retention_end):
-    """Smallest ground-up loss whose payment exceeds ``t``, for ``t >= 0``.
+    """Largest ground-up loss whose unlimited payment is at most ``t``, ``t >= 0``.
 
     Notes
     -----
@@ -962,7 +1000,8 @@ def _retention_inverse(t, attachment, retention_end):
     ``d1 + t (d2 - d1) / d2`` so the franchise (``d2 = d1``) maps the whole
     gap ``[0, d1]`` to ``d1``: no loss pays an amount strictly between zero and
     ``d1``. Above ``d2`` the payment is the loss itself. ``d2 = 0`` (a zero
-    attachment) has no ramp and is the identity.
+    attachment) has no ramp and is the identity. Callers apply it only below
+    the limit, where the cap does not bind.
     """
     t = np.asarray(t, dtype=float)
     d1, d2 = attachment, retention_end
@@ -973,17 +1012,17 @@ def _retention_inverse(t, attachment, retention_end):
     return np.where(t <= d2, below, t)
 
 
-def make_layer_retention_cdf(attachment, retention_end, top, pattach,
+def make_layer_retention_cdf(attachment, retention_end, limit, pattach,
                              conditional):
     """Decorator wrapping a CDF for a layer with a finite retention end.
 
     Notes
     -----
-    The payment is the non-decreasing ``g`` of :func:`_retention_payment`, so
-    ``P(g(X) <= t) = F(g^{-1}(t))`` with :func:`_retention_inverse`.
+    Below the limit the payment is the non-decreasing ``u(X) = X - r(X)``, so
+    ``P(g(X) <= t) = F(u^{-1}(t))`` with :func:`_retention_inverse`.
     Conditional on ``X > d1`` this is ``(F(d1 + t/k) - F(d1)) / S(d1)`` on the
     ramp and ``(F(t) - F(d1)) / S(d1)`` above it; unconditional keeps the mass
-    ``F(d1)`` at zero. Both reach one at the top payment ``top``.
+    ``F(d1)`` at zero. Both reach one at the limit ``y``.
     """
     def actual_decorator(fzcdf):
         def wrapper(t):
@@ -992,20 +1031,20 @@ def make_layer_retention_cdf(attachment, retention_end, top, pattach,
                                              retention_end))
             if conditional:
                 inner = (inner - (1 - pattach)) / pattach
-            return np.where(t < 0, 0.0, np.where(t >= top, 1.0, inner))
+            return np.where(t < 0, 0.0, np.where(t >= limit, 1.0, inner))
         return wrapper
 
     return actual_decorator
 
 
-def make_layer_retention_sf(attachment, retention_end, top, pattach,
+def make_layer_retention_sf(attachment, retention_end, limit, pattach,
                             conditional):
     """Decorator wrapping a survival function for a finite retention end.
 
     Notes
     -----
-    ``S(g^{-1}(t))``, divided by ``S(d1)`` when conditional; computed from the
-    ground-up survival function for accuracy in the tail.
+    ``S(u^{-1}(t))`` below the limit, divided by ``S(d1)`` when conditional;
+    computed from the ground-up survival function for accuracy in the tail.
     """
     def actual_decorator(fzsf):
         def wrapper(t):
@@ -1014,24 +1053,24 @@ def make_layer_retention_sf(attachment, retention_end, top, pattach,
                                             retention_end))
             if conditional:
                 inner = inner / pattach
-            return np.where(t < 0, 1.0, np.where(t >= top, 0.0, inner))
+            return np.where(t < 0, 1.0, np.where(t >= limit, 0.0, inner))
         return wrapper
 
     return actual_decorator
 
 
-def make_layer_retention_pdf(attachment, retention_end, top, pattach, pdetach,
-                             conditional):
+def make_layer_retention_pdf(attachment, retention_end, limit, pattach,
+                             pdetach, conditional):
     """Decorator wrapping a PDF for a finite retention end.
 
     Notes
     -----
-    Density of the payment ``f(g^{-1}(t)) / k`` on the ramp and ``f(t)`` above
+    Density of the payment ``f(u^{-1}(t)) / k`` on the ramp and ``f(t)`` above
     it (divided by ``S(d1)`` when conditional); zero in the franchise gap,
-    where ``1 / k = 0``. Point masses are marked with ``inf``: at the top when
-    ``pdetach > 0`` and, unconditionally, at zero when ``pattach < 1``. The
-    point mass tests come **before** the range tests, so ``t == top`` is
-    reported as the mass and not swallowed by ``t >= top``.
+    where ``1 / k = 0``. Point masses are marked with ``inf``: at the limit
+    when ``pdetach > 0`` and, unconditionally, at zero when ``pattach < 1``.
+    The point mass tests come **before** the range tests, so ``t == limit`` is
+    reported as the mass and not swallowed by ``t >= limit``.
     """
     d1, d2 = attachment, retention_end
     inv_k = (d2 - d1) / d2 if d2 > 0 else 1.0
@@ -1045,8 +1084,8 @@ def make_layer_retention_pdf(attachment, retention_end, top, pattach, pdetach,
                 body = body / pattach
             top_mass = np.inf if pdetach > 0 else 0.0
             zero_mass = np.inf if (not conditional and pattach < 1) else body
-            return np.where(t == top, top_mass,
-                            np.where(t > top, 0.0,
+            return np.where(t == limit, top_mass,
+                            np.where(t > limit, 0.0,
                                      np.where(t < 0, 0.0,
                                               np.where(t == 0, zero_mass, body))))
         return wrapper
@@ -1054,7 +1093,7 @@ def make_layer_retention_pdf(attachment, retention_end, top, pattach, pdetach,
     return actual_decorator
 
 
-def make_layer_retention_ppf(attachment, retention_end, top, pattach,
+def make_layer_retention_ppf(attachment, retention_end, limit, pattach,
                              conditional):
     """Decorator wrapping a percent point function for a finite retention end.
 
@@ -1068,13 +1107,13 @@ def make_layer_retention_ppf(attachment, retention_end, top, pattach,
         def wrapper(q):
             q = np.asarray(q, dtype=float)
             p = 1 - pattach * (1 - q) if conditional else q
-            return _retention_payment(fzppf(p), attachment, retention_end, top)
+            return _retention_payment(fzppf(p), attachment, retention_end, limit)
         return wrapper
 
     return actual_decorator
 
 
-def make_layer_retention_isf(attachment, retention_end, top, pattach,
+def make_layer_retention_isf(attachment, retention_end, limit, pattach,
                              conditional):
     """Decorator wrapping an inverse survival function for a finite retention end.
 
@@ -1087,13 +1126,13 @@ def make_layer_retention_isf(attachment, retention_end, top, pattach,
         def wrapper(q):
             q = np.asarray(q, dtype=float)
             p = q * pattach if conditional else q
-            return _retention_payment(fzisf(p), attachment, retention_end, top)
+            return _retention_payment(fzisf(p), attachment, retention_end, limit)
         return wrapper
 
     return actual_decorator
 
 
-def _moms_retention(partial_e, sf, attachment, retention_end, top, n):
+def _moms_retention(partial_e, sf, attachment, retention_end, limit, n):
     """Raw moments ``E[g(X)^m]``, ``m = 0..n``, unconditional (not divided by ``S(d1)``).
 
     Parameters
@@ -1103,8 +1142,8 @@ def _moms_retention(partial_e, sf, attachment, retention_end, top, n):
         (:func:`_partial_e`) or numerical (:func:`_partial_e_numeric`).
     sf : callable
         Ground-up survival function.
-    attachment, retention_end, top : float
-        ``d1``, a finite ``d2`` with ``d1 <= d2 <= top``, and ``top = d1 + y``.
+    attachment, retention_end, limit : float
+        ``d1``, a finite ``d2 >= d1``, and the largest payment ``y``.
     n : int
         Highest moment.
 
@@ -1115,32 +1154,37 @@ def _moms_retention(partial_e, sf, attachment, retention_end, top, n):
 
     Notes
     -----
-    With ``PE_j(t) = E[X^j; X <= t]`` and ``k = d2 / (d2 - d1)``,
+    With ``PE_j(t) = E[X^j; X <= t]``, ``k = d2 / (d2 - d1)`` and ``D`` the
+    detachment of :func:`_retention_detachment`,
 
     .. math::
 
         E[g(X)^m] = k^m \\sum_j \\binom{m}{j} (-d_1)^{m-j}
-                    (PE_j(d_2) - PE_j(d_1))
-                    + PE_m(top) - PE_m(d_2) + top^m S(top).
+                    (PE_j(\\min(d_2, D)) - PE_j(d_1))
+                    + PE_m(D) - PE_m(d_2) + y^m S(D),
 
-    The three terms are the ramp on ``(d1, d2]``, the identity piece on
-    ``(d2, top]`` and the mass at the top. The ramp is absent for the
-    franchise (``d2 = d1``). An infinite ``top`` (unlimited layer) drops the
-    mass term and reads the identity piece as the tail of ``E[X^m]``.
+    where the identity term is present only when ``D > d2``. The three terms
+    are the ramp on ``(d1, min(d2, D)]``, the identity piece on ``(d2, D]``
+    and the mass at the limit. The ramp is absent for the franchise
+    (``d2 = d1``). An infinite limit drops the mass term and reads the
+    identity piece as the tail of ``E[X^m]``.
     """
-    d1, d2 = attachment, retention_end
+    d1, d2, y = attachment, retention_end, limit
+    det = _retention_detachment(d1, d2, y)
+    ramp_end = min(d2, det)
     pe_d1 = np.asarray(partial_e(d1), dtype=float)
+    pe_ramp = np.asarray(partial_e(ramp_end), dtype=float)
     pe_d2 = np.asarray(partial_e(d2), dtype=float)
-    pe_top = np.asarray(partial_e(top), dtype=float)
+    pe_det = np.asarray(partial_e(det), dtype=float)
     out = np.zeros(n + 1)
     for m in range(n + 1):
         ramp = 0.0
         if d2 > d1:
             k = d2 / (d2 - d1)
             ramp = k ** m * sum(binom(m, j) * (-d1) ** (m - j)
-                                * (pe_d2[j] - pe_d1[j]) for j in range(m + 1))
-        ident = pe_top[m] - pe_d2[m]
-        mass = top ** m * float(sf(top)) if np.isfinite(top) else 0.0
+                                * (pe_ramp[j] - pe_d1[j]) for j in range(m + 1))
+        ident = pe_det[m] - pe_d2[m] if det > d2 else 0.0
+        mass = y ** m * float(sf(det)) if np.isfinite(y) else 0.0
         out[m] = ramp + ident + mass
     return out
 
@@ -1603,9 +1647,11 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             Ground-up loss ``d2`` at which the retention reaches zero
             (``[Franchise-Deductible]``). ``inf`` (default) is the ordinary
             deductible; ``d2 == exp_attachment`` is the franchise, which pays
-            the whole loss once it exceeds the attachment. A finite value
-            needs a layer clause and ``attachment <= d2 <= attachment +
-            limit``. See :func:`_retention_payment`.
+            the whole loss, up to the limit, once it exceeds the attachment.
+            A finite value needs a layer clause and ``d2 >= attachment``. The
+            limit is the largest payment in every form; ``detachment`` is the
+            loss at which the payment first reaches it. See
+            :func:`_retention_payment` and :func:`_retention_detachment`.
 
         Warnings
         --------
@@ -1657,11 +1703,14 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
                 raise ValueError(
                     'A franchise or disappearing deductible needs a layer '
                     'clause, e.g. 1000 xs 50 franchise.')
-            if not (self.attachment <= self.retention_end <= self.detachment):
+            if self.retention_end < self.attachment:
                 raise ValueError(
-                    f'Retention end {self.retention_end:g} must lie between '
-                    f'the attachment {self.attachment:g} and the layer top '
-                    f'{self.detachment:g}.')
+                    f'Retention end {self.retention_end:g} must be at least '
+                    f'the attachment {self.attachment:g}.')
+            # the payment is capped at the limit, so the detachment is the
+            # loss at which it first reaches the limit, not attachment + limit
+            self.detachment = _retention_detachment(
+                self.attachment, self.retention_end, exp_limit)
         self.fz = None
         self.pattach = 0
         self.moment_pattach = 0
@@ -2053,14 +2102,15 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         cond = self.conditional
         if np.isfinite(getattr(self, 'retention_end', np.inf)):
             # franchise or disappearing deductible ([Franchise-Deductible]):
-            # the payment is g(X) on the ground-up law, see
-            # _retention_payment; the top payment is the ground-up top d.
-            r = self.retention_end
-            self._layered_cdf = make_layer_retention_cdf(a, r, d, pa, cond)(self.fz.cdf)
-            self._layered_sf = make_layer_retention_sf(a, r, d, pa, cond)(self.fz.sf)
-            self._layered_pdf = make_layer_retention_pdf(a, r, d, pa, pd, cond)(self.fz.pdf)
-            self._layered_isf = make_layer_retention_isf(a, r, d, pa, cond)(self.fz.isf)
-            self._layered_ppf = make_layer_retention_ppf(a, r, d, pa, cond)(self.fz.ppf)
+            # the payment is g(X) = min(X - r(X), y) on the ground-up law,
+            # see _retention_payment; the largest payment is the declared
+            # limit y (a histogram build may tighten self.limit).
+            r, y = self.retention_end, self._exp_limit
+            self._layered_cdf = make_layer_retention_cdf(a, r, y, pa, cond)(self.fz.cdf)
+            self._layered_sf = make_layer_retention_sf(a, r, y, pa, cond)(self.fz.sf)
+            self._layered_pdf = make_layer_retention_pdf(a, r, y, pa, pd, cond)(self.fz.pdf)
+            self._layered_isf = make_layer_retention_isf(a, r, y, pa, cond)(self.fz.isf)
+            self._layered_ppf = make_layer_retention_ppf(a, r, y, pa, cond)(self.fz.ppf)
             return
         self._layered_cdf = make_layer_attachment_cdf(a, l, pa, cond)(self.fz.cdf)
         self._layered_sf  = make_layer_attachment_sf (a, l, pa, cond)(self.fz.sf)   # noqa
@@ -2546,9 +2596,9 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         same conditions as the ordinary analytic path in :meth:`moms`, and
         :func:`_partial_e_numeric` on the (spliced) law for everything else.
         """
-        a, r, top = self.attachment, self.retention_end, self.detachment
+        a, r, y = self.attachment, self.retention_end, self._exp_limit
         if isinstance(self.fz, _DiscreteRV):
-            g = _retention_payment(self.fz.xk, a, r, top)
+            g = _retention_payment(self.fz.xk, a, r, y)
             raw = [float(np.sum(g ** m * self.fz.pk)) for m in (1, 2, 3)]
         else:
             analytic = (isinstance(self.sev_name, str)
@@ -2563,35 +2613,12 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             else:
                 def pe(t):
                     return _partial_e_numeric(self.fz, t, 3)
-            raw = list(_moms_retention(pe, self.fz.sf, a, r, top, 3)[1:])
+            raw = list(_moms_retention(pe, self.fz.sf, a, r, y, 3)[1:])
         if self.conditional:
             if self.pattach == 0:
                 return 0.0, 0.0, 0.0
             raw = [v / self.pattach for v in raw]
         return tuple(raw)
-
-    @property
-    def payment_max(self):
-        """Largest payment the layer can make.
-
-        Returns
-        -------
-        float
-            ``limit`` for an ordinary deductible; the ground-up top
-            ``attachment + limit`` under a franchise or disappearing deductible
-            (a finite ``retention_end``), where the whole loss is paid once the
-            retention has vanished. ``inf`` for an unlimited layer.
-
-        Notes
-        -----
-        Code that bounds a severity's support, such as the bounded-severity
-        grid window and the tail report, must read this rather than ``limit``:
-        ``1000 xs 50 franchise`` pays up to 1050, not 1000
-        (``[Franchise-Deductible]``).
-        """
-        if np.isfinite(getattr(self, 'retention_end', np.inf)):
-            return self.detachment
-        return self.limit
 
     def plot(self, n=None, log=False, full_range=False, reflect=False,
              return_period=False, invert=False):

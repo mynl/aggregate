@@ -1,9 +1,10 @@
 """Franchise deductible and the retention family it belongs to (#9).
 
-``[Franchise-Deductible]``. A layer ``y xs d1`` has ground-up top ``top = d1 +
-y``. The retention is ``d1`` up to ``d1``, ``d1 (d2 - x) / (d2 - d1)`` on
-``(d1, d2]`` and zero above ``d2``; ``d2 = inf`` is the ordinary deductible and
-``d2 = d1`` the franchise, which pays ``min(X, top)`` once ``X > d1``. The
+``[Franchise-Deductible]``. A layer ``y xs d1`` retains ``d1`` up to ``d1``,
+``d1 (d2 - x) / (d2 - d1)`` on ``(d1, d2]`` and zero above ``d2``, and pays
+``min(x - r(x), y)``: deductible first, limit second, so ``y`` is the largest
+payment in every form. ``d2 = inf`` is the ordinary deductible and ``d2 = d1``
+the franchise, which pays ``min(X, y)`` once ``X > d1``. The
 transform is built with ``d2`` as its parameter, so the disappearing deductible
 (``d1 < d2``) is tested here at the engine level although DecL exposes only
 ``franchise``.
@@ -26,15 +27,16 @@ LOGNORM = dict(sev_name='lognorm', sev_mean=100, sev_cv=2)
 
 def _brute_moments(sev, conditional):
     """``E[g(X)^m]`` by direct integration of the payment function."""
-    fz, d1, top = sev.fz, sev.attachment, sev.detachment
+    fz, d1, det, y = sev.fz, sev.attachment, sev.detachment, sev.limit
 
     def g(x):
-        return float(S._retention_payment(x, d1, sev.retention_end, top))
+        return float(S._retention_payment(x, d1, sev.retention_end, y))
 
     out = []
     for m in (1, 2, 3):
-        body = quad(lambda x: g(x) ** m * fz.pdf(x), d1, top, limit=500)[0]
-        val = body + g(top) ** m * fz.sf(top)
+        body = (quad(lambda x: g(x) ** m * fz.pdf(x), d1, det, limit=500)[0]
+                if det > d1 else 0.0)
+        val = body + y ** m * fz.sf(det)
         out.append(val / (fz.sf(d1) if conditional else 1.0))
     return out
 
@@ -49,8 +51,10 @@ def _brute_moments(sev, conditional):
     dict(sev_name='gamma', sev_mean=100, sev_cv=0.8),       # closed form
     dict(sev_name='weibull_min', sev_a=0.8, sev_scale=80),  # numerical
 ], ids=['lognorm', 'gamma', 'weibull'])
-@pytest.mark.parametrize('d1, d2, y', [(50, 50, 1000), (25, 50, 1000)],
-                         ids=['franchise', 'disappearing'])
+@pytest.mark.parametrize('d1, d2, y', [
+    (50, 50, 1000), (50, 50, 30), (25, 50, 1000), (25, 50, 40)],
+    ids=['franchise', 'franchise-low-limit', 'disappearing',
+         'disappearing-limit-on-ramp'])
 def test_moments_match_direct_integration(kw, conditional, d1, d2, y):
     """The partial expectation form agrees with integrating ``g(X)^m``."""
     sev = Severity(exp_attachment=d1, exp_limit=y, exp_retention_end=d2,
@@ -59,23 +63,55 @@ def test_moments_match_direct_integration(kw, conditional, d1, d2, y):
                                rtol=1e-9)
 
 
+def test_franchise_is_attachment_plus_ordinary_layer():
+    """For ``y > d1``, ``y xs d1 franchise`` pays ``d1`` plus ``(y - d1) xs d1``.
+
+    Conditional on ``X > d1`` the franchise payment ``min(X, y)`` is
+    ``d1 + min(X - d1, y - d1)``, so every moment follows from the ordinary
+    layer shifted by ``d1``.
+    """
+    d1, y = 50.0, 1000.0
+    f = Severity(exp_attachment=d1, exp_limit=y, exp_retention_end=d1,
+                 **LOGNORM)
+    o = Severity(exp_attachment=d1, exp_limit=y - d1, **LOGNORM)
+    o1, o2, o3 = o.moms()
+    shifted = (d1 + o1, d1 ** 2 + 2 * d1 * o1 + o2,
+               d1 ** 3 + 3 * d1 ** 2 * o1 + 3 * d1 * o2 + o3)
+    np.testing.assert_allclose(f.moms(), shifted, rtol=1e-12)
+
+
 @pytest.mark.parametrize('conditional', [True, False])
-def test_franchise_mean_is_ordinary_mean_plus_attachment(conditional):
-    """Each claim above ``d1`` recovers the ``d1`` it would otherwise keep."""
-    f = Severity(exp_attachment=50, exp_limit=1000, exp_retention_end=50,
+def test_franchise_with_limit_below_attachment_pays_the_limit(conditional):
+    """For ``y <= d1`` every loss above ``d1`` pays exactly ``y``."""
+    f = Severity(exp_attachment=50, exp_limit=30, exp_retention_end=50,
                  sev_conditional=conditional, **LOGNORM)
-    o = Severity(exp_attachment=50, exp_limit=1000,
-                 sev_conditional=conditional, **LOGNORM)
-    recovered = 50 * (1.0 if conditional else o.fz.sf(50))
-    assert f.moms()[0] == pytest.approx(o.moms()[0] + recovered, rel=1e-12)
+    p = 1.0 if conditional else f.fz.sf(50)
+    np.testing.assert_allclose(f.moms(), [30 * p, 900 * p, 27000 * p],
+                               rtol=1e-12)
+    assert f.detachment == 50
+
+
+@pytest.mark.parametrize('d1, d2, y, expected', [
+    (50, np.inf, 1000, 1050),     # ordinary: d1 + y
+    (50, 50, 1000, 1000),         # franchise: max(d1, y)
+    (50, 50, 30, 50),
+    (25, 50, 40, 45),             # disappearing, y <= d2: d1 + y / k, k = 2
+    (25, 50, 1000, 1000),         # disappearing, y > d2: y
+])
+def test_detachment_is_where_the_payment_reaches_the_limit(d1, d2, y, expected):
+    sev = Severity(exp_attachment=d1, exp_limit=y, exp_retention_end=d2,
+                   **LOGNORM)
+    assert sev.detachment == pytest.approx(expected, rel=1e-14)
+    assert float(S._retention_payment(sev.detachment + 1e-9, d1, d2, y)
+                 if np.isfinite(d2) else y) == pytest.approx(y)
 
 
 def test_discrete_franchise_is_exact():
-    """Atoms above the attachment pay in full, capped at the top ``3 + 10``."""
+    """Atoms above the attachment pay in full, capped at the limit 10."""
     sev = Severity('dhistogram', exp_attachment=3, exp_limit=10,
                    exp_retention_end=3, sev_xs=[1, 3, 4, 8, 20],
                    sev_ps=[.2] * 5)
-    pays = np.array([4.0, 8.0, 13.0])
+    pays = np.array([4.0, 8.0, 10.0])
     expected = [float(np.mean(pays ** m)) for m in (1, 2, 3)]
     np.testing.assert_allclose(sev.moms(), expected, rtol=1e-14)
 
@@ -93,7 +129,8 @@ def test_franchise_gap_carries_no_probability():
     gap = np.array([0.0, 1.0, 25.0, 49.99, 50.0])
     np.testing.assert_allclose(cond.cdf(gap), 0.0, atol=1e-15)
     np.testing.assert_allclose(unc.cdf(gap), unc.fz.cdf(50), rtol=1e-14)
-    assert float(cond.cdf(1050.0)) == 1.0
+    assert float(cond.cdf(1000.0)) == 1.0
+    assert float(cond.cdf(999.0)) < 1.0
 
 
 @pytest.mark.parametrize('d1, d2', [(50, 50), (25, 50)],
@@ -103,7 +140,7 @@ def test_cdf_sf_and_quantiles_are_consistent(d1, d2, conditional):
     """``cdf + sf = 1``, ``ppf`` is monotone and agrees with ``isf``."""
     sev = Severity(exp_attachment=d1, exp_limit=1000, exp_retention_end=d2,
                    sev_conditional=conditional, **LOGNORM)
-    t = np.array([0.0, 10, 30, 60, 200, 800, 1049])
+    t = np.array([0.0, 10, 30, 60, 200, 800, 999])
     np.testing.assert_allclose(sev.cdf(t) + sev.sf(t), 1.0, atol=1e-14)
     q = np.linspace(0.001, 0.999, 400)
     assert np.all(np.diff(sev.ppf(q)) >= 0)
@@ -124,10 +161,14 @@ def test_cdf_matches_ground_up_formula():
             (fz.cdf(t) - fz.cdf(d1)) / fz.sf(d1), rel=1e-12)
 
 
-def test_retention_end_must_lie_in_the_layer():
-    with pytest.raises(ValueError, match='between the attachment'):
-        Severity(exp_attachment=50, exp_limit=100, exp_retention_end=500,
+def test_retention_end_must_not_precede_the_attachment():
+    with pytest.raises(ValueError, match='at least the attachment'):
+        Severity(exp_attachment=50, exp_limit=100, exp_retention_end=20,
                  **LOGNORM)
+    # beyond the old d1 + y bound is fine: the limit caps the payment
+    sev = Severity(exp_attachment=50, exp_limit=100, exp_retention_end=500,
+                   **LOGNORM)
+    assert sev.detachment == pytest.approx(50 + 100 * 450 / 500)
     with pytest.raises(ValueError, match='needs a layer clause'):
         Severity(exp_retention_end=50, **LOGNORM)
 
@@ -165,10 +206,10 @@ def test_ordinary_layer_has_no_retention_end():
 # Aggregate
 # ---------------------------------------------------------------------------
 
-def test_aggregate_franchise_adds_attachment_per_claim():
-    """Agg mean moves by exactly ``d1`` times the layer claim count."""
+def test_aggregate_franchise_is_attachment_plus_narrower_layer():
+    """``1000 xs 50 franchise`` is ``50`` per claim plus ``950 xs 50``."""
     f = build('agg GS.F 100 claims 1000 xs 50 franchise sev lognorm 100 cv 2 poisson')
-    o = build('agg GS.O 100 claims 1000 xs 50 sev lognorm 100 cv 2 poisson')
+    o = build('agg GS.O 100 claims 950 xs 50 sev lognorm 100 cv 2 poisson')
     assert f.est_m - o.est_m == pytest.approx(50 * f.n, rel=1e-9)
     assert f.valid.passes
 
@@ -183,40 +224,35 @@ def test_aggregate_vector_franchise():
 def test_aggregate_discrete_franchise_lands_on_the_atoms():
     a = build('agg GS.FD dfreq [1] 10 xs 3 franchise dsev [1 3 4 8 20]')
     support = a.xs[a.agg_density > 1e-12]
-    np.testing.assert_allclose(support, [4.0, 8.0, 13.0])
-    assert a.est_m == pytest.approx(25 / 3, rel=1e-12)
+    np.testing.assert_allclose(support, [4.0, 8.0, 10.0])
+    assert a.est_m == pytest.approx(22 / 3, rel=1e-12)
 
 
 # ---------------------------------------------------------------------------
-# The largest payment is the ground-up top, not the limit
+# The limit is the largest payment in every form
 # ---------------------------------------------------------------------------
 
-def test_payment_max_is_the_ground_up_top():
-    """``1000 xs 50 franchise`` pays up to 1050; an ordinary layer up to 1000."""
-    f = Severity(exp_attachment=50, exp_limit=1000, exp_retention_end=50,
-                 **LOGNORM)
-    o = Severity(exp_attachment=50, exp_limit=1000, **LOGNORM)
-    assert f.payment_max == 1050
-    assert o.payment_max == 1000
+@pytest.mark.parametrize('d2', [50, 75], ids=['franchise', 'disappearing'])
+def test_no_payment_exceeds_the_limit(d2):
+    sev = Severity(exp_attachment=50, exp_limit=1000, exp_retention_end=d2,
+                   **LOGNORM)
+    assert float(sev.ppf(1 - 1e-12)) == 1000
+    assert float(sev.sf(1000.0)) == 0.0
+    assert float(sev.sf(999.0)) == pytest.approx(
+        sev.fz.sf(999.0) / sev.fz.sf(50), rel=1e-12)
 
 
-def test_narrow_high_franchise_layer_fits_the_grid():
-    """A grid sized from the limit alone would drop most of the mass here.
-
-    ``100 xs 1000 franchise`` pays between 1000 and 1100, eleven times the
-    limit; before the bounded window read ``payment_max`` it lost 46% of the
-    probability off the top of the grid and reported an aggregate mean of 3009
-    against 10904.
-    """
+def test_high_franchise_with_narrow_limit_is_a_point_mass():
+    """``100 xs 1000 franchise`` pays exactly 100 on every claim above 1000."""
     a = build('agg GS.Narrow 10 claims 100 xs 1000 franchise '
               'sev lognorm 500 cv 1 poisson')
-    theory = float(a.stats_df.loc[('agg', 'mean'), 'mixed'])
-    assert a.est_m == pytest.approx(theory, rel=1e-6)
+    assert a.sevs[0].moms() == pytest.approx((100.0, 1e4, 1e6), rel=1e-12)
+    assert a.est_m == pytest.approx(1000.0, rel=1e-9)
     assert a.valid.passes
 
 
-def test_tail_report_reads_the_ground_up_top():
+def test_tail_report_reads_the_limit():
     from aggregate import tail as _tail
     sev = Severity(exp_attachment=1000, exp_limit=100, exp_retention_end=1000,
                    **LOGNORM)
-    assert _tail.severity_support(sev)[1] == 1100
+    assert _tail.severity_support(sev)[1] == 100

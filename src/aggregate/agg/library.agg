@@ -420,7 +420,7 @@ agg SevLayer.Franchise
   20 xs 5 franchise
   sev lognorm 10 cv 0.5
   fixed
-  note{Franchise deductible: once the loss exceeds the attachment of 5 the whole loss is paid, up to the layer top of 25, so the mean is exactly 5 more than in SevLayer.}
+  note{Franchise deductible: once the loss exceeds the attachment of 5 the whole loss is paid, subject to the limit of 20, so each claim pays 5 plus the ordinary layer 15 xs 5.}
   tags{topic:severity, role:intermediate};
 
 agg UnconditionalDiscreteSeverity

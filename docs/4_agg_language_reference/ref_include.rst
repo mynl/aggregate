@@ -630,7 +630,7 @@
     //
     // ``franchise`` after the layer reads the attachment as a franchise
     // deductible: once the loss exceeds it the insured keeps nothing, and the
-    // payment is ``min(X, a + y)`` ([Franchise-Deductible]). The transformer
+    // payment is ``min(X, y)`` ([Franchise-Deductible]). The transformer
     // stores it as ``exp_retention_end`` equal to the attachment, the d2 = d1
     // member of the retention family in ``_severity.py``.
     layers: numbers XS numbers as_label   -> layers_xs

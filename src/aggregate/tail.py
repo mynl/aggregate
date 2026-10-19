@@ -1164,13 +1164,17 @@ def severity_support(severity, reference: bool = False) -> tuple[float, float]:
     if signed:
         return lo, hi
 
-    # payment_max, not limit: a franchise pays up to the ground-up top
-    limit = getattr(severity, 'payment_max', getattr(severity, 'limit', np.inf))
+    limit = getattr(severity, 'limit', np.inf)
     limit = float(limit) if limit is not None else np.inf
     attach = getattr(severity, 'attachment', 0.0)
     attach = float(attach) if attach is not None else 0.0
     if np.isfinite(limit):
         return 0.0, limit
+    # an unlimited franchise or disappearing deductible retains nothing at
+    # the top of the support, so it pays up to the ground-up maximum
+    # ([Franchise-Deductible])
+    if np.isfinite(getattr(severity, 'retention_end', np.inf)):
+        attach = 0.0
     s_hi = (hi - attach) if np.isfinite(hi) else np.inf
     return 0.0, max(s_hi, 0.0)
 
@@ -1229,7 +1233,7 @@ def _severity_capped_note(severity, base: TailClass, right_tail: TailClass) -> s
     """
     if right_tail != TailClass.BOUNDED or base < TailClass.SUBEXPONENTIAL:
         return ''
-    limit = getattr(severity, 'payment_max', getattr(severity, 'limit', np.inf))
+    limit = getattr(severity, 'limit', np.inf)
     ub = getattr(severity, 'sev_ub', np.inf)
     cap = min(float(limit) if limit is not None else np.inf,
               float(ub) if ub is not None else np.inf)

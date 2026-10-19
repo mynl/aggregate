@@ -20,7 +20,7 @@ single-consumer case).
 
 import numpy as np
 
-from ._style import plt, mpl, FIG_W
+from ._style import plt, mpl, FIG_W, _fit_to_page
 
 
 def plot_bounds_weights(bounds, ax=None, *, levels=20, colorbar=True):
@@ -42,7 +42,7 @@ def plot_bounds_weights(bounds, ax=None, *, levels=20, colorbar=True):
     matplotlib.axes.Axes
     """
     if ax is None:
-        _, ax = plt.subplots(figsize=(FIG_W, FIG_W),
+        _, ax = plt.subplots(figsize=_fit_to_page((FIG_W, FIG_W)),
                              constrained_layout=True)
     bit = bounds.weight_df['weight'].unstack()
     img = ax.contourf(bit.columns, bit.index, bit,
@@ -81,7 +81,7 @@ def plot_hull_bounds(engine, items=None, P=None, axs=None, max_t=None):
         n = len(items)
         ncols = min(n, 3)
         nrows = -(-n // ncols)
-        fig, axs = plt.subplots(nrows, ncols, figsize=(3.5 * ncols, 2.8 * nrows),
+        fig, axs = plt.subplots(nrows, ncols, figsize=_fit_to_page((3.5 * ncols, 2.8 * nrows)),
                                 constrained_layout=True, squeeze=False)
         axs = axs.flat
     for ax, u in zip(axs, items):
@@ -105,5 +105,5 @@ def plot_hull_bounds(engine, items=None, P=None, axs=None, max_t=None):
             ax.plot([P, P], [lo[0], hi[0]], lw=2.5, c='k', solid_capstyle='butt')
             ax.plot([P, P], [lo[0], hi[0]], 'o', ms=4, c='k')
         ax.set(title=u, xlabel=engine._xlabel, ylabel=engine._ylabel)
-        ax.legend(fontsize='x-small')
+        ax.legend()
     return axs

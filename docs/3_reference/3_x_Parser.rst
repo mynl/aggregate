@@ -87,15 +87,17 @@ reference for the usage patterns.
 Syntax highlighting
 -------------------
 
-:class:`~aggregate.decl_pygments.AggLexer` is a Pygments lexer for DecL, a
-hand-written mirror of ``decl.lark``. Pygments resolves it globally through an
-entry point, so ``:language: agg`` in these docs, ``pygmentize`` on a ``.agg``
-file, and the colorized :func:`~aggregate.decl_writer.format_program` output all
-reach the same class.
-Because the mirror is hand-written it can drift from the grammar;
-``tests/test_grammar_sync.py`` is the guard.
+:class:`~aggregate.decl_pygments.AggLexer` is a Pygments lexer for DecL, a mirror of ``decl.lark``. Pygments resolves it globally through an entry point, so ``:language: agg`` in these docs, ``pygmentize`` on a ``.agg`` file, and the colorized :func:`~aggregate.decl_writer.format_program` output all reach the same class. Its words come from the DecL word list below; the rest of its rules are hand-written and can drift from the grammar, and ``tests/test_grammar_sync.py`` is the guard.
 
 .. automodule:: aggregate.decl_pygments
+
+DecL word list
+--------------
+
+:func:`~aggregate.decl_words.decl_words` returns every word a program needs to color DecL, by group: the reserved words, frequency names, declaration keywords, trailer clauses and constants read from ``decl.lark``, the documented distortion kinds read from the registry, and the severity and mixing distribution names kept in the module. ``python -m aggregate.decl_words`` prints the same list as JSON, with the package version, for colorizers outside Python. Submodule access only.
+
+.. automodule:: aggregate.decl_words
+   :members: decl_words
 
 DecL help pages
 ---------------

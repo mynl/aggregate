@@ -9,8 +9,9 @@ Three layers (see ``dev/plan-plots-subsystem.md``):
 
 - **Layer 0** -- :mod:`aggregate.plots._style`: "make the space". Generic
   canvas creators (:func:`make_mosaic`, :func:`make_grid`), the house style
-  (:func:`use`, :func:`context`, :func:`rc_params`) and the shared figure
-  constants. No domain knowledge.
+  (:func:`use`, :func:`context`, :func:`rc_params`), the page every library
+  figure fits (:func:`fit_page`) and the shared figure constants. No domain
+  knowledge.
 - **Layer 1** -- ``_density`` / ``_distribution`` / ``_quantile`` / ...:
   content panel workers, by *what* is drawn. Each renders one content type into
   a **provided** ``Axes`` from a public ``<noun>_df`` slice.
@@ -25,7 +26,7 @@ Layer-2 compositor functions re-exported here.
 from ._style import (
     plt, mpl, ticker,
     FIG_W, FIG_H, FONT_SIZE, LEGEND_FONT, PLOT_FACE_COLOR, FIGURE_BG_COLOR,
-    use, context, rc_params,
+    use, context, rc_params, fit_page,
     make_mosaic, make_grid,
 )
 
@@ -45,7 +46,7 @@ from ._chartdoc import plot_chartdoc
 
 __all__ = [
     # Layer 0
-    'use', 'context', 'rc_params', 'make_mosaic', 'make_grid',
+    'use', 'context', 'rc_params', 'fit_page', 'make_mosaic', 'make_grid',
     'FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
     'PLOT_FACE_COLOR', 'FIGURE_BG_COLOR',
     # Layer 2 compositors

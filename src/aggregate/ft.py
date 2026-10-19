@@ -39,6 +39,7 @@ def poisson_example(en, small2):
     """
     from scipy.stats import poisson
     from .plots import plt, ticker
+    from .plots._style import _fit_to_page
 
     B = 1 << small2
     z = np.zeros(B); z[1] = 1
@@ -50,7 +51,7 @@ def poisson_example(en, small2):
     po = poisson(en)
     df['Exact pmf'] = po.pmf(df.x)
     df = df.set_index('x', drop=True)
-    fig, [ax0, ax1] = plt.subplots(1, 2, figsize=(FIG_W * 2, FIG_H + 0.3), constrained_layout=True)
+    fig, [ax0, ax1] = plt.subplots(1, 2, figsize=_fit_to_page((FIG_W * 2, FIG_H + 0.3)), constrained_layout=True)
     ax0.plot(wrap);
     ax0.set(title=f'Raw FFT-based output, wrapped to [0, {B}]',
             xlabel=f'Wrapped outcome, n mod {B}',
@@ -82,8 +83,9 @@ def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0, cmap='plasm
 
     """
     from .plots import plt, mpl
+    from .plots._style import _fit_to_page
 
-    fig, axs = plt.subplots(1, 3, figsize=(3 * FIG_W, FIG_H + 0.3), constrained_layout=True)
+    fig, axs = plt.subplots(1, 3, figsize=_fit_to_page((3 * FIG_W, FIG_H + 0.3)), constrained_layout=True)
     ax0, ax1, ax2 = axs.flat
 
     if ez == 0 or sev_clause != '':
@@ -196,14 +198,15 @@ def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
 
     """
     from .plots import plt
+    from .plots._style import _fit_to_page
 
     df, ag = recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz)
 
     # update the ag object if agg_log2
     if agg_log2 == 0:
         # just plot
-        fig, ax0 = plt.subplots(1, 1, figsize=(
-            3.5, 2.45), constrained_layout=True)
+        fig, ax0 = plt.subplots(1, 1, figsize=_fit_to_page(
+            (3.5, 2.45)), constrained_layout=True)
 
         df.plot(ax=ax0, c='C0')
         ax0.set(
@@ -221,8 +224,8 @@ def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
         print('-'*80)
 
         # merge and compare
-        fig, axs = plt.subplots(2, 3, figsize=(
-            3 * 3.5, 2 * 2.45), constrained_layout=True)
+        fig, axs = plt.subplots(2, 3, figsize=_fit_to_page(
+            (3 * 3.5, 2 * 2.45)), constrained_layout=True)
         ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
 
         df.plot(ax=ax0, c='C0')

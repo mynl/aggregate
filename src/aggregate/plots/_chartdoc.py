@@ -36,7 +36,7 @@ import numpy as np
 
 from ..charts.ir import ChartCapabilityError
 from ..constants import LOG_FLOOR
-from ._style import plt, mpl, FIG_H, FIG_W, FONT_SIZE, make_grid
+from ._style import plt, mpl, FIG_H, FIG_W, _points, make_grid
 
 __all__ = ['plot_chartdoc']
 
@@ -298,11 +298,16 @@ BLOCK_HATCH = {'co_participation': '///', 'gap': 'xx'}
 #: so the default landscape cell is the wrong shape for it.
 TOWER_HEIGHT = 1.8
 
-#: Point size of a block's label text, a fraction of the house font. A
-#: named number rather than matplotlib's 'xx-small', because the fits or
-#: does not fit arithmetic below has to agree with what is drawn, and a
-#: relative keyword leaves the renderer guessing what it asked for.
-LABEL_POINTS = 0.65 * FONT_SIZE
+def _label_points():
+    """Point size of a block's label text: the active tick label size.
+
+    Notes
+    -----
+    Resolved to points when the figure is drawn, from the style then in
+    force, because the fits or does not fit arithmetic below has to agree
+    with what is drawn. The library names no type size of its own.
+    """
+    return _points('ytick.labelsize')
 
 #: Width of one character at the label font, as a fraction of the point
 #: size. A crude average over a proportional face, which is all a fits or
@@ -871,7 +876,7 @@ def _rows_that_fit(ax, height, span):
     if not span > 0:
         return 0
     pixels = _axes_height_px(ax) * abs(height) / span
-    row = ROW_PITCH * LABEL_POINTS * ax.figure.dpi / 72.0
+    row = ROW_PITCH * _label_points() * ax.figure.dpi / 72.0
     return int(pixels // row) if row > 0 else 0
 
 
@@ -935,8 +940,9 @@ def _label_block(ax, doc, block, reading, x_span):
     rows = _rows_that_fit(ax, height, span)
     if rows < 1:
         return
+    points = _label_points()
     width = _axes_width_px(ax) * (block.x1 - block.x0) / x_span
-    room = int(width / (CHAR_WIDTH * LABEL_POINTS * ax.figure.dpi / 72.0))
+    room = int(width / (CHAR_WIDTH * points * ax.figure.dpi / 72.0))
     headline = _typeset(doc, block.label) if block.label else ''
     if headline and len(headline) > room:
         # The headline names the block. An annotation floating in an
@@ -951,7 +957,7 @@ def _label_block(ax, doc, block, reading, x_span):
         return
     ax.text(0.5 * (block.x0 + block.x1), mid,
             '\n'.join(lines), ha='center', va='center',
-            fontsize=LABEL_POINTS, linespacing=1.3)
+            fontsize=points, linespacing=1.3)
 
 
 #: The diverging ramp a matrix is read on: favorable, neutral, unfavorable.
@@ -1166,12 +1172,12 @@ def _render_matrix_panel(ax, doc, panel, series):
                 text = f'{values[i, j]:.2f}×'.replace('-', '−')
                 ax.text(x, y + (0.36 if annotations else 0.5), text,
                         ha='center', va='center', color=ink,
-                        fontsize=FONT_SIZE + 1)
+                        fontsize=mpl.rcParams['axes.labelsize'])
             if annotations and annotations[i][j]:
                 ax.text(x, y + 0.72,
                         f'({annotations[i][j]})'.replace('-', '−'),
                         ha='center', va='center', color=faint,
-                        fontsize=FONT_SIZE - 1.7)
+                        fontsize=mpl.rcParams['xtick.labelsize'])
 
     ax.set_xlim(0, ncol + (offsets[-1] if ncol else 0.0))
     ax.set_ylim(0, nrow + (row_offsets[-1] if nrow else 0.0))
@@ -1269,7 +1275,7 @@ def _render_tower_panel(ax, doc, panel, blocks, log=False, full=False,
                   if m.panel_id == panel.id and m.label}
         ax.set_yticks(ticks)
         ax.set_yticklabels([_typeset(doc, labels.get(at, '')) or f'{at:,.0f}'
-                            for at in ticks], fontsize=LABEL_POINTS)
+                            for at in ticks])
 
 
 def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
@@ -1501,7 +1507,7 @@ def _render_xy_panel(ax, doc, panel, series_list, log=False, full=False,
     if labeled and sum(s.role != 'identity' for s in series_list) > 1:
         corner = _legend_corner([(x, y) for s, x, y, _ in drawn
                                  if s.role != 'identity'], x_window)
-        ax.legend(loc=corner, fontsize='xx-small')
+        ax.legend(loc=corner)
     value_label = doc.meta.get('value_label')
     if value_label and any(s.value is not None for s in series_list):
         # A family shaded by a number needs the number named, and only the

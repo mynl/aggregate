@@ -50,3 +50,33 @@ def test_context_overrides():
         assert tuple(plt.rcParams["figure.figsize"]) == (5.5, 3.5)
         # base style still applies for non-overridden keys
         assert plt.rcParams["axes.facecolor"] == "white"
+
+
+def test_house_type_and_face_in_a_pdf(tmp_path, caplog):
+    """``Aggregate.plot()`` under the style prints ticks and legend at 8pt,
+    labels and titles at 9pt, the suptitle at matplotlib's ``large``, and
+    embeds STIXGeneral alone, with no font fallback logged.
+
+    ``dev/plan-library-figures.md`` (``[Library-Figures-House-Type]``). The
+    program mirrors a line of ``src/aggregate/agg/decl-testers.agg``. Read
+    from the uncompressed content stream: ``Tf`` sets each span's size.
+    """
+    import logging
+    import re
+
+    from aggregate import build
+
+    a = build('agg P.Tail.LN 5 claims sev lognorm 100 cv 3 poisson')
+    path = tmp_path / 'agg.pdf'
+    with caplog.at_level(logging.WARNING, logger='matplotlib.font_manager'):
+        with aggregate.style.context(**{'pdf.compression': 0}):
+            fig = a.plot()
+            fig.savefig(path)
+            plt.close(fig)
+    raw = path.read_bytes().decode('latin-1')
+    sizes = {float(s) for s in re.findall(r'/F\d+ ([\d.]+) Tf', raw)}
+    assert sizes == {8.0, 9.0, 10.8}
+    faces = {re.sub(r'^[A-Z]{6}\+', '', f)
+             for f in re.findall(r'/BaseFont /(\S+)', raw)}
+    assert faces and all(f.startswith('STIXGeneral') for f in faces), faces
+    assert not [r for r in caplog.records if 'findfont' in r.getMessage()]

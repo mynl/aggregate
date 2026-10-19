@@ -52,6 +52,9 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
 # users restyle via matplotlib's native mplstyle / rcParams.
 FIG_W = 3.5
 FIG_H = 2.45
+# FONT_SIZE and LEGEND_FONT stay exported so no import breaks, but the library
+# no longer reads them: every type size comes from the active style
+# (data/aggregate.mplstyle), per dev/done/plan-library-figures.md.
 FONT_SIZE = 9
 LEGEND_FONT = 'x-small'
 # see https://matplotlib.org/stable/gallery/color/named_colors.html

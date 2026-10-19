@@ -166,3 +166,7 @@ Plotting subsystem
 plot. Each class's ``.plot()`` is a thin stub into a per-class compositor.
 
 .. automodule:: aggregate.plots
+
+A document that prints library figures calls :func:`~aggregate.plots.fit_page` once with its text width, and every figure the library draws afterwards fits that width and is drawn at its final size, so its type prints at the size the style names. It only shrinks, and it is off until called.
+
+.. autofunction:: aggregate.plots.fit_page

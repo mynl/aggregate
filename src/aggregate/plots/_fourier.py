@@ -17,7 +17,7 @@ import logging
 import numpy as np
 import pandas as pd
 
-from ._style import plt, ticker
+from ._style import plt, ticker, _fit_to_page
 
 logger = logging.getLogger(__name__)
 
@@ -62,10 +62,10 @@ def plot_fourier(ftools, suptitle='', xlim=None, verbose=True):
 
     # plot four graphs per invert()
     if verbose:
-        ftools.last_fig, axs = plt.subplots(2, 3, figsize=(3 * 2.5, 2 * 2), constrained_layout=True)
+        ftools.last_fig, axs = plt.subplots(2, 3, figsize=_fit_to_page((3 * 2.5, 2 * 2)), constrained_layout=True)
         ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
     else:
-        ftools.last_fig, axs = plt.subplots(1, 2, figsize=(2 * 2.5, 1 * 2.5), constrained_layout=True)
+        ftools.last_fig, axs = plt.subplots(1, 2, figsize=_fit_to_page((2 * 2.5, 1 * 2.5)), constrained_layout=True)
         ax0, ax1 = axs.flat
 
     x = np.array(ftools._df.index)
@@ -89,7 +89,7 @@ def plot_fourier(ftools, suptitle='', xlim=None, verbose=True):
         ax.plot(x, p / b, label='Fourier', lw=1)
         if has_exact:
             ax.plot(xe, pe, ls='--', c='C3', label='exact', lw=1)
-        ax.legend(fontsize='x-small')
+        ax.legend()
     ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x')
     # mn = min(np.log10(exact).min(), np.log10(x).min())
     mn0 = np.log10(p / b).min() * 1.25
@@ -203,7 +203,7 @@ def plot_fourier_wraps(ftools, wraps=None, calc='survival', add_tail=False):
 
     # report answer
     ans = []
-    ftools.last_fig, axs = plt.subplots(2, 2, figsize=(2 * 2.5, 2 * 2.), constrained_layout=True)
+    ftools.last_fig, axs = plt.subplots(2, 2, figsize=_fit_to_page((2 * 2.5, 2 * 2.)), constrained_layout=True)
     ax0, ax1, ax2, ax3 = axs.flat
     for ax in axs.flat:
         ax.plot(x, p, label='Fourier', lw=2)
@@ -259,9 +259,9 @@ def plot_fourier_wraps(ftools, wraps=None, calc='survival', add_tail=False):
             title='Incremental - log scale',
             xlabel='Outcome, x',
             ylabel='Log density')
-    ax2.legend(fontsize='x-small', ncol=2)
+    ax2.legend(ncol=2)
     if add_tail:
-        ax1.legend(fontsize='x-small', ncol=2)
+        ax1.legend(ncol=2)
     if add_tail:
         if 0 not in wraps:
             wraps.append(0)
@@ -282,7 +282,7 @@ def plot_fourier_wraps(ftools, wraps=None, calc='survival', add_tail=False):
 
 def plot_fourier_simpson(ftools, ylim=1e-16):
     """Plot Simpson's approximation."""
-    fig, ax = plt.subplots(1, 1, figsize=(5, 3.25), constrained_layout=True)
+    fig, ax = plt.subplots(1, 1, figsize=_fit_to_page((5, 3.25)), constrained_layout=True)
     if ftools._df_exact is not None:
         ftools.df_exact.p.plot(ax=ax, lw=1, c='C1')
     xs = np.array(ftools.df.index)

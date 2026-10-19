@@ -162,6 +162,23 @@
 
 ## Recently landed
 
+- **[Library-Figures]** DONE at **1.6.0a2** and **1.6.0a3** (2026-10-19,
+  `dev/done/plan-library-figures.md`, the library half of house-style's plan
+  of the same name): `aggregate.plots.fit_page(width, max_height)` fits every
+  library figure to a document's page, and `aggregate.mplstyle` takes the
+  house type and face with no type size left in library code. house-style
+  calls `fit_page` from its setup once 1.6.0 is on PyPI.
+
+- **[DecL-Word-List]** DONE at **1.6.0a1** (2026-10-19,
+  `dev/done/plan-decl-word-list.md`): `aggregate.decl_words.decl_words()` is
+  the one DecL word list, derived from `decl.lark` and the distortion
+  registry where they hold the words, and `AggLexer` builds from it. The
+  consumers are the other repositories' plans of the same name: aLL serves it
+  at `GET /v1/decl/words` and retires `decl-keywords.json`
+  (`[Keyword-Mirror-Gaps]` there), aSP drops its inline regex, house-style
+  generates `decl.xml` from it. `_TERMINAL_LABELS` and `agg.sublime-syntax`
+  stay hand kept and test checked.
+
 - **[Thread-Safe-Load]** DONE at **1.5.2** (2026-10-14,
   `dev/done/plan-1.5.2-thread-safe-load.md`, raised from aLL): `load`, `fork`
   and `reload` run under a per-instance `RLock`, and `_loaded` turns True only
@@ -234,16 +251,13 @@
 
 ## Correctness
 
-- **[Unit-Capital-Above-Frame]** (#12, was `[Unit-Capital-Far-Tail]`;
-  reproduced on 1.5.0, 2026-10-14): `unit_capital_at` raises a numpy
-  broadcast `ValueError` when `a` is above the augmented frame's top. Accepted:
-  use the last row and warn, as `pricing_at` does; the contributor may send
-  the PR. The far tail half is declined: where `S <= VALIDATION_NOISE` the
-  density frame zeroes alpha, so on the linear frame unit margins stop summing
-  to the total and the reconciliation warning fires. That warning is the
-  intended signal; no renormalizing by the sum of unit margins and no share
-  inheritance. Optional with the fix: the check is skipped for
-  `pentagon_at(unit=...)`, which also swaps in the last row without a warning.
+- **[Unit-Capital-Above-Frame]** DONE at **1.5.3** (2026-10-19, #13, from
+  #12; was `[Unit-Capital-Far-Tail]`): above the augmented frame,
+  `unit_capital_at` and `pentagon_at` use the last row and warn, and a warning
+  fires whenever `a` reaches layers with `S <= VALIDATION_NOISE`, whichever
+  units are requested. The far tail half stays declined: no renormalizing by
+  the sum of unit margins and no share inheritance, since the warning is the
+  intended signal.
 - **[Fuzz-Removal-Phantom-Tail-Mass]** (was `[Far-Tail-Raw-Moment-Inflation]`;
   diagnosed 2026-10-07, second occurrence 2026-10-11, full account in
   `dev/done/plan-a400-v1-loose-ends.md` phase 3 and
@@ -438,6 +452,11 @@
 
 > Carried as a list, not as paragraphs. Each is detailed in the archive.
 
+- **[Plot-Argument-Warts]** (found at 1.6.0a2): `Distortion.plot_affine(ax=)`
+  accepts `ax` and ignores it (`plots/_distortion.py`); and
+  `pedagogy.similar_risks_example` raises `TypeError`, calling
+  `Portfolio.plot(figsize=)` and `Bounds.plot_envelope(axs=)`, neither of
+  which takes that argument.
 - **[Display-Surface-Punchups]** — `_repr_html_` is on the five first-class
   classes only; `_html_info_blob` exists on `Aggregate` alone while four other
   classes build the same intro inline (the obvious fourth mixin); and the P&L
@@ -449,9 +468,13 @@
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against
   the published *Aggregate* paper and make the docs match. The switches-to-config
   half is done; the aliasing half shipped as `[Validation-Punchup]`.
-- **[Input-Guards]** — zero `lb` not consistent with attachment equals zero;
-  flag **fixed** frequency with a non-integer expected value; flag **mixing**
-  with an inconsistent frequency distribution.
+- **[Input-Guards]** (#18, ruled 2026-10-19): a **fixed** frequency whose
+  count is not whole (directly, or derived from loss or premium) builds
+  silently with negative probabilities; it will raise `ValueError` within a
+  small tolerance, pointing at `dfreq` and `poisson`. Contributor PR to
+  follow. The old "zero `lb`" and "mixing with an inconsistent frequency"
+  notes are dropped: neither could be reconstructed, and the grammar already
+  rejects mixing with a second frequency.
 - **[Sdist-Prune-Tests]** The sdist ships setuptools' default
   `tests/test_*.py` (139 files since 1.0.1) without `conftest.py` or
   `tests/data`, so the tests cannot run from it. Add `prune tests` to

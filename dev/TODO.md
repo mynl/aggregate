@@ -162,6 +162,16 @@
 
 ## Recently landed
 
+- **[DecL-Word-List]** DONE at **1.6.0a1** (2026-10-19,
+  `dev/done/plan-decl-word-list.md`): `aggregate.decl_words.decl_words()` is
+  the one DecL word list, derived from `decl.lark` and the distortion
+  registry where they hold the words, and `AggLexer` builds from it. The
+  consumers are the other repositories' plans of the same name: aLL serves it
+  at `GET /v1/decl/words` and retires `decl-keywords.json`
+  (`[Keyword-Mirror-Gaps]` there), aSP drops its inline regex, house-style
+  generates `decl.xml` from it. `_TERMINAL_LABELS` and `agg.sublime-syntax`
+  stay hand kept and test checked.
+
 - **[Thread-Safe-Load]** DONE at **1.5.2** (2026-10-14,
   `dev/done/plan-1.5.2-thread-safe-load.md`, raised from aLL): `load`, `fork`
   and `reload` run under a per-instance `RLock`, and `_loaded` turns True only

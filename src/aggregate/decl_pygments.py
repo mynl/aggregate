@@ -1,21 +1,22 @@
 """
 Pygments lexer for the DecL language.
 
-``AggLexer`` is a hand-written mirror of ``decl.lark``, which is the single
-source of truth for the language. Pygments resolves it globally through the
-``pygments.lexers`` entry point in ``pyproject.toml``, so ``:language: agg`` in
-the docs, ``pygmentize`` on a ``.agg`` file, and
-:func:`aggregate.decl_writer._colorize` (behind ``format_program`` and
-``pprogram_html``) all reach the same class.
+``AggLexer`` mirrors ``decl.lark``, which is the single source of truth for the
+language. Pygments resolves it globally through the ``pygments.lexers`` entry
+point in ``pyproject.toml``, so ``:language: agg`` in the docs, ``pygmentize``
+on a ``.agg`` file, and :func:`aggregate.decl_writer._colorize` (behind
+``format_program`` and ``pprogram_html``) all reach the same class.
 
-Because the mirror is hand-written it can drift from the grammar, and silently:
-an unmatched construct simply falls through to the catch-all ID rule or emits
-``Token.Error``. ``tests/test_grammar_sync.py`` is the guard. It walks every
-reserved word in the grammar's ``ID`` exclusion list, checks the constructs that
-list cannot reach (the trailer clauses, quoted labels, comments, operators), and
-tokenizes the whole shipped ``.agg`` corpus asserting zero ``Token.Error``. Add
-a keyword or a clause to ``decl.lark`` and that suite fails until this file
-follows.
+Its words come from :func:`aggregate.decl_words.decl_words`, the one DecL word
+list every colorizer reads, so a keyword added to the grammar is colored here
+with no edit. The rest of the rule set (comments, the trailer clause bodies,
+labels, numbers, operators) is written by hand and can drift from the grammar,
+and silently: an unmatched construct simply falls through to the catch-all ID
+rule or emits ``Token.Error``. ``tests/test_grammar_sync.py`` is the guard. It
+walks every reserved word in the grammar's ``ID`` exclusion list, checks the
+constructs that list cannot reach (the trailer clauses, quoted labels,
+comments, operators), and tokenizes the whole shipped ``.agg`` corpus asserting
+zero ``Token.Error``.
 
 Notes
 -----
@@ -36,6 +37,8 @@ from pygments.lexer import RegexLexer, default, include, words
 from pygments.token import (Comment, Generic, Keyword, Name, Number, Operator,
                             Punctuation, String, Text)
 
+from .decl_words import decl_words
+
 __all__ = ['AggLexer']
 
 
@@ -47,6 +50,28 @@ _KW = r'(?![a-zA-Z0-9._:~\-])'
 
 #: An identifier, mirroring the tail of the grammar's ``ID`` terminal.
 _ID = r'[a-zA-Z][\._:~a-zA-Z0-9\-]*'
+
+_WORDS = decl_words()
+
+#: The token type for a severity name, by its shape parameter count. ``None``
+#: is the empirical ``dhistogram`` and ``chistogram``, colored with the one
+#: shape names as they always have been.
+_SEVERITY_TOKENS = {0: Name.Function, 1: Name.Class, 2: Name.Namespace,
+                    None: Name.Class}
+
+
+def _severity_rule(count):
+    """The ``words()`` rule for the severity names with ``count`` shapes."""
+    return (words(tuple(name for name, n in _WORDS['severities'].items()
+                        if n == count), suffix=_KW),
+            _SEVERITY_TOKENS[count])
+
+
+#: Every reserved word without a color of its own. ``mixed`` is absent because
+#: the root state colors it and opens the mixing distribution state; the
+#: frequency names and the declaration keywords have their own rules.
+_KEYWORDS = tuple(sorted(set(_WORDS['reserved']) - set(_WORDS['frequencies'])
+                         - set(_WORDS['declarations']) - {'mixed'}))
 
 
 class AggLexer(RegexLexer):
@@ -143,10 +168,9 @@ class AggLexer(RegexLexer):
             # break is whitespace inside a statement, so `mixed` and its
             # mixing distribution may sit on separate lines.
             (r'\s+', Text),
-            (r'sichel\.(?:gamma|ig)' + _KW, Name.Function, '#pop'),
-            (words(('gamma', 'delaporte', 'ig', 'sig', 'beta', 'sichel',
-                    '<DISTRIBUTION>'),
-                   suffix=_KW), Name.Function, '#pop'),
+            # The mixing distributions, and the help renderer's placeholder.
+            (words(_WORDS['mixing'] + ('<DISTRIBUTION>',), suffix=_KW),
+             Name.Function, '#pop'),
             # Never strand the state on an unrecognized follower.
             default('#pop'),
         ],
@@ -167,79 +191,26 @@ class AggLexer(RegexLexer):
 
         'keywords': [
             # Frequency distributions (the grammar's FREQ terminal).
-            (words(
-                ('binomial', 'pascal', 'poisson', 'bernoulli', 'geometric',
-                 'fixed', 'neyman', 'neymana', 'neymanA', 'logarithmic',
-                 'negbin'),
-                suffix=_KW
-            ), Name.Function),
+            (words(_WORDS['frequencies'], suffix=_KW), Name.Function),
 
-            # Named continuous severity distributions, by shape-parameter
-            # count. Almost all are scipy.stats names; ``cantor`` is the
-            # library's own, and colors with the other one-shape names.
-            # Zero parameter.
-            (words((
-                'anglit', 'arcsine', 'cauchy', 'cosine', 'expon', 'gilbrat',
-                'gumbel_l', 'gumbel_r', 'halfcauchy', 'halflogistic',
-                'halfnorm', 'hypsecant', 'kstwobign', 'laplace', 'levy',
-                'levy_l', 'logistic', 'maxwell', 'moyal', 'norm', 'rayleigh',
-                'semicircular', 'uniform', 'wald'
-            ), suffix=_KW), Name.Function),
-            # One parameter.
-            (words((
-                'alpha', 'argus', 'bradford', 'cantor', 'chi', 'chi2', 'dgamma', 'dweibull', 'erlang',
-                'exponnorm', 'exponpow', 'fatiguelife', 'fisk', 'foldcauchy', 'foldnorm',
-                'gamma', 'genextreme', 'genhalflogistic', 'genlogistic', 'gennorm', 'genpareto',
-                'gompertz', 'halfgennorm', 'invgamma', 'invgauss', 'invweibull', 'kappa3', 'ksone',
-                'kstwo', 'laplace_asymmetric', 'loggamma', 'loglaplace', 'lognorm', 'lomax',
-                'nakagami', 'pareto', 'pearson3', 'powerlaw', 'powernorm', 'rdist', 'recipinvgauss',
-                'rice', 'skewcauchy', 'skewnorm', 't', 'triang', 'truncexpon', 'tukeylambda',
-                'vonmises', 'vonmises_line', 'weibull_max', 'weibull_min', 'wrapcauchy'
-            ), suffix=_KW), Name.Class),
-            # Two parameter.
-            (words((
-                'beta', 'betaprime', 'burr', 'burr12', 'crystalball', 'exponweib', 'f', 'gengamma',
-                'geninvgauss', 'johnsonsb', 'johnsonsu', 'kappa4', 'levy_stable', 'loguniform',
-                'mielke', 'nct', 'ncx2', 'norminvgauss', 'powerlognorm', 'reciprocal',
-                'studentized_range', 'trapezoid', 'trapz', 'truncnorm'
-            ), suffix=_KW), Name.Namespace),
-            # Empirical severities. These are distribution names, not
-            # declaration keywords: they arrive through the grammar's `ids`
-            # rule, as in `sev dhistogram xps [0 99] [.8 .2]`.
-            (words(('dhistogram', 'chistogram'), suffix=_KW), Name.Class),
+            # Named severity distributions, colored by shape parameter count.
+            # They arrive through the grammar's `ids` rule as a plain ID, so
+            # the empirical `dhistogram` and `chistogram` are names too, not
+            # declaration keywords.
+            _severity_rule(0),
+            _severity_rule(1),
+            _severity_rule(2),
+            _severity_rule(None),
 
             # The discrete declaration keywords. `dfreq` belongs here with its
             # siblings rather than with the FREQ distribution names: it
             # declares an outcome-and-probability pair, it is not a named
             # distribution.
-            (words(('dfreq', 'dsev', 'dbvsev', 'dwait', 'nttagg'),
-                   suffix=_KW), Name.Label),
+            (words(_WORDS['declarations'], suffix=_KW), Name.Label),
 
-            # Every remaining reserved word in the grammar's ID exclusion list.
-            # `mixed` is absent on purpose: the root state colors it and opens
-            # the mixing-distribution state. `inf` is absent because the number
+            # Every remaining reserved word. `inf` is not reserved; the number
             # rules claim it, as the grammar does.
-            (words(
-                ('occurrence', 'aggregate', 'distortion', 'exposure', 'tweedie',
-                 'premium', 'tower', 'picks', 'prem', 'pnl', 'xpnl', 'peel',
-                 'inherit', 'derive',
-                 'bivariate', 'bv', 'clash', 'copula',
-                 'netceded', 'grossceded', 'grossnet',
-                 'approximate', 'approx', 'ssev', 'splice',
-                 'claims', 'ceded', 'claim', 'loss', 'payoff', 'dist',
-                 'expense', 'expenses', 'cede', 'deposit', 'rol', 'less',
-                 'port', 'rate', 'net', 'sev', 'agg', 'xps', 'wts',
-                 'and', 'as', 'exp', 'at', 'cv', 'lr', 'xs',
-                 'of', 'to', 'po', 'zm', 'zt',
-                 # reinstatements
-                 'reinstatements', 'reinstatement', 'free', 'no',
-                 # variable rating
-                 'swing', 'slide', 'retro', 'corridor', 'basic', 'lcm',
-                 'min', 'max', 'pc', 'after',
-                 # renewal frequency
-                 'wait', 'years', 'year', ),
-                suffix=_KW
-            ), Keyword),
+            (words(_KEYWORDS, suffix=_KW), Keyword),
         ],
 
         # Exactly the grammar's operator and punctuation set. Comma and pipe

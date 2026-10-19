@@ -5,7 +5,9 @@
 Several artefacts mirror that keyword set by hand and silently drift when a new
 keyword is added to the grammar:
 
-- :class:`aggregate.decl_pygments.AggLexer` — the Pygments syntax colorer.
+- :class:`aggregate.decl_pygments.AggLexer`, the Pygments syntax colorer. Its
+  words come from :func:`aggregate.decl_words.decl_words`; its other rules are
+  written by hand.
 - ``agg.sublime-syntax`` — the Sublime Text colorer at the repo root.
 - :data:`aggregate.parser_errors._TERMINAL_LABELS` — the human-readable
   terminal labels used in parse-error messages.
@@ -25,7 +27,8 @@ green. The corpus tests below close that hole: they tokenize every shipped
 ``.agg`` file and assert zero ``Token.Error``, which no construct can escape.
 
 The web app's ``decl-keywords.json`` lives in a separate repository and is not
-checked here.
+checked here. Its replacement is :func:`aggregate.decl_words.decl_words`, the
+word list AggLexer is built from, which ``tests/test_decl_words.py`` checks.
 """
 from __future__ import annotations
 
@@ -39,6 +42,12 @@ from pygments.token import Token
 
 from aggregate.parser import GRAMMAR_FILE
 from aggregate.decl_pygments import AggLexer
+# The grammar readers live with the word list they build; these tests guard
+# the colorizers against the same extraction.
+from aggregate.decl_words import (
+    _grammar_brace_clauses as grammar_brace_clauses,
+    _grammar_reserved_words as grammar_reserved_words,
+)
 from aggregate.parser_errors import _TERMINAL_LABELS
 
 #: The shipped DecL corpora, tokenized whole by the corpus tests below.
@@ -67,23 +76,6 @@ def _significant(source: str) -> list:
     return [(t, v) for t, v in _tokens(source) if v.strip()]
 
 
-def grammar_reserved_words() -> list[str]:
-    """Every reserved word, read from the ``ID`` terminal's exclusion list.
-
-    The ``ID`` terminal in ``decl.lark`` rejects bare keywords via a single
-    negative-lookahead alternation — the authoritative flat list of every
-    reserved word in the language::
-
-        ID: /(?!agg\\.|...)(?!(?:agg|aggregate|...|zt)(?![namechar])).../
-    """
-    id_line = next(
-        line for line in _grammar_text().splitlines() if line.lstrip().startswith("ID:")
-    )
-    m = re.search(r"\(\?!\(\?:([a-zA-Z0-9_|]+)\)\(\?!", id_line)
-    assert m, "could not find the ID-exclusion keyword list in decl.lark"
-    return sorted(set(m.group(1).split("|")))
-
-
 def grammar_keyword_terminals() -> list[str]:
     """Every priority-tagged terminal name (``NAME.2:`` / ``NAME.3:``).
 
@@ -92,18 +84,6 @@ def grammar_keyword_terminals() -> list[str]:
     """
     names = re.findall(r"^([A-Z][A-Z0-9_]*)\.\d+\s*:", _grammar_text(), re.MULTILINE)
     return sorted(set(names))
-
-
-def grammar_brace_clauses() -> list[str]:
-    """The trailer clause words, read from the ``word\\{`` terminals.
-
-    Derived rather than hard-coded so that a *fifth* brace clause added to
-    ``decl.lark`` fails this suite instead of silently going uncolored, which
-    is exactly how ``tags`` and ``doc`` were missed.
-    """
-    found = re.findall(r"^([A-Z]+)\.\d+:\s*/([a-z]+)\\\{", _grammar_text(),
-                       re.MULTILINE)
-    return sorted({word for _terminal, word in found})
 
 
 def grammar_operator_literals() -> list[str]:
@@ -134,7 +114,7 @@ def test_grammar_brace_clause_extraction_sane():
     A fourth, ``doc{{{...}}}``, was retired at 1.0.0a301
     (``dev/done/plan-decommission-docs.md``).
     """
-    assert grammar_brace_clauses() == ["hints", "note", "tags"]
+    assert grammar_brace_clauses() == ("hints", "note", "tags")
 
 
 def test_grammar_operator_extraction_sane():

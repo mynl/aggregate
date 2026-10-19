@@ -1,7 +1,8 @@
 # Plan: one DecL word list, derived in aggregate and read by every colorizer
 
 `[DecL-Word-List]`. Drafted 2026-10-19 at 1.5.3 (`d85f0c2`) at Steve's request, from the
-house-style review (ruling there: "the single word list lives in aggregate"). Not yet ruled.
+house-style review (ruling there: "the single word list lives in aggregate"). Ruled 2026-10-19,
+executed as 1.6.0a1; see Rulings and Execution log at the foot.
 
 This is the library half of a set of four plans with the same file name, each stating its own side:
 
@@ -133,3 +134,23 @@ Each of these is the other repository's own plan. This one changes nothing outsi
 2. **Distortion names in the docs.** AggLexer could color them as Pygments `Name.Builtin`, as aLL
    and the house do. That would be a visible change to the Sphinx docs, so it is left out unless
    you want it.
+
+## Rulings
+
+2026-10-19, Steve: question 1 "agree". The grammar and the distortion registry decide what is colored; the 25 words outside both stop being colored in aLL, whose completion keeps what it finds useful (the aggregate-api plan carries that out). Question 2 was not asked again, so its recommendation stands: AggLexer does not color distortion names and the Sphinx docs do not change. Versioning: this plan lands as 1.6.0a1, the first of three alphas rolled up into the 1.6.0 release. The choices above are rulings, not proposals.
+
+## Execution log
+
+1.6.0a1, 2026-10-19.
+
+Divergences from the plan:
+
+1. **A package, not a module file.** `src/aggregate/decl_words/` holds `__init__.py` (the list) and `__main__.py` (the JSON printer). AggLexer imports the list, so `import aggregate` loads it, and `python -m` on an already imported module file makes `runpy` warn on stderr that it was found in `sys.modules`. A package's `__main__` does not. The import path, `from aggregate.decl_words import decl_words`, is the plan's.
+2. **JSON shape.** `{"version": ..., "groups": decl_words()}`: the version beside the groups, nested so a consumer can iterate the groups without filtering out the version.
+3. **Two dead severity names.** AggLexer listed `gilbrat` and `trapz`, which scipy has removed (1.17.1 here); `getattr(scipy.stats, name)` fails on both, so the acceptance check "every name resolves" could not pass with them. `gilbrat` became its current spelling `gibrat`, and `trapz` was dropped (`trapezoid` was already listed). The only lexer change: those two words now lex as plain names, and `gibrat` as a zero shape severity. Neither occurs in the four corpora.
+4. **Counts for the special cases.** `cantor` is 1 (one shape, `c`); `dhistogram` and `chistogram` map to `None`, having no shape parameter. AggLexer colors `None` as `Name.Class`, which it always did for those two. The tests check every other count against scipy's `numargs`.
+5. **`mixing` includes `sichel.gamma` and `sichel.ig`**, which AggLexer matched with a separate regex. One `words()` rule now covers all eight, and the tests check the group against the frequency registry less the named frequencies, `empirical` and `renewal`.
+6. **The grammar readers take an optional text** and read `decl.lark` when it is omitted, so `tests/test_grammar_sync.py` imports them under their old names. `grammar_brace_clauses()` now returns a tuple, and its sanity test compares with one.
+7. **Not re-exported from `aggregate`.** A top level `decl_words` function would shadow the submodule's name; submodule access only, like `aggregate.ntt`.
+8. **The token stream check ran in session, not as a committed test.** AggLexer's tokens over `library.agg`, `decl-testers.agg`, `_test_suite.agg` and `_test_suite2.agg` (39,009 tokens) were dumped before and after the change and compared byte for byte: identical. The committed tests instead check each group's color in AggLexer, which is what would move if the rule building went wrong.
+9. **Docs.** `docs/3_reference/3_x_Parser.rst` gains a "DecL word list" section and no longer calls AggLexer hand written. Docs await a rebuild.

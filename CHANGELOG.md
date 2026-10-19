@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.6.0a1 - 2026-10-19
+
+**[DecL-Word-List] one DecL word list, `aggregate.decl_words.decl_words()`, for every program that colors DecL.** It returns the words by group: `reserved`, `frequencies`, `clauses` and `constants` read from `decl.lark`, `distortions` from `Distortion.available_distortions(pricing=False)`, and `declarations`, `severities` (name to shape parameter count) and `mixing` kept in the module and checked by `tests/test_decl_words.py`. `python -m aggregate.decl_words` prints it as JSON with the package version, for colorizers outside Python. `AggLexer` now builds its keyword rules from the list, and its tokens over the four shipped corpora are unchanged; the severity names `gilbrat` and `trapz`, which scipy no longer has, are gone, and `gibrat` is added. Submodule access only. aggregate-api, aggregate-asp and house-style pick the list up in their own `[DecL-Word-List]` plans once this is on PyPI. Docs await a rebuild. Plan `dev/done/plan-decl-word-list.md`.
+
 ## 1.5.3 - 2026-10-19
 
 **[Unit-Capital-Above-Frame] unit capital above the augmented frame uses the last row, and far tail unit capital always warns.** `unit_capital_at`, behind `pricing_at`, `price` and `pentagon_at`, now treats an asset level above the last row of the augmented frame as `pricing_at` does: it uses the last row and warns, where it raised a numpy broadcast `ValueError`. `pentagon_at` now warns when it falls back to the last row. A new warning fires whenever the asset level reaches layers with `S <= VALIDATION_NOISE`, whichever units are requested, so a single unit `pentagon_at(unit=...)` in the far tail is no longer silent. The split is left as computed and total capital stays exact; nothing moves at ordinary asset levels. Contributed by @KasraBashirioskooei (#13, from #12).

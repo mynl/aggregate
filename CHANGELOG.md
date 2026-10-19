@@ -22,6 +22,8 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ## 1.6.0 - 2026-10-19
 
+**Release 1.6.0, the first since 1.2.0, rolls up 1.2.1 to 1.6.0a3 below.** New: exact arithmetic in nttagg probabilities and the `exact_tail` chart (1.4.0, 1.5.0), `aggregate.ntt.engine_status()` (1.3.0), a version written once and read live (1.2.1), thread safe `Underwriter` loading (1.5.2), and the DecL word list, `fit_page` and the house type in library figures (1.6.0). Fixed: exact zeros for an identically zero cession (1.5.1), and unit capital above the augmented frame (1.5.3). Thanks to @KasraBashirioskooei for five pull requests: both fixes, the gold standard allocation and bounds tests (#10, #14), and the `AggregateDeductible` library entry (#16).
+
 **[House-Style-Integration] one DecL word list for every colorizer, and library figures that fit a document's page in the house type.** Rolls up 1.6.0a1 to 1.6.0a3 below. `aggregate.decl_words.decl_words()` (and `python -m aggregate.decl_words` for JSON) is the single DecL word list, derived from `decl.lark` and the distortion registry, and `AggLexer` builds from it. `aggregate.plots.fit_page(width, max_height)` fits every library figure to a page, off by default. `aggregate.mplstyle` takes the house type and face (STIXGeneral, 9pt labels, 8pt ticks and legend), and no library code names a type size. aggregate-api, aggregate-asp and house-style each pick these up in their own plans once this is on PyPI.
 
 ## 1.6.0a3 - 2026-10-19

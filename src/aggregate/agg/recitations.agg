@@ -1,0 +1,714 @@
+# recitations.agg
+# ======================================================================
+#
+# Every DecL program in *Recitations*, the book of textbook and
+# examination problems worked with `aggregate`. Each declaration
+# carries a note{} naming the text it comes from and the example or
+# exercise it works.
+#
+# Generated from the book by `make_agg.py`; do not edit by hand. Programs
+# are in canonical form, which is what the parser understood rather than
+# what was typed, and are named `<CitationKey>.<declared name>` so that
+# nothing in the file shadows anything else. Where more than three
+# declarations share a shape, two are kept, as the book appendix samples
+# them, and a model built by more than one chapter is listed once.
+#
+# 78 programs from 5 chapters.
+#
+# Read it back with `build.load("recitations.agg")`, or parse it
+# without loading with `build.interpret_file("recitations.agg")`.
+# Sections below are the book chapters that built the programs; the
+# name and the note give the source.
+
+
+# Bibliography
+# ----------------------------------------------------------------------
+#
+# The 5 works the notes below cite, read from the library
+# the book itself cites, D:/Projects/Biblio/uber-library.bib.
+#
+# @Bahnemann2015
+#     Bahnemann, David (2015). Distributions for Actuaries. Casualty
+#     Actuarial Society Monographs No. 2. www.casact.org
+#
+# @Bodoff2007
+#     Bodoff, Neil M. (2007). Capital Allocation by Percentile Layer.
+#     Variance 3(1), 13-30.
+#
+# @Brehm2007
+#     Brehm, Paul J. and Perry, James H. and Venter, Gary G. and Witcraft,
+#     Susan E. (2007). Enterprise Risk Analysis. Casualty Actuarial
+#     Society.
+#
+# @Frees2018a
+#     Frees, Edward (2018). Loss Data Analytics. Open Actuarial Texts.
+#     https://openacttexts.github.io/Loss-Data-Analytics/
+#
+# @Klugman2019
+#     Klugman, Stuart A. and Panjer, Harry H. and Willmot, Gordon E.
+#     (2019). Loss Models: from data to decisions. John Wiley & Sons.
+#
+
+# Loss Models, Chapter 9  [Klugman2019.qmd]
+# ----------------------------------------------------------------------
+
+agg Klugman2019.KPW.95
+  dfreq [0 1 2 3 4 5 6 7 8] [0.05 0.1 0.15 0.2 0.25 0.15 0.06 0.03 0.01]
+  dsev [1 2 3 4 5 6 7 8 9 10] [0.15 0.2 0.25 0.125 0.075 0.05 0.05 0.05 0.025 0.025]
+  note{@Klugman2019, Examples 9.5 and 9.6, group dental payments per employee.}
+
+agg Klugman2019.KPW.9.19
+  dfreq [0 1 3] [0.5 0.4 0.1]
+  dsev [1 10] [0.9 0.1]
+  note{@Klugman2019, Exercise 9.19, a discrete frequency and claim size.}
+
+agg Klugman2019.KPW.9.23
+  dfreq [0 1 2 3] [0.5 0.2 0.2 0.1]
+  sev 3 * norm + 100
+  note{@Klugman2019, Exercise 9.23, a normal claim size under a discrete frequency.}
+
+agg Klugman2019.KPW.9.24
+  dfreq [0 1 2 3 4] [0.0625 0.25 0.375 0.25 0.0625]
+  dsev [2 3] [0.4 0.6]
+  aggregate net of
+    inf xs 5
+  note{@Klugman2019, Exercise 9.24, an employer self insuring a life program.}
+
+agg Klugman2019.KPW.9.31
+  [2 3] claims
+  sev [1000 200] * uniform
+  occurrence ceded to
+    inf xs 100
+  poisson
+  note{@Klugman2019, Exercise 9.31, medical and dental claims in excess of 100.}
+
+agg Klugman2019.KPW.9.34
+  5 claims
+  dsev [1 5 10] [0.8 0.16 0.04]
+  poisson
+  note{@Klugman2019, Exercise 9.34, a compound Poisson on three claim amounts.}
+
+agg Klugman2019.KPW.9.9
+  3 claims
+  dsev [1 2 3] [0.6333333333333333 0.26666666666666666 0.09999999999999999]
+  poisson
+  note{@Klugman2019, Examples 9.9 and 9.10, two compound Poissons combined into one.}
+
+agg Klugman2019.KPW.9.35
+  96 claims
+  sev 8 * uniform
+  mixed gamma 0.25
+  note{@Klugman2019, Exercise 9.35, a negative binomial uniform aggregate for the normal approximation.}
+
+agg Klugman2019.KPW.9.36
+  3 claims
+  sev 2 * burr12 1 3
+  poisson
+  note{@Klugman2019, Exercise 9.36, a Poisson Burr aggregate.}
+
+port Klugman2019.KPW.9.9.p
+  note{@Klugman2019, Examples 9.9 and 9.10, the same two compound Poissons as a portfolio.}
+  agg A
+    2 claims
+    dsev [1 2] [0.6 0.4]
+    poisson
+  agg B
+    1 claim
+    dsev [1 3] [0.7 0.3]
+    poisson
+
+agg Klugman2019.KPW.9.39
+  1.2 claims
+  sev expon
+  binomial 0.4
+  note{@Klugman2019, Exercise 9.39, a binomial exponential aggregate.}
+
+port Klugman2019.kpw_9_40
+  note{@Klugman2019, Exercise 9.40, three policies with fixed claim amounts as a portfolio.}
+  agg A
+    50 claims
+    dsev [10]
+    poisson
+  agg B
+    60 claims
+    dsev [20]
+    poisson
+  agg C
+    30 claims
+    dsev [40]
+    poisson
+
+agg Klugman2019.KPW.9.11
+  0.9 claims
+  dsev [0 50 150] [0.3 0.5 0.2]
+  binomial 0.3 zm 0.4
+  note{@Klugman2019, Example 9.11, a zero modified binomial frequency.}
+
+agg Klugman2019.KPW.9.45
+  6 claims
+  dsev [1 2 4]
+  poisson
+  note{@Klugman2019, Exercise 9.45, a compound Poisson on claim amounts 1, 2 and 4.}
+
+agg Klugman2019.KPW.9.47
+  2 claims
+  dsev [1 2] [0.25 0.75]
+  poisson
+  note{@Klugman2019, Exercise 9.47, a compound Poisson priced with a dividend.}
+
+agg Klugman2019.KPW.9.57
+  3 claims
+  dsev [1 2 3 4] [0.4 0.3 0.2 0.1]
+  poisson
+  note{@Klugman2019, Exercise 9.57, a compound Poisson on four claim amounts.}
+
+agg Klugman2019.KPW.9.58
+  3 claims
+  dsev [1 2 3 4] [0.4 0.3 0.2 0.1]
+  mixed gamma 0.408248290463863
+  note{@Klugman2019, Exercise 9.58, the same with a negative binomial frequency.}
+
+agg Klugman2019.KPW.9.59
+  5 claims
+  sev 2500 * gamma 0.5
+  poisson
+  note{@Klugman2019, Exercise 9.59, a Poisson gamma truck fleet against an annual maximum.}
+
+agg Klugman2019.KPW.9.60
+  40 claims
+  dsev [5 10] [0.75 0.25]
+  neyman 4
+  note{@Klugman2019, Exercise 9.60, physician and prescription payments with a Neyman Type A frequency.}
+
+agg Klugman2019.KPW.9.14
+  3 claims
+  18 xs 6
+  sev 10 * pareto 4 + -10 !
+  occurrence net of
+    25% po inf xs 0
+  poisson
+  note{@Klugman2019, Example 9.14, a Poisson Pareto aggregate with a deductible, a limit and coinsurance.}
+
+agg Klugman2019.KPW.9.63
+  1.4 claims
+  125 xs 50
+  sev 100 * gamma 2 !
+  mixed gamma 0.7071067811865476
+  note{@Klugman2019, Exercise 9.63, a negative binomial gamma aggregate with a deductible of 50 and a limit of 175.}
+
+port Klugman2019.KPW.9.15.p
+  note{@Klugman2019, Example 9.15, group life with an accidental death benefit, as a portfolio of two classes.}
+  agg A
+    0.5 claims
+    dsev [50 100] [0.7 0.3]
+    binomial 0.01
+  agg B
+    0.25 claims
+    dsev [75 150] [0.7 0.3]
+    binomial 0.01
+
+agg Klugman2019.KPW.9.15.w
+  0.75 claims
+  dsev [50 75 100 150] [0.4666666666666666 0.2333333333333333 0.19999999999999998 0.09999999999999999]
+  binomial 0.01
+  note{@Klugman2019, Example 9.15, the classes wrongly combined into one binomial aggregate.}
+
+agg Klugman2019.KPW.9.15.cp
+  0.75 claims
+  dsev [50 75 100 150] [0.4666666666666666 0.2333333333333333 0.19999999999999998 0.09999999999999999]
+  poisson
+  note{@Klugman2019, Example 9.15, the compound Poisson approximation.}
+
+agg Klugman2019.ee.1
+  0.00149 claims
+  dsev [15]
+  bernoulli
+  note{@Klugman2019, Examples 9.16 and 9.17, the death benefit of employee 1 of 14.}
+
+agg Klugman2019.ee.2
+  0.00142 claims
+  dsev [16]
+  bernoulli
+  note{@Klugman2019, Examples 9.16 and 9.17, the death benefit of employee 2 of 14.}
+
+agg Klugman2019.kpw_9_16.po
+  0.048130000000000006 claims
+  dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.01038853 0.03095782 0.02950343 0.01038853 0.07334303 0.01121961 0.02659464 0.10056098 0.08186162 0.02534802 0.02140037 0.02555579 0.09952213 0.4533555]
+  poisson
+  note{@Klugman2019, Exercise 9.18, the mean matched compound Poisson approximation to Example 9.16.}
+
+agg Klugman2019.Class.1
+  50 claims
+  dsev [1]
+  binomial 0.1
+  note{@Klugman2019, Exercise 9.73, class 1 of the five classes of lives.}
+
+agg Klugman2019.Class.2
+  10 claims
+  dsev [2]
+  binomial 0.02
+  note{@Klugman2019, Exercise 9.73, class 2 of the five classes of lives.}
+
+agg Klugman2019.Class.2.c
+  10 claims
+  dsev [1]
+  binomial 0.02
+  note{@Klugman2019, Exercise 9.73, the reinsurer's loss from class 2.}
+
+agg Klugman2019.Class.3.c
+  10 claims
+  dsev [2]
+  binomial 0.02
+  note{@Klugman2019, Exercise 9.73, the reinsurer's loss from class 3.}
+
+agg Klugman2019.CP.Approx
+  100 claims
+  dsev [1 2] [0.9 0.1]
+  poisson
+  note{@Klugman2019, Exercise 9.73, the compound Poisson approximation to the reinsurer's loss.}
+
+port Klugman2019.KPW.9.74p
+  note{@Klugman2019, Exercise 9.74, three groups of employees as a portfolio.}
+  agg A
+    10 claims
+    sev 500 * expon
+    binomial 0.02
+  agg B
+    7.5 claims
+    sev 750 * expon
+    binomial 0.03
+  agg C
+    10 claims
+    sev 1000 * expon
+    binomial 0.04
+
+agg Klugman2019.KPW.9.74.cp
+  [10 7.5 10] claims
+  sev [500 750 1000] * expon
+  poisson
+  note{@Klugman2019, Exercise 9.74, the compound Poisson approximation.}
+
+
+# Loss Data Analytics  [Frees2018a.qmd]
+# ----------------------------------------------------------------------
+
+agg Frees2018a.lda.3.3.5
+  1 claim
+  sev [200 200] * [expon pareto] [1 3] + [0 -200] wts [0.25 0.75]
+  fixed
+  note{@Frees2018a, Example 3.3.5, a mixture of an exponential and a Pareto.}
+
+agg Frees2018a.lda.3.4.1
+  1 claim
+  inf xs 100
+  sev 1000 * expon 1 !
+  fixed
+  note{@Frees2018a, Example 3.4.1, an exponential loss under a deductible of 100, per loss.}
+
+agg Frees2018a.lda.3.4.2
+  1 claim
+  6 xs 4
+  sev 10 * beta 2 1
+  fixed
+  note{@Frees2018a, Example 3.4.2, a beta loss under a deductible of 4.}
+
+agg Frees2018a.X06
+  1 claim
+  500 xs 100
+  sev 1000 * expon
+  fixed
+  note{@Frees2018a, Example 3.4.5, a health policy layer of 500 xs 100 in 2006.}
+
+agg Frees2018a.X07
+  1 claim
+  500 xs 100
+  sev 1050 * expon
+  fixed
+  note{@Frees2018a, Example 3.4.5, the same layer in 2007, after 5% trend.}
+
+agg Frees2018a.insurer.net
+  1 claim
+  5000 xs 0
+  sev 3600 * pareto 5 + -3600
+  occurrence net of
+    15% po 5000 xs 0
+  fixed
+  note{@Frees2018a, Example 3.4.6 modified, the insurer's share of a Pareto loss.}
+
+agg Frees2018a.QU
+  12 claims
+  dsev [1 2 3] [0.5 0.3333333333333333 0.16666666666666666]
+  poisson
+  note{@Frees2018a, Example 5.3.1, the number of claimants from Poisson accidents.}
+
+agg Frees2018a.lda.5.3.2
+  dfreq [1 2] [0.8 0.2]
+  dsev [0 100 1000] [0.2 0.7 0.1]
+  note{@Frees2018a, Example 5.3.2, a discrete frequency and severity.}
+
+agg Frees2018a.lda.5.3.3
+  4 claims
+  dsev [1 2 3 4]
+  geometric
+  note{@Frees2018a, Examples 5.3.3 and 5.4.1, a geometric discrete aggregate.}
+
+agg Frees2018a.Pharma
+  25 claims
+  sev 90 * uniform + 5
+  poisson
+  note{@Frees2018a, Examples 5.3.5 and 5.4.2, a Poisson uniform aggregate.}
+
+agg Frees2018a.Projects
+  2 claims
+  dsev [5 10 20] [0.2 0.3 0.5]
+  geometric
+  aggregate net of
+    15 xs 0
+  note{@Frees2018a, Example 5.3.6, the overtime hours paid in excess of 15 a week.}
+
+agg Frees2018a.Projects.1
+  2 claims
+  dsev [5 10 20] [0.2 0.3 0.5]
+  geometric
+  aggregate ceded to
+    inf xs 0
+  note{@Frees2018a, Example 5.3.7, the expected overtime above 0 hours, one of four attachments.}
+
+agg Frees2018a.Projects.1.v2
+  2 claims
+  dsev [5 10 20] [0.2 0.3 0.5]
+  geometric
+  aggregate ceded to
+    inf xs 5
+  note{@Frees2018a, Example 5.3.7, the expected overtime above 5 hours, one of four attachments.}
+
+agg Frees2018a.LDA554
+  3 claims
+  sev 50 * burr12 1 3
+  poisson zm 0.5
+  note{@Frees2018a, Example 5.5.4, a zero modified Poisson Burr aggregate.}
+
+agg Frees2018a.Original
+  300 claims
+  dsev [4 8 12 20]
+  mixed gamma 0.07453559924999298
+  note{@Frees2018a, Examples 5.5.5 and 5.5.6 modified, the group dental policy before the change.}
+
+agg Frees2018a.Revised
+  300 claims
+  inf xs 10
+  sev dhistogram xps [6 12 18 30] [0.25 0.25 0.25 0.25] !
+  mixed gamma 0.07453559924999298
+  note{@Frees2018a, Examples 5.5.5 and 5.5.6 modified, the group dental policy after the change.}
+
+agg Frees2018a.Auto
+  16 claims
+  inf xs 100
+  sev 200 * expon !
+  poisson
+  note{@Frees2018a, Example 5.5.7, the fleet after both modifications, severity per loss.}
+
+agg Frees2018a.Auto.v2
+  16 claims
+  inf xs 100
+  sev 200 * expon
+  poisson
+  note{@Frees2018a, Example 5.5.7, the same with severity per payment, which overstates the cost.}
+
+agg Frees2018a.VaR
+  1 claim
+  dsev [1 3 4] [0.75 0.2 0.05]
+  fixed
+  note{@Frees2018a, Example 10.3.4, value at risk for a discrete variable.}
+
+port Frees2018a.retained
+  note{@Frees2018a, Example 10.4.3.3, the telecom risks retained under the deductibles.}
+  agg building
+    1 claim
+    100 xs 0
+    sev 100 * gamma 2
+    fixed
+  agg motor
+    1 claim
+    200 xs 0
+    sev 200 * gamma 2
+    fixed
+
+port Frees2018a.insured
+  note{@Frees2018a, Example 10.4.3.3, the telecom risks transferred to the insurer.}
+  agg building
+    1 claim
+    inf xs 100
+    sev 100 * gamma 2 !
+    fixed
+  agg motor
+    1 claim
+    inf xs 200
+    sev 200 * gamma 2 !
+    fixed
+  agg d.and.o
+    1 claim
+    sev 1000 * pareto 2 + -1000
+    fixed
+  agg cyber
+    1 claim
+    sev 2000 * pareto 3 + -2000
+    fixed
+
+port Frees2018a.total
+  note{@Frees2018a, Example 10.4.3.3, the telecom risks in total.}
+  agg building
+    1 claim
+    sev 100 * gamma 2
+    fixed
+  agg motor
+    1 claim
+    sev 200 * gamma 2
+    fixed
+  agg d.and.o
+    1 claim
+    sev 1000 * pareto 2 + -1000
+    fixed
+  agg cyber
+    1 claim
+    sev 2000 * pareto 3 + -2000
+    fixed
+
+
+# Distributions for Actuaries  [Bahnemann2015.qmd]
+# ----------------------------------------------------------------------
+
+agg Bahnemann2015.Bahn.4.1
+  dfreq [0 1 2] [0.6 0.3 0.1]
+  dsev [1 2 3] [0.4 0.5 0.1]
+  note{@Bahnemann2015, Example 4.1, a simple discrete aggregate.}
+
+agg Bahnemann2015.Bahn.4.2
+  2.5 claims
+  sev 400 * gamma 3
+  poisson
+  note{@Bahnemann2015, Example 4.2, a Poisson gamma (Tweedie) aggregate.}
+
+agg Bahnemann2015.Bahn.4.5
+  2.5 claims
+  sev 400 * gamma 3
+  poisson
+  note{@Bahnemann2015, Example 4.5, a Poisson gamma aggregate.}
+
+agg Bahnemann2015.Bahn.4.7
+  8 claims
+  sev 3750 * gamma 0.2
+  poisson
+  note{@Bahnemann2015, Problems 4.7 and 4.13, a Poisson gamma aggregate and its approximations.}
+
+agg Bahnemann2015.Bahn.4.2b
+  10 claims
+  sev 6000 * gamma 0.05
+  poisson
+  note{@Bahnemann2015, Example 4.3, the Tweedie at a higher frequency, for the approximations.}
+
+agg Bahnemann2015.Bahn.4.4
+  1.75 claims
+  dsev [1 2 3 4 5] [0.2 0.4 0.2 0.15 0.05]
+  poisson
+  note{@Bahnemann2015, Example 4.4, a Poisson discrete aggregate.}
+
+agg Bahnemann2015.Bahn.4.15
+  3 claims
+  1000 xs 0
+  sev 403.4287934927351 * lognorm 1.5
+  poisson
+  note{@Bahnemann2015, Example 4.15, a Poisson lognormal aggregate with a limit of 1,000.}
+
+agg Bahnemann2015.Bahn.5.13
+  15 claims
+  5000 xs 3000
+  sev 395.7964246880697 * lognorm 1.8 !
+  poisson
+  note{@Bahnemann2015, Example 5.13, the layer 5,000 xs 3,000 of a Poisson lognormal, per loss.}
+
+agg Bahnemann2015.Bahn.5.13b
+  1.9535923221305609 claims
+  5000 xs 3000
+  sev 395.7964246880697 * lognorm 1.8
+  poisson
+  note{@Bahnemann2015, Example 5.13, the same layer with the count of claims reaching it.}
+
+agg Bahnemann2015.Bahn.6.3
+  1 claim
+  sev 1096.6331584284585 * lognorm 2.4
+  fixed
+  note{@Bahnemann2015, Example 6.3, the lognormal severity behind the increased limits factors.}
+
+agg Bahnemann2015.Bahn.6.5
+  0.2 claims
+  [100000 500000 1000000 2000000 3000000 4000000 5000000] xs 0
+  sev 1096.6331584284585 * lognorm 2.4
+  poisson
+  note{@Bahnemann2015, Example 6.5, risk loads at seven policy limits.}
+
+agg Bahnemann2015.Bahn.6.6
+  1.2 claims
+  500000 xs 0
+  sev 1998.1958951041172 * lognorm 2.4
+  mixed gamma 0.31622776601683794
+  aggregate ceded to
+    1000000 xs 0 and
+    1000000 xs 1000000 and
+    1000000 xs 2000000 and
+    1000000 xs 3000000 and
+    1000000 xs 4000000 and
+    inf xs 5000000
+  note{@Bahnemann2015, Example 6.6, aggregate premiums at a per claim limit of 500,000.}
+
+agg Bahnemann2015.Bahn.6.6.v2
+  1.2 claims
+  1000000 xs 0
+  sev 1998.1958951041172 * lognorm 2.4
+  mixed gamma 0.31622776601683794
+  aggregate ceded to
+    1000000 xs 0 and
+    1000000 xs 1000000 and
+    1000000 xs 2000000 and
+    1000000 xs 3000000 and
+    1000000 xs 4000000 and
+    inf xs 5000000
+  note{@Bahnemann2015, Example 6.6, aggregate premiums at a per claim limit of 1,000,000.}
+
+agg Bahnemann2015.Bahn.6.6.v3
+  1.2 claims
+  2000000 xs 0
+  sev 1998.1958951041172 * lognorm 2.4
+  mixed gamma 0.31622776601683794
+  aggregate ceded to
+    2000000 xs 0 and
+    1000000 xs 2000000 and
+    1000000 xs 3000000 and
+    1000000 xs 4000000 and
+    inf xs 5000000
+  note{@Bahnemann2015, Example 6.6, aggregate premiums at a per claim limit of 2,000,000.}
+
+agg Bahnemann2015.Bahn.6.6.v4
+  1.2 claims
+  3000000 xs 0
+  sev 1998.1958951041172 * lognorm 2.4
+  mixed gamma 0.31622776601683794
+  aggregate ceded to
+    3000000 xs 0 and
+    1000000 xs 3000000 and
+    1000000 xs 4000000 and
+    inf xs 5000000
+  note{@Bahnemann2015, Example 6.6, aggregate premiums at a per claim limit of 3,000,000.}
+
+agg Bahnemann2015.Bahn.6.6.v5
+  1.2 claims
+  4000000 xs 0
+  sev 1998.1958951041172 * lognorm 2.4
+  mixed gamma 0.31622776601683794
+  aggregate ceded to
+    4000000 xs 0 and
+    1000000 xs 4000000 and
+    inf xs 5000000
+  note{@Bahnemann2015, Example 6.6, aggregate premiums at a per claim limit of 4,000,000.}
+
+agg Bahnemann2015.Bahn.6.6.v6
+  1.2 claims
+  5000000 xs 0
+  sev 1998.1958951041172 * lognorm 2.4
+  mixed gamma 0.31622776601683794
+  aggregate ceded to
+    5000000 xs 0 and
+    inf xs 5000000
+  note{@Bahnemann2015, Example 6.6, aggregate premiums at a per claim limit of 5,000,000.}
+
+agg Bahnemann2015.Bahn.6.7
+  0.0005 claims
+  [100000 99000 98000 97000 96000 95000 90000] xs [0 1000 2000 3000 4000 5000 10000]
+  sev 1096.6331584284585 * lognorm 2.4 !
+  poisson
+  note{@Bahnemann2015, Example 6.7, deductible credits at seven deductibles.}
+
+
+# Enterprise Risk Analysis, Section 2.5  [Brehm2007.qmd]
+# ----------------------------------------------------------------------
+
+port Brehm2007.ABCD
+  note{@Brehm2007, Section 2.5, the gross portfolio of the reinsurance example.}
+  agg Casualty
+    14 premium at 0.78 lr
+    5 xs 0
+    sev lognorm 0.1 cv 10
+    mixed gamma 0.3
+  agg PropertyNC
+    17 premium at 0.63 lr
+    25 xs 0
+    sev lognorm [0.1 1] cv [5 10] wts [0.7 0.3]
+    mixed gamma 0.1
+  agg PropertyC
+    2 premium at 0.63 lr
+    150 xs 0
+    sev 3 * pareto 2.375 + -3
+    poisson
+
+port Brehm2007.ABCD:Net
+  note{@Brehm2007, Section 2.5, the same portfolio net of the reinsurance program.}
+  agg Casualty
+    14 premium at 0.78 lr
+    5 xs 0
+    sev lognorm 0.1 cv 10
+    occurrence net of
+      4 xs 1
+    mixed gamma 0.3
+  agg PropertyNC
+    17 premium at 0.63 lr
+    25 xs 0
+    sev lognorm [0.1 1] cv [5 10] wts [0.7 0.3]
+    occurrence net of
+      17 xs 3
+    mixed gamma 0.1
+  agg PropertyC
+    2 premium at 0.63 lr
+    150 xs 0
+    sev 3 * pareto 2.375 + -3
+    occurrence net of
+      24 xs 1
+    poisson
+
+port Brehm2007.ABCD:Ceded
+  note{@Brehm2007, Section 2.5, the reinsurance program ceded from the portfolio.}
+  agg Casualty
+    14 premium at 0.78 lr
+    5 xs 0
+    sev lognorm 0.1 cv 10
+    occurrence ceded to
+      4 xs 1
+    mixed gamma 0.3
+  agg PropertyNC
+    17 premium at 0.63 lr
+    25 xs 0
+    sev lognorm [0.1 1] cv [5 10] wts [0.7 0.3]
+    occurrence ceded to
+      17 xs 3
+    mixed gamma 0.1
+  agg PropertyC
+    2 premium at 0.63 lr
+    150 xs 0
+    sev 3 * pareto 2.375 + -3
+    occurrence ceded to
+      24 xs 1
+    poisson
+
+
+# Examination Questions  [exam-questions.qmd]
+# ----------------------------------------------------------------------
+
+port Exam.CASq15
+  note{@Bodoff2007, CAS Exam 9, Spring 2018, Question 15, wind and earthquake perils for percentile layer capital allocation.}
+  agg X1
+    1 claim
+    dsev [0 5] [0.85 0.15]
+    fixed
+  agg X2
+    1 claim
+    dsev [0 15] [0.99 0.01]
+    fixed

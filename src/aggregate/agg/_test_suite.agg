@@ -140,7 +140,10 @@ agg E.TSev16 5 claims 200 xs  0 sev 1.2343e2 * lognorm 2  ! poisson          not
 agg E.TSev17 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2    poisson          note{conditional severity};
 agg E.TSev18 5 claims 200 xs 10 sev 1.2343e2 * lognorm 2  ! poisson          note{unconditional severity};
 # computed scale: +, - and * are legal inside parentheses (1.0.0a268)
-agg E.TSev19 1 claim sev (exp(-1 * .4**2/2)) * lognorm .4 fixed              note{the lognormal mean normalizer exp(-sigma^2/2), written inline}
+agg E.TSev19 1 claim sev (exp(-1 * .4**2/2)) * lognorm .4 fixed              note{the lognormal mean normalizer exp(-sigma^2/2), written inline};
+# deductible forms on the layers clause: franchise and disappearing
+agg E.TSev20 10 claims 100 xs 10 franchise          sev lognorm 10 cv 0.8 poisson note{franchise deductible: a claim above 10 is paid from the ground up, capped at 100};
+agg E.TSev21 10 claims 100 xs 10 to 20 disappearing sev lognorm 10 cv 0.8 poisson note{disappearing deductible: the retention falls from 10 to zero as the loss rises from 10 to 20}
 
 # Specifying exposure
 # ===================

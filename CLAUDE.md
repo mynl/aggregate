@@ -326,7 +326,8 @@ These are standing rules — follow them without being re-asked:
     fact lives in exactly one of the four.
 - **Keep `dev/TODO.md` current.** When a tracked item lands, mark it done (and
   note the version / `dev/done/plan-*.md`); when scope shifts, edit the entry.
-  Move a completed plan from `dev/` to `dev/done/`. The file was restarted on
+  A plan moves to `dev/done/` in the commit that lands its first step and is
+  edited there from then on (house rule). The file was restarted on
   2026-10-07 at `1.0.0a396`; its 1,706-line predecessor is archived at
   `dev/done/TODO-2026-10-07.md` and holds the full historical backlog, so check
   there before concluding an item was never considered. **Keep entries to one
@@ -354,12 +355,15 @@ These are standing rules — follow them without being re-asked:
 - **A version-bump commit is one coherent unit.** It carries the code change,
   the `__version__` bump in `src/aggregate/__init__.py`, the `CHANGELOG.md` section, and whatever release
   hygiene the change implies — `dev/TODO.md`, `dev/FEATURES.csv` (via
-  `dev/regen_features.py`), grammar-reference regen, moving a finished plan to
-  `dev/done/`. Never split those across commits, and never let a version land in
-  a different commit from its CHANGELOG section — that is what breaks bisect.
-- **Never push; never bypass.** Pushing to GitHub is the author's, on explicit
-  request only. No `--no-verify`, no `--amend` of anything already pushed —
-  prefer a new commit to rewriting one.
+  `dev/regen_features.py`), grammar-reference regen, moving the plan to
+  `dev/done/` if this is its first bump. Never split those across commits,
+  and never let a version land in a different commit from its CHANGELOG
+  section — that is what breaks bisect.
+- **Push with every commit; never bypass.** Each commit is pushed as it lands
+  (house rule, 2026-10-20), so a bump is on GitHub the moment it is committed.
+  Merging a reviewed contributor PR is covered too. No `--no-verify`, and no
+  `--amend` of anything committed, since it is already pushed: prefer a new
+  commit to rewriting one.
 - **Check git state before asserting it — never from memory.** The author also
   commits frequently without announcing it, so any claim about what is or isn't
   committed written from session memory is routinely *wrong* by the time it is

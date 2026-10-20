@@ -135,18 +135,23 @@
 > Rulings and promises were posted on GitHub on 2026-10-13. Contributors leave
 > the version, `CHANGELOG.md` and this file alone; we add all three at merge.
 
-- **[Deductible-Vocabulary]** (#9): rulings posted, contributor implementing.
-  **Declined:** a policy-side annual aggregate deductible, which is exactly
-  `aggregate net of D xs 0`; wanted instead a `library.agg` entry and one
-  sentence in the Twenty Minutes "Anatomy" section. **Accepted:** `y xs a
-  franchise` and `y xs d1 to d2 disappearing`, modifiers on the layers clause.
-  The ground-up top stays at `a + y` (maximum covered loss), so `1000 xs 50
-  franchise` pays `min(X, 1050)` for `X > 50`, and disappearing requires
-  `d1 <= d2 <= d1 + y`. One transform on the continuous severity, a sibling of
-  the `make_layer_attachment_*` wrappers, with `d2` as its parameter (`inf`
-  ordinary, `d1` franchise); not rebucketing through `make_ceder_netter`.
-  Franchise PR first, then disappearing, each with a DecL reference section
-  and a Twenty Minutes example.
+- **[Deductible-Vocabulary]** (#9): franchise **landed at 1.7.0** (#15), the
+  aggregate deductible library entry at 1.6.0 (#16), disappearing pending in
+  #20 with the owed corpus items (a `_test_suite.agg` line, the unparser
+  corpus and the snapshot recapture, for both forms). Revised ruling on #15:
+  the payment is `min(x - r(x), y)`, deductible first and limit second, so
+  `limit` is the largest payment and the only constraint is `d1 <= d2`. One
+  transform on the continuous severity with `d2` (`retention_end`) as its
+  parameter: `inf` ordinary, `d1` franchise, `d1 < d2` disappearing.
+
+- **[Deductible-Forms-Follow-Ups]** (from the #15 review): (1) the old
+  `make_layer_attachment_pdf` tests `x >= limit` before `x == limit`, so it
+  never returns the point-mass marker at the limit (`pdf(1000)` is 0 for
+  `1000 xs 50` on a lognormal); the retention wrapper tests the mass first.
+  (2) `feasible_bucket` and `size_biased_cdf` return their no-reading values
+  under a finite `retention_end`, so bucket sizing has no feasibility reading
+  for a franchise or disappearing deductible. (3) The `qd` one-liner prints
+  `1,000 xs 50` with no modifier for a franchise.
 
 - **[Snapshot-Portability]** (promised in #8): untouched `master` at 1.0.1
   fails 56 fast tests on macOS (Apple Silicon): 44 exhibit snapshots, chart
@@ -309,19 +314,11 @@
   non-color cue per cell. **Blocks nothing**, but it should be settled before
   the matrix baseline image is blessed, since blessing freezes the picture.
 
-- **[Wheel-Smoke-Check]** (found the hard way at 1.0.1) — a packaging defect is
-  **invisible to pytest by construction**: the suite runs against the editable
-  install, where every module is present on disk, so `packages = ["aggregate"]`
-  silently dropped `aggregate.charts`, `.plots` and `.exhibits` from the 1.0.0
-  wheel and `a.plot()` raised `ModuleNotFoundError` for anyone who installed
-  it. Nothing in the repo would ever have said so. Wanted: a
-  `scripts/check_wheel.py` that runs `uv build`, installs the wheel into a
-  throwaway venv, and asserts the smoke set (import, `build(...)`, `.plot()`,
-  each subpackage, a `library.agg` recipe, `qd`), plus a listing check that
-  every `src/aggregate/**/__init__.py` has a counterpart in the artifact. A
-  release-time command like the numerics gate, **not** part of the suite, since
-  it needs a built artifact. Until it exists, the clean-venv install is a
-  manual step in `V:\worktrees\BETA-MERGE.md` and must not be skipped.
+- **[Wheel-Smoke-Check]** (**DONE**, **1.6.1**, #17): `scripts/check_wheel.py`
+  builds the wheel, checks its listing against `src/aggregate` (packages,
+  modules, package data) and smoke tests it in a throwaway venv from outside
+  the repository. A release-time command, not part of the suite. It replaces
+  the manual clean-venv install step; run it at every release.
 
 ## Tests and the parity scaffold
 

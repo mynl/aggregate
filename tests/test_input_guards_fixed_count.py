@@ -4,7 +4,9 @@
 for a fractional ``n`` the FFT result is not a distribution (it carries negative
 probabilities and misses the mean), so the build raises instead. The count can
 be stated directly, or derived from an expected loss or from premium times loss
-ratio, and the message names whichever route produced it.
+ratio, and the message names whichever route produced it. A ``dfreq`` support
+with a fractional outcome has the same defect through the other door, a
+fractional power in ``sum p_k z^k``, and is refused when the frequency is built.
 """
 from __future__ import annotations
 
@@ -59,3 +61,34 @@ def test_other_frequencies_accept_a_fractional_count():
     """Only ``fixed`` is guarded: an expected count may be fractional."""
     a = build('agg GF.Poisson 2.5 claims dsev [1 2] poisson')
     assert a.n == pytest.approx(2.5)
+
+
+@pytest.mark.parametrize('program, shown', [
+    ('agg DF.One dfreq [2.5] dsev [1 2]', '2.5'),
+    ('agg DF.Mixed dfreq [1 2.5 4] [.2 .3 .5] dsev [1]', '2.5'),
+    ('agg DF.Two dfreq [0.5 1.5] dsev [1]', '0.5, 1.5'),
+], ids=['single', 'one-of-three', 'two'])
+def test_fractional_dfreq_outcome_is_refused(program, shown):
+    with pytest.raises(ValueError) as info:
+        build(program)
+    msg = str(info.value)
+    assert 'must be whole numbers' in msg
+    assert f'support includes {shown}.' in msg
+    assert 'poisson' in msg
+
+
+def test_fractional_dfreq_refused_in_the_constructor():
+    """The guard sits on the empirical frequency, so the Python API is covered too."""
+    from aggregate._frequency import Frequency
+    with pytest.raises(ValueError, match='support includes 2.5'):
+        Frequency('empirical', [1, 2.5], [0.5, 0.5], False, 0)
+
+
+@pytest.mark.parametrize('program', [
+    'agg DF.Whole dfreq [1 2 3] dsev [1 2]',
+    'agg DF.Ulps dfreq [3.0000000001] dsev [1 2]',
+], ids=['whole', 'within-tolerance'])
+def test_whole_dfreq_outcomes_build(program):
+    a = build(program)
+    assert np.all(a.agg_density >= -1e-10)
+    assert a.agg_density.sum() == pytest.approx(1.0, abs=1e-10)

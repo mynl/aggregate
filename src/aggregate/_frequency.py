@@ -1154,6 +1154,39 @@ class FrequencyEmpirical(Frequency):
     def _build(self):
         self.freq_a, self.freq_b = validate_discrete_distribution(
             self.freq_a, self.freq_b)
+        self._guard_whole_outcomes()
+
+    def _guard_whole_outcomes(self):
+        """Refuse a count support that is not made of whole numbers.
+
+        Raises
+        ------
+        ValueError
+            If any outcome is not within a relative ``1e-9`` of an integer
+            ([Input-Guards]). The message lists the offending outcomes.
+
+        Notes
+        -----
+        The generating function is :math:`\\sum_k p_k z^k`. For a fractional
+        outcome :math:`k` the FFT evaluates :math:`z^k` on the unit circle
+        through the principal branch, which is not the transform of any
+        distribution: the aggregate density comes back with negative
+        probabilities and a total mass other than one, exactly as for a
+        fractional ``fixed`` count. The tolerance matches the ``fixed`` guard,
+        so an outcome a few ulps off a whole number still builds.
+        """
+        a = np.asarray(self.freq_a, dtype=float)
+        bad = a[~np.isclose(a, np.round(a), rtol=1e-9, atol=1e-12)]
+        if bad.size == 0:
+            return
+        shown = ', '.join(f'{x:.6g}' for x in bad[:5])
+        more = f' and {bad.size - 5} more' if bad.size > 5 else ''
+        raise ValueError(
+            f'dfreq outcomes are claim counts and must be whole numbers, but '
+            f'the support includes {shown}{more}. A fractional count has no '
+            f'distribution and returns negative probabilities. List whole '
+            f'counts with their probabilities, or use poisson for an expected '
+            f'count.')
 
     def freq_moms(self, n):
         en = np.sum(self.freq_a * self.freq_b)

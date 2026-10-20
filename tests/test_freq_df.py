@@ -85,9 +85,10 @@ def test_freq_df_mean_guard():
 
 
 def test_freq_df_fractional_support_raises():
-    a = build('agg F dfreq [0.5 1.5] dsev [1]', update=False)
-    with pytest.raises(ValueError, match='integer'):
-        a.frequency.freq_df
+    # a fractional support is refused when the frequency is built
+    # ([Input-Guards]), before freq_df can be asked for it
+    with pytest.raises(ValueError, match='whole numbers'):
+        build('agg F dfreq [0.5 1.5] dsev [1]', update=False)
 
 
 def test_en_resolved_not_sentinel():

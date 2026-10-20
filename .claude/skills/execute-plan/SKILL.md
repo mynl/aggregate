@@ -4,7 +4,7 @@ description: Review a dev plan and, if it is sound, execute it end to end with
   house hygiene: phase by phase against the narrowed edit loop, the tier 3 gate,
   one
   version bump commit per phase, execution notes recording every divergence,
-  dev/TODO.md, dev-files.md, and the finished plan retired to dev/done/. If the
+  dev/TODO.md, dev-files.md, and the plan retired to dev/done/ at its first phase. If the
   plan is not sound, stop and ask in one batch rather than guess. Use when asked
   to review a plan and execute it if it is ok, to run, work, do or implement a
   dev/plan-*.md, or to pick up a plan that is specified and ruled but not yet
@@ -182,9 +182,11 @@ Three things this skill adds on top of it:
 
 ## 7. Retire the plan
 
-In the final phase's commit, and not before:
+In the first phase's commit, move the plan from `dev/` to `dev/done/`; every
+later phase edits it there, and the execution notes accumulate in the moved
+file (house rule, 2026-10-20). In the final phase's commit:
 
-- Move the plan from `dev/` to `dev/done/`, together with its execution notes.
+- Confirm the plan sits in `dev/done/` with its execution notes complete.
 - **Symlink care.** A shared plan is retired from the side that owns it and the
   link follows in the same breath. Do not move a symlink into `dev/done/` on its
   own; that dangles it. A reflected plan is retired on each side independently,

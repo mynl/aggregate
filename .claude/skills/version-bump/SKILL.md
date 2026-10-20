@@ -2,7 +2,7 @@
 name: version-bump
 description: Bump the aggregate 1.0.0a version and commit it as one coherent
   unit: the gate run, the __version__ line, the CHANGELOG section, dev/TODO.md, any
-  regen the change implies, the finished plan moved to dev/done/, and a one-line
+  regen the change implies, the plan moved to dev/done/ at its first bump, and a one-line
   commit message. Use when a plan-based change is finished, when asked to bump,
   ship, cut a version or commit a version, and to decide whether a given change
   bumps at all.
@@ -77,7 +77,8 @@ the change implies, and never splits them across commits:
 - The grammar snapshot if the grammar or transformer moved,
   `uv run python tests/capture_spec_snapshot.py`, with its diff read
   deliberately before it is committed.
-- The finished plan moved from `dev/` to `dev/done/`.
+- The plan moved from `dev/` to `dev/done/` if this is its first bump; later
+  bumps edit it there (house rule, 2026-10-20).
 
 **Never let a version land in a different commit from its CHANGELOG section.**
 That is precisely what breaks bisect.
@@ -88,7 +89,7 @@ copies live in the API repo, both retired to `done/` on 2026-08-21. Do not move
 a symlink into `dev/done/` on its own; a shared plan is retired from the side
 that owns it and the link follows in the same breath. The live LIB half of the
 joint surface is `dev/plan-3d-plot-LIB.md`, a real file, and it moves to
-`dev/done/` on its own when its two bumps land.
+`dev/done/` on its own at its first bump.
 
 ## 5. Write the CHANGELOG section
 
@@ -133,7 +134,8 @@ author's uncommitted work.
 
 ## 7. Never
 
-- **Never push.** Pushing is the author's, on explicit request only.
+- **Never leave a bump unpushed.** The push is part of the bump (house rule,
+  2026-10-20), not a separate request.
 - **Never `--no-verify`**, and never `--amend` anything already pushed. Prefer a
   new commit to rewriting one.
 - **Never batch two bumps into one commit**, and never defer a bump to the end

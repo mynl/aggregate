@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.6.1 - 2026-10-20
+
+**[Wheel-Smoke-Check] `scripts/check_wheel.py` builds the wheel, lists it against `src` and smoke tests it in a throwaway venv.** Three stages, every check reported and a nonzero exit on any failure: `uv build --wheel` (or `--wheel <path>` for an existing artifact); a listing check that every package, module and package-data file under `src/aggregate` is in the wheel; and a smoke run in a fresh venv from outside the repository, which confirms the import came from the venv and not `src`, then the version, `build` on a known mean, `qd`, `plot`, every subpackage and a `library.agg` recipe. Standard library plus `uv` only, a release-time command like the numerics gate and not part of the suite; usage in `scripts/README.md`. Contributed by @KasraBashirioskooei (#17).
+
 ## 1.6.0 - 2026-10-19
 
 **Release 1.6.0, the first since 1.2.0, rolls up 1.2.1 to 1.6.0a3 below.** New: exact arithmetic in nttagg probabilities and the `exact_tail` chart (1.4.0, 1.5.0), `aggregate.ntt.engine_status()` (1.3.0), a version written once and read live (1.2.1), thread safe `Underwriter` loading (1.5.2), and the DecL word list, `fit_page` and the house type in library figures (1.6.0). Fixed: exact zeros for an identically zero cession (1.5.1), and unit capital above the augmented frame (1.5.3). Thanks to @KasraBashirioskooei for five pull requests: both fixes, the gold standard allocation and bounds tests (#10, #14), and the `AggregateDeductible` library entry (#16).

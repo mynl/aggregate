@@ -1170,6 +1170,11 @@ def severity_support(severity, reference: bool = False) -> tuple[float, float]:
     attach = float(attach) if attach is not None else 0.0
     if np.isfinite(limit):
         return 0.0, limit
+    # an unlimited franchise or disappearing deductible retains nothing at
+    # the top of the support, so it pays up to the ground-up maximum
+    # ([Franchise-Deductible])
+    if np.isfinite(getattr(severity, 'retention_end', np.inf)):
+        attach = 0.0
     s_hi = (hi - attach) if np.isfinite(hi) else np.inf
     return 0.0, max(s_hi, 0.0)
 

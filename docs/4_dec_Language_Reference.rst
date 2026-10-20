@@ -121,6 +121,37 @@ The body is exactly ``dfreq`` then ``dsev`` then the usual trailer: no exposures
 
 ``build`` returns an :class:`aggregate.ntt.AggregateNTT`, an ordinary :class:`~aggregate.Aggregate` whose float pipeline is driven bit-identically from the exact spec (``float(Fraction)`` is correctly rounded), plus ``density_df`` columns ``p_exact_float`` and ``p_exact_log10`` (the latter readable in the deep tail, where the former underflows to zero), the exact rationals on the ``p_exact`` property (or ``p_exact_at(loss)`` for named buckets, which is the cheap way to ask), the per-bucket ``accuracy_df`` comparison, an ``ntt_audit`` record, and a ``stats_df`` ``exact`` column that validation measures against. Guardrails refuse monster cases up front with a size estimate (override with ``build(..., ntt_override=True)``); a case whose support needs more than the default ``log2`` cap asks for an explicit ``log2``; the 32-bit prime supply caps the envelope near a transform length of :math:`2^{22}`, intrinsic to the method. The transform phase is threaded across primes, ``min(4, os.cpu_count())`` by default and set with ``build(..., ntt_workers=n)`` (``1`` forces serial). Both heavy phases, the per-prime transform and the Chinese remainder reconstruction, run in the optional compiled ``aggregate-ntt`` package when that happens to be installed, which needs no attention: it is discovered rather than declared, the answers are identical either way, and ``build(..., ntt_engine='python')`` forces the pure-Python path if one is ever in dispute. The engine also lifts the prime-supply cap, since it carries 63-bit primes where the pure-Python transform is limited to 32-bit, so it needs about half as many and reaches cases the library alone refuses. ``ntt_audit`` names the engine that produced a record, and the ``aggregate.ntt`` logger reports the route at ``INFO``. See :mod:`aggregate.ntt` for the engine and the mathematics.
 
+.. _franchise deductible:
+
+Deductible Forms (franchise)
+============================
+
+A layers clause ``y xs a`` applies an ordinary deductible: the insured retains the first ``a`` of every loss and the layer pays the excess, up to the limit ``y``. The ``franchise`` modifier changes only the retention. Once a loss exceeds the attachment the insured keeps nothing, and the whole loss is paid, subject to the limit::
+
+    agg Ordinary  100 claims 1000 xs 50           sev lognorm 100 cv 2 poisson
+    agg Franchise 100 claims 1000 xs 50 franchise sev lognorm 100 cv 2 poisson
+    agg Vector    100 claims [500 1000] xs [25 50] franchise sev lognorm 100 cv 2 poisson
+
+Both forms belong to one family of retentions. The retention on a loss :math:`x` is parameterized by the loss :math:`d_2` at which it reaches zero:
+
+.. math::
+
+    r(x) = \begin{cases}
+        d_1 & x \le d_1 \\
+        d_1 \dfrac{d_2 - x}{d_2 - d_1} & d_1 < x \le d_2 \\
+        0 & x > d_2,
+    \end{cases}
+
+and the layer ``y xs d1`` pays :math:`g(x) = \min(x - r(x), y)`. Setting :math:`d_2 = \infty` gives the ordinary deductible, payment :math:`\min((x - d_1)^+, y)`. Setting :math:`d_2 = d_1` gives the franchise, payment :math:`\min(x, y)` for :math:`x > d_1` and zero otherwise, so no payment ever lies strictly between zero and :math:`\min(d_1, y)`. A value :math:`d_2 > d_1` is a disappearing deductible; the engine already supports it, and DecL will expose it separately. The only constraint is :math:`d_1 \le d_2`.
+
+**Limit convention.** The deductible applies first and the limit second, following the IRMI definition of a franchise deductible ("once it is met, the entire amount of the loss is paid, subject to the policy limit") and the first edition of *Loss Models*. The limit :math:`y` is the largest payment in every form: ``1000 xs 50 franchise`` pays :math:`\min(X, 1000)` once :math:`X > 50`. The payment reaches the limit at the ground-up loss :math:`d_1 + y` for the ordinary deductible and :math:`\max(d_1, y)` for the franchise; this is the layer's ``detachment``. With :math:`y > d_1` the franchise pays :math:`d_1` plus the ordinary layer ``(y - d1) xs d1`` on every claim above :math:`d_1`; with :math:`y \le d_1` every such claim pays exactly :math:`y`.
+
+**Conditional and unconditional.** As with an ordinary layer, the claim count is the count of losses exceeding the attachment, and the severity is conditional on :math:`X > d_1`. For the franchise its distribution function is :math:`(F(t) - F(d_1)) / S(d_1)` for payments :math:`d_1 < t < y`, zero below, and one at the limit, which carries the mass :math:`S(\max(d_1, y)) / S(d_1)`. The trailing ``!`` makes the severity unconditional in the usual way: the count is ground up and the probability :math:`F(d_1)` of a loss at or below the attachment sits at a payment of zero.
+
+**Vectors.** ``franchise`` applies to every layer of a vector clause ``[...] xs [...]``, each with its own attachment.
+
+**Moments** come from the same partial expectations as an ordinary layer, so the theoretical moments that validation compares against are exact. The library entry ``SevLayer.Franchise`` sets the franchise beside ``SevLayer``.
+
 Dec Language Grammar Specification
 ===================================
 

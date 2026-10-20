@@ -257,6 +257,22 @@ Policy terms are language, not post-processing. Expected losses by limit, and th
         print(f'limit {lim:6,d}   E[S] {al.est_m:10,.0f}   '
               f'ILF {al.est_m / base:.3f}')
 
+The deductible has forms too. An ordinary ``1000 xs 50`` retains the first 50 of every loss; adding ``franchise`` retains nothing once a loss exceeds 50, so the whole loss is paid, subject to the limit of 1000. The franchise pays 50 more than the ordinary layer on small and middling claims, and the same 1000 on the largest:
+
+.. ipython:: python
+
+    for form in ['', 'franchise']:
+        d = build(f'''
+            agg Deductible
+                100 claims
+                1000 xs 50 {form}
+                sev lognorm 100 cv 2
+                poisson
+        ''')
+        print(f'{form or "ordinary":9s}   E[S] {d.est_m:10,.0f}   CV {d.est_cv:.3f}')
+
+Both are members of one family of retentions, set out in :ref:`franchise deductible`.
+
 The layer caps each occurrence. Features that cap the year are covered in :ref:`intro20 reinsurance`.
 
 .. _intro20 reinsurance:

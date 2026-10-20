@@ -2587,6 +2587,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             spec['exp_premium'] = safe_scale(scale, spec['exp_premium'])
             spec['exp_attachment'] = safe_scale(scale, spec['exp_attachment'])
             spec['exp_limit'] = safe_scale(scale, spec['exp_limit'])
+            # the retention end is a loss amount, so it scales with the attachment
+            if spec.get('exp_retention_end') is not None:
+                spec['exp_retention_end'] = safe_scale(scale, spec['exp_retention_end'])
             spec['sev_loc'] = safe_scale(scale, spec['sev_loc'])
             # note: scaling the scale takes care of the mean, so do not double count
             # default is 0. Can't ask if array is...but if array have to deal with it
@@ -2627,7 +2630,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                  value_type='loss',
                  approximate='exact',
                  label=None, label_map=None,
-                 note='', hints='', tags=(), _tweedie=None):
+                 note='', hints='', tags=(), _tweedie=None,
+                 exp_retention_end=None):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
         It allows for very flexible creation of Aggregate distributions. Severity
@@ -2649,6 +2653,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         :param exp_attachment:  occurrence attachment; None indicates no limit clause, which is treated different
                                 from an attachment of zero.
         :param exp_limit:       occurrence limit
+        :param exp_retention_end: ground-up loss at which the retention reaches
+                                zero, per layer (``[Franchise-Deductible]``);
+                                ``None`` or ``inf`` is the ordinary deductible,
+                                the attachment itself is the franchise.
         :param sev_name:        severity name or sev.BUILTIN_SEV or meta.var agg or port or similar or vector or matrix
         :param sev_a:           scipy stats shape parameter
         :param sev_b:           scipy stats shape parameter
@@ -3100,6 +3108,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if not isinstance(sev_ub, Iterable):
             sev_ub = np.array([sev_ub])
 
+        # Retention end per layer ([Franchise-Deductible]); None is the
+        # ordinary deductible. Broadcast below to the shape of the broadcast
+        # attachment, which it always conforms to.
+        _retention_in = (np.inf if exp_retention_end is None
+                         else np.asarray(exp_retention_end, dtype=float))
         # counter to label components
         r = 0
         # broadcast together and create container for the severity distributions
@@ -3123,6 +3136,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             self.en = np.array(en, dtype=float)
             self.attachment = attachment
             self.limit = limit
+            retention = np.broadcast_to(_retention_in, np.shape(attachment))
             # these all have the same length because have been broadcast
             n_components = len(exp_el)
             self._guard_exposure_rows(n_components)
@@ -3141,7 +3155,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
                 # WARNING: note sev_xs and sev_ps are NOT broadcast
                 self.sevs[r] = Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
-                                        _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect)
+                                        _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect,
+                                        exp_retention_end=float(retention[r]))
                 sev1, sev2, sev3 = self.sevs[r].moms()
 
                 # input claim count trumps input loss
@@ -3209,6 +3224,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                                     sev_wt, sev_lb, sev_ub)
             exp_el = np.where(exp_el > 0, exp_el, exp_premium * exp_lr)
             exp_arrays = [exp_el, exp_premium, exp_lr, en, attachment, limit]
+            retention = np.broadcast_to(_retention_in, np.shape(attachment))
             sev_arrays = [sev_name, sev_a, sev_b, sev_mean, sev_cv, sev_loc, sev_scale, sev_lb, sev_ub]
             n_components = len(exp_el) * len(sev_name)
             self.en = np.empty(n_components, dtype=float)
@@ -3258,7 +3274,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 actual_sevs = []
                 for _sn, _sa, _sb, _sm, _scv, _sloc, _ssc, _slb, _sub, _swt in zip(*sev_arrays, sev_wt):
                     actual_sevs.append(Severity(_sn, _at, _y, _sm, _scv, _sa, _sb, _sloc, _ssc, sev_xs, sev_ps,
-                                                _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect))
+                                                _swt, _slb, _sub, sev_conditional, sev_signed=sev_signed, sev_reflect=sev_reflect,
+                                                exp_retention_end=float(retention[e_idx])))
 
                 # now we need to figure the severity across the mixture for this particular layer and  attach
                 moms = []

@@ -21,7 +21,7 @@ Per atom, then group.
 Signed throughout.
     The group ``role`` books each leg into the holder's ledger, so ``sell`` gives ``+consideration, -obligation`` and ``buy`` gives the contra. The ``EX`` column therefore adds straight down the sheet and each row's distribution is built on the signed values. Because :math:`q_p(-X) = -q_{1-p}(X)`, the adverse tail lands where the reader expects for both roles, automatically and with no special casing.
 Exact by default.
-    A ``bs=0`` leg is an exact irregular :class:`GridDistribution`: group atoms by value, sum probability. Grid distributions need no equal spacing and never touch the FFT machinery, so the exact route is also the cheap one. A ``bs>0`` leg rebuckets onto a regular grid through the shared pushforward machinery and is audited in :attr:`PnL.validation_df`.
+    A ``bs=0`` leg is an exact irregular :class:`GridDistribution`: group atoms by value, treating values within the ledger's ``validation.level_set_rtol`` tolerance as one outcome, and sum probability. Grid distributions need no equal spacing and never touch the FFT machinery, so the exact route is also the cheap one. A ``bs>0`` leg rebuckets onto a regular grid through the shared pushforward machinery and is audited in :attr:`PnL.validation_df`.
 One 2-D source.
     Any number of ``is2d`` legs may read the single shared joint. An ``is2d`` leg over a 1-D source is an error; a 2-D source with 1-D legs is fine, since they read axis 0. Only one latent dimension ever exists, which is what keeps the atom set shared and the ladder conditional.
 
@@ -273,7 +273,7 @@ The scenario ladder is the P&L's one genuinely new piece of mathematics, and it 
 
 The ledger is evaluated per atom over one shared source: every row :math:`X_i` (leg, total, running net) and the grand result :math:`M = \sum_i X_i` are vectors of signed values on the same atoms :math:`\omega` with probabilities :math:`p(\omega)`. For each ladder point :math:`q` in ``PERCENTILE_LADDER`` the scenario is anchored on the margin: let :math:`m_q = \inf\{x : \Pr(M \le x) \ge q\}` be the lower :math:`q`-quantile of :math:`M`, read straight off the grand result's :class:`GridDistribution`.
 
-Because the grid distribution's support is the set of exact result values, the event :math:`A_q = \{\omega : M(\omega) = m_q\}` is a nonempty exact slice, tested with float equality and no tolerance. Each cell of column :math:`\kappa_q` is the conditional mean of its row over that slice:
+The grid distribution's support is the set of result values, with atoms that agree to within a ledger-wide tolerance merged into one outcome: ``validation.level_set_rtol`` (default :math:`10^{-9}`) times the largest absolute value of any row. The same result reached by different arithmetic, such as the many :math:`(l, r)` cells of a 2-D occurrence joint with one :math:`l - r`, or a corridor or retro leg, differs in its last few bits, and float equality would catch an arbitrary part of it. The event :math:`A_q = \{\omega : M(\omega) = m_q\}` is therefore the whole level set up to that tolerance, a nonempty slice. Each cell of column :math:`\kappa_q` is the conditional mean of its row over that slice:
 
 .. math::
 

@@ -257,6 +257,17 @@ class ValidationSettings:
         candidate grids, losing nothing at all is free to insist on.
         (Formerly ``DEFICIT_MATERIALITY``.) The 1e-4 default is a judgment
         call pending review (numerics-3).
+    level_set_rtol : float
+        Relative tolerance under which two atoms of a :class:`~aggregate.PnL`
+        ledger row are one outcome ([Kappa-Level-Sets]). The absolute
+        tolerance is this times the largest absolute value of any row of the
+        ledger. The same result reached by different arithmetic paths (the
+        cells of a 2-D occurrence joint, a corridor or retro leg) differs in
+        its last few bits, of order ``1e-13`` relative; distinct outcomes on
+        any grid the library builds differ by far more. Atoms within the
+        tolerance share one atom of the row's exact distribution, one
+        ``κ`` slice of :attr:`~aggregate.PnL.economic_df`, and the
+        break-even count of :attr:`~aggregate.PnL.prob_eq_0`.
     """
 
     eps: float = 1e-4
@@ -264,6 +275,7 @@ class ValidationSettings:
     aliasing_eps: float = 1e-5
     exeqa_noise_floor: float = 1e-4
     deficit_materiality: float = 1e-4
+    level_set_rtol: float = 1e-9
 
 
 @dataclass(frozen=True)
@@ -377,6 +389,8 @@ _ENV_MAP = {
     'AGGREGATE_REINS_BUCKET': ('discretization', 'reins_bucket', str),
     'AGGREGATE_DSEV_BUCKET': ('discretization', 'dsev_bucket', str),
     'AGGREGATE_VALIDATION_EPS': ('validation', 'eps', float),
+    'AGGREGATE_VALIDATION_LEVEL_SET_RTOL': ('validation', 'level_set_rtol',
+                                            float),
     'AGGREGATE_VALUE_TYPE_LOSS': ('labels', 'loss', str),
     'AGGREGATE_VALUE_TYPE_PAYOFF': ('labels', 'payoff', str),
 }

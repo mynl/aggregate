@@ -167,6 +167,12 @@
 
 ## Recently landed
 
+- **[Kappa-Level-Sets]** DONE at **1.10.1** (2026-10-22,
+  `dev/done/plan-kappa-level-sets.md`): `κ` cells and the waterfall's
+  diversified columns condition on the whole level set up to
+  `validation.level_set_rtol`, not on exact float equality; exact row
+  distributions and `prob_eq_0` use the same tolerance. The massive one-sweep
+  route still has no conditional ladder (`[Massive-Kappa-Second-Sweep]`).
 - **[Format-Sheet-Block-Filter]** DONE at **1.10.0** (2026-10-22,
   `dev/done/plan-format-sheet-block-filter.md`, the library half of
   aggregate-api's `[Greater-Tables-8]`): `FormatSheet.block` sends each block

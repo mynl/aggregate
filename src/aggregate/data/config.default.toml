@@ -139,6 +139,13 @@
 # 1e-4 is a judgment call.
 # deficit_materiality = 1e-4
 
+# level_set_rtol: atoms of a PnL ledger row whose values agree to within this
+# times the ledger's largest absolute row value are one outcome. The same
+# result reached by different arithmetic (the cells of a 2-D occurrence joint,
+# a corridor or retro leg) differs in its last few bits; this merges them in
+# the row's distribution, the kappa columns of economic_df and prob_eq_0.
+# level_set_rtol = 1e-9
+
 
 # [bivariate] -- defaults for the bivariate module.
 [bivariate]

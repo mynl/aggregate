@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.10.1 - 2026-10-22
+
+**[Kappa-Level-Sets] κ columns condition on the whole level set.** A `κq` cell of `PnL.economic_df`, and the waterfall's diversified columns built from `κ01`, is now the mean over every atom whose result agrees with `x_q` to within `validation.level_set_rtol` (new, default `1e-9`, env `AGGREGATE_VALIDATION_LEVEL_SET_RTOL`) times the ledger's largest absolute row value; it was the mean over the atoms whose float matched `x_q` bit for bit. **Numbers move** on ledgers whose result is reached by rounding-sensitive arithmetic (occurrence walks, retro, corridors): on the measured cases the largest κ cell change was 289 on `Bear1990.BN.TreatyIV`, 698 on a 750 xs 250 occurrence walk, 1,428 on the same walk with a corridor, and the native `aad 50` walk's `κ01` layer recovery went from 525.48 to 599.55. The exact distribution of every `bs = 0` ledger row merges atoms within the same tolerance, and `prob_eq_0` counts break-even atoms split by rounding. Docs await a rebuild.
+
 ## 1.10.0 - 2026-10-22
 
 **[Format-Sheet-Block-Filter] Exhibits build without greater_tables' `formatters key ... matches no column` warning: the format sheets send each block only the entries for columns it has.** `FormatSheet.block(exhibit, rename, labels)` keeps an exact entry and its tag only when the displayed label (after `rename`) is in `labels`. The `labels` default changes from `()` to `None`, which returns the whole sheet; an empty list returns nothing. A block's own `formatters` are not filtered, so a misspelled key there still warns. Before this, greater_tables 7.4 and later raised one warning per sheet entry a block lacked, and one aggregate-api pricing request returned 538.

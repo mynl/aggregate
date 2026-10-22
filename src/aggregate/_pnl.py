@@ -103,6 +103,7 @@ import pandas as pd
 
 from ._aggregate import return_period_frame, value_type_label
 from ._help import HelpMixin
+from .config import get_settings
 from .constants import INFO_NA, info_row
 from .moments import VALIDATION_NOISE, _snap_noise
 from ._labeled import LabeledMixin
@@ -170,7 +171,8 @@ class Leg:
         them; the group's ``role`` supplies the sign.
     bs : float, default 0
         ``0`` -> the leg's distribution is the exact irregular
-        :class:`GridDistribution` (group atoms by value, sum probability).
+        :class:`GridDistribution` (group atoms by value, up to the ledger's
+        ``validation.level_set_rtol`` tolerance, and sum probability).
         ``> 0`` -> mean-preserving rebucket onto a regular ``bs`` grid via the
         shared pushforward machinery, audited in :attr:`PnL.validation_df`.
     is2d : bool, default False
@@ -440,6 +442,79 @@ def _moments_of(values, probs):
     return m, sd, cv, skew
 
 
+def _atom_groups(values, probs, tol):
+    """Merge the atoms whose values agree to within ``tol`` into one outcome.
+
+    Parameters
+    ----------
+    values, probs : array_like
+        One entry per source atom.
+    tol : float
+        Absolute tolerance. ``0`` merges only exactly equal values.
+
+    Returns
+    -------
+    x, p : ndarray
+        One entry per group, ``x`` strictly increasing: the group's value and
+        its total probability. A group holding one distinct value keeps it
+        exactly; a group holding several takes their probability-weighted
+        mean, or its smallest value when it has no mass.
+    lo, hi : ndarray
+        The smallest and largest atom value in each group. The group is
+        exactly the atoms with ``lo <= value <= hi``, so its atoms are sliced
+        by that interval and no per-atom group index is needed.
+
+    Notes
+    -----
+    **Gap clustering** ([Kappa-Level-Sets]). The distinct values are sorted
+    and a new group starts wherever the gap to the previous value exceeds
+    ``tol``. Rounding to a grid of width ``tol`` would split any cluster
+    that straddles a grid line. Groups are maximal runs, so consecutive
+    groups are more than ``tol`` apart and the interval description is
+    exact. A run has no bound on its length: a chain of values each within
+    ``tol`` of the next is one group however far it reaches. On the grids
+    the library builds, distinct outcomes differ by far more than ``tol``,
+    and a run spans only the rounding noise of one outcome reached by
+    different arithmetic.
+
+    **Cost.** One hash pass reduces the atoms to their distinct values, as
+    the exact ``groupby`` this replaces did, and the clustering runs on
+    those: typically a few thousand where the atoms number a million. A
+    distinct value contributes its value times its mass to its group's
+    mean, exactly for every atom it holds, so the mean takes no second pass
+    over the atoms.
+
+    **Why the weighted mean.** It is ``E[value | group]``, so a conditioning
+    row's own cell in a ``κ`` column equals its distribution's atom, and the
+    grand-result row of :attr:`PnL.economic_df` stays its own marginal
+    quantile. Clipping to ``[lo, hi]`` keeps the rounding of the division
+    from moving a value outside its group.
+    """
+    probs = np.asarray(probs, dtype=float)
+    codes, uniq = pd.factorize(np.asarray(values, dtype=float), sort=True)
+    if (codes < 0).any():
+        # NaN values carry no outcome; the exact groupby dropped them too
+        keep = codes >= 0
+        codes, probs = codes[keep], probs[keep]
+    if not len(uniq):
+        empty = np.empty(0)
+        return empty, empty, empty, empty
+    mass = np.bincount(codes, weights=probs, minlength=len(uniq))
+    start = np.empty(len(uniq), dtype=bool)
+    start[0] = True
+    np.greater(np.diff(uniq), tol, out=start[1:])
+    first = np.flatnonzero(start)
+    last = np.append(first[1:], len(uniq)) - 1
+    p = np.add.reduceat(mass, first)
+    lo, hi = uniq[first], uniq[last]
+    x = lo.copy()
+    multi = (lo != hi) & (p > 0)
+    if multi.any():
+        xm = np.add.reduceat(uniq * mass, first)
+        x[multi] = np.clip(xm[multi] / p[multi], lo[multi], hi[multi])
+    return x, p, lo, hi
+
+
 # ----------------------------------------------------------------------
 # An evaluated ledger row: signed per-atom values + the shared probs
 # ----------------------------------------------------------------------
@@ -452,9 +527,10 @@ class _EvaluatedLeg:
     the exhibits iterate one row type. Two backings:
 
     * **atoms** (in-memory sources): per-atom signed ``values`` + the shared
-      ``probs``; ``bs=0`` builds the exact irregular GD (group-by-value,
-      sum-prob), ``bs>0`` (declared legs only) rebuckets via the shared
-      pushforward machinery. Moments are exact off the atoms.
+      ``probs``; ``bs=0`` builds the exact irregular GD (atoms grouped by
+      value up to ``level_tol``, :func:`_atom_groups`, probability summed),
+      ``bs>0`` (declared legs only) rebuckets via the shared pushforward
+      machinery. Moments are exact off the atoms.
     * **sweep** (massive sources): a precomputed regular-``bs``
       :class:`GridDistribution` from the one-pass band sweep plus the sweep's
       **exact** streamed mean / sd (the audit's EX basis); the skewness is
@@ -472,6 +548,12 @@ class _EvaluatedLeg:
         #: already signed, ``sign`` recovers the caller's magnitude when needed
         #: (:meth:`PnL.evaluate` prices the obligation magnitude).
         self.sign = float(sign)
+        #: Absolute tolerance under which two atoms are one outcome
+        #: ([Kappa-Level-Sets]); :class:`PnL` sets it ledger-wide before any
+        #: GD is built. ``0`` groups by exact value.
+        self.level_tol = 0.0
+        #: ``(lo, hi)`` atom value bounds per exact-GD atom, set with the GD
+        self._group_bounds = None
         self._gd = gd
         self._moms = None
         if gd is not None:
@@ -502,14 +584,30 @@ class _EvaluatedLeg:
                     source='pnl-leg')
             else:
                 from ._grid_distribution import GridDistribution
-                ser = (pd.Series(self.probs, index=self.values)
-                       .groupby(level=0).sum().sort_index())
+                x, p, lo, hi = _atom_groups(self.values, self.probs,
+                                            self.level_tol)
+                self._group_bounds = (lo, hi)
                 self._gd = GridDistribution(
-                    ser.index.to_numpy(dtype=float),
-                    ser.to_numpy(dtype=float),
-                    bs=None, name=self.label,
+                    x, p, bs=None, name=self.label,
                     is_loss_value=PNL_IS_LOSS_VALUE)
         return self._gd
+
+    def level_set(self, x):
+        """Boolean atom mask of the outcome ``x``, an atom of :attr:`gd`.
+
+        Exact route (``bs == 0``) only. Every atom grouped into the outcome
+        ``x`` by :func:`_atom_groups`, which is the slice a ``κ`` cell
+        conditions on. A group of one distinct value is matched by equality,
+        the common case; a group the tolerance merged is matched by its value
+        interval, which holds exactly its atoms.
+        """
+        gd = self.gd
+        lo, hi = self._group_bounds
+        g = int(np.searchsorted(gd.x, x))
+        a, b = lo[g], hi[g]
+        if a == b:
+            return self.values == a
+        return (self.values >= a) & (self.values <= b)
 
     @property
     def moments(self):
@@ -1070,6 +1168,10 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         #: are not affine on the subject's support carry NaN cells (fork B
         #: truncation). ``None`` when not computed.
         self._palm_gross_ladder = None
+        #: absolute tolerance under which two atoms of a row are one outcome
+        #: ([Kappa-Level-Sets]); set by :meth:`_assemble_rows` on the per-atom
+        #: route, unused elsewhere
+        self._level_tol = 0.0
         #: tower presentation: multi-group, or a forced single-group walk
         #: ([Decision-XPnL-Plain-Is-One-Step-Walk] -- ``force_tower=True``
         #: presents the one-group ledger as its single (Step, Side) block /
@@ -1220,6 +1322,15 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
             sum((g.obl_total_values for g in egs), np.zeros(n)), probs)
         self._grand_result = (rows[self.result_name] if self._tower
                               else self._group_result_rows[0])
+        # one ledger-wide tolerance under which two atoms of any row are one
+        # outcome ([Kappa-Level-Sets]), set before any row builds its GD
+        evaluated = list({id(r): r for r in (*rows.values(), self._grand_cons,
+                                             self._grand_obl)}.values())
+        scale = max([1.0] + [max(float(r.values.max()), -float(r.values.min()))
+                             for r in evaluated])
+        self._level_tol = get_settings().validation.level_set_rtol * scale
+        for r in evaluated:
+            r.level_tol = self._level_tol
 
     # ------------------------------------------------------------------
     # ledger assembly (massive one-sweep pushforward route)
@@ -1591,15 +1702,22 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         Replaces the old ``prob_loss`` (``P(result < 0)``), which had no
         meaning on a loss-valued object -- the probability of *a loss* and the
         probability of *losing money* are opposite tails of the same number.
-        Mass is summed over the atoms at exactly zero, so a continuous P&L
-        straddling zero reports ``0.0``; the atom is genuine (and often large)
-        for discrete and reinsurance-net books.
+        Mass is summed over the atoms at zero, so a continuous P&L straddling
+        zero reports ``0.0``; the atom is genuine (and often large) for
+        discrete and reinsurance-net books.
+
+        On the per-atom route "at zero" means within the ledger's level-set
+        tolerance, ``validation.level_set_rtol`` times its largest absolute
+        row value ([Kappa-Level-Sets]): a break-even reached by different
+        arithmetic on different atoms lands a few ulps either side of zero,
+        and exact equality would count only the atoms that happen to land on
+        it. The sweep-backed route reads its regular grid's zero bucket.
         """
         if self._probs is None:                # sweep-backed (massive source)
             gd = self._grand_result.gd
             return float(gd.p[gd.x == 0].sum())
         v = self._grand_result.values
-        return float(self._probs[v == 0].sum())
+        return float(self._probs[np.abs(v) <= self._level_tol].sum())
 
     def q(self, p, kind='lower'):
         """Quantile (value at risk) of the result. Delegates to the result GD."""
@@ -1969,60 +2087,47 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return pd.MultiIndex.from_tuples(
             tuples, names=['Step', 'Side', 'Label'])
 
-    def _scenario_ladder(self):
+    def _kappa_ladder(self, anchor):
         """The [Kappa-Scenario-Percentiles] pass: ``{label: [cell per q]}``.
 
-        For each ladder point ``q``, anchor the scenario on the **grand
-        result**: ``x_q = gd.q(q)`` off the grand-result GD, form the exact
-        atom slice ``result == x_q`` (the GD support *is* the set of exact
-        result values, so float equality is exact), and take the
-        probability-weighted mean of every row's signed values over the
-        slice::
+        For each ladder point ``q``, take the anchor row's quantile
+        ``x_q = anchor.gd.q(q)``, form the anchor's level set at ``x_q``
+        (:meth:`_EvaluatedLeg.level_set`), and take the
+        probability-weighted mean of every row's signed values over it::
 
-            cell(row, κq) = E[row | result == x_q]
+            cell(row, κq) = E[row | anchor == x_q]
 
         This is the library's kappa function ``E[X_i | X = x]`` (Portfolio's
-        ``exeqa_*``) applied to the ledger. By linearity of conditional
-        expectation every column **foots exactly** -- legs -> totals ->
-        result add down the sheet to ``x_q``; the grand-result cell is
-        automatically its own marginal quantile (``E[result | result = x] =
-        x``), no special case. In-memory atoms route only (the massive
-        one-sweep route keeps marginal ladders --
-        [Massive-Kappa-Second-Sweep]).
+        ``exeqa_*``) applied to the ledger. Two anchors are in use: the
+        **grand result** for :attr:`economic_df`, and the **first group's
+        result**, the gross step in every builder, for the gross basis of
+        :attr:`waterfall_df` ([Waterfall-Gross-Basis]). Exact for every row,
+        nonlinear covers included, because the atoms carry the joint. By
+        linearity of conditional expectation every column **foots exactly**
+        (legs, totals and results add down the sheet), and the anchor's own
+        cell is its own marginal quantile (``E[anchor | anchor = x] = x``),
+        no special case. On a non-monotone anchor the cell is the mean over
+        the whole level set. In-memory atoms route only (the massive
+        one-sweep route keeps marginal ladders, [Massive-Kappa-Second-Sweep]).
+
+        Notes
+        -----
+        **The level set is taken up to a tolerance** ([Kappa-Level-Sets]).
+        Atoms whose anchor values agree to within the ledger's
+        ``validation.level_set_rtol`` times its largest absolute row value
+        are one outcome, grouped once when the anchor builds its GD. The same
+        result reached by different arithmetic, the many ``(l, r)`` cells of
+        a 2-D occurrence joint with one ``l - r``, or a corridor or retro
+        leg, differs in its last few bits. Exact float equality then caught
+        an arbitrary subset of the level set, as little as 2% of its mass on
+        measured occurrence walks, and the subset changed with the numpy
+        build. Footing could not catch it, since linearity holds on any
+        subset of atoms.
         """
-        res_vals = self._grand_result.values
-        gd = self._grand_result.gd
+        gd = anchor.gd
         slices = []
         for q in PERCENTILE_LADDER:
-            mask = res_vals == float(gd.q(q))
-            pw = self._probs[mask]
-            slices.append((mask, pw, float(pw.sum())))
-        return {label: [float((row.values[mask] * pw).sum() / pm)
-                        for mask, pw, pm in slices]
-                for label, row in self._rows.items()}
-
-    def _gross_scenario_ladder(self):
-        """The gross-anchored twin of :meth:`_scenario_ladder`.
-
-        Identical atom-slice arithmetic with the anchor swapped from the
-        grand result to the **first group's result**, the gross step in
-        every builder ([Waterfall-Gross-Basis]): for each ladder point
-        ``q``, the conditioning event is the gross result landing at its
-        own ``q``-quantile, and each cell is ``E[row | gross result ==
-        x_q]``. Exact for every row, nonlinear aggregate covers included,
-        because the atoms carry the joint. Columns foot by linearity of
-        conditional expectation, and the gross row's cell is its own
-        marginal quantile (``E[result | result = x] = x``). On a
-        non-monotone gross row the cell is the exact mean over the level
-        set, the same semantics :meth:`_scenario_ladder` documents.
-        Shared-atoms route only; computed on demand, like its twin.
-        """
-        gross = self._group_result_rows[0]
-        res_vals = gross.values
-        gd = gross.gd
-        slices = []
-        for q in PERCENTILE_LADDER:
-            mask = res_vals == float(gd.q(q))
+            mask = anchor.level_set(float(gd.q(q)))
             pw = self._probs[mask]
             slices.append((mask, pw, float(pw.sum())))
         return {label: [float((row.values[mask] * pw).sum() / pm)
@@ -2171,7 +2276,9 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         The ``κ`` ladder columns are **scenario states, not per-row
         quantiles**: column ``κq`` is the state in which the grand result
         lands at its ``q``-quantile, and each cell is the conditional mean
-        ``E[row | result == x_q]`` (:meth:`_scenario_ladder`). The header
+        ``E[row | result == x_q]`` (:meth:`_kappa_ladder`), the event taken
+        up to ``validation.level_set_rtol`` so that one outcome reached by
+        different arithmetic is one event ([Kappa-Level-Sets]). The header
         signals the semantics ([Decision-Ladder-Column-Names]): ``κ`` *means*
         conditioning happened. Consequences:
 
@@ -2192,8 +2299,8 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         Two subtleties, documented rather than engineered away: where the
         result is **non-monotone** in the source (slides, swings, humps --
-        the "switcheroo") the cell is the exact mean over the level set
-        ``{result == x_q}``, well-defined but subtler to interpret; and a
+        the "switcheroo") the cell is the exact mean over the level set, up
+        to ``level_set_rtol``, well-defined but subtler to interpret; and a
         **constant** grand result (fully hedged) makes the conditioning event
         everything, so every cell equals its ``EX``. Ledgers with **no shared
         atoms** fall into two camps ([Decision-Kappa-Shared-Source-Rule]).
@@ -2242,7 +2349,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
                         for row in self._rows.values()]
                 cols = _stat_names()
         else:
-            ladder = self._scenario_ladder()
+            ladder = self._kappa_ladder(self._grand_result)
             data = [[_snap_noise(v) for v in
                      list(row.moments) + ladder[label]]
                     for label, row in self._rows.items()]
@@ -2682,7 +2789,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         # the builder computed one, else no gross column
         q_index = PERCENTILE_LADDER.index(p)
         if self._probs is not None:
-            gross_ladder = self._gross_scenario_ladder()
+            gross_ladder = self._kappa_ladder(self._group_result_rows[0])
         else:
             gross_ladder = self._palm_gross_ladder
 

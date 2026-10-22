@@ -1,7 +1,8 @@
 # Plan: κ columns condition on the whole level set, not on exact float equality
 
 `[Kappa-Level-Sets]`, one step, one version bump (a fix, so a patch). Drafted 2026-10-22 at 1.7.1
-(`3f342d3`). **Status: drafted, not reviewed, not executed.**
+(`3f342d3`). **Status: reviewed and executed 2026-10-22 as 1.10.1, on Steve's `/execute-plan`.**
+See the Execution log at the foot.
 
 ## Goal
 
@@ -194,3 +195,36 @@ cells of `economic_df` and the waterfall's diversified columns move on ledgers w
 computed through rounding-sensitive arithmetic (occurrence walks, retro, corridors), previously
 off by up to several hundred on the measured examples; new setting `validation.level_set_rtol`
 (default `1e-9`); `prob_eq_0` counts break-even atoms split by rounding.
+
+## Execution log
+
+**1.10.1, 2026-10-22**, on `dev` after 1.10.0 (`67eb0cb`). The plan carried no open question; its status read drafted, and Steve's `/execute-plan` invocation stood as the review. Every cited file, symbol and line number (1972, 2004, 1581, 491, 2245, 2685) still matched at 1.10.0: `_pnl.py` and `_grid_distribution.py` were untouched since 1.7.1.
+
+Divergences and findings:
+
+1. **Grouping by distinct values, not by sorting the atoms.** Measured on TreatyII (1,048,576 atoms, 1,374 distinct result values): the exact `groupby` took 13.2 ms of a 24 ms cold `economic_df`, and a stable argsort with gap clustering 17.3 ms, which alone would have broken the 10% budget. `_atom_groups(values, probs, tol)` instead hashes the atoms to their distinct values (`pd.factorize`, one pass, as the `groupby` did), gap-clusters the sorted distinct values, and forms each group's weighted mean from distinct value times its mass, so no second pass over the atoms. Same groups as the plan's algorithm. Cold `economic_df` on TreatyII went from 24 ms to 22 ms.
+2. **Group bounds, not a per-atom group index.** The plan cached `_EvaluatedLeg._group_index`. The row instead keeps `_group_bounds = (lo, hi)` per GD atom, and `_EvaluatedLeg.level_set(x)` slices by `values == lo` when the group holds one distinct value (the common case, today's cost) or by `lo <= values <= hi` when the tolerance merged several. Groups are maximal runs more than `tol` apart, so the interval holds exactly the group's atoms.
+3. **A lone distinct value keeps its float exactly**, and a merged group's weighted mean is clipped to `[lo, hi]`. Without that, `v * m / m` can move a value by an ulp, which at zero tolerance could break the strict ordering of the GD atoms. With `level_set_rtol = 0` the GD is the old exact one.
+4. **The tolerance is read at evaluation** (`get_settings()` in `_assemble_rows`), not frozen in a module constant, so a reload or the environment variable takes effect. Rows built outside `_assemble_rows` (`_zero_row`, the stitched and sweep routes) keep `level_tol = 0`, exact grouping. The scan for `S` costs 2.0 ms on TreatyII's 0.95 s build.
+5. **Acceptance item 2 ran on a different ledger.** The qmd's hand-built AAD ledger (a corridor on the recovery leg) was replaced at 1.9.0 by the native `aad` clause (`occurrence net of 750 xs 250 aad 50 deposit 326.39`). On that walk the exact slice caught 0.934 of the level set at 1.10.0, with a κ error of 74, and `κ01` layer recovery read 525.48 under both numpy 2.4.5 (`.venv`) and numpy 2.5.1 (the reproductions book's venv, editable on this worktree). After the fix it reads 599.55 under both, with zero error against the brute-force level set. The plan's 577 belonged to the retired hand-built ledger and grid and is not reproduced.
+6. **TreatyIIp** lives in the reproductions book's `reproductions.agg` (`D:/projects/aggregate/reproductions`), not in the shipped one; the evidence script read it from there.
+7. **Tests beyond the plan's list**: `_atom_groups` keeps a lone value exactly and gives a massless group its smallest value; the walk fixture is shown to split its level sets; the gross-anchored ladder is checked against brute force too. The brute force uses a fixed `1e-9`, not the setting, and with `AGGREGATE_VALIDATION_LEVEL_SET_RTOL=0` the split, level-set and break-even tests fail, so they detect the defect. Footing reuses `tests.test_pnl_peel._assert_column_foots`.
+8. **No pinned value moved.** Neither the exhibit snapshots (Tower and Peel walks included) nor any other test changed.
+9. **Docs**: two sentences in `docs/2_aggregate_overview/pipeline-pnl.rst` (the `bs=0` leg, and "tested with float equality and no tolerance"). `3_x_PnL.rst`, `features.rst` and `pipeline-exhibits-and-charts.rst` hold no exact-equality wording. The config template gains a commented `level_set_rtol` entry. Not built.
+
+Measured after the fix, `kappa_check.py` (the plan's measurement, comparing each `economic_df` κ cell with the brute-force tolerant mean):
+
+| Program | Atoms | Max κ error before | After | Worst merged group span |
+|---|---:|---:|---:|---:|
+| `Bear1990.BN.TreatyII` | 1,048,576 | 0 | 0 | 0 |
+| `Bear1990.BN.TreatyIIp` | 1,048,576 | 0 | 0 | 1.8e-12 |
+| `Bear1990.BN.TreatyIII` | 65,536 | 1.8e-17 | 1.8e-17 | 1.8e-12 |
+| `Bear1990.BN.TreatyIV` | 65,536 | 289.4 | 0 | 3.0e-08 |
+| `Bear1990.BN.TreatyV`, `TreatyVI` | 65,536 | 0 | 0 | 0 |
+| GC occurrence walk | 131,072 | 698.2 | 0 | 5.7e-14 |
+| Same plus the corridor | 131,072 | 1,427.8 | 0 | 3.6e-12 |
+| Same walk with `aad 50` | 131,072 | 74.1 | 0 | 9.1e-13 |
+
+The widest merged group spans under 1% of the tolerance (TreatyIV, tolerance 4.1e-06), and the smallest gap between distinct GD atoms on any of these ledgers is 0.02, so the default sits orders of magnitude from both and no chaining occurs.
+
+Tests: tier 1 on the P&L, config and exhibit files, 737 passed. Tier 3 `UV_PROJECT_ENVIRONMENT=.venv uv run pytest -m 'slow or not slow'`, 6496 passed. Numerics gate, the same with `-W error::RuntimeWarning`, 6496 passed.

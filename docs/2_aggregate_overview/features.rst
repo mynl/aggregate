@@ -3242,6 +3242,23 @@ driven by the recovery:
 
     qd(reinst.reins_summary_df)
 
+Annual aggregate deductible and limit (1.8.0, 1.9.0)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``aad d`` and ``agglimit m`` after an occurrence layer apply an annual
+aggregate deductible and an aggregate limit to the layer's annual recovery
+``R``: the reinsurer pays ``min((R - d)+, m)``, amounts for 100% of the layer.
+The cedant's net needs the joint of gross loss and recovery, so a ``pnl`` or
+``xpnl`` runs on the reinstatements joint. See
+:doc:`../3_reference/3_x_PnL` for the rules.
+
+.. code-block:: text
+
+    xpnl Cedant 2000 premium less agg GrossBook 2000 premium at 70% lr
+        1000 xs 0 sev 120 * lomax 2.5
+        occurrence net of 750 xs 250 aad 50 deposit 326.389307
+        mixed gamma .185
+
 Variable rating (a118, a119, a120)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

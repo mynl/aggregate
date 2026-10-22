@@ -190,7 +190,15 @@ def _terms(share, limit, attach, stage):
 
 
 def _reinstatement_line(terms):
-    """The reinstatement schedule as one line, or None."""
+    """The occurrence layer's annual terms as one line, or None.
+
+    The reinstatement schedule, or for an
+    :class:`~aggregate.contract_terms.AnnualLayerTerms` (which has no
+    schedule) its DecL clause at 100% of the layer, ``aad 50 agglimit 500``.
+    """
+    clause = getattr(terms, 'decl_clause', None)
+    if clause is not None:
+        return clause
     rates = tuple(terms.rates)
     if not rates:
         return 'no reinstatements'

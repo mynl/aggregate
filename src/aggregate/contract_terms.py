@@ -4,15 +4,18 @@ A *contract term* is a deterministic, vectorized function :math:`\varphi` of a
 realized loss quantity that fills **one** leg of a Gross / Ceded / Net P&L (the
 legs model, ``dev/plan-variable-rating-appendix.md`` section 1). Pushed forward
 over the loss distribution -- 1-D on an aggregate basis, 2-D on an occurrence
-basis (appendix section 2) -- it makes that leg stochastic. Six features share
-this shape: reinstatement premium (:class:`ReinstatementTerms`), retro, swing,
-slide, profit commission and corridor.
+basis (appendix section 2) -- it makes that leg stochastic. Seven features
+share this shape: reinstatement premium (:class:`ReinstatementTerms`), the
+annual aggregate deductible and limit (:class:`AnnualLayerTerms`), retro,
+swing, slide, profit commission and corridor.
 
-This module holds the thin :class:`ContractTerms` base and the six single-leg
-features. Five are pure single-leg maps (retro, swing, slide, profit
-commission, corridor); :class:`ReinstatementTerms` is the one **two-map**
-feature (a premium decorator ``h(R)`` *and* the annual-cap loss transform
-``A(R)``), consumed by the reinstatements P&L builders.
+This module holds the thin :class:`ContractTerms` base and the seven features.
+Five are pure single-leg maps (retro, swing, slide, profit commission,
+corridor). The two occurrence-layer bases, :class:`ReinstatementTerms` and
+:class:`AnnualLayerTerms`, each carry an annual loss transform ``A(R)`` of the
+layer's annual recovery and a premium decorator ``h(R)`` (identically zero for
+the annual terms), consumed by the occurrence P&L builders over the ``(L, R)``
+joint.
 
 Each feature owns its vectorized :meth:`~ContractTerms.phi`, the P&L leg it fills
 (:attr:`~ContractTerms.target_leg`) and the loss quantity ``phi`` reads
@@ -39,6 +42,7 @@ __all__ = [
     'ProfitCommissionTerms',
     'CorridorTerms',
     'ReinstatementTerms',
+    'AnnualLayerTerms',
 ]
 
 #: The P&L legs a contract term may fill (appendix section 1).
@@ -740,3 +744,175 @@ class ReinstatementTerms(ContractTerms):
                 f'rates={self.rates}, deposit={self.deposit:g}, '
                 f'rol={self.rol:.4g}, m={self.n_reinstatements}, '
                 f'Y={self.total_recovery_capacity:g})')
+
+
+def _annual_terms_label(aad, agglimit):
+    """The display text for an occurrence layer's annual terms.
+
+    ``AAD 50, agglimit 500``, dropping a zero deductible or an unbounded
+    limit, so ``agglimit 500`` and ``AAD 50`` read as written.
+
+    Parameters
+    ----------
+    aad : float
+        The annual aggregate deductible, at 100% of the layer.
+    agglimit : float
+        The aggregate limit, at 100% of the layer; ``inf`` when unbounded.
+
+    Returns
+    -------
+    str
+    """
+    parts = []
+    if aad > 0 or not np.isfinite(agglimit):
+        parts.append(f'AAD {aad:,g}')
+    if np.isfinite(agglimit):
+        parts.append(f'agglimit {agglimit:,g}')
+    return ', '.join(parts)
+
+
+@dataclass(frozen=True)
+class AnnualLayerTerms(ContractTerms):
+    r"""Annual aggregate deductible and aggregate limit on one occurrence layer.
+
+    Describes a ``y`` xs ``a`` occurrence layer whose annual recovery ``R`` is
+    subject to an annual aggregate deductible ``d`` and an aggregate limit
+    ``m``: the reinsurer pays ``A(R) = min((R - d)+, m)``. DecL ``aad d
+    agglimit m`` on the layer, amounts for 100% of the layer. All currency
+    fields here are **after** the placement share ``s``, as the engine's
+    ``R`` already is: ``s min((R100 - d)+, m) = min((R - s d)+, s m)``.
+
+    Parameters
+    ----------
+    limit : float
+        The occurrence fill width ``s * y``, the name and meaning the
+        occurrence P&L builders and the joint-grid check read off every
+        occurrence basis. Not the aggregate limit.
+    annual_deductible : float, default 0.0
+        The annual aggregate deductible after share, ``s * d``; finite and
+        ``>= 0``.
+    annual_limit : float, default inf
+        The aggregate limit after share, ``s * m``; ``> 0``, ``inf`` for an
+        annual deductible alone.
+    deposit : float, default 0.0
+        The layer's fixed ceded premium (``deposit | rol | rate``), or ``0``
+        when the layer is unpriced.
+    share : float, default 1.0
+        The placement share ``s``, kept for display only, so the terms can be
+        stated at 100% as written (:attr:`decl_clause`).
+
+    Notes
+    -----
+    ``A`` is nondecreasing and piecewise linear in ``R`` with kinks at ``s d``
+    and ``s (d + m)``, so the recovery leg ``A(R)`` and the cedant's net
+    ``L - A(R)`` are deterministic pushforwards of the ``(L, R)`` joint. ``L``
+    and ``R`` are dependent but neither is a function of the other (the
+    random claim count decouples them), which is why the cedant's side needs
+    the joint while the reinsurer's side ``A(R)`` is one dimensional.
+
+    There is no reinstatement premium: :meth:`reinstatement_premium` is
+    identically zero, so the ceded premium is the fixed ``deposit``.
+    :meth:`phi` is the recovery map, matching :attr:`target_leg`.
+
+    Examples
+    --------
+    ``d = 50``, ``m = 500`` on a full layer: ``R = 30`` recovers ``0``,
+    ``R = 200`` recovers ``150``, ``R = 900`` recovers ``500``.
+
+    >>> AnnualLayerTerms(limit=750.0, annual_deductible=50.0,
+    ...                  annual_limit=500.0).recovery(np.array([30.0, 200.0, 900.0]))
+    array([  0., 150., 500.])
+    """
+
+    #: ``ContractTerms`` metadata: ``A(R)`` fills the ceded-loss leg, reading
+    #: the unlimited annual occurrence recovery ``R``.
+    target_leg = 'ceded_loss'
+    loss_basis = 'occurrence_recovery'
+
+    limit: float
+    annual_deductible: float = 0.0
+    annual_limit: float = np.inf
+    deposit: float = 0.0
+    share: float = 1.0
+
+    def __post_init__(self):
+        for f in ('limit', 'annual_deductible', 'annual_limit', 'deposit',
+                  'share'):
+            object.__setattr__(self, f, float(getattr(self, f)))
+        if not (self.limit > 0 and np.isfinite(self.limit)):
+            raise ValueError(
+                f'AnnualLayerTerms: limit must be finite and > 0, '
+                f'got {self.limit!r}.')
+        if not (self.annual_deductible >= 0
+                and np.isfinite(self.annual_deductible)):
+            raise ValueError(
+                f'AnnualLayerTerms: annual_deductible must be finite and '
+                f'>= 0, got {self.annual_deductible!r}.')
+        if not self.annual_limit > 0:
+            raise ValueError(
+                f'AnnualLayerTerms: annual_limit must be > 0 (inf allowed), '
+                f'got {self.annual_limit!r}.')
+        if not (self.deposit >= 0 and np.isfinite(self.deposit)):
+            raise ValueError(
+                f'AnnualLayerTerms: deposit must be finite and >= 0, '
+                f'got {self.deposit!r}.')
+        if not (0 < self.share <= 1):
+            raise ValueError(
+                f'AnnualLayerTerms: share must be in (0, 1], '
+                f'got {self.share!r}.')
+
+    def recovery(self, R):
+        r"""Annual recovery after the terms, ``A(R) = min((R - d)+, m)``.
+
+        Parameters
+        ----------
+        R : float or ndarray
+            Unlimited annual occurrence recovery (after share).
+
+        Returns
+        -------
+        float or ndarray
+            ``min(max(R - annual_deductible, 0), annual_limit)``.
+        """
+        R = np.asarray(R, dtype=float)
+        return np.minimum(np.maximum(R - self.annual_deductible, 0.0),
+                          self.annual_limit)
+
+    def reinstatement_premium(self, R):
+        """Identically zero: the annual terms carry no reinstatement premium.
+
+        Returned broadcast to the shape of ``R`` so composite legs stay
+        vectorized.
+        """
+        return np.zeros_like(np.asarray(R, dtype=float))
+
+    def ceded_premium(self, R):
+        """Total ceded premium, the fixed ``deposit`` broadcast over ``R``."""
+        return self.deposit + self.reinstatement_premium(R)
+
+    def phi(self, R):
+        """``ContractTerms`` leg map: the recovery ``A(R)`` (the ceded loss)."""
+        return self.recovery(R)
+
+    @property
+    def decl_clause(self):
+        """The terms as DecL at 100% of the layer, e.g. ``aad 50 agglimit 500``.
+
+        The clause that follows the layer in a program, so a ledger label
+        built on the layer's DecL descriptor reads as the program does.
+        """
+        def at100(x):
+            return float(f'{x / self.share:.12g}') if np.isfinite(x) else x
+        aad, agglimit = at100(self.annual_deductible), at100(self.annual_limit)
+        parts = []
+        if aad > 0 or not np.isfinite(agglimit):
+            parts.append(f'aad {aad:g}')
+        if np.isfinite(agglimit):
+            parts.append(f'agglimit {agglimit:g}')
+        return ' '.join(parts)
+
+    def __repr__(self):
+        return (f'AnnualLayerTerms(limit={self.limit:g}, '
+                f'annual_deductible={self.annual_deductible:g}, '
+                f'annual_limit={self.annual_limit:g}, '
+                f'deposit={self.deposit:g}, share={self.share:g})')

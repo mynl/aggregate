@@ -96,7 +96,7 @@ The recipe carries ``kind``, ``is_tower`` (``xpnl`` or not), the resolved ``econ
 The two-tier classifier
 ~~~~~~~~~~~~~~~~~~~~~~~
 
-The occurrence tier is classified as none, guaranteed cost, or reinstatements, and the aggregate tier as none, guaranteed cost, or feature, **independently**. Classifying them together, in a single-kind chain, once let a variable-rating feature branch shadow a reinstatements clause and mis-scope an inuring occurrence program.
+The occurrence tier is classified as none, guaranteed cost, or reinstatements or annual terms (``aad`` / ``agglimit``), and the aggregate tier as none, guaranteed cost, or feature, **independently**. Classifying them together, in a single-kind chain, once let a variable-rating feature branch shadow a reinstatements clause and mis-scope an inuring occurrence program.
 
 Recipe kinds and where they route:
 
@@ -110,7 +110,8 @@ Recipe kinds and where they route:
 ``var``          :func:`build_variable_pnl` with ``walk=is_tower``; a retro ``xpnl``
                  errors, there being no cession to walk
 ``reins``        :func:`build_reinstatement_source`, then
-                 :func:`build_reinstatement_pnl` with ``walk=is_tower``
+                 :func:`build_reinstatement_pnl` with ``walk=is_tower``;
+                 reinstatements and annual terms alike
 ``port_plain``   :func:`build_plain_pnl` over the portfolio's net-net total density
 ===============  ===================================================================
 
@@ -152,7 +153,7 @@ The builder therefore calls :meth:`Aggregate.occ_bivariate` with ``views=('gross
 
 A subsequent aggregate cover is then a 2-D leg on the same joint, recovering :math:`g(\max(L - C, 0))`. The clip at zero matters only for off-support cells where :math:`C > L`, which carry essentially no mass but still evaluate.
 
-Reinstatements build their own joint through :func:`build_reinstatement_source`, over :math:`(L, R)` with :math:`L` the gross loss and :math:`R` the unlimited ceded amount, so that the stochastic ceded premium :math:`D + h(R)` is measurable. Both faces of a reinstatement program ride that one joint, which is why the consolidated ``pnl`` and the ``xpnl`` walk agree exactly rather than approximately.
+Reinstatements build their own joint through :func:`build_reinstatement_source`, over :math:`(L, R)` with :math:`L` the gross loss and :math:`R` the unlimited ceded amount, so that the stochastic ceded premium :math:`D + h(R)` is measurable. Both faces of a reinstatement program ride that one joint, which is why the consolidated ``pnl`` and the ``xpnl`` walk agree exactly rather than approximately. Annual terms on the occurrence layer (``aad d agglimit m``) ride the same joint with an :class:`~aggregate.contract_terms.AnnualLayerTerms` in place of the reinstatement terms: the recovery map is :math:`\min((R - d)^+, m)` and the premium decorator :math:`h` is identically zero, so the ceded premium is the fixed deposit, which is optional.
 
 Grid adequacy on a joint
 ~~~~~~~~~~~~~~~~~~~~~~~~

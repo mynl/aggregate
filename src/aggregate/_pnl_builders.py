@@ -84,15 +84,27 @@ def check_joint_grid_adequacy(bs_x, bs_y, terms, agg_reins=None, *,
     bs_x, bs_y : float
         The joint's axis-0 (gross loss) / axis-1 (unlimited ceded) bucket
         sizes.
-    terms : ReinstatementTerms or None
+    terms : ReinstatementTerms or AnnualLayerTerms or None
         The occurrence basis; its fill width ``y = terms.limit`` is the occ
         tier's kink scale (read on axis 1). ``None`` for a guaranteed-cost
         occurrence joint (no reinstatement kink -- the per-atom ``xpnl``
-        walks reuse this check for their aggregate tier).
+        walks reuse this check for their aggregate tier). An
+        :class:`~aggregate.contract_terms.AnnualLayerTerms` with a finite
+        ``annual_limit`` adds that width, the band between the recovery
+        map's two kinks, as a second axis-1 scale.
     agg_reins : list of (share, limit, attach), optional
         A subsequent aggregate cover's layers; each finite width
         ``share * limit`` is a kink scale of the derived net ``L - A(R)``
         (or ``L - C``), resolved no better than ``max(bs_x, bs_y)``.
+
+    Notes
+    -----
+    The annual deductible is deliberately **not** checked (review ruling,
+    dev/done/plan-occurrence-annual-deductible-limit.md). A typical deductible
+    is small against the layer, so a 20-bucket floor on it would warn on
+    nearly every program, and from DecL there is no way to refine the joint;
+    the measured error is small (an AAD of 50 on a 750 xs 250 layer, bucket
+    20: recovery 187.19 against 187.08 on a bucket of 5).
     """
     import warnings as _warnings
     from .constants import CoarseJointGridWarning
@@ -102,6 +114,10 @@ def check_joint_grid_adequacy(bs_x, bs_y, terms, agg_reins=None, *,
         if np.isfinite(terms.limit) and n_occ < JOINT_KINK_MIN_BUCKETS:
             short.append(f'occurrence fill width {terms.limit:g} spans '
                          f'{n_occ:.1f} buckets (axis-1 bs {bs_y:g})')
+        m = getattr(terms, 'annual_limit', np.inf)
+        if np.isfinite(m) and m / bs_y < JOINT_KINK_MIN_BUCKETS:
+            short.append(f'aggregate limit {m:g} spans {m / bs_y:.1f} '
+                         f'buckets (axis-1 bs {bs_y:g})')
     bs_net = max(bs_x, bs_y)
     for share, limit, _attach in (agg_reins or []):
         width = share * limit
@@ -111,7 +127,7 @@ def check_joint_grid_adequacy(bs_x, bs_y, terms, agg_reins=None, *,
                          f'{n_agg:.1f} buckets (bs {bs_net:g})')
     if short:
         _warnings.warn(
-            'coarse reinstatement joint: ' + '; '.join(short)
+            'coarse occurrence joint: ' + '; '.join(short)
             + f'. Kinked treaty maps need >= {JOINT_KINK_MIN_BUCKETS} '
             'buckets across each kink region for grid-accurate recoveries; '
             'refine the joint grid (bs / log2_x / log2_y forwarded to '
@@ -386,6 +402,41 @@ def _tier_label(agg, site, generic):
     if len(layers) == 1:
         return _layer_descriptor(site, layers[0])
     return generic
+
+
+def _occ_tier_label(agg, terms):
+    """The occurrence tier's step label, naming any annual terms.
+
+    :func:`_tier_label` for the occurrence site, with the terms' DecL clause
+    appended when the label is the layer's own descriptor, so an undeclared
+    layer with an AAD reads ``occ 750 xs 250 aad 50``, as the program does.
+    A declared ``as`` label is used as written. Reinstatement terms add
+    nothing here (their schedule is its own premium row).
+    """
+    base = _tier_label(agg, 'occ_reins', 'ceded occ')
+    clause = getattr(terms, 'decl_clause', '')
+    if clause and not _first_reins_label(agg, 'occ_reins'):
+        return f'{base} {clause}'
+    return base
+
+
+def _occ_terms_wording(terms):
+    """Short phrases describing an occurrence basis, for construction text.
+
+    Returns ``(kind, premium, recovery)``: the program kind for the heading,
+    the ceded premium as booked, and the recovery map, for a
+    :class:`~aggregate.contract_terms.ReinstatementTerms` or an
+    :class:`~aggregate.contract_terms.AnnualLayerTerms`.
+    """
+    if getattr(terms, 'decl_clause', None) is not None:
+        return ('annual-terms',
+                f'the ceded premium is the fixed deposit D = {terms.deposit:g} '
+                '(no reinstatement premium)',
+                'min((R - d)+, m)')
+    return ('reinstatements',
+            f'the ceded premium D + h(R) = {terms.deposit:g} + reinstatement '
+            'premium is genuinely stochastic',
+            'A(R)')
 
 
 def _ledger_economics(agg, gross, ceded, econ):
@@ -1994,8 +2045,8 @@ def agg_tier_maps(terms, agg_recovery, agg_ceded_premium, agg_feature_terms):
 
 def build_reinstatement_source(agg, *, terms=None, gross_premium=None,
                                bs=None, log2_x=None, log2_y=None):
-    r"""Build the ``(L, R)`` joint source and resolved economics for a
-    reinstatements program.
+    r"""Build the ``(L, R)`` joint source and resolved economics for an
+    occurrence program with reinstatements or annual terms.
 
     Relocated off ``Aggregate.reinstatement_analysis`` at the
     [Decommission-Analysis-Classes] refactor -- the orchestration the P&L
@@ -2009,9 +2060,11 @@ def build_reinstatement_source(agg, *, terms=None, gross_premium=None,
     Parameters
     ----------
     agg : Aggregate
-        The reinstated engine (carries ``occ_reins`` / ``agg_reins`` and the
-        DecL-attached ``reinstatement_terms`` / ``reinstatement_gross_premium``).
-    terms : ReinstatementTerms, optional
+        The engine (carries ``occ_reins`` / ``agg_reins`` and the
+        DecL-attached ``reinstatement_terms`` / ``reinstatement_gross_premium``;
+        the terms are a :class:`~aggregate.contract_terms.ReinstatementTerms`
+        or an :class:`~aggregate.contract_terms.AnnualLayerTerms`).
+    terms : ReinstatementTerms or AnnualLayerTerms, optional
         Override for ``agg.reinstatement_terms``.
     gross_premium : float, optional
         Override for the resolved gross premium ``P_G``.
@@ -2027,20 +2080,21 @@ def build_reinstatement_source(agg, *, terms=None, gross_premium=None,
     from . import _reinsurance
     if agg.occ_reins is None:
         raise ValueError(
-            'reinstatements require occurrence reinsurance; none configured '
-            'on this aggregate.')
+            'reinstatements and annual terms require occurrence reinsurance; '
+            'none configured on this aggregate.')
     if len(agg.occ_reins) != 1:
         raise ValueError(
-            f'reinstatements require a single occurrence layer; found '
-            f'{len(agg.occ_reins)} ([reins-single-layer]). A reinstated '
-            'layer cannot share the occurrence tier with other variable '
+            f'reinstatements and annual terms require a single occurrence '
+            f'layer; found {len(agg.occ_reins)} ([reins-single-layer]). The '
+            'decorated layer cannot share the occurrence tier with other '
             'layers (the engine ceiling is the 2-D (L, R) joint).')
     if terms is None:
         terms = getattr(agg, 'reinstatement_terms', None)
     if terms is None:
         raise ValueError(
-            'reinstatements need a ReinstatementTerms, or a DecL '
-            'reinstatements clause that sets self.reinstatement_terms.')
+            'the occurrence builders need a ReinstatementTerms or an '
+            'AnnualLayerTerms, or a DecL reinstatements / aad / agglimit '
+            'clause that sets self.reinstatement_terms.')
     if gross_premium is None:
         # the gross premium stashed by a DecL ``pnl ... reinstatements``
         # build (the consideration), then the exposure ``premium`` clause.
@@ -2049,8 +2103,8 @@ def build_reinstatement_source(agg, *, terms=None, gross_premium=None,
         gross_premium = getattr(agg, 'exp_premium', None)
     if gross_premium is None or gross_premium == 0:
         raise ValueError(
-            'reinstatements need a gross premium (no premium clause on the '
-            'aggregate to default from).')
+            'reinstatements and annual terms need a gross premium (no premium '
+            'clause on the aggregate to default from).')
     biv = agg.occ_bivariate(views=('gross', 'ceded'), bs=bs,
                             log2_x=log2_x, log2_y=log2_y)
     # [Reinst-Joint-Grid-Adequacy]: warn when a treaty kink region spans too
@@ -2138,7 +2192,7 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
     t = terms
     P_G, D = gross_premium, t.deposit
     A, h = t.recovery, t.reinstatement_premium
-    occ_base = _tier_label(agg, 'occ_reins', 'ceded occ')
+    occ_base = _occ_tier_label(agg, t)
     agg_base = _tier_label(agg, 'agg_reins', 'ceded agg')
     prem_key = consideration_label or 'Premium'
     loss_key = loss_label or 'Loss'
@@ -2183,11 +2237,11 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
         pnl.economics = dict(gcn_economics)
     feat = type(agg_feature_terms).__name__ \
         if agg_feature_terms is not None else None
+    kind_word, prem_words, rec_words = _occ_terms_wording(t)
     pnl._construction_description = (
-        f'Occurrence-reinstatements walk (xpnl): 2-D group ledger over the '
-        f'shared (L, R) joint ([One-2D-Source]): {len(groups)} groups; the '
-        f'ceded premium D + h(R) = {D:g} + reinstatement premium is '
-        'genuinely stochastic; '
+        f'Occurrence {kind_word} walk (xpnl): 2-D group ledger over the '
+        f'shared (L, R) joint ([One-2D-Source]): {len(groups)} groups; '
+        f'{prem_words}; '
         + (f'the aggregate cover is {feat}-rated (its map rides the same '
            'joint); ' if feat else '')
         + 'scenario (κ) ladder (one shared joint). The consolidated net '
@@ -2198,8 +2252,8 @@ def build_reinstatement_pnl(agg, *, source, terms, gross_premium,
         + (f', aggregate ceded premium {pc:g}' if pc else '')
         + f'; committed scale = gross - deposit - pc_agg = {P_G - D - pc:g}.'
         '\nRows: the gross loss reads axis 0 of the joint (loss-basis LAE '
-        'stochastic rate * l); the occurrence recovery A(R) and premium '
-        'D + h(R) read axis 1; a subsequent aggregate cover recovers '
+        f'stochastic rate * l); the occurrence recovery {rec_words} and '
+        'premium D + h(R) read axis 1; a subsequent aggregate cover recovers '
         'g(max(L - A(R), 0)) on the same joint (no new dimension).\n\n'
         + pnl._replay_block())
     return pnl
@@ -2276,11 +2330,13 @@ def _build_reinstatement_consolidated(agg, *, source, terms, gross_premium,
         pnl.economics = dict(gcn_economics)
     feat = type(agg_feature_terms).__name__ \
         if agg_feature_terms is not None else None
+    kind_word, _prem_words, rec_words = _occ_terms_wording(t)
     pnl._construction_description = (
-        'Consolidated reinstatements pnl over the shared (L, R) joint '
+        f'Consolidated {kind_word} pnl over the shared (L, R) joint '
         '([Decision-PnL-Is-Consolidated], closing [2D-Deferred]): one sell '
         f'group; net premium P_G - D - h(R){" - P_agg" if pc or feat else ""}'
-        ' is genuinely stochastic; commissions book as an obligation-side '
+        f' and net loss L - {rec_words} are pushforwards of the joint '
+        '(h = 0 for annual terms); commissions book as an obligation-side '
         'commission leg ([Commission-Obligation-Side]); '
         + (f'the aggregate cover is {feat}-rated (its map rides the same '
            'joint); ' if feat else '')

@@ -71,12 +71,15 @@ Contract terms
 A **contract term** is a deterministic, vectorized function of a realized loss
 quantity that fills one leg of a Gross / Ceded / Net P&L. Pushed forward over
 the loss distribution, 1-D on an aggregate basis and 2-D on an occurrence basis,
-it makes that leg stochastic. Six features share this shape: reinstatement
-premium, retro, swing, slide, profit commission, and corridor.
+it makes that leg stochastic. Seven features share this shape: reinstatement
+premium, the annual aggregate deductible and limit, retro, swing, slide, profit
+commission, and corridor.
 
-Five are pure single-leg maps; :class:`~aggregate.contract_terms.ReinstatementTerms`
-is the one two-map feature, carrying a premium decorator and the annual-cap loss
-transform. The terms objects hang off the wrapped engine
+Five are pure single-leg maps. The two occurrence-layer bases,
+:class:`~aggregate.contract_terms.ReinstatementTerms` and
+:class:`~aggregate.contract_terms.AnnualLayerTerms`, each carry an annual loss
+transform of the layer's recovery and a premium decorator (identically zero for
+the annual terms). The terms objects hang off the wrapped engine
 (``pnl.engine.reinstatement_terms``, ``pnl.engine.variable_terms``). They are
 reached by submodule import and are not re-exported at the top level::
 
@@ -93,5 +96,42 @@ reached by submodule import and are not re-exported at the top level::
    ProfitCommissionTerms
    CorridorTerms
    ReinstatementTerms
+   AnnualLayerTerms
+
+Annual terms on an occurrence layer
+-----------------------------------
+
+``aad d`` and ``agglimit m``, written directly after one occurrence layer,
+put an annual aggregate deductible and an aggregate limit on the layer's annual
+recovery :math:`R`. The reinsurer pays :math:`A(R) = \min((R - d)^+, m)` and the
+cedant's net is :math:`L - A(R)`. Either term may be written alone. Amounts are
+for 100% of the layer and the placement share :math:`s` applies after, so on the
+engine's shared recovery the map is :math:`\min((R - s d)^+, s m)`::
+
+    xpnl Cedant 2000 premium
+        less agg GrossBook 2000 premium at 70% lr 1000 xs 0
+            sev 120 * lomax 2.5
+            occurrence net of 750 xs 250 aad 50 deposit 326.389307
+            mixed gamma .185
+
+The reinsurer's side is a function of :math:`R` alone, but the cedant's net
+depends on :math:`L` and :math:`R` together, so both faces run on the
+:math:`(L, R)` joint that reinstatements use, with an
+:class:`~aggregate.contract_terms.AnnualLayerTerms` on
+``pnl.engine.reinstatement_terms``. ``agglimit 750`` is the same contract as
+``no reinstatements`` on a 750 layer, and ``agglimit 1500`` the same as
+``reinstatements 1 free``; the ledgers agree leg for leg.
+
+The terms need a single occurrence layer and cannot sit with
+``reinstatements`` on it; they are refused on an aggregate layer, which is
+itself the annual deductible and limit (``m xs d``). They combine with
+``cede``, with a ceded premium clause (which is optional; without one the
+layer books zero premium with a :class:`~aggregate.constants.ZeroPremiumCessionWarning`),
+and with one variable-rating feature on the aggregate tier, which reads the net
+of everything, :math:`L - A(R)`. In a plain ``agg`` the terms are honored after
+``occurrence ceded to``, as the aggregate stage ``aggregate ceded to s m xs s d``,
+and ignored with an :class:`~aggregate.constants.IgnoredDecLClauseWarning` after
+``occurrence net of``; the stored program keeps them, so a ``pnl`` or ``xpnl``
+over the ``agg`` by reference applies them.
 
 .. automodule:: aggregate.contract_terms

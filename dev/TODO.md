@@ -42,14 +42,6 @@
 
 ## In flight
 
-- **[Occurrence-Annual-Terms]**
-  (`dev/done/plan-occurrence-annual-deductible-limit.md`): `aad d` and
-  `agglimit m` on one occurrence layer. Step `[Annual-Terms-DecL]` landed at
-  **1.8.0**: grammar, spec keys `occ_reins_aad` / `occ_reins_agglimit`, the
-  refusals, and the plain `agg` (honored after `ceded to` as the aggregate
-  stage, ignored with a warning after `net of`). Step `[Annual-Terms-PnL]`,
-  the cedant's net in `pnl` / `xpnl` through `AnnualLayerTerms`, is next;
-  until it lands a `pnl` with annual terms raises `NotImplementedError`.
 - **[NTT-Tail-Visibility]** (`dev/plan-ntt-tail-visibility.md`) — phase 1
   `[NTT-Accuracy-Overflow]` landed at **1.2.0a6**: `ntt_audit` and
   `accuracy_df` no longer raise on any case whose exact tail falls below the
@@ -175,6 +167,15 @@
 
 ## Recently landed
 
+- **[Occurrence-Annual-Terms]** DONE at **1.8.0** and **1.9.0**
+  (2026-10-22, `dev/done/plan-occurrence-annual-deductible-limit.md`): `aad d`
+  and `agglimit m` on one occurrence layer. `[Annual-Terms-DecL]` (1.8.0): the
+  grammar, spec keys `occ_reins_aad` / `occ_reins_agglimit`, the refusals, and
+  the plain `agg` (honored after `ceded to` as the aggregate stage, ignored
+  with a warning after `net of`). `[Annual-Terms-PnL]` (1.9.0): the cedant's
+  net in `pnl` / `xpnl` through `AnnualLayerTerms` on the reinstatements
+  joint. Follow-ups: `[Reinstatement-Cap-On-Ceded-Agg]` and
+  `[Reins-Economics-On-Port-Unit]` below.
 - **[Library-Figures]** DONE at **1.6.0a2** and **1.6.0a3** (2026-10-19,
   `dev/done/plan-library-figures.md`, the library half of house-style's plan
   of the same name): `aggregate.plots.fit_page(width, max_height)` fits every

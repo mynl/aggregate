@@ -1436,7 +1436,12 @@ agg OAT.Limit 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 agglim
 agg OAT.Both 10 claims sev lognorm 100 cv 2 occurrence net of 650 xs 350 aad 50 agglimit 500 poisson                note{both terms; net of, so ignored with a warning};
 agg OAT.Priced 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 agglimit 500 deposit 100 cede 10% as Layer poisson   note{loss then money order};
 agg OAT.Ceded 10 claims sev lognorm 100 cv 2 occurrence ceded to 90% po 750 xs 250 aad 50 agglimit 500 poisson     note{ceded to: honored as the aggregate stage 450 xs 45};
-agg OAT.CededByHand 10 claims sev lognorm 100 cv 2 occurrence ceded to 90% po 750 xs 250 poisson aggregate ceded to 450 xs 45   note{the same stage written by hand}
+agg OAT.CededByHand 10 claims sev lognorm 100 cv 2 occurrence ceded to 90% po 750 xs 250 poisson aggregate ceded to 450 xs 45   note{the same stage written by hand};
+xpnl OAT.Cedant 2000 premium less agg OAT.Cedant_e 2000 premium at 70% lr 1000 xs 0 sev 120 * lomax 2.5 occurrence net of 750 xs 250 aad 50 deposit 326.389307 mixed gamma .185   note{acceptance: the cedant's net under an AAD, margin 460.70 on a bucket of 5};
+pnl OAT.CedantNet 2000 premium less agg OAT.CedantNet_e 2000 premium at 70% lr 1000 xs 0 sev 120 * lomax 2.5 occurrence net of 90% po 750 xs 250 aad 50 agglimit 500 deposit 300 cede 10% mixed gamma .185   note{consolidated face, share and cede};
+xpnl OAT.AsReinst 2000 premium less agg OAT.AsReinst_e 2000 premium at 70% lr 1000 xs 0 sev 120 * lomax 2.5 occurrence net of 750 xs 250 agglimit 1500 deposit 300 mixed gamma .185   note{equals reinstatements 1 free, leg for leg};
+xpnl OAT.WithPC 2000 premium less agg OAT.WithPC_e 2000 premium at 70% lr 1000 xs 0 sev 120 * lomax 2.5 occurrence net of 750 xs 250 aad 50 agglimit 500 deposit 300 mixed gamma .185 aggregate net of 500 xs 1200 deposit 100 pc 50% after 10%   note{an aggregate-tier feature over the same joint};
+xpnl OAT.Unpriced 2000 premium less agg OAT.Unpriced_e 2000 premium at 70% lr 1000 xs 0 sev 120 * lomax 2.5 occurrence net of 750 xs 250 aad 50 mixed gamma .185   note{no premium clause: books zero with a warning}
 # agg OAT.OnAgg 10 claims sev lognorm 100 cv 2 poisson aggregate net of 750 xs 250 aad 50                           note{refused: aggregate layer}
 # agg OAT.TwoLayers 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 and 1000 xs 1000 poisson   note{refused: two occurrence layers}
 # agg OAT.WithReinst 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 deposit 100 reinstatements 1 free poisson   note{refused: with reinstatements}

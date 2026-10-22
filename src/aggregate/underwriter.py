@@ -24,6 +24,7 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
 from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
+from .contract_terms import _annual_terms_label
 from .parser import (UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM,
                      DERIVE_PREMIUM)
 from .recipe import Recipe
@@ -178,31 +179,6 @@ def _strip_ignored_economics(name, spec, context='agg'):
     warnings.warn(msg, IgnoredDecLClauseWarning, stacklevel=3)
     return {k: v for k, v in spec.items()
             if k not in _AGG_IGNORED_ECONOMICS_KEYS}
-
-
-def _annual_terms_label(aad, agglimit):
-    """The display text for an occurrence layer's annual terms.
-
-    ``AAD 50, agglimit 500``, dropping a zero deductible or an unbounded
-    limit, so ``agglimit 500`` and ``AAD 50`` read as written.
-
-    Parameters
-    ----------
-    aad : float
-        The annual aggregate deductible, at 100% of the layer.
-    agglimit : float
-        The aggregate limit, at 100% of the layer; ``inf`` when unbounded.
-
-    Returns
-    -------
-    str
-    """
-    parts = []
-    if aad > 0 or not np.isfinite(agglimit):
-        parts.append(f'AAD {aad:,g}')
-    if np.isfinite(agglimit):
-        parts.append(f'agglimit {agglimit:,g}')
-    return ', '.join(parts)
 
 
 def _ceded_annual_terms_as_aggregate(name, spec):
@@ -1800,10 +1776,15 @@ class Underwriter(HelpMixin):
             # inner Aggregate is built (it is not a loss-structure key) and use it
             # below to attach a ReinstatementTerms.
             reinst = spec.pop('occ_reins_reinst', None)
+            # Annual terms (aad / agglimit) on the one occurrence layer: the
+            # same kind of annual map of the layer's recovery as the
+            # reinstatement cap, so pop them likewise and route through the
+            # same branch below with an AnnualLayerTerms. The parser has
+            # already refused them alongside reinstatements.
+            annual = None
             if 'occ_reins_aad' in spec:
-                raise NotImplementedError(
-                    f"{name}: annual terms (aad / agglimit) in a 'pnl' / "
-                    "'xpnl' are not built yet; a plain 'agg' accepts them.")
+                annual = (spec.pop('occ_reins_aad'),
+                          spec.pop('occ_reins_agglimit'))
             # Variable rating (Phase 3, decision 0): one of swing / slide / pc /
             # corridor on one aggregate layer. Pop the feature spec key + the
             # decorated layer index before economics / inner build.
@@ -1820,8 +1801,9 @@ class Underwriter(HelpMixin):
             # --------------------------------------------------------------
             # Two-tier classification ([One-Classifier-Fix],
             # dev/done/plan-pnl-faces-punchlist.md):
-            # the occurrence tier is {none | gc | reinstatements}, the
-            # aggregate tier {none | gc | feature}, classified INDEPENDENTLY
+            # the occurrence tier is {none | gc | reinstatements | annual
+            # terms}, the aggregate tier {none | gc | feature}, classified
+            # INDEPENDENTLY
             # -- the old single-kind elif chain let a feature branch shadow
             # the reinstatements clause and mis-scope an inuring occurrence
             # program. Ceded-premium clauses resolve to per-side economics;
@@ -1876,27 +1858,45 @@ class Underwriter(HelpMixin):
                                      'consideration': consideration,
                                      'consideration_label': consideration_label,
                                      'loss_label': loss_label}
-            elif reinst is not None:
-                # Reinstatements (stochastic ceded premium D + h(R)) route
-                # through the joint-sourced reinstatement builders. The base
-                # premium D = the layer's resolved occurrence premium
+            elif reinst is not None or annual is not None:
+                # Reinstatements (stochastic ceded premium D + h(R)) and the
+                # annual terms (recovery min((R - d)+, m), no reinstatement
+                # premium) are both an annual map of the one occurrence
+                # layer's recovery R, so both route through the joint-sourced
+                # occurrence builders, which read only recovery /
+                # reinstatement_premium / deposit / limit off the terms. The
+                # base premium D = the layer's resolved occurrence premium
                 # (econ['pc_occ']); effective occ limit y = share x limit.
                 # This branch precedes the feature branch
                 # ([Reinstatements-Dropped-By-Feature-Branch] fix): the occ
                 # tier owns the (L, R) joint, and a feature on the aggregate
                 # cover rides the SAME joint via the tier maps
                 # (``agg_feature_terms`` passed to the builder).
-                from .contract_terms import ReinstatementTerms
-                if occ_noclause:
-                    raise ValueError(
-                        f"{name}: 'reinstatements' require a base premium clause "
-                        "(deposit / rol / rate) on the occurrence layer.")
+                from .contract_terms import AnnualLayerTerms, ReinstatementTerms
                 inner = Aggregate(**spec)
-                rates = next((r for r in reinst if r is not None), None)
                 share, limit, _attach = spec['occ_reins'][0]
-                inner.reinstatement_terms = ReinstatementTerms(
-                    limit=float(share) * float(limit), rates=rates,
-                    deposit=float(econ['pc_occ']))
+                share, limit = float(share), float(limit)
+                if reinst is not None:
+                    if occ_noclause:
+                        raise ValueError(
+                            f"{name}: 'reinstatements' require a base premium "
+                            "clause (deposit / rol / rate) on the occurrence "
+                            "layer.")
+                    rates = next((r for r in reinst if r is not None), None)
+                    inner.reinstatement_terms = ReinstatementTerms(
+                        limit=share * limit, rates=rates,
+                        deposit=float(econ['pc_occ']))
+                else:
+                    # amounts are for 100% of the layer; the share applies
+                    # after, as it does to the engine's R (ruling 4). The
+                    # premium clause is optional (ruling 9): a missing one
+                    # books zero with the warning above.
+                    aad, agglimit = annual
+                    inner.reinstatement_terms = AnnualLayerTerms(
+                        limit=share * limit,
+                        annual_deductible=share * float(aad),
+                        annual_limit=share * float(agglimit),
+                        deposit=float(econ['pc_occ']), share=share)
                 inner.reinstatement_gross_premium = float(econ['gross'])
                 inner._pnl_recipe = {'kind': 'reins', 'expense_spec': expense_spec,
                                      'econ': econ,
@@ -1961,8 +1961,8 @@ class Underwriter(HelpMixin):
                 if recipe_kind != 'gcn':
                     _why = {
                         'plain': 'the engine carries no reinsurance',
-                        'reins': 'a reinstated program is a single occurrence '
-                                 'layer',
+                        'reins': 'a reinstated program, or one with annual '
+                                 'terms, is a single occurrence layer',
                         'var': 'a variable-rating feature decorates a single '
                                'aggregate layer',
                     }.get(recipe_kind, f'the {recipe_kind} recipe has no layer '

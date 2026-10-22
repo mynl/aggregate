@@ -2,7 +2,7 @@
 
 `[Occurrence-Annual-Terms]`, two steps, two minor bumps: `[Annual-Terms-DecL]` and
 `[Annual-Terms-PnL]`. Drafted 2026-10-22 at 1.7.1 (`3f342d3`). **Status: final, all rulings made by
-the author on 2026-10-22; not executed.**
+the author on 2026-10-22; executed 2026-10-22 as 1.8.0 and 1.9.0, see the execution log at the end.**
 
 ## Goal
 
@@ -281,3 +281,19 @@ Landed at 1.8.0.
 - **`decl-testers.agg`** gains section `OAT`, with the six refusals commented like section X because they do not parse.
 - **Snapshot and `FEATURES.csv`**: `tests/capture_spec_snapshot.py` rewrote `expected_specs.json` with no diff, as the plan required; `dev/regen_features.py` reported no change.
 
+
+### Divergences, step `[Annual-Terms-PnL]`
+
+Landed at 1.9.0.
+
+- **`AnnualLayerTerms.phi` is the recovery `A(R)`**, not an alias of `reinstatement_premium` as the plan says. The plan also sets `target_leg = 'ceded_loss'`, and the `ContractTerms` contract is that `phi` fills the target leg; nothing reads `phi` off an occurrence basis, so the consistent reading costs nothing. `reinstatement_premium` is identically zero, as planned.
+- **One extra field, `share`** (default `1.0`), for display only: the property `decl_clause` states the terms at 100% as written (`aad 50 agglimit 500`), the after-share amounts divided by `share` and rounded to 12 significant figures so no float dust shows. Used by the ledger labels and the structure chart.
+- **The label helper moved** from `underwriter._annual_terms_label` (step 1) to `contract_terms._annual_terms_label`, one copy imported by the underwriter.
+- **Ledger labels**: an undeclared layer's step reads `occ 750 xs 250 aad 50` (new `_occ_tier_label` in `_pnl_builders.py`); a declared `as` label is used as written. The builders have no separate reinstatement premium row to suppress: the occurrence premium leg is `D + h(R)` for both bases, so with `h = 0` it is the fixed deposit, which is what `no reinstatements` (`rates == ()`) already does.
+- **The structure chart** (`charts/_emit_structure.py`, not in the plan) reads `agg.reinstatement_terms.rates` to annotate the occurrence layer and would have raised on the new terms; `_reinstatement_line` now returns the terms' `decl_clause` for an `AnnualLayerTerms`.
+- **Grid check per review ruling 3**: a finite `annual_limit` is checked against the axis-1 bucket, the deductible is not (the reason is in the `check_joint_grid_adequacy` Notes). The warning text now opens `coarse occurrence joint:` rather than `coarse reinstatement joint:`, since it serves both bases and the guaranteed-cost walks; no test matched the old text.
+- **Construction text**: the walk and consolidated descriptions name the basis (`Occurrence annual-terms walk`, the fixed deposit, the map `min((R - d)+, m)`) through a small `_occ_terms_wording` helper. The error texts in `build_reinstatement_source` and the `peel` refusal name both bases.
+- **A share prorates the deposit**, as for every occurrence premium: `90% po 750 xs 250 ... deposit 300` books 270, and `cede 10%` books 27. The plan's test said "the commission leg equals `cede * deposit`", which holds for the booked deposit.
+- **Acceptance on two grids**: the DecL face on its default joint (bucket 20) gives net margin 460.80 and recovery 187.19 against the note's 460.70 and 187.08; rebuilt by `build_reinstatement_pnl` on `occ_bivariate(bs=5, total_log2=21)` it gives 460.70, SD 474.20 and 187.08, matching the note to the displayed figures. DecL has no way to set the joint grid; `build_reinstatement_source` forwards `bs` / `log2_x` / `log2_y` but not `total_log2`, so the test calls `occ_bivariate` directly.
+- **Docs**: besides `3_x_PnL.rst`, the "reinstatements guide" was read as `2_aggregate_overview/pipeline-pnl.rst` (classification table and the joint paragraph) plus a short non-executing section in `features.rst`. Docs await a rebuild.
+- **`FEATURES.csv`** has no contract-terms rows; the regen reported no change.

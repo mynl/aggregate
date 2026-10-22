@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.10.2 - 2026-10-22
+
+**[Input-Guards] A `fixed` claim count that is not a whole number, and a `dfreq` outcome that is negative or not whole, raise `ValueError`.** Both built silently before: the fractional forms returned negative probabilities and a total mass other than one, and a negative outcome was clamped onto 0, moving the mean. The tolerance is a relative `1e-9`. The `fixed` message names the count and its route (stated claims, expected loss over mean severity, or premium times loss ratio over mean severity) and suggests a two point `dfreq` with the same mean, or `poisson`. The `dfreq` check is in the empirical frequency constructor, so `Frequency('empirical', ...)` raises too. Contributed by @KasraBashirioskooei (#19) from the ruling on #18.
+
 ## 1.10.1 - 2026-10-22
 
 **[Kappa-Level-Sets] κ columns condition on the whole level set.** A `κq` cell of `PnL.economic_df`, and the waterfall's diversified columns built from `κ01`, is now the mean over every atom whose result agrees with `x_q` to within `validation.level_set_rtol` (new, default `1e-9`, env `AGGREGATE_VALIDATION_LEVEL_SET_RTOL`) times the ledger's largest absolute row value; it was the mean over the atoms whose float matched `x_q` bit for bit. **Numbers move** on ledgers whose result is reached by rounding-sensitive arithmetic (occurrence walks, retro, corridors): on the measured cases the largest κ cell change was 289 on `Bear1990.BN.TreatyIV`, 698 on a 750 xs 250 occurrence walk, 1,428 on the same walk with a corridor, and the native `aad 50` walk's `κ01` layer recovery went from 525.48 to 599.55. The exact distribution of every `bs = 0` ledger row merges atoms within the same tolerance, and `prob_eq_0` counts break-even atoms split by rounding. Docs await a rebuild.

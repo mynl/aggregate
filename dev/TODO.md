@@ -167,6 +167,13 @@
 
 ## Recently landed
 
+- **[Input-Guards]** DONE at **1.10.2** (2026-10-22, contributor PR #19 from
+  the ruling on #18): a `fixed` count that is not whole (stated, or derived
+  from loss or premium) and a `dfreq` outcome that is negative or not whole
+  raise `ValueError` within a relative `1e-9`, pointing at `dfreq` and
+  `poisson`. The old "zero `lb`" and "mixing with an inconsistent frequency"
+  notes were dropped: neither could be reconstructed, and the grammar already
+  rejects mixing with a second frequency.
 - **[Kappa-Level-Sets]** DONE at **1.10.1** (2026-10-22,
   `dev/done/plan-kappa-level-sets.md`): `κ` cells and the waterfall's
   diversified columns condition on the whole level set up to
@@ -502,13 +509,6 @@
 - **[Validation-Calc-Review]** (#49) — audit the validation algorithm against
   the published *Aggregate* paper and make the docs match. The switches-to-config
   half is done; the aliasing half shipped as `[Validation-Punchup]`.
-- **[Input-Guards]** (#18, ruled 2026-10-19): a **fixed** frequency whose
-  count is not whole (directly, or derived from loss or premium) builds
-  silently with negative probabilities; it will raise `ValueError` within a
-  small tolerance, pointing at `dfreq` and `poisson`. Contributor PR to
-  follow. The old "zero `lb`" and "mixing with an inconsistent frequency"
-  notes are dropped: neither could be reconstructed, and the grammar already
-  rejects mixing with a second frequency.
 - **[Sdist-Prune-Tests]** The sdist ships setuptools' default
   `tests/test_*.py` (139 files since 1.0.1) without `conftest.py` or
   `tests/data`, so the tests cannot run from it. Add `prune tests` to

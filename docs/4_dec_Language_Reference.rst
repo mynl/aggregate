@@ -123,16 +123,17 @@ The body is exactly ``dfreq`` then ``dsev`` then the usual trailer: no exposures
 
 .. _franchise deductible:
 
-Deductible Forms (franchise)
-============================
+Deductible Forms (franchise, disappearing)
+==========================================
 
-A layers clause ``y xs a`` applies an ordinary deductible: the insured retains the first ``a`` of every loss and the layer pays the excess, up to the limit ``y``. The ``franchise`` modifier changes only the retention. Once a loss exceeds the attachment the insured keeps nothing, and the whole loss is paid, subject to the limit::
+A layers clause ``y xs a`` applies an ordinary deductible: the insured retains the first ``a`` of every loss and the layer pays the excess, up to the limit ``y``. Two modifiers change only the retention. Under ``franchise``, once a loss exceeds the attachment the insured keeps nothing, and the whole loss is paid, subject to the limit. Under ``to d2 disappearing`` the retention shrinks as the loss grows and vanishes at a loss of ``d2``::
 
-    agg Ordinary  100 claims 1000 xs 50           sev lognorm 100 cv 2 poisson
-    agg Franchise 100 claims 1000 xs 50 franchise sev lognorm 100 cv 2 poisson
-    agg Vector    100 claims [500 1000] xs [25 50] franchise sev lognorm 100 cv 2 poisson
+    agg Ordinary     100 claims 1000 xs 50                    sev lognorm 100 cv 2 poisson
+    agg Franchise    100 claims 1000 xs 50 franchise          sev lognorm 100 cv 2 poisson
+    agg Disappearing 100 claims 1000 xs 50 to 200 disappearing sev lognorm 100 cv 2 poisson
+    agg Vector       100 claims [500 1000] xs [25 50] to [40 80] disappearing sev lognorm 100 cv 2 poisson
 
-Both forms belong to one family of retentions. The retention on a loss :math:`x` is parameterized by the loss :math:`d_2` at which it reaches zero:
+All three forms belong to one family of retentions. The retention on a loss :math:`x` is parameterized by the loss :math:`d_2` at which it reaches zero:
 
 .. math::
 
@@ -142,15 +143,15 @@ Both forms belong to one family of retentions. The retention on a loss :math:`x`
         0 & x > d_2,
     \end{cases}
 
-and the layer ``y xs d1`` pays :math:`g(x) = \min(x - r(x), y)`. Setting :math:`d_2 = \infty` gives the ordinary deductible, payment :math:`\min((x - d_1)^+, y)`. Setting :math:`d_2 = d_1` gives the franchise, payment :math:`\min(x, y)` for :math:`x > d_1` and zero otherwise, so no payment ever lies strictly between zero and :math:`\min(d_1, y)`. A value :math:`d_2 > d_1` is a disappearing deductible; the engine already supports it, and DecL will expose it separately. The only constraint is :math:`d_1 \le d_2`.
+and the layer ``y xs d1`` pays :math:`g(x) = \min(x - r(x), y)`. Setting :math:`d_2 = \infty` gives the ordinary deductible, payment :math:`\min((x - d_1)^+, y)`. Setting :math:`d_2 = d_1` gives the franchise, payment :math:`\min(x, y)` for :math:`x > d_1` and zero otherwise, so no payment ever lies strictly between zero and :math:`\min(d_1, y)`. A value :math:`d_2 > d_1` is the disappearing deductible, written ``y xs d1 to d2 disappearing``: on :math:`(d_1, d_2]` it pays :math:`k (x - d_1)` with :math:`k = d_2 / (d_2 - d_1)`, rising from zero to the full loss :math:`d_2`, and above :math:`d_2` the whole loss, each capped at :math:`y`. The only constraint is :math:`d_1 \le d_2`; ``to d1 disappearing`` is the franchise and ``to inf disappearing`` the ordinary deductible.
 
-**Limit convention.** The deductible applies first and the limit second, following the IRMI definition of a franchise deductible ("once it is met, the entire amount of the loss is paid, subject to the policy limit") and the first edition of *Loss Models*. The limit :math:`y` is the largest payment in every form: ``1000 xs 50 franchise`` pays :math:`\min(X, 1000)` once :math:`X > 50`. The payment reaches the limit at the ground-up loss :math:`d_1 + y` for the ordinary deductible and :math:`\max(d_1, y)` for the franchise; this is the layer's ``detachment``. With :math:`y > d_1` the franchise pays :math:`d_1` plus the ordinary layer ``(y - d1) xs d1`` on every claim above :math:`d_1`; with :math:`y \le d_1` every such claim pays exactly :math:`y`.
+**Limit convention.** The deductible applies first and the limit second, following the IRMI definition of a franchise deductible ("once it is met, the entire amount of the loss is paid, subject to the policy limit") and the first edition of *Loss Models*. The limit :math:`y` is the largest payment in every form: ``1000 xs 50 franchise`` pays :math:`\min(X, 1000)` once :math:`X > 50`. The payment reaches the limit at the ground-up loss :math:`d_1 + y` for the ordinary deductible, :math:`\max(d_1, y)` for the franchise, and for the disappearing deductible :math:`d_1 + y / k` when :math:`y \le d_2`, otherwise :math:`y`; this is the layer's ``detachment``. With :math:`y > d_1` the franchise pays :math:`d_1` plus the ordinary layer ``(y - d1) xs d1`` on every claim above :math:`d_1`; with :math:`y \le d_1` every such claim pays exactly :math:`y`.
 
-**Conditional and unconditional.** As with an ordinary layer, the claim count is the count of losses exceeding the attachment, and the severity is conditional on :math:`X > d_1`. For the franchise its distribution function is :math:`(F(t) - F(d_1)) / S(d_1)` for payments :math:`d_1 < t < y`, zero below, and one at the limit, which carries the mass :math:`S(\max(d_1, y)) / S(d_1)`. The trailing ``!`` makes the severity unconditional in the usual way: the count is ground up and the probability :math:`F(d_1)` of a loss at or below the attachment sits at a payment of zero.
+**Conditional and unconditional.** As with an ordinary layer, the claim count is the count of losses exceeding the attachment, and the severity is conditional on :math:`X > d_1`. For the franchise its distribution function is :math:`(F(t) - F(d_1)) / S(d_1)` for payments :math:`d_1 < t < y`, zero below, and one at the limit, which carries the mass :math:`S(\max(d_1, y)) / S(d_1)`. For the disappearing deductible it is :math:`(F(d_1 + t / k) - F(d_1)) / S(d_1)` for payments :math:`t \le d_2` and :math:`(F(t) - F(d_1)) / S(d_1)` above, again up to the limit, where the mass is :math:`S(\text{detachment}) / S(d_1)`. The trailing ``!`` makes the severity unconditional in the usual way: the count is ground up and the probability :math:`F(d_1)` of a loss at or below the attachment sits at a payment of zero.
 
-**Vectors.** ``franchise`` applies to every layer of a vector clause ``[...] xs [...]``, each with its own attachment.
+**Vectors.** ``franchise`` applies to every layer of a vector clause ``[...] xs [...]``, each with its own attachment. For ``disappearing``, ``to`` takes either one value for every layer or a vector ``to [...]`` with one retention end per layer, counting layers after the limits and attachments broadcast (``[500 1000] xs 50 to [60 70] disappearing`` is two layers); a vector of any other length is an error.
 
-**Moments** come from the same partial expectations as an ordinary layer, so the theoretical moments that validation compares against are exact. The library entry ``SevLayer.Franchise`` sets the franchise beside ``SevLayer``.
+**Moments** come from the same partial expectations as an ordinary layer, so the theoretical moments that validation compares against are exact. The library entries ``SevLayer.Franchise`` and ``SevLayer.Disappearing`` set both forms beside ``SevLayer``.
 
 Dec Language Grammar Specification
 ===================================

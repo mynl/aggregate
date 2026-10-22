@@ -647,8 +647,15 @@ ntt_atom: NTT_NUMBER                        -> ntt_number
 // payment is ``min(X, y)`` ([Franchise-Deductible]). The transformer
 // stores it as ``exp_retention_end`` equal to the attachment, the d2 = d1
 // member of the retention family in ``_severity.py``.
+//
+// ``y xs d1 to d2 disappearing`` is the member with ``d2 > d1``: the
+// retention falls linearly from ``d1`` at a loss of ``d1`` to zero at a loss
+// of ``d2``, and the payment is ``min(X - r(X), y)``
+// ([Disappearing-Deductible]). ``d2`` is stored as ``exp_retention_end``; a
+// vector ``to [...]`` must conform to the attachments.
 layers: numbers XS numbers as_label   -> layers_xs
       | numbers XS numbers FRANCHISE as_label -> layers_xs_franchise
+      | numbers XS numbers TO numbers DISAPPEARING as_label -> layers_xs_disappearing
       | tower                              -> layers_tower
       |                                    -> layers_none
 
@@ -885,6 +892,7 @@ SLIDE.2:      /slide(?![a-zA-Z0-9._:~\-])/
 RETRO.2:      /retro(?![a-zA-Z0-9._:~\-])/
 CORRIDOR.2:   /corridor(?![a-zA-Z0-9._:~\-])/
 FRANCHISE.2:  /franchise(?![a-zA-Z0-9._:~\-])/
+DISAPPEARING.2: /disappearing(?![a-zA-Z0-9._:~\-])/
 BASIC.2:      /basic(?![a-zA-Z0-9._:~\-])/
 LCM.2:        /lcm(?![a-zA-Z0-9._:~\-])/
 MIN.2:        /min(?![a-zA-Z0-9._:~\-])/
@@ -980,7 +988,7 @@ NTT_NUMBER: /(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

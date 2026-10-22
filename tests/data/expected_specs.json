@@ -1820,6 +1820,48 @@
       "hints": ""
     }
   },
+  "agg E.TSev20 10 claims 100 xs 10 franchise          sev lognorm 10 cv 0.8 poisson note{franchise deductible: a claim above 10 is paid from the ground up, capped at 100}": {
+    "kind": "agg",
+    "name": "E.TSev20",
+    "spec": {
+      "name": "E.TSev20",
+      "exp_en": 10.0,
+      "exp_attachment": 10.0,
+      "exp_limit": 100.0,
+      "exp_retention_end": 10.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "franchise deductible: a claim above 10 is paid from the ground up, capped at 100",
+      "hints": ""
+    }
+  },
+  "agg E.TSev21 10 claims 100 xs 10 to 20 disappearing sev lognorm 10 cv 0.8 poisson note{disappearing deductible: the retention falls from 10 to zero as the loss rises from 10 to 20}": {
+    "kind": "agg",
+    "name": "E.TSev21",
+    "spec": {
+      "name": "E.TSev21",
+      "exp_en": 10.0,
+      "exp_attachment": 10.0,
+      "exp_limit": 100.0,
+      "exp_retention_end": 20.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 0.8,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "poisson",
+      "note": "disappearing deductible: the retention falls from 10 to zero as the loss rises from 10 to 20",
+      "hints": ""
+    }
+  },
   "agg F.Expos01   10 claims         sev lognorm 50 cv 0.8 poisson    note{specify number of claims}": {
     "kind": "agg",
     "name": "F.Expos01",

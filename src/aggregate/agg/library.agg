@@ -423,6 +423,14 @@ agg SevLayer.Franchise
   note{Franchise deductible: once the loss exceeds the attachment of 5 the whole loss is paid, subject to the limit of 20, so each claim pays 5 plus the ordinary layer 15 xs 5.}
   tags{topic:severity, role:intermediate};
 
+agg SevLayer.Disappearing
+  1 claim
+  20 xs 5 to 10 disappearing
+  sev lognorm 10 cv 0.5
+  fixed
+  note{Disappearing deductible: the retention of 5 shrinks linearly as the loss grows from 5 to 10, so a loss of 7.5 pays 5, and a loss above 10 is paid in full, subject to the limit of 20.}
+  tags{topic:severity, role:intermediate};
+
 agg UnconditionalDiscreteSeverity
   5 claims
   4 xs 2

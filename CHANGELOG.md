@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.7.1 - 2026-10-22
+
+**[Qd-Wrap-Strings] `qd` wraps the strings it prints at 72 characters.** The `Aggregate` and `Portfolio` info blob, the `PnL` and `BivariateAggregate` repr, and a bare `str` argument now print as wrapped lines instead of one long row in markdown output. Wrapping is per line, so embedded newlines are kept, and long tokens are not split. Tables, numbers and other objects print as before.
+
 ## 1.7.0 - 2026-10-20
 
 **[Franchise-Deductible] `y xs a franchise` on the layers clause: a franchise deductible, built as the retention family with `d2` as its parameter.** Once a loss exceeds the attachment the whole loss is paid, subject to the limit: the payment is `min(X, y)` for `X > a`, deductible first and limit second (the IRMI definition and *Loss Models*, first edition), so `limit` stays the largest payment in every form and `detachment` becomes the loss at which the payment first reaches it, `max(a, y)` for the franchise. Engine: `make_layer_retention_cdf`, `_sf`, `_pdf`, `_ppf` and `_isf` beside the `make_layer_attachment_*` wrappers, moments from the existing partial expectations (exact atom sums for a discrete law), and `Severity(..., exp_retention_end=inf)` / `Aggregate(..., exp_retention_end=None)` carrying `d2` (`inf` the ordinary deductible, `a` the franchise); the spec key round trips through `decl_writer` and homogeneous scaling, and vectorizes over `[...] xs [...]`. `feasible_bucket` and `size_biased_cdf` return their no-reading values under a finite retention end. New reserved word `franchise`; DecL reference section "Deductible Forms", a comparison in the Twenty Minutes page, and `SevLayer.Franchise` in `library.agg`. Docs await a rebuild. Contributed by @KasraBashirioskooei (#15) from the rulings on #9; the disappearing deductible, the `d2 > a` member, follows in #20.

@@ -3,6 +3,7 @@ import itertools
 import logging
 import sys
 from numbers import Number
+from textwrap import wrap
 
 import numpy as np
 import pandas as pd
@@ -379,7 +380,17 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
     :param: trim: legacy trailing-zero trim flag (currently no-op)
     :param: ff: if not None, use this function to format floats, or 'basic', or 'binary'
     :kwargs: passed to pd.DataFrame.to_string for dataframes only. e.g., pass dict of formatters by column.
+
+    Strings (the info blob, a repr, a bare ``str`` argument) are wrapped at 72
+    characters, so they do not render as one long row in markdown output.
     """
+    def wrap_print(s):
+        """Print ``s`` wrapped at 72 characters, one line at a time."""
+        # wrap line by line: textwrap folds newlines into spaces and would run
+        # a multi-line string together; long tokens stay whole
+        print('\n'.join('\n'.join(wrap(line, 72, break_long_words=False))
+                        for line in s.split('\n')))
+
     from .distributions import Aggregate
     from .portfolio import Portfolio
     from ._pnl import PnL
@@ -402,19 +413,19 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             # validation result inline, mirroring ``_repr_html_``) and the
             # moments-and-percentiles ``summary_df``. The return-period
             # ``tail_df`` is served on demand.
-            print(x._text_info_blob())
+            wrap_print(x._text_info_blob())
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, PnL):
             # P&L headline: the repr then the fixed summary card (marginal
             # range percentiles; the footing sheet is economic_df).
-            print(repr(x))
+            wrap_print(repr(x))
             qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, BivariateAggregate):
             # bivariate headline: the repr then the marginals-and-total
             # at-a-glance frame ([Bivariate-Punchup]); the moment audit is
             # validation_df, served on demand. Before update() there is no
             # joint density and the repr alone is the honest answer.
-            print(repr(x))
+            wrap_print(repr(x))
             if x.density is not None or x._massive is not None:
                 qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, CalibrationResult):
@@ -451,6 +462,8 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             print(x)
         elif isinstance(x, Number):
             print(ff(x))
+        elif isinstance(x, str):
+            wrap_print(x)
         else:
             print(x)
 

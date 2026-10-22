@@ -34,9 +34,12 @@ def _parse(program):
      'sev lognorm 100 cv 2 poisson', [40.0, 80.0]),
     ('agg D 100 claims [500 1000] xs [25 50] to 80 disappearing '
      'sev lognorm 100 cv 2 poisson', 80.0),
+    ('agg D 100 claims [500 1000] xs 50 to [60 70] disappearing '
+     'sev lognorm 100 cv 2 poisson', [60.0, 70.0]),
     ('agg D 100 claims 1000 xs 25 to 50 disappearing as "DD" '
      'sev lognorm 100 cv 2 poisson', 50.0),
-], ids=['scalar', 'vector', 'scalar-end-vector-layers', 'label'])
+], ids=['scalar', 'vector', 'scalar-end-vector-layers',
+        'vector-end-scalar-attachment', 'label'])
 def test_disappearing_parses_and_round_trips(program, expected):
     """``exp_retention_end`` holds ``d2`` and the unparser restores it."""
     kind, name, spec = _parse(program)
@@ -59,9 +62,12 @@ def test_retention_end_at_the_attachment_is_the_franchise():
     assert 'franchise' in spec_to_decl(d, kind='agg', name='D')
 
 
-def test_vector_retention_end_must_conform():
-    with pytest.raises(ValueError, match='has 3 entries but there are 2'):
-        build('agg D 100 claims [500 1000] xs [25 50] to [40 80 90] disappearing '
+@pytest.mark.parametrize('layers', ['[500 1000] xs [25 50]', '[500 1000] xs 25'],
+                         ids=['vector-attachment', 'scalar-attachment'])
+def test_vector_retention_end_must_conform(layers):
+    """The count to match is the broadcast layer count, not the attachments."""
+    with pytest.raises(ValueError, match='has 3 entries but there are 2 layers'):
+        build(f'agg D 100 claims {layers} to [40 80 90] disappearing '
               'sev lognorm 100 cv 2 poisson')
 
 
@@ -107,3 +113,21 @@ def test_aggregate_matches_its_theoretical_moments():
     theory = float(a.stats_df.loc[('agg', 'mean'), 'mixed'])
     assert a.est_m == pytest.approx(theory, rel=1e-5)
     assert a.valid.passes
+
+
+def test_vector_retention_end_broadcasts_over_a_scalar_attachment():
+    """``[500 1000] xs 50 to [60 70]`` is two layers sharing one attachment.
+
+    The engine broadcasts the attachment and the retention end to the layers,
+    so each severity carries its own ``d2`` and has the moments of the same
+    layer built alone.
+    """
+    a = build('agg D.Broadcast 100 claims [500 1000] xs 50 to [60 70] '
+              'disappearing sev lognorm 100 cv 2 poisson')
+    assert [s.retention_end for s in a.sevs] == [60.0, 70.0]
+    for sev, (y, d2) in zip(a.sevs, [(500, 60), (1000, 70)]):
+        alone = build(f'agg D.Alone{y} 100 claims {y} xs 50 to {d2} '
+                      'disappearing sev lognorm 100 cv 2 poisson').sevs[0]
+        np.testing.assert_allclose(sev.moms(), alone.moms(), rtol=1e-12)
+    theory = float(a.stats_df.loc[('agg', 'mean'), 'mixed'])
+    assert a.est_m == pytest.approx(theory, rel=1e-5)

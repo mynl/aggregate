@@ -3098,6 +3098,16 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # overall freq CV with common mixing
         mix_cv = self.frequency.freq_a
 
+        # how the claim count was entered, for the fixed count guard below
+        # ([Input-Guards]). Premium is tested before loss because the parser
+        # may already have filled exp_el in from premium times loss ratio.
+        _count_route = (
+            'claims' if np.any(np.asarray(exp_en, dtype=float) > 0)
+            else 'premium' if (np.any(np.asarray(exp_premium, dtype=float) > 0)
+                               and np.any(np.asarray(exp_lr, dtype=float) > 0))
+            else 'loss' if np.any(np.asarray(exp_el, dtype=float) > 0)
+            else 'claims')
+
         # broadcast arrays: force answers all to be arrays (?why only these items?!)
         if not isinstance(exp_el, Iterable):
             exp_el = np.array([exp_el])
@@ -3428,6 +3438,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             )
 
         self.n = ma.tot_freq_1
+        if self.frequency.freq_name == 'fixed':
+            self._guard_fixed_count(_count_route, tot_loss, tot_prem)
         # stamp the resolved unconditional claim count onto the frequency:
         # a parametric Frequency is a family until the exposure fixes its
         # mean; this is what freq_df (and any standalone use) reads
@@ -3648,6 +3660,61 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if not self._freq_zm or not base_en > 0:
             return base_en
         return self.frequency.modify_mean(base_en)
+
+    def _guard_fixed_count(self, route, tot_loss, tot_prem):
+        """Refuse a ``fixed`` frequency whose claim count is not a whole number.
+
+        Parameters
+        ----------
+        route : {'claims', 'loss', 'premium'}
+            How the exposure clause stated the count: directly, as an expected
+            loss divided by the mean severity, or as premium times loss ratio
+            divided by the mean severity.
+        tot_loss, tot_prem : float
+            The resolved expected loss and premium, quoted in the message.
+
+        Raises
+        ------
+        ValueError
+            If ``self.n`` is not within a relative ``1e-9`` of an integer
+            ([Input-Guards]). The message names the count, how it was derived,
+            and the ``dfreq`` and ``poisson`` alternatives.
+
+        Notes
+        -----
+        A ``fixed`` frequency has generating function :math:`z^n`. The FFT
+        raises the transformed severity to that power, and for a fractional
+        :math:`n` the result is not the transform of any distribution: the
+        density comes back with negative probabilities and a mean that misses
+        the target, and every quantile, TVaR or price read from it is
+        meaningless. The tolerance lets a count such as ``3.0000000001`` that
+        arithmetic left a few ulps off a whole number through.
+        """
+        n = float(self.n)
+        if np.isclose(n, round(n), rtol=1e-9, atol=1e-12):
+            return
+        if route == 'claims':
+            derived = f'the exposure clause states {n:.6g} claims'
+        else:
+            sev_mean = tot_loss / n if n else np.nan
+            if route == 'loss':
+                derived = (f'it is derived from the expected loss: '
+                           f'{tot_loss:,.6g} / mean severity {sev_mean:,.6g}')
+            else:
+                derived = (f'it is derived from the premium: premium '
+                           f'{tot_prem:,.6g} x loss ratio {tot_loss / tot_prem:.6g}'
+                           f' = expected loss {tot_loss:,.6g}, '
+                           f'/ mean severity {sev_mean:,.6g}')
+        # the two point count with this mean, as a concrete dfreq suggestion
+        lo = int(np.floor(n))
+        p_hi = n - lo
+        raise ValueError(
+            f'{self.name}: a fixed frequency needs a whole number of claims, '
+            f'but the claim count is {n:.6g} ({derived}). A fractional fixed '
+            f'count has no distribution and returns negative probabilities. '
+            f'Use dfreq for a known count distribution (dfreq [{lo} {lo + 1}] '
+            f'[{1 - p_hi:.6g} {p_hi:.6g}] has this mean), or poisson for an '
+            f'expected count.')
 
     def _guard_exposure_rows(self, n_exposure_rows):
         """Refuse an exposure profile an empirical frequency cannot carry.

@@ -1419,3 +1419,27 @@ agg MD.Probe 10 claims sev lognorm 100 cv 3 poisson                             
 # middle probability: 1/2 - 2**-110 rounds to 1/2. See tests/test_ntt.py.
 nttagg NTA.Deep      dfreq [1:10] dsev [1 2 8] [1/2 (1/2-2**-30) 2**-30]    note{smallest mass 2**-300/10: a double, but past the float FFT};
 nttagg NTA.Underflow dfreq [1:10] dsev [1 2 8] [1/2 (1/2-2**-110) 2**-110]  note{smallest mass 2**-1100/10: past any double}
+
+# OAT. Annual terms on an occurrence layer ([Occurrence-Annual-Terms], 1.8.0)
+# ============================================================
+# ``aad d`` and ``agglimit m`` decorate ONE occurrence layer, written directly
+# after the layer, so the reinsurer pays min((R - d)+, m) on the layer's annual
+# recovery R. Amounts are for 100% of the layer; a share applies after. On
+# ``occurrence ceded to`` a plain agg honors them as its aggregate stage (OAT.Ceded
+# equals OAT.CededByHand array for array); on ``net of`` it ignores them with an
+# IgnoredDecLClauseWarning and the stored program keeps them for a pnl / xpnl.
+# The refusals are commented, like section X. See
+# tests/test_occurrence_annual_terms.py and
+# dev/done/plan-occurrence-annual-deductible-limit.md.
+agg OAT.Aad 10 claims sev lognorm 100 cv 2 occurrence net of 90% po 100 xs 100 aad 50 poisson                       note{AAD alone, 90% share};
+agg OAT.Limit 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 agglimit 500 poisson                      note{aggregate limit alone};
+agg OAT.Both 10 claims sev lognorm 100 cv 2 occurrence net of 650 xs 350 aad 50 agglimit 500 poisson                note{both terms; net of, so ignored with a warning};
+agg OAT.Priced 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 agglimit 500 deposit 100 cede 10% as Layer poisson   note{loss then money order};
+agg OAT.Ceded 10 claims sev lognorm 100 cv 2 occurrence ceded to 90% po 750 xs 250 aad 50 agglimit 500 poisson     note{ceded to: honored as the aggregate stage 450 xs 45};
+agg OAT.CededByHand 10 claims sev lognorm 100 cv 2 occurrence ceded to 90% po 750 xs 250 poisson aggregate ceded to 450 xs 45   note{the same stage written by hand}
+# agg OAT.OnAgg 10 claims sev lognorm 100 cv 2 poisson aggregate net of 750 xs 250 aad 50                           note{refused: aggregate layer}
+# agg OAT.TwoLayers 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 and 1000 xs 1000 poisson   note{refused: two occurrence layers}
+# agg OAT.WithReinst 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 deposit 100 reinstatements 1 free poisson   note{refused: with reinstatements}
+# agg OAT.NegAad 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad -5 poisson                        note{refused: negative deductible}
+# agg OAT.ZeroLimit 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 agglimit 0 poisson                 note{refused: zero limit}
+# agg OAT.Repeated 10 claims sev lognorm 100 cv 2 occurrence net of 750 xs 250 aad 50 aad 60 poisson               note{refused: repeated clause, a parse error}

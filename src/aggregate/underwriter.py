@@ -63,6 +63,7 @@ _AGG_IGNORED_ECONOMICS_KEYS = (
     'occ_reins_premium', 'occ_reins_cede',
     'agg_reins_premium', 'agg_reins_cede',
     'occ_reins_reinst',
+    'occ_reins_aad', 'occ_reins_agglimit',
     'agg_reins_swing', 'agg_reins_swing_layer',
     'agg_reins_slide', 'agg_reins_slide_layer',
     'agg_reins_pc', 'agg_reins_pc_layer',
@@ -77,6 +78,7 @@ _IGNORED_CLAUSE_NAMES = (
      'ceded premium (deposit / rol / rate)'),
     (('occ_reins_cede', 'agg_reins_cede'), 'cede'),
     (('occ_reins_reinst',), 'reinstatements'),
+    (('occ_reins_aad', 'occ_reins_agglimit'), 'aad / agglimit'),
     (('agg_reins_swing',), 'swing'),
     (('agg_reins_slide',), 'slide'),
     (('agg_reins_pc',), 'pc'),
@@ -176,6 +178,86 @@ def _strip_ignored_economics(name, spec, context='agg'):
     warnings.warn(msg, IgnoredDecLClauseWarning, stacklevel=3)
     return {k: v for k, v in spec.items()
             if k not in _AGG_IGNORED_ECONOMICS_KEYS}
+
+
+def _annual_terms_label(aad, agglimit):
+    """The display text for an occurrence layer's annual terms.
+
+    ``AAD 50, agglimit 500``, dropping a zero deductible or an unbounded
+    limit, so ``agglimit 500`` and ``AAD 50`` read as written.
+
+    Parameters
+    ----------
+    aad : float
+        The annual aggregate deductible, at 100% of the layer.
+    agglimit : float
+        The aggregate limit, at 100% of the layer; ``inf`` when unbounded.
+
+    Returns
+    -------
+    str
+    """
+    parts = []
+    if aad > 0 or not np.isfinite(agglimit):
+        parts.append(f'AAD {aad:,g}')
+    if np.isfinite(agglimit):
+        parts.append(f'agglimit {agglimit:,g}')
+    return ', '.join(parts)
+
+
+def _ceded_annual_terms_as_aggregate(name, spec):
+    """Rewrite ``occurrence ceded to ... aad d agglimit m`` as an aggregate stage.
+
+    On an ``occurrence ceded to`` program the engine's output is the layer's
+    annual recovery ``R``, so the annual terms are exactly an aggregate layer
+    on it: the reinsurer pays ``min((R - s d)+, s m)``, which is
+    ``aggregate ceded to s m xs s d`` with ``s`` the placement share (the
+    terms are written for 100% of the layer). The aggregate stage then
+    reports the annual layer through every existing reinsurance view with no
+    new code. Any other spec is returned unchanged; on ``occurrence net of``
+    the terms reach :func:`_strip_ignored_economics` and are ignored with a
+    warning (ruling 2 of dev/done/plan-occurrence-annual-deductible-limit.md).
+
+    Parameters
+    ----------
+    name : str
+        The object being built, named in the error.
+    spec : dict
+        The parsed spec. Never mutated: it is the stored recipe's own dict,
+        and the stored program must keep the declaration so an ``agg.NAME``
+        reference inside a ``pnl`` / ``xpnl`` re-injects the terms.
+
+    Returns
+    -------
+    dict
+        A rewritten **copy**, or ``spec`` itself when there is nothing to do.
+
+    Raises
+    ------
+    ValueError
+        When the program also carries its own ``aggregate`` clause. The two
+        would need sequential aggregate stages, which the engine does not
+        have.
+    """
+    if 'occ_reins_aad' not in spec or spec.get('occ_kind') != 'ceded to':
+        return spec
+    share = float(spec['occ_reins'][0][0])
+    aad = float(spec['occ_reins_aad'])
+    agglimit = float(spec['occ_reins_agglimit'])
+    if spec.get('agg_reins'):
+        raise ValueError(
+            f"{name}: annual terms (aad / agglimit) on an 'occurrence ceded to' "
+            "program become its aggregate stage, so the program cannot also "
+            "carry an 'aggregate' clause. Write the annual terms into the "
+            f"aggregate clause instead: 'aggregate ceded to "
+            f"{share * agglimit:g} xs {share * aad:g}' at this share, composed "
+            "with the existing aggregate layers.")
+    out = {k: v for k, v in spec.items()
+           if k not in ('occ_reins_aad', 'occ_reins_agglimit')}
+    out['agg_reins'] = [(1.0, share * agglimit, share * aad)]
+    out['agg_kind'] = 'ceded to'
+    out['agg_reins_label'] = [_annual_terms_label(aad, agglimit)]
+    return out
 
 
 # Write order for to_agg: .agg files load sequentially and named references
@@ -1631,8 +1713,12 @@ class Underwriter(HelpMixin):
             # A pure aggregate ignores what it cannot use and says so: the
             # reinsurance-economics / feature clauses parse everywhere (the
             # shared agg body), but activating them needs a P&L premium
-            # context ([Reins-Economics-On-Agg-Ignore-Warn]).
-            spec = _strip_ignored_economics(name, spec)
+            # context ([Reins-Economics-On-Agg-Ignore-Warn]). Annual terms on
+            # an ``occurrence ceded to`` layer are the exception: they act on
+            # the engine's own output, so they become its aggregate stage
+            # first, and only ``net of`` terms reach the strip.
+            spec = _strip_ignored_economics(
+                name, _ceded_annual_terms_as_aggregate(name, spec))
             obj = Aggregate(**spec)
             obj.program = program
             # With ``program`` now populated, fold the method-of-moments
@@ -1714,6 +1800,10 @@ class Underwriter(HelpMixin):
             # inner Aggregate is built (it is not a loss-structure key) and use it
             # below to attach a ReinstatementTerms.
             reinst = spec.pop('occ_reins_reinst', None)
+            if 'occ_reins_aad' in spec:
+                raise NotImplementedError(
+                    f"{name}: annual terms (aad / agglimit) in a 'pnl' / "
+                    "'xpnl' are not built yet; a plain 'agg' accepts them.")
             # Variable rating (Phase 3, decision 0): one of swing / slide / pc /
             # corridor on one aggregate layer. Pop the feature spec key + the
             # decorated layer index before economics / inner build.
@@ -1901,7 +1991,9 @@ class Underwriter(HelpMixin):
             # ([Reins-Economics-On-Bvagg-Ignore-Warn]).
             units = spec.get('units')
             if units:
-                rebuilt = [(k, n, _strip_ignored_economics(n, s, 'bvagg'))
+                rebuilt = [(k, n, _strip_ignored_economics(
+                               n, _ceded_annual_terms_as_aggregate(n, s),
+                               'bvagg'))
                            if k == 'agg' else (k, n, s)
                            for k, n, s in units]
                 if any(new is not old for (*_, new), (*_, old)

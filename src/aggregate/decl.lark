@@ -379,8 +379,11 @@ reins_list: reins_list AND reins_clause   -> reins_list_cons
 // side (the occurrence program inures). ``cede`` is the commission fraction,
 // valid only with a premium. Entered gross of commission. The loss layer feeds
 // the reinsurance engine exactly as before; the premium / cede / reinstatements
-// ride alongside for the P&L.
-reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable as_label   -> reins_clause
+// ride alongside for the P&L. The optional annual terms (``reins_annual``) sit
+// directly after the layer because they are part of the loss definition, not
+// the economics, so a full clause reads loss then money:
+// ``750 xs 250 aad 50 agglimit 500 deposit 100 cede 10% as Layer``.
+reins_clause: reins_layer reins_annual reins_premium reins_cede reins_reinst reins_variable as_label   -> reins_clause
 
 // ``po`` (part of) is the ONE way to write a partial placement. The leading
 // quantity says which reading is meant: a literal percentage (``50%``) is the
@@ -393,6 +396,19 @@ reins_clause: reins_layer reins_premium reins_cede reins_reinst reins_variable a
 // xs <attach>`` already speaks it. See dev/done/plan-single-placement-keyword.md.
 reins_layer: expr XS expr                   -> reins_clause_xs
            | expr PART_OF expr XS expr      -> reins_clause_part
+
+// Optional annual terms decorating ONE occurrence layer: an annual aggregate
+// deductible ``aad d`` and an aggregate limit ``agglimit m`` on the layer's
+// annual recovery R, so the reinsurer pays min((R - d)+, m). Either or both;
+// stated for 100% of the layer, the placement share applying after. ``agglimit``
+// is one word because ``agg`` starts a unit inside a ``port`` body. The
+// occurrence-only, single-layer and not-with-reinstatements constraints are
+// enforced in the transformer. See
+// dev/done/plan-occurrence-annual-deductible-limit.md.
+reins_annual: AAD expr AGGLIMIT expr   -> reins_annual_both
+            | AAD expr                 -> reins_annual_aad
+            | AGGLIMIT expr            -> reins_annual_limit
+            |                          -> reins_annual_none
 
 reins_premium: DEPOSIT expr   -> reins_premium_deposit
              | ROL expr       -> reins_premium_rol
@@ -858,6 +874,10 @@ ROL.2:        /rol(?![a-zA-Z0-9._:~\-])/
 REINSTATEMENTS.2: /(?:reinstatements|reinstatement)(?![a-zA-Z0-9._:~\-])/
 FREE.2:       /free(?![a-zA-Z0-9._:~\-])/
 NO.2:         /no(?![a-zA-Z0-9._:~\-])/
+// Annual terms on one occurrence layer: an annual aggregate deductible and an
+// aggregate limit on the layer's annual recovery.
+AAD.2:        /aad(?![a-zA-Z0-9._:~\-])/
+AGGLIMIT.2:   /agglimit(?![a-zA-Z0-9._:~\-])/
 // Variable rating (Phase 3): swing / slide / profit-commission / corridor
 // decorate one reinsurance layer; retro is the account-level rating clause.
 SWING.2:      /swing(?![a-zA-Z0-9._:~\-])/
@@ -960,7 +980,7 @@ NTT_NUMBER: /(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:agg|aggregate|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

@@ -255,3 +255,29 @@ paragraph each), `dev/TODO.md`, `dev/FEATURES.csv` via `dev/regen_features.py`; 
   ledger (outside the repository).
 - Annual terms on more than one occurrence layer needs a joint of dimension one more than the
   number of decorated layers; not planned.
+
+## Execution log
+
+Executed from 2026-10-22 at 1.7.1 (`83ae845`). Review rulings by the author, 2026-10-22, on three findings:
+
+1. **Portfolio units: left as is.** The plan says portfolio units follow the same two routes as `agg` and `bvagg`, but a port unit has no route: any economics clause (deposit, cede, reinstatements) in a port unit raises a raw `TypeError` from `Aggregate.__init__` today (verified on 1.7.1, `unexpected keyword argument 'occ_reins_premium'`), and `_build_pnl_from_port` builds the same `Portfolio`. Annual terms in a port unit raise the same `TypeError`. Tracked as `[Reins-Economics-On-Port-Unit]` in `dev/TODO.md`.
+2. **Clause order: the ruled slot.** The grammar places the annual terms directly after the layer, but the step 2 test (`750 xs 250 deposit P agglimit 1500`) and the acceptance program (`... deposit 326.389307 aad 50 ...`) put them after the deposit, where they do not parse. Both strings are rewritten to the ruled order: `750 xs 250 agglimit 1500 deposit P` and `750 xs 250 aad 50 deposit 326.389307`.
+3. **Grid check: the aggregate limit only.** With `JOINT_KINK_MIN_BUCKETS = 20`, checking the deductible warns on the plan's own acceptance program at bucket 20 (2.5 buckets) and at bucket 5 (10 buckets), a warning DecL offers no way to act on, while the default grid is within 0.11 of the note's 187.08. A finite `annual_limit` (the band between the two kinks, the analog of the reinstated fill width) is checked; `annual_deductible` is not.
+
+### Divergences, step `[Annual-Terms-DecL]`
+
+Landed at 1.8.0.
+
+- **`decl_writer` renders the terms**, not in the plan's file list. Without it `program`, `to_agg` and derived programs drop them, and `decl-testers.agg` does not round-trip. They render directly after the layer; a zero `aad` with a finite limit and an unbounded `agglimit` are dropped, except that a bare `aad 0` still renders so it re-parses to the same spec.
+- **Two more keyword mirrors**: `parser_errors._TERMINAL_LABELS` and `agg.sublime-syntax` carry `AAD` / `AGGLIMIT` (`tests/test_grammar_sync.py` enforces both). The word list itself needed no edit: `decl_words` reads the reserved group off the `ID` lookahead. Ripple: the app's `web/src/decl-words.json` in aggregate-api regenerates from `python -m aggregate.decl_words`.
+- **Both spec keys are emitted** whenever either term is written (`0.0` for an absent deductible, `inf` for an absent limit), so consumers read them without defaults.
+- **The annual pair sits last in the transformer's clause tuple** (`(layer, premium, cede, reinst, variable, label, annual)`), though second in the source, so the positions every other consumer reads are unchanged.
+- **The repeated clause is a parse error**, not a transformer message: the grammar has one slot, so `aad 50 aad 60` fails to parse. "At most one annual clause" across layers is still checked, and its message is the one shown when two layers both carry terms; with one decorated layer among several, the single-layer message shows.
+- **The not-with-reinstatements check is per clause** (`reins_clause`), next to the existing reinstatements / variable-feature check; across layers the single-layer rule covers it.
+- **A `pnl` / `xpnl` with annual terms raises `NotImplementedError`** at this step, so the commit is bisectable with a clear message rather than a `TypeError`. Step 2 replaces it.
+- **The aggregate stage label** is `AAD 50, agglimit 500` (`_annual_terms_label` in `underwriter.py`), dropping a zero deductible or an unbounded limit, and states the 100% amounts as written.
+- **`bvagg` is tested** on both routes (a view-pair `net of` unit warns naming the unit; a copula unit's `ceded to` terms become its aggregate stage). Portfolio units per review ruling 1.
+- **Cheat sheet**: the annual terms went into box 2 of page 2, retitled "Reinstatements and annual terms", rather than a new box, to leave the page layout alone; the order line reads `LAYER <ANNUAL*> <PREMIUM*> ...`. The PDF is not rebuilt.
+- **`decl-testers.agg`** gains section `OAT`, with the six refusals commented like section X because they do not parse.
+- **Snapshot and `FEATURES.csv`**: `tests/capture_spec_snapshot.py` rewrote `expected_specs.json` with no diff, as the plan required; `dev/regen_features.py` reported no change.
+

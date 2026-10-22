@@ -1393,20 +1393,30 @@ class UnderwritingTransformer(Transformer):
     # ----- reinsurance ----------------------------------------------
     @staticmethod
     def _split_reins(triples, which, kind):
-        """Split a reins_list of ``(layer, premium, cede, reinst)`` into spec keys.
+        """Split a reins_list of clause tuples into spec keys.
 
-        ``<which>_reins`` is the list of ``(share, limit, attach)`` layer tuples
-        the reinsurance engine consumes (unchanged). The parallel per-layer
-        ``<which>_reins_premium`` (``(basis, value)`` or ``None``),
-        ``<which>_reins_cede`` (fraction or ``None``) and ``<which>_reins_reinst``
-        (reinstatement-rate tuple or ``None``) lists are added **only** when some
-        layer carries them, so plain reinsurance specs are untouched.
+        Each element is ``(layer, premium, cede, reinst, variable, label,
+        annual)`` from :meth:`reins_clause`. ``<which>_reins`` is the list of
+        ``(share, limit, attach)`` layer tuples the reinsurance engine consumes
+        (unchanged). The parallel per-layer ``<which>_reins_premium``
+        (``(basis, value)`` or ``None``), ``<which>_reins_cede`` (fraction or
+        ``None``) and ``<which>_reins_reinst`` (reinstatement-rate tuple or
+        ``None``) lists are added **only** when some layer carries them, so
+        plain reinsurance specs are untouched.
 
         The cross-layer reinstatement constraints (locked, dev/plan-reinstatements.md)
         are enforced here, where the whole layer list is in scope: reinstatements
         decorate an **occurrence** layer only; **at most one** layer may carry the
         clause ([reins-one-clause]); and the occurrence tier must then be a
         **single** layer ([reins-single-layer], the 2-D ``(L, R)`` engine ceiling).
+
+        The annual terms (``aad`` / ``agglimit``) carry the same three
+        constraints and emit the scalar keys ``occ_reins_aad`` (the 100%
+        deductible, ``0.0`` when only a limit is written) and
+        ``occ_reins_agglimit`` (the 100% limit, ``inf`` when only a deductible
+        is written). Scalars rather than per-layer lists, because the terms
+        require a single occurrence layer
+        (dev/done/plan-occurrence-annual-deductible-limit.md).
         """
         layers = [t[0] for t in triples]
         prem = [t[1] for t in triples]
@@ -1414,6 +1424,7 @@ class UnderwritingTransformer(Transformer):
         reinst = [t[3] for t in triples]
         variable = [t[4] for t in triples]
         label = [t[5] for t in triples]
+        annual = [t[6] for t in triples]
         out = {f"{which}_reins": layers, f"{which}_kind": kind}
         if any(p is not None for p in prem):
             out[f"{which}_reins_premium"] = prem
@@ -1462,6 +1473,26 @@ class UnderwritingTransformer(Transformer):
                     "layer cannot share the occurrence tier with other layers "
                     "(the engine ceiling is the 2-D (L, R) joint).")
             out[f"{which}_reins_reinst"] = reinst
+        present_annual = [a for a in annual if a is not None]
+        if present_annual:
+            if which != "occ":
+                raise ValueError(
+                    "DecL: 'aad' / 'agglimit' decorate an occurrence layer, not "
+                    "aggregate reinsurance. An aggregate layer is itself the "
+                    "annual deductible and limit: write 'm xs d'.")
+            if len(present_annual) > 1:
+                raise ValueError(
+                    f"DecL: 'aad' / 'agglimit' may decorate at most one "
+                    f"occurrence layer; found {len(present_annual)}.")
+            if len(layers) != 1:
+                raise ValueError(
+                    f"DecL: 'aad' / 'agglimit' require a single occurrence "
+                    f"layer; found {len(layers)}. The annual terms cannot share "
+                    "the occurrence tier with other layers (the engine ceiling "
+                    "is the 2-D (L, R) joint).")
+            aad, agglimit = present_annual[0]
+            out["occ_reins_aad"] = aad
+            out["occ_reins_agglimit"] = agglimit
         return out
 
     def agg_reins_net(self, c):
@@ -1556,11 +1587,12 @@ class UnderwritingTransformer(Transformer):
 
     def reins_list_tower(self, c):
         # A tower has no per-layer premium / cede / reinstatements / variable
-        # feature / label: wrap each layer as a ``(layer, premium, cede, reinst,
-        # variable, label)`` so reins_list elements are uniform.
+        # feature / label / annual terms: wrap each layer as a ``(layer,
+        # premium, cede, reinst, variable, label, annual)`` so reins_list
+        # elements are uniform.
         tower = c[0]
         limit, attach = tower[0], tower[1]
-        return [((1.0, l, a), None, None, None, None, None)
+        return [((1.0, l, a), None, None, None, None, None, None)
                 for l, a in zip(limit, attach)]
 
     def reins_clause_xs(self, c):
@@ -1588,21 +1620,29 @@ class UnderwritingTransformer(Transformer):
 
     # ----- ceded-premium / commission decorators (decision 3) -------
     def reins_clause(self, c):
-        """Combine a loss layer with its optional premium / cede / reinstatements
-        / variable-rating feature.
+        """Combine a loss layer with its optional annual terms / premium / cede /
+        reinstatements / variable-rating feature.
 
-        Returns ``(layer, premium, cede, reinst, variable, label)`` where ``layer``
-        is the ``(share, limit, attach)`` tuple consumed by the reinsurance engine,
-        ``premium`` is ``(basis, value)`` (basis in ``deposit`` / ``rol`` /
-        ``rate``) or ``None``, ``cede`` is the commission fraction or ``None``,
-        ``reinst`` is the tuple of reinstatement price multipliers or ``None``,
-        ``variable`` is ``(feature, params)`` for one of swing / slide / pc /
-        corridor or ``None``, and ``label`` is the optional ``as`` display label
-        for the cession (or ``None``). ``reins_list`` splits these into parallel
-        spec keys.
+        Returns ``(layer, premium, cede, reinst, variable, label, annual)``
+        where ``layer`` is the ``(share, limit, attach)`` tuple consumed by the
+        reinsurance engine, ``premium`` is ``(basis, value)`` (basis in
+        ``deposit`` / ``rol`` / ``rate``) or ``None``, ``cede`` is the
+        commission fraction or ``None``, ``reinst`` is the tuple of
+        reinstatement price multipliers or ``None``, ``variable`` is
+        ``(feature, params)`` for one of swing / slide / pc / corridor or
+        ``None``, ``label`` is the optional ``as`` display label for the
+        cession (or ``None``), and ``annual`` is the ``(aad, agglimit)`` pair of
+        100% amounts or ``None``. ``reins_list`` splits these into spec keys.
+        The annual terms sit last in the tuple, though second in the source,
+        so the long-standing positions of the other fields stay put.
         """
-        layer, premium, cede, reinst, variable, as_label = c
+        layer, annual, premium, cede, reinst, variable, as_label = c
         label = as_label.get("label")
+        if annual is not None and reinst is not None:
+            raise ValueError(
+                "DecL: 'aad' / 'agglimit' cannot combine with 'reinstatements' "
+                "on the same layer; both set the layer's annual recovery. "
+                "Write the annual limit one way or the other.")
         if cede is not None and premium is None:
             raise ValueError(
                 "DecL: 'cede' (ceding commission) needs a ceded-premium clause "
@@ -1640,7 +1680,44 @@ class UnderwritingTransformer(Transformer):
                     raise ValueError(
                         "DecL: 'slide' replaces the fixed 'cede' commission; give "
                         "one or the other.")
-        return (layer, premium, cede, reinst, variable, label)
+        return (layer, premium, cede, reinst, variable, label, annual)
+
+    # ----- annual terms on an occurrence layer -------------------------
+    # ``aad d`` / ``agglimit m`` -> the ``(aad, agglimit)`` pair of 100%
+    # amounts, ``0.0`` / ``inf`` filling the one not written. Carried on the
+    # spec keys ``occ_reins_aad`` / ``occ_reins_agglimit``. See
+    # dev/done/plan-occurrence-annual-deductible-limit.md.
+    @staticmethod
+    def _annual_terms(aad, agglimit, written_limit):
+        """Validate and return the ``(aad, agglimit)`` pair as floats.
+
+        ``written_limit`` is ``False`` when the limit was omitted and is the
+        implied unbounded ``inf``, the one infinite value allowed.
+        """
+        aad, agglimit = float(aad), float(agglimit)
+        if not (np.isfinite(aad) and aad >= 0):
+            raise ValueError(
+                f"DecL: 'aad' must be finite and >= 0, got {aad:g}.")
+        if written_limit and not (np.isfinite(agglimit) and agglimit > 0):
+            raise ValueError(
+                f"DecL: 'agglimit' must be finite and > 0, got {agglimit:g}. "
+                "Omit the clause for an unlimited annual recovery.")
+        return (aad, agglimit)
+
+    def reins_annual_both(self, c):
+        _aad, aad, _lim, agglimit = c
+        return self._annual_terms(aad, agglimit, True)
+
+    def reins_annual_aad(self, c):
+        _aad, aad = c
+        return self._annual_terms(aad, np.inf, False)
+
+    def reins_annual_limit(self, c):
+        _lim, agglimit = c
+        return self._annual_terms(0.0, agglimit, True)
+
+    def reins_annual_none(self, c):
+        return None
 
     def reins_premium_deposit(self, c):
         return ('deposit', float(c[1]))

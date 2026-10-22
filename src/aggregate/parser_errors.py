@@ -112,6 +112,8 @@ _TERMINAL_LABELS: dict[str, str] = {
     "REINSTATEMENTS": "'reinstatements'",
     "FREE": "'free' (zero-rate reinstatement)",
     "NO": "'no' (no reinstatements)",
+    "AAD": "'aad' (annual aggregate deductible)",
+    "AGGLIMIT": "'agglimit' (aggregate limit)",
     "SWING": "'swing' (variable ceded premium)",
     "SLIDE": "'slide' (sliding-scale commission)",
     "RETRO": "'retro' (retrospective rating)",

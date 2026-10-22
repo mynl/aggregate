@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.8.0 - 2026-10-22
+
+**[Annual-Terms-DecL] `aad d` and `agglimit m` on an occurrence layer: an annual aggregate deductible and an aggregate limit on the layer's annual recovery.** Written directly after the layer (`occurrence net of 90% po 750 xs 250 aad 50 agglimit 500 deposit 100`), either or both, amounts for 100% of the layer with the share applied after; the reinsurer pays `min((R - s d)+, s m)`. New reserved words `aad` and `agglimit`; spec keys `occ_reins_aad` (default `0`) and `occ_reins_agglimit` (default `inf`), which round trip through `decl_writer`. Refused on an aggregate layer, on more than one occurrence layer, with `reinstatements`, for a negative `aad`, and for a zero or explicit infinite `agglimit`. A plain `agg` honors the terms after `occurrence ceded to`, as the aggregate stage `aggregate ceded to s m xs s d` (an `aggregate` clause alongside raises), and ignores them after `net of` with an `IgnoredDecLClauseWarning`, the stored program keeping them; `bvagg` components follow the same two routes, and a `port` unit raises the same `TypeError` as every other economics clause there. A `pnl` / `xpnl` with the terms raises `NotImplementedError` until the next step. Grammar reference and DecL cheat sheet updated; docs await a rebuild.
+
 ## 1.7.1 - 2026-10-22
 
 **[Qd-Wrap-Strings] `qd` wraps the strings it prints at 72 characters.** The `Aggregate` and `Portfolio` info blob, the `PnL` and `BivariateAggregate` repr, and a bare `str` argument now print as wrapped lines instead of one long row in markdown output. Wrapping is per line, so embedded newlines are kept, and long tokens are not split. Tables, numbers and other objects print as before.

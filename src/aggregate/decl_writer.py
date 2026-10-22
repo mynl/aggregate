@@ -590,7 +590,7 @@ def _render_variable_feature(spec: dict, list_key: str, layer_idx: int) -> str:
 
 
 def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
-                         variable='', label=None) -> str:
+                         variable='', label=None, annual=None) -> str:
     """Render one ``(share, limit, attach)`` cession tuple with its decorators.
 
     A full-line share (1.0) renders as ``limit xs attach``; a partial share
@@ -613,6 +613,12 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
     treaty-language group chain is input sugar that canonicalises to the list);
     the **empty** tuple renders as ``no reinstatements`` (zero reinstatements, a
     single annual limit).
+
+    Optional annual terms ``annual`` (the ``(aad, agglimit)`` pair of 100%
+    amounts) render directly after the layer, where the grammar puts them:
+    ``aad d`` unless ``d`` is zero with a finite limit, then ``agglimit m``
+    unless ``m`` is the implied ``inf``. An explicit ``aad 0`` alone still
+    renders, so it re-parses to the same spec.
     """
     share, limit, attach = clause
     if float(share) == 1.0:
@@ -621,6 +627,12 @@ def _render_reins_clause(clause, premium=None, cede=None, reinst=None,
         base = (f'{_fmt_num(float(share) * 100)}% po '
                 f'{_fmt_num(limit)} xs {_fmt_num(attach)}')
     parts = [base]
+    if annual is not None:
+        aad, agglimit = annual
+        if aad != 0 or not np.isfinite(agglimit):
+            parts.append(f'aad {_fmt_num(aad)}')
+        if np.isfinite(agglimit):
+            parts.append(f'agglimit {_fmt_num(agglimit)}')
     if premium is not None:
         basis, value = premium
         parts.append(f'{basis} {_fmt_num(value)}')
@@ -663,13 +675,17 @@ def _render_reins(spec: dict, prefix: str, list_key: str, kind_key: str):
     cede = spec.get(f'{list_key}_cede')
     reinst = spec.get(f'{list_key}_reinst')
     label = spec.get(f'{list_key}_label')
+    # Annual terms are scalar keys on the one occurrence layer they decorate.
+    annual = ((spec['occ_reins_aad'], spec['occ_reins_agglimit'])
+              if list_key == 'occ_reins' and 'occ_reins_aad' in spec else None)
     cessions = [
         _render_reins_clause(c,
                              prem[i] if prem is not None else None,
                              cede[i] if cede is not None else None,
                              reinst[i] if reinst is not None else None,
                              _render_variable_feature(spec, list_key, i),
-                             label[i] if label is not None else None)
+                             label[i] if label is not None else None,
+                             annual if i == 0 else None)
         for i, c in enumerate(layers)]
     return _Block(f'{prefix} {spec[kind_key]}', cessions, sep='and')
 

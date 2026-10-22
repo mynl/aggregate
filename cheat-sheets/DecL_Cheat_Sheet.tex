@@ -198,7 +198,7 @@ Key: \texttt{<INPUT>} user input; \texttt{lower\_case} a DecL keyword; \texttt{C
 {\huge{\bf DecL Cheat Sheet \textnormal{(2/4)}: reinsurance economics, \texttt{pnl} and \texttt{xpnl}}}
 
 \raggedright Page 1 declared the reinsurance \emph{loss} structure. Everything here is \emph{money}: ceded premium, commission, reinstatements, variable rating, and the profit-and-loss statement that books them. \\
-A priced layer is \texttt{LAYER <PREMIUM*> <CEDE*> <REINSTATEMENTS*> <VARIABLE*> <LABEL*>}, in that order.
+A priced layer is \texttt{LAYER <ANNUAL*> <PREMIUM*> <CEDE*> <REINSTATEMENTS*> <VARIABLE*> <LABEL*>}, in that order.
 
 \begin{multicols*}{3}
 
@@ -228,8 +228,12 @@ A priced layer is \texttt{LAYER <PREMIUM*> <CEDE*> <REINSTATEMENTS*> <VARIABLE*>
 \medskip\it Multipliers $\alpha_j$ are relative to the base rate on line $r$, so a base premium clause is required. \texttt{free} $=$ \texttt{at 0\%}. Counts may be digits or the words \texttt{one}\dots\texttt{five}. $m$ reinstatements $=$ $m+1$ annual limits, so \texttt{no reinstatements} is one limit --- distinct from \rm omitting\it{} the clause, which keeps free and unlimited.
 
 \medskip\it One occurrence layer, one clause. This is the stochastic-ceded property-cat feature.
+
+\medskip\rm\texttt{LAYER aad <D> agglimit <M>} {\it annual terms, either or both}
+
+\medskip\it The reinsurer pays $\min((R-d)^+, m)$ on the layer's annual recovery $R$, amounts for 100\% of the layer. One occurrence layer, not with reinstatements. A plain \texttt{agg} honors them after \texttt{ceded to} and ignores them after \texttt{net of}.
 \end{minipage}};
-\node[fancytitle] at (box.north west) {2. Reinstatements};
+\node[fancytitle] at (box.north west) {2. Reinstatements and annual terms};
 \end{tikzpicture}
 
 %--- Variable rating ---

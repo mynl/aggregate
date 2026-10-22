@@ -42,6 +42,14 @@
 
 ## In flight
 
+- **[Occurrence-Annual-Terms]**
+  (`dev/done/plan-occurrence-annual-deductible-limit.md`): `aad d` and
+  `agglimit m` on one occurrence layer. Step `[Annual-Terms-DecL]` landed at
+  **1.8.0**: grammar, spec keys `occ_reins_aad` / `occ_reins_agglimit`, the
+  refusals, and the plain `agg` (honored after `ceded to` as the aggregate
+  stage, ignored with a warning after `net of`). Step `[Annual-Terms-PnL]`,
+  the cedant's net in `pnl` / `xpnl` through `AnnualLayerTerms`, is next;
+  until it lands a `pnl` with annual terms raises `NotImplementedError`.
 - **[NTT-Tail-Visibility]** (`dev/plan-ntt-tail-visibility.md`) — phase 1
   `[NTT-Accuracy-Overflow]` landed at **1.2.0a6**: `ntt_audit` and
   `accuracy_df` no longer raise on any case whose exact tail falls below the
@@ -397,6 +405,21 @@
 - **[Waterfall-Limited-Margin]** — from
   `dev/deferred/plan-pnl-evaluate-anchor-DEFERRED.md`, which carries the
   analysis.
+- **[Reinstatement-Cap-On-Ceded-Agg]** (ruling 8 of
+  `dev/done/plan-occurrence-annual-deductible-limit.md`): a plain `agg` honors
+  `agglimit` on an `occurrence ceded to` layer but ignores the reinstatement
+  cap there, so `750 xs 250 agglimit 1500` and `750 xs 250 reinstatements 1
+  free` give different ceded distributions though the annual limit is the
+  same. Honor the cap `(m+1) s y` on `ceded to` as an aggregate stage, the way
+  the annual terms are; the reinstatement premium stays ignored.
+- **[Reins-Economics-On-Port-Unit]** (found reviewing the annual terms plan,
+  2026-10-22): any economics clause in a `port` unit (deposit, cede,
+  reinstatements, `aad` / `agglimit`) raises a raw `TypeError` from
+  `Aggregate.__init__`, since the strip serves `agg` and `bvagg` only;
+  `_build_pnl_from_port` builds the same `Portfolio`. Extend the strip (and the
+  `ceded to` annual rewrite) to port units, with a remedy sentence of their
+  own: folding into a `pnl` by `agg.NAME` does not apply to a unit inside a
+  port.
 
 ## From the a89 objective review
 

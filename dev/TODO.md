@@ -135,15 +135,6 @@
 > Rulings and promises were posted on GitHub on 2026-10-13. Contributors leave
 > the version, `CHANGELOG.md` and this file alone; we add all three at merge.
 
-- **[Deductible-Vocabulary]** (#9): franchise **landed at 1.7.0** (#15), the
-  aggregate deductible library entry at 1.6.0 (#16), disappearing pending in
-  #20 with the owed corpus items (a `_test_suite.agg` line, the unparser
-  corpus and the snapshot recapture, for both forms). Revised ruling on #15:
-  the payment is `min(x - r(x), y)`, deductible first and limit second, so
-  `limit` is the largest payment and the only constraint is `d1 <= d2`. One
-  transform on the continuous severity with `d2` (`retention_end`) as its
-  parameter: `inf` ordinary, `d1` franchise, `d1 < d2` disappearing.
-
 - **[Deductible-Forms-Follow-Ups]** (from the #15 review): (1) the old
   `make_layer_attachment_pdf` tests `x >= limit` before `x == limit`, so it
   never returns the point-mass marker at the limit (`pdf(1000)` is 0 for
@@ -167,6 +158,13 @@
 
 ## Recently landed
 
+- **[Deductible-Vocabulary]** DONE at **1.11.0** (2026-10-22, #9): the
+  aggregate deductible library entry at 1.6.0 (#16), franchise at 1.7.0
+  (#15), disappearing at 1.11.0 (#20), with corpus lines, unparser cases and
+  the snapshot for both forms. One transform on the continuous severity with
+  `d2` (`retention_end`) as its parameter: `inf` ordinary, `d1` franchise,
+  `d1 < d2` disappearing; the payment is `min(x - r(x), y)`, deductible first
+  and limit second. Open items are in `[Deductible-Forms-Follow-Ups]`.
 - **[Input-Guards]** DONE at **1.10.2** (2026-10-22, contributor PR #19 from
   the ruling on #18): a `fixed` count that is not whole (stated, or derived
   from loss or premium) and a `dfreq` outcome that is negative or not whole

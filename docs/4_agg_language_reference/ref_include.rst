@@ -654,7 +654,8 @@
     // retention falls linearly from ``d1`` at a loss of ``d1`` to zero at a loss
     // of ``d2``, and the payment is ``min(X - r(X), y)``
     // ([Disappearing-Deductible]). ``d2`` is stored as ``exp_retention_end``; a
-    // vector ``to [...]`` must conform to the attachments.
+    // vector ``to [...]`` has one entry per layer, counted after the limits and
+    // attachments broadcast, and a scalar applies to every layer.
     layers: numbers XS numbers as_label   -> layers_xs
           | numbers XS numbers FRANCHISE as_label -> layers_xs_franchise
           | numbers XS numbers TO numbers DISAPPEARING as_label -> layers_xs_disappearing

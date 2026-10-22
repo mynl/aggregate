@@ -2241,6 +2241,49 @@ def test_every_served_block_reconstructs_hash_for_hash(objects):
     assert seen > 50
 
 
+def test_no_exhibit_draws_an_unmatched_formatters_warning(objects):
+    """The format sheets reach a block only with the columns it has.
+
+    greater_tables 7.4 and later raises a ``UserWarning`` for each
+    ``formatters`` key that matches no column of the table it builds. The
+    sheets are shared by every exhibit, so before 1.10.0 each block drew one
+    per sheet entry it lacked, and one aggregate-api pricing request returned
+    538 ([Format-Sheet-Block-Filter]). Swept over every (object, exhibit,
+    perspective).
+    """
+    import warnings
+    seen = 0
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        for obj in objects.values():
+            for name, perspectives in available_exhibits(obj):
+                for perspective in perspectives:
+                    build_exhibit(obj, name, perspective)
+                    seen += 1
+    unmatched = sorted({str(w.message) for w in caught
+                        if 'matches no column' in str(w.message)})
+    assert unmatched == []
+    assert seen > 50
+
+
+def test_a_block_s_own_unmatched_formatters_key_still_warns(dice, monkeypatch):
+    """A block's own ``formatters`` are written for that one frame and are not
+    filtered, so a misspelled key there is a real mistake and greater_tables
+    raises its warning. Shows the check is live under the installed
+    greater_tables, so the sweep above is not passing vacuously."""
+    from aggregate.exhibits import _core
+    frames = _core.exhibit_frames
+
+    def misspelled(obj, name, perspective):
+        return [(block, df, {**kw, 'formatters': {'Nonesuch': '.3f'}})
+                for block, df, kw in frames(obj, name, perspective)]
+
+    monkeypatch.setattr(_core, 'exhibit_frames', misspelled)
+    with pytest.warns(UserWarning,
+                      match="formatters key 'Nonesuch' matches no column"):
+        build_exhibit(dice, 'summary')
+
+
 # The committed snapshot file drives the case list, so a freshly captured
 # exhibit (a new kind, a new phase) is guarded the moment the capture script
 # runs; a case that disappears from the live registry fails its build below.

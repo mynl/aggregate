@@ -213,6 +213,49 @@ def test_block_translates_keys_through_a_renamer():
     assert 'Coefficient of variation' in selectors['ratio_cols']
 
 
+# --- the block filter ([Format-Sheet-Block-Filter]) ---------------------------
+
+def test_an_exact_entry_reaches_only_a_block_with_that_column():
+    """greater_tables 7.4 and later warns on a formatters key matching no column."""
+    sheet = format_sheet('raw')
+    labels = ['CV', 'Skew', 'not a sheet word']
+    formatters, selectors = sheet.block(None, None, labels)
+    assert formatters == {'CV': '.1%', 'Skew': '.3g'}
+    assert selectors == {'ratio_cols': ['CV']}
+    assert 'L' in sheet.block()[0], 'no labels still means the whole sheet'
+
+
+def test_the_filter_applies_to_a_scoped_entry():
+    sheet = format_sheet('raw')
+    assert sheet.block('tail', None, ['P'])[0]['P'] == '.5f'
+    assert 'P' not in sheet.block('tail', None, ['VaR'])[0]
+    assert set(sheet.block('tail', None, ['VaR'])[0]) == {'VaR'}
+
+
+def test_the_filter_applies_to_the_displayed_label():
+    """``labels`` arrive relabeled, so the filter runs after ``rename``."""
+    sheet = format_sheet('raw')
+    rename = {'CV': 'Coefficient of variation'}.get
+    renamer = lambda c: rename(c) or c                     # noqa: E731
+    kept, selectors = sheet.block(None, renamer, ['Coefficient of variation'])
+    assert kept == {'Coefficient of variation': '.1%'}
+    assert selectors == {'ratio_cols': ['Coefficient of variation']}
+    dropped, selectors = sheet.block(None, renamer, ['CV'])
+    assert dropped == {} and selectors == {}
+
+
+def test_an_empty_block_gets_nothing():
+    assert format_sheet('raw').block('tail', None, []) == ({}, {})
+    assert format_sheet('raw').block('stats', None, iter([])) == ({}, {})
+
+
+def test_labels_may_be_a_generator():
+    """Patterns and the filter both walk the labels, so a generator is listed."""
+    labels = (label for label in ['CV', 'e0.m0'])
+    formatters, _ = format_sheet('raw').block(None, None, labels)
+    assert set(formatters) == {'CV', 'e0.m0'}
+
+
 # --- the loader --------------------------------------------------------------
 
 def test_sheets_are_cached_per_perspective():

@@ -177,7 +177,7 @@ class FormatSheet:
         return any(regex.fullmatch(str(label))
                    for regex, _value, _tag in (*scoped_patterns, *self.patterns))
 
-    def block(self, exhibit=None, rename=None, labels=()):
+    def block(self, exhibit=None, rename=None, labels=None):
         """The greater_tables kwargs this sheet contributes to one block.
 
         Parameters
@@ -193,17 +193,26 @@ class FormatSheet:
             renamer touching ``CV`` would silently detach its format, which is
             what the module level dicts did.
         labels : iterable, optional
-            The block's own column labels, which is what patterns are matched
-            against. They arrive already relabeled, so a pattern needs no
-            ``rename`` trip: it is written against what a reader sees.
+            The block's own column labels. Patterns are matched against them,
+            and an exact entry is kept only when its displayed label (after
+            ``rename``) is among them. They arrive already relabeled, so a
+            pattern needs no ``rename`` trip: it is written against what a
+            reader sees. ``None``, the default, means no block: patterns
+            expand against nothing and every exact entry is returned, the
+            whole sheet. An empty list is a block with no columns, and gets
+            nothing.
 
         Returns
         -------
         (dict, dict)
             The ``formatters`` mapping, and ``{'<tag>_cols': [labels]}`` for
-            each tag the sheet stamps. Labels the frame does not carry are
-            harmless in both: greater_tables looks formats up by label and
-            resolves a selector list against the columns it actually has.
+            each tag the sheet stamps. Given ``labels``, an exact entry for a
+            column the block does not have is left out of both, because
+            greater_tables 7.4 and later raises a ``UserWarning`` for a
+            ``formatters`` key that matches no column. Tags are filtered the
+            same way for consistency, although greater_tables intersects a
+            selector list with the table's labels and an absent label there
+            is harmless.
 
         Notes
         -----
@@ -213,12 +222,23 @@ class FormatSheet:
         is a statement about one word, and the word is the more specific of
         the two. Among patterns the first match in file order wins, so a
         narrow pattern belongs above a broad one.
+
+        The filter to ``labels`` is where a shared declaration meets one
+        table ([Format-Sheet-Block-Filter]). The sheet is written once for
+        every exhibit, so most of its entries name columns a given block
+        lacks, and that is not a mistake: a shared declaration applies where
+        it matches and stays quiet elsewhere. A block's own ``formatters``,
+        laid over these in :func:`~aggregate.exhibits.build_exhibit`, is
+        written for that one frame and is not filtered, so a key there that
+        matches nothing still draws greater_tables' warning.
         """
         scoped_columns, scoped_tags, scoped_patterns = self.exhibits.get(
             exhibit, ({}, {}, ()))
+        if labels is not None:
+            labels = list(labels)      # iterated twice, so not a generator
         columns, tags = {}, {}
         ordered = (*scoped_patterns, *self.patterns)
-        for label in labels:
+        for label in labels or ():
             for regex, value, tag in ordered:
                 if regex.fullmatch(str(label)):
                     columns[label] = value
@@ -234,6 +254,13 @@ class FormatSheet:
         if rename is not None:
             exact = {rename(label): value for label, value in exact.items()}
             exact_tags = {rename(label): tag for label, tag in exact_tags.items()}
+        if labels is not None:
+            # after the rename, because labels arrive relabeled
+            present = set(labels)
+            exact = {label: value for label, value in exact.items()
+                     if label in present}
+            exact_tags = {label: tag for label, tag in exact_tags.items()
+                          if label in present}
         for label in exact:
             tags.pop(label, None)      # an exact entry replaces a pattern's tag
         columns.update(exact)

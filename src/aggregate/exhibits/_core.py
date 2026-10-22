@@ -253,7 +253,7 @@ def _import_greater_tables():
     except ImportError as exc:
         raise ImportError(
             'greater_tables is required to build exhibit IR blocks. It is a '
-            'dependency of aggregate (greater_tables>=6), so this means a '
+            'dependency of aggregate (greater_tables>=8.1), so this means a '
             'broken environment: reinstall with '
             '`uv sync --all-extras` or `pip install -U aggregate`.') from exc
     return greater_tables

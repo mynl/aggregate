@@ -1,7 +1,8 @@
 # Plan: format sheets send greater_tables only the columns a block has
 
 `[Format-Sheet-Block-Filter]`, one step. Drafted 2026-10-22 at 1.7.1 (`3f342d3`) during the
-greater_tables 8.1.0 rollout. **Status: ruled 2026-10-22, not executed.** See Rulings at the foot.
+greater_tables 8.1.0 rollout. **Status: executed 2026-10-22 as 1.10.0.** See Rulings and the
+Execution log at the foot.
 
 This is the library half of a pair. The other half is
 `V:\dev\aggregate-api\dev\plan-greater-tables-8.md`, which moves aggregate-api and the
@@ -149,3 +150,19 @@ No new public names. The one signature change is the `labels` default in step 2.
 2. **The `labels` default is `None`**, meaning the whole sheet, with any list filtering. The
    alternative, keeping `()` and filtering only a non-empty list, would leave a block with no
    columns receiving the whole sheet.
+
+## Execution log
+
+**1.10.0, 2026-10-22**, on `dev` after 1.9.0 (`298f095`). Steps 1 to 6 landed as written. Review found every cited path, line number and snippet matching the code at 1.9.0, and no name to vet beyond the `labels` default.
+
+Divergences and findings:
+
+1. **A third copy of the floor.** `_import_greater_tables` in `exhibits/_core.py` gave the floor as `greater_tables>=6` in its `ImportError` text. Changed to `>=8.1`. The plan named only the two `pyproject.toml` comments.
+2. **The lock diff has one line beyond greater-tables.** pexpect's dependency on ptyprocess loses its `sys_platform != 'emscripten' and sys_platform != 'win32'` marker, a re-resolution by uv 0.12.7. No effect: pexpect itself is still required under that marker (`uv.lock`, the ipython entry), so ptyprocess installs nowhere new.
+3. **`labels` is listed once at the top of `block`.** Patterns and the new filter both walk it, so a generator would have reached the filter empty. Covered by `test_labels_may_be_a_generator`, and an explicit empty block by `test_an_empty_block_gets_nothing`; both are additions to the plan's test list.
+4. **The live warning case injects its key by monkeypatching `_core.exhibit_frames`.** No registered block sets its own `formatters` with an absent column, so the misspelled key is laid onto the `summary` block's kwargs for the one test.
+5. **Exhibit snapshots re-captured: 8 of 166 cases, 938 cells.** Every moved cell is an inferred format on a column with no sheet reading, and every one is greater_tables 7.4.0's Fixed entry (a float column takes the decimals its smallest value needs, or goes to SI past five). The `approximation` exhibit on `Aggregate`, `ReinsAggregate` and `ReinsPortfolio` (both perspectives) gains a decimal on several columns. `reins_summary_df` on `PeelMarginal` (both perspectives) moves `Change CV` from `dec 5`, which set `1.55e-06` as `0.00000`, to SI 3, which sets `0.2558` as `255.757m`. `Change EX` was already SI. The filter alone moved no IR: nothing else in the snapshot file changed.
+6. **Finding for the author: `Change CV` in SI.** It reads like `Change EX` now, but `255.757m` for a change of 0.256 in a CV is an odd reading for an actuarial table. Both labels are on `PENDING_VOCABULARY` in `tests/test_exhibits.py`, so the fix is a sheet entry (the `residual` style, say) when that punch list is ruled. Not done here.
+7. **`.doc-venv` is not touched.** It is absent from this worktree; `doc-test-uv.ps1` syncs it from the lock when it next runs.
+
+Tests: tier 1 on `tests/test_exhibit_formats.py` and `tests/test_exhibits.py`, 328 passed. Tier 3 gate `UV_PROJECT_ENVIRONMENT=.venv uv run pytest -m 'slow or not slow'` on greater-tables 8.1.0, 6483 passed; its warnings summary holds no greater_tables warning and no `matches no column`.

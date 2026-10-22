@@ -167,6 +167,13 @@
 
 ## Recently landed
 
+- **[Format-Sheet-Block-Filter]** DONE at **1.10.0** (2026-10-22,
+  `dev/done/plan-format-sheet-block-filter.md`, the library half of
+  aggregate-api's `[Greater-Tables-8]`): `FormatSheet.block` sends each block
+  only the exact entries for its columns, so exhibits build without
+  greater_tables' unmatched `formatters` warning; the floor is
+  `greater_tables>=8.1.0`. Next: the author releases 1.10.0 to PyPI, then
+  aggregate-api's `dev/plan-greater-tables-8.md` executes.
 - **[Occurrence-Annual-Terms]** DONE at **1.8.0** and **1.9.0**
   (2026-10-22, `dev/done/plan-occurrence-annual-deductible-limit.md`): `aad d`
   and `agglimit m` on one occurrence layer. `[Annual-Terms-DecL]` (1.8.0): the

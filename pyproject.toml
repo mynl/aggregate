@@ -28,12 +28,15 @@ classifiers = [
     "Topic :: Office/Business :: Financial",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
-# greater_tables 6 requires Python >= 3.12 and floors numpy at 2.0 and pandas
+# greater_tables requires Python >= 3.12 and floors numpy at 2.0 and pandas
 # at 2.2, so making it a plain dependency at 1.0.0a229 raised this project's
 # floors to match rather than leaving them to be inherited silently. It also
-# brings pydantic and pyyaml in transitively.
+# brings pydantic and pyyaml in transitively. The floor is 8.1 since 1.10.0:
+# the exhibit format sheets filter their entries to each block's columns,
+# which greater_tables 7.4 and later requires to build without a warning per
+# unmatched formatters key, and 8.1 keeps the 6 floors above.
 dependencies = [
-    "greater_tables>=6",
+    "greater_tables>=8.1.0",
     "IPython",
     "lark>=1.1",
     "matplotlib>=3.5",
@@ -113,13 +116,13 @@ all = [
     "aggregate[notebook,numba,massive,viz]",
 ]
 # The exhibits IR (dev/plan-exhibits.md, [Exhibits-Module]) needs
-# greater_tables 6, which published to PyPI on 2026-08-07. It is a plain
-# dependency above rather than an `exhibits` extra: the exhibit surface is
-# part of what the library is for, and an extra bought nothing once the
-# package resolved normally. Developing greater_tables alongside this repo
-# still works, but a `uv sync` will replace an editable checkout with the
-# published wheel, so re-install it after syncing:
-#   UV_PROJECT_ENVIRONMENT=.venv uv pip install -e C:/S/AI/greatest-tables
+# greater_tables, 8.1 or later since 1.10.0 (8.1.0 published to PyPI on
+# 2026-10-22). It is a plain dependency above rather than an `exhibits`
+# extra: the exhibit surface is part of what the library is for, and an extra
+# bought nothing once the package resolved normally. Developing greater_tables
+# alongside this repo still works, but a `uv sync` will replace an editable
+# checkout with the published wheel, so re-install it after syncing:
+#   UV_PROJECT_ENVIRONMENT=.venv uv pip install -e V:/dev/greatest-tables
 
 [tool.setuptools]
 include-package-data = true

@@ -1152,18 +1152,21 @@ class FrequencyEmpirical(Frequency):
     carries_own_count = True
 
     def _build(self):
+        # guard the outcomes as entered: validation clamps a negative outcome
+        # onto 0, which would hide it
+        self._guard_whole_outcomes()
         self.freq_a, self.freq_b = validate_discrete_distribution(
             self.freq_a, self.freq_b)
-        self._guard_whole_outcomes()
 
     def _guard_whole_outcomes(self):
-        """Refuse a count support that is not made of whole numbers.
+        """Refuse a count support that is not made of non-negative whole numbers.
 
         Raises
         ------
         ValueError
-            If any outcome is not within a relative ``1e-9`` of an integer
-            ([Input-Guards]). The message lists the offending outcomes.
+            If any outcome is negative, or is not within a relative ``1e-9``
+            of an integer ([Input-Guards]). The message lists the offending
+            outcomes.
 
         Notes
         -----
@@ -1172,21 +1175,33 @@ class FrequencyEmpirical(Frequency):
         through the principal branch, which is not the transform of any
         distribution: the aggregate density comes back with negative
         probabilities and a total mass other than one, exactly as for a
-        fractional ``fixed`` count. The tolerance matches the ``fixed`` guard,
-        so an outcome a few ulps off a whole number still builds.
+        fractional ``fixed`` count. A negative outcome is not a count at all;
+        ``validate_discrete_distribution`` would clamp it onto 0, so the
+        object would build silently with a mean other than the one the stated
+        counts give. The guard therefore runs on the outcomes as entered,
+        before that validation. The tolerance matches the ``fixed`` guard, so
+        an outcome a few ulps off a whole number still builds.
         """
         a = np.asarray(self.freq_a, dtype=float)
-        bad = a[~np.isclose(a, np.round(a), rtol=1e-9, atol=1e-12)]
+        whole = np.round(a)
+        fractional = ~np.isclose(a, whole, rtol=1e-9, atol=1e-12)
+        negative = whole < 0
+        bad = a[fractional | negative]
         if bad.size == 0:
             return
         shown = ', '.join(f'{x:.6g}' for x in bad[:5])
         more = f' and {bad.size - 5} more' if bad.size > 5 else ''
+        why = []
+        if fractional.any():
+            why.append('A fractional count has no distribution and returns '
+                       'negative probabilities.')
+        if negative.any():
+            why.append('A negative count is not a number of claims.')
         raise ValueError(
-            f'dfreq outcomes are claim counts and must be whole numbers, but '
-            f'the support includes {shown}{more}. A fractional count has no '
-            f'distribution and returns negative probabilities. List whole '
-            f'counts with their probabilities, or use poisson for an expected '
-            f'count.')
+            f'dfreq outcomes are claim counts and must be non-negative whole '
+            f'numbers, but the support includes {shown}{more}. '
+            f'{" ".join(why)} List whole counts with their probabilities, or '
+            f'use poisson for an expected count.')
 
     def freq_moms(self, n):
         en = np.sum(self.freq_a * self.freq_b)

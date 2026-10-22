@@ -6,7 +6,8 @@ probabilities and misses the mean), so the build raises instead. The count can
 be stated directly, or derived from an expected loss or from premium times loss
 ratio, and the message names whichever route produced it. A ``dfreq`` support
 with a fractional outcome has the same defect through the other door, a
-fractional power in ``sum p_k z^k``, and is refused when the frequency is built.
+fractional power in ``sum p_k z^k``, and is refused when the frequency is built,
+as is a negative outcome, which validation would otherwise clamp onto 0.
 """
 from __future__ import annotations
 
@@ -72,9 +73,33 @@ def test_fractional_dfreq_outcome_is_refused(program, shown):
     with pytest.raises(ValueError) as info:
         build(program)
     msg = str(info.value)
-    assert 'must be whole numbers' in msg
+    assert 'must be non-negative whole numbers' in msg
+    assert 'fractional count' in msg
     assert f'support includes {shown}.' in msg
     assert 'poisson' in msg
+
+
+@pytest.mark.parametrize('program, shown', [
+    ('agg N.One dfreq [-1 2] dsev [1 2]', '-1'),
+    ('agg N.Two dfreq [-2 -1 3] [.2 .3 .5] dsev [1]', '-2, -1'),
+], ids=['one', 'two'])
+def test_negative_dfreq_outcome_is_refused(program, shown):
+    """A negative outcome used to be clamped onto 0, moving the mean silently."""
+    with pytest.raises(ValueError) as info:
+        build(program)
+    msg = str(info.value)
+    assert 'must be non-negative whole numbers' in msg
+    assert f'support includes {shown}.' in msg
+    assert 'negative count is not a number of claims' in msg
+    assert 'fractional count' not in msg
+
+
+def test_negative_and_fractional_dfreq_outcomes_give_both_reasons():
+    with pytest.raises(ValueError) as info:
+        build('agg N.Both dfreq [-1 1.5] dsev [1]')
+    msg = str(info.value)
+    assert 'support includes -1, 1.5.' in msg
+    assert 'fractional count' in msg and 'negative count' in msg
 
 
 def test_fractional_dfreq_refused_in_the_constructor():
@@ -87,7 +112,8 @@ def test_fractional_dfreq_refused_in_the_constructor():
 @pytest.mark.parametrize('program', [
     'agg DF.Whole dfreq [1 2 3] dsev [1 2]',
     'agg DF.Ulps dfreq [3.0000000001] dsev [1 2]',
-], ids=['whole', 'within-tolerance'])
+    'agg DF.Zero dfreq [0 1 2] dsev [1 2]',
+], ids=['whole', 'within-tolerance', 'zero'])
 def test_whole_dfreq_outcomes_build(program):
     a = build(program)
     assert np.all(a.agg_density >= -1e-10)

@@ -4,7 +4,9 @@
 # Every DecL program in *Reproductions*, the book of worked examples that
 # rebuilds published actuarial and numerical results with `aggregate`.
 # Each declaration carries a note{} naming the paper it comes from and
-# saying in one line what it is.
+# saying in one line what it is, and a tags{topic:<CitationKey>}, so
+# that once loaded, build.discover(tags='topic:Venter1983') lists the
+# programs from one paper.
 #
 # See https://blog.mynl.com/posts/notes/2026-10-08-Aggregate-Reproductions/
 #
@@ -17,7 +19,7 @@
 # curves are exempt from the sampling, each being its own curve rather
 # than an arithmetic variant of the one above it.
 #
-# 140 programs from 28 chapters.
+# 143 programs from 29 chapters.
 #
 # Read it back with `build.load("reproductions.agg")`, or parse it
 # without loading with `build.interpret_file("reproductions.agg")`.
@@ -34,7 +36,7 @@
 # Bibliography
 # ----------------------------------------------------------------------
 #
-# The 29 works the notes below cite, read from the library
+# The 30 works the notes below cite, read from the library
 # the book itself cites, D:/Projects/Biblio/uber-library.bib.
 #
 # @Asmussen2016a
@@ -113,6 +115,11 @@
 #     distribution of aggregate claims and its stop-loss premiums.
 #     Insurance Mathematics and Economics 1(1), 13-18.
 #     doi:10.1016/0167-6687(82)90016-6
+#
+# @Gollini2016
+#     Gollini, Isabella and Rougier, Jonathan (2016). Rapidly bounding the
+#     exceedance probabilities of high aggregate losses. The Journal of
+#     Operational Risk, 1-33. doi:10.21314/JOP.2016.179
 #
 # @Grubel1999
 #     Grübel, Rudolf and Hermesmeier, Renate (1999). Computation of
@@ -202,14 +209,14 @@ agg Venter1983.Venter
   250000 xs 0
   sev chistogram xps [0 1000 5000 6000 7000 8000 9000 10000 12500 15000 17500 20000 25000 35000 50000 75000 100000 125000 150000 175000 200000 225000 250000 300000] [0.38935 0.38935 0.00568 0.00543 0.00517 0.00495 0.00473 0.01098 0.00989 0.00896 0.00815 0.01426 0.02237 0.02353 0.02459 0.01517 0.01021 0.00732 0.00547 0.00423 0.00337 0.00274 0.0241]
   poisson
-  note{@Venter1983, Exhibit 3, a compound Poisson over a tabulated claim size law.}
+  note{@Venter1983, Exhibit 3, a compound Poisson over a tabulated claim size law.} tags{topic:Venter1983}
 
 agg Bear1990.BN.One
   [9000 3000] premium at [0.04 0.03] lr
   160 xs 0
   sev 40 * pareto [0.9 0.95] + -40
   poisson
-  note{@Bear1990, the subject book of two excess casualty classes.}
+  note{@Bear1990, the subject book of two excess casualty classes.} tags{topic:Bear1990}
 
 agg Bear1990.BN.One.v2
   [9000 3000] premium at [0.04 0.03] lr
@@ -218,7 +225,7 @@ agg Bear1990.BN.One.v2
   poisson
   aggregate net of
     360 xs 0
-  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.}
+  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.} tags{topic:Bear1990}
 
 agg Homer2003.HC
   5 claims
@@ -226,16 +233,16 @@ agg Homer2003.HC
   occurrence net of
     400000 xs 600000
   mixed gamma 0.2
-  note{@Homer2003, Section 2's per occurrence layer, whose net and ceded views give Table 2.3.}
+  note{@Homer2003, Section 2's per occurrence layer, whose net and ceded views give Table 2.3.} tags{topic:Homer2003}
 
 agg Bruno2006.B7
   91000 claims
   dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.0103301 0.030799 0.0293511 0.0103301 0.0730414 0.0111568 0.0264554 0.1002133 0.0815418 0.0252146 0.0212857 0.0254214 0.0991756 0.4556837]
   poisson
-  note{@Bruno2006, Table 7's compound Poisson at lambda = 91,000.}
+  note{@Bruno2006, Table 7's compound Poisson at lambda = 91,000.} tags{topic:Bruno2006}
 
 port Denuit2025a.Denuit.Pool
-  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.} tags{topic:Denuit2025a}
   agg Agent1
     1 claim
     sev 2 * expon splice [0 10]
@@ -250,7 +257,7 @@ port Denuit2025a.Denuit.Pool
     fixed
 
 
-# The threshold above which Riebesell is consistent  [Mack2003.qmd]
+# Mack and Fackler's test of Riebesell's rule  [Mack2003.qmd]
 # ----------------------------------------------------------------------
 
 agg Mack2003.S
@@ -258,97 +265,97 @@ agg Mack2003.S
   0.01 xs 0
   sev expon
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v2
   1 claim
   0.1 xs 0
   sev expon
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v3
   1 claim
   sev expon
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.} tags{topic:Mack2003}
 
 agg Mack2003.S.v4
   1 claim
   0.01 xs 0
   sev 10 * gamma 0.1
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v5
   1 claim
   0.1 xs 0
   sev 10 * gamma 0.1
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v6
   1 claim
   sev 10 * gamma 0.1
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.} tags{topic:Mack2003}
 
 agg Mack2003.S.v7
   1 claim
   0.01 xs 0
   sev lognorm 1 cv 4.95315270785704
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v8
   1 claim
   0.1 xs 0
   sev lognorm 1 cv 4.95315270785704
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v9
   1 claim
   sev lognorm 1 cv 4.95315270785704
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.} tags{topic:Mack2003}
 
 agg Mack2003.S.v10
   1 claim
   0.01 xs 0
   sev 0.5 * lomax 1.5
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v11
   1 claim
   0.1 xs 0
   sev 0.5 * lomax 1.5
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, limited at one layer top.} tags{topic:Mack2003}
 
 agg Mack2003.S.v12
   1 claim
   sev 0.5 * lomax 1.5
   fixed
-  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.}
+  note{@Mack2003, a severity behind the Table 1 exposure curve, unlimited.} tags{topic:Mack2003}
 
 agg Mack2003.Riebesell
   1 claim
   5000000 xs 0
   sev [9894.934954 259286.6924] * [lognorm pareto] [1.8 0.7369655942] wts [0.965191548087 0.034808451913] splice [0 259286.6924 inf]
   fixed
-  note{@Mack2003, the spliced severity whose Pareto tail makes Riebesell's rule consistent.}
+  note{@Mack2003, the spliced severity whose Pareto tail makes Riebesell's rule consistent.} tags{topic:Mack2003}
 
 agg Mack2003.Riebesell.v2
   1 claim
   50000 xs 0
   sev [9894.934954 259286.6924] * [lognorm pareto] [1.8 0.7369655942] wts [0.965191548087 0.034808451913] splice [0 259286.6924 inf]
   fixed
-  note{@Mack2003, the spliced severity whose Pareto tail makes Riebesell's rule consistent.}
+  note{@Mack2003, the spliced severity whose Pareto tail makes Riebesell's rule consistent.} tags{topic:Mack2003}
 
 
-# Trend by layer, and a discrepancy in Table 1  [Mata2005.qmd]
+# Mata and Verheyen on trend by layer  [Mata2005.qmd]
 # ----------------------------------------------------------------------
 
 agg Mata2005.M
@@ -356,29 +363,29 @@ agg Mata2005.M
   250000 xs 0
   sev lognorm 152062.97146657703 cv 13.727535749987513
   fixed
-  note{@Mata2005, the lognormal severity behind Table 1, limited at one layer top.}
+  note{@Mata2005, the lognormal severity behind Table 1, limited at one layer top.} tags{topic:Mata2005}
 
 agg Mata2005.M.v2
   1 claim
   500000 xs 0
   sev lognorm 152062.97146657703 cv 13.727535749987513
   fixed
-  note{@Mata2005, the lognormal severity behind Table 1, limited at one layer top.}
+  note{@Mata2005, the lognormal severity behind Table 1, limited at one layer top.} tags{topic:Mata2005}
 
 agg Mata2005.M.v3
   1 claim
   sev lognorm 152062.97146657703 cv 13.727535749987513
   fixed
-  note{@Mata2005, the lognormal severity behind Table 1, unlimited.}
+  note{@Mata2005, the lognormal severity behind Table 1, unlimited.} tags{topic:Mata2005}
 
 agg Mata2005.M.v4
   1 claim
   sev lognorm 103491.50327117534 cv 13.727535749987513
   fixed
-  note{@Mata2005, the lognormal severity behind Table 1, unlimited.}
+  note{@Mata2005, the lognormal severity behind Table 1, unlimited.} tags{topic:Mata2005}
 
 
-# A policy limit that only usually holds  [Bodoff2017.qmd]
+# Bodoff and excess of policy limits losses  [Bodoff2017.qmd]
 # ----------------------------------------------------------------------
 
 agg Bodoff2017.B
@@ -386,48 +393,48 @@ agg Bodoff2017.B
   50000 xs 0
   sev 50000 * lomax 1.5
   fixed
-  note{@Bodoff2017, Exhibit 4's Pareto severity under a policy limit.}
+  note{@Bodoff2017, Exhibit 4's Pareto severity under a policy limit.} tags{topic:Bodoff2017}
 
 agg Bodoff2017.B.v2
   1 claim
   100000 xs 0
   sev 50000 * lomax 1.5
   fixed
-  note{@Bodoff2017, Exhibit 4's Pareto severity under a policy limit.}
+  note{@Bodoff2017, Exhibit 4's Pareto severity under a policy limit.} tags{topic:Bodoff2017}
 
 
-# The bivariate FFT, twenty years early  [Homer2003.qmd]
+# Homer and Clark's bivariate FFT  [Homer2003.qmd]
 # ----------------------------------------------------------------------
 
 bivariate Homer2003.A
   dfreq [2]
   dbvsev [0 1 2] [0 1 2] [[0.4 0 0] [0.3 0.3 0] [0 0 0]]
-  note{@Homer2003, the toy bivariate severity that checks the two dimensional convolution.}
+  note{@Homer2003, the toy bivariate severity that checks the two dimensional convolution.} tags{topic:Homer2003}
 
 bivariate Homer2003.HC3
   4 claims
   dbvsev [0 200000 400000 600000 800000 1000000] [0 200000 400000 600000 800000 1000000 1200000] [[0.08389999999999327 0.014699999999998822 0.0012999999999998956 9.9999999999992e-05 0 0 0] [0.27979999999997757 0.13289999999998933 0.03159999999999747 0.004999999999999599 0.0005999999999999518 9.9999999999992e-05 0] [0.04149999999999668 0.03209999999999742 0.012499999999998998 0.003199999999999744 0.0005999999999999518 9.9999999999992e-05 0] [0.030699999999997542 0.03299999999999736 0.01769999999999858 0.006399999999999488 0.0016999999999998637 0.000399999999999968 9.9999999999992e-05] [0.022799999999998172 0.03129999999999749 0.021499999999998274 0.009899999999999208 0.0033999999999997275 0.0008999999999999279 0.000199999999999984] [0.033756260434097296 0.05659432387309546 0.047378964941596206 0.02644407345579788 0.011118530884799109 0.003706176961599703 0.0010016694490799197]]
   mixed gamma 0.5
-  note{@Homer2003, Section 3's loss subject to an aggregate, plus unlimited ALAE.}
+  note{@Homer2003, Section 3's loss subject to an aggregate, plus unlimited ALAE.} tags{topic:Homer2003}
 
 bivariate Homer2003.HC4
   10 claims
   dbvsev [0 200000 400000 600000 800000] [0 1 2 3 4 5] [[0 0.10000000000000002 0 0 0 0] [0.43800000000000006 0 0 0 0 0] [0.24600000000000002 0 0 0 0 0] [0.13800000000000004 0 0 0 0 0] [0.07800000000000001 0 0 0 0 0]]
   mixed gamma 0.31622776601683794
-  note{@Homer2003, Section 4's joint distribution of dollars against counts.}
+  note{@Homer2003, Section 4's joint distribution of dollars against counts.} tags{topic:Homer2003}
 
 bivariate Homer2003.HC4b
   10 claims
   dbvsev [0 200000 400000 600000 800000] [0 1 2 3 4 5] [[0 0.10000000000000002 0 0 0 0] [0.43800000000000006 0 0 0 0 0] [0.24600000000000002 0 0 0 0 0] [0.13800000000000004 0 0 0 0 0] [0.07800000000000001 0 0 0 0 0]]
   mixed gamma 0.31622776601683794
-  note{@Homer2003, Section 4's joint distribution on the smaller grid, for the reach comparison.}
+  note{@Homer2003, Section 4's joint distribution on the smaller grid, for the reach comparison.} tags{topic:Homer2003}
 
 
-# Six adjustable features, one clause each  [Bear1990.qmd]
+# Bear and Nemlick on adjustable treaty features  [Bear1990.qmd]
 # ----------------------------------------------------------------------
 
 port Bear1990.BearNemlick.One
-  note{@Bear1990, the Table I subject book as a two class portfolio.}
+  note{@Bear1990, the Table I subject book as a two class portfolio.} tags{topic:Bear1990}
   agg Class1
     9000 premium at 0.04 lr
     160 xs 0
@@ -440,7 +447,7 @@ port Bear1990.BearNemlick.One
     mixed gamma 0.22335691114062584
 
 port Bear1990.BearNemlick.Two
-  note{@Bear1990, the Treaty II subject book as a three class portfolio.}
+  note{@Bear1990, the Treaty II subject book as a three class portfolio.} tags{topic:Bear1990}
   agg Class1
     2000 premium at 0.1 lr
     700 xs 0
@@ -467,7 +474,7 @@ xpnl Bear1990.BN.TreatyII
       occurrence net of
         700 xs 0 deposit 1172 reinstatements [0 0 0] as Layer
       poisson
-  note{@Bear1990, Treaty II, three free reinstatements.}
+  note{@Bear1990, Treaty II, three free reinstatements.} tags{topic:Bear1990}
 
 agg Bear1990.BN.TwoAlt
   [2000 2000 2000] premium at [0.1 0.14 0.21] lr
@@ -476,7 +483,7 @@ agg Bear1990.BN.TwoAlt
   poisson
   aggregate ceded to
     2800 xs 0
-  note{@Bear1990, Treaty II's layer ceded as an aggregate rather than walked.}
+  note{@Bear1990, Treaty II's layer ceded as an aggregate rather than walked.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyIII
   10000 premium
@@ -488,7 +495,7 @@ xpnl Bear1990.BN.TreatyIII
       poisson
       aggregate net of
         10000 xs 0 deposit 350 corridor 1 po 1 xs 1 as Corridor
-  note{@Bear1990, Treaty III, a loss corridor.}
+  note{@Bear1990, Treaty III, a loss corridor.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyIIIb
   10000 premium
@@ -500,7 +507,7 @@ xpnl Bear1990.BN.TreatyIIIb
       poisson
       aggregate net of
         10000 xs 0 deposit 366.9658642415209 corridor 1 po 0.9537671868292504 xs 0.9537671868292504 as Corridor
-  note{@Bear1990, Treaty III at a recalibrated deposit and corridor.}
+  note{@Bear1990, Treaty III at a recalibrated deposit and corridor.} tags{topic:Bear1990}
 
 pnl Bear1990.BN.TreatyIV
   retro basic 0 lcm 1.3333333333 min 360 max 1200 premium
@@ -510,7 +517,7 @@ pnl Bear1990.BN.TreatyIV
       160 xs 0
       sev 40 * pareto [0.9 0.95] + -40
       poisson
-  note{@Bear1990, Treaty IV, retrospective rating.}
+  note{@Bear1990, Treaty IV, retrospective rating.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyV
   18000 premium
@@ -522,7 +529,7 @@ xpnl Bear1990.BN.TreatyV
       poisson
       aggregate net of
         80% po 100000 xs 0 deposit 5625 pc 0.25 after 0.2 as "PC layer"
-  note{@Bear1990, Treaty V, a three year profit commission.}
+  note{@Bear1990, Treaty V, a three year profit commission.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyVI
   25000 premium
@@ -534,7 +541,7 @@ xpnl Bear1990.BN.TreatyVI
       poisson
       aggregate net of
         100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
-  note{@Bear1990, Treaty VI, a sliding scale commission.}
+  note{@Bear1990, Treaty VI, a sliding scale commission.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyVI.v2
   25000 premium
@@ -546,21 +553,21 @@ xpnl Bear1990.BN.TreatyVI.v2
       poisson
       aggregate net of
         100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
-  note{@Bear1990, Treaty VI, a sliding scale commission.}
+  note{@Bear1990, Treaty VI, a sliding scale commission.} tags{topic:Bear1990}
 
 agg Bear1990.BN.One.v3
   [9000 3000] premium at [0.04 0.03] lr
   160 xs 0
   sev 40 * pareto [0.9 0.95] + -40
   mixed gamma 0.22360679774997896
-  note{@Bear1990, the subject book of two excess casualty classes.}
+  note{@Bear1990, the subject book of two excess casualty classes.} tags{topic:Bear1990}
 
 agg Bear1990.BN.One.v4
   [9000 3000] premium at [0.04 0.03] lr
   160 xs 0
   sev 40 * pareto [0.9 0.95] + -40
   mixed gamma 0.31622776601683794
-  note{@Bear1990, the subject book of two excess casualty classes.}
+  note{@Bear1990, the subject book of two excess casualty classes.} tags{topic:Bear1990}
 
 agg Bear1990.BN.One.v5
   [9000 3000] premium at [0.04 0.03] lr
@@ -569,7 +576,7 @@ agg Bear1990.BN.One.v5
   mixed gamma 0.22360679774997896
   aggregate net of
     360 xs 0
-  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.}
+  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.} tags{topic:Bear1990}
 
 agg Bear1990.BN.One.v6
   [9000 3000] premium at [0.04 0.03] lr
@@ -578,7 +585,7 @@ agg Bear1990.BN.One.v6
   mixed gamma 0.31622776601683794
   aggregate net of
     360 xs 0
-  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.}
+  note{@Bear1990, Treaty I, an annual aggregate deductible on the subject book.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyII.v2
   1172 premium
@@ -590,7 +597,7 @@ xpnl Bear1990.BN.TreatyII.v2
       occurrence net of
         700 xs 0 deposit 1172 reinstatements [0 0 0] as Layer
       mixed gamma 0.22360679774997896
-  note{@Bear1990, Treaty II, three free reinstatements.}
+  note{@Bear1990, Treaty II, three free reinstatements.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyII.v3
   1172 premium
@@ -602,7 +609,7 @@ xpnl Bear1990.BN.TreatyII.v3
       occurrence net of
         700 xs 0 deposit 1172 reinstatements [0 0 0] as Layer
       mixed gamma 0.31622776601683794
-  note{@Bear1990, Treaty II, three free reinstatements.}
+  note{@Bear1990, Treaty II, three free reinstatements.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyIII.v2
   10000 premium
@@ -614,7 +621,7 @@ xpnl Bear1990.BN.TreatyIII.v2
       mixed gamma 0.22360679774997896
       aggregate net of
         10000 xs 0 deposit 350 corridor 1 po 1 xs 1 as Corridor
-  note{@Bear1990, Treaty III, a loss corridor.}
+  note{@Bear1990, Treaty III, a loss corridor.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyIII.v3
   10000 premium
@@ -626,7 +633,7 @@ xpnl Bear1990.BN.TreatyIII.v3
       mixed gamma 0.31622776601683794
       aggregate net of
         10000 xs 0 deposit 350 corridor 1 po 1 xs 1 as Corridor
-  note{@Bear1990, Treaty III, a loss corridor.}
+  note{@Bear1990, Treaty III, a loss corridor.} tags{topic:Bear1990}
 
 pnl Bear1990.BN.TreatyIV.v2
   retro basic 0 lcm 1.3333333333 min 360 max 1200 premium
@@ -636,7 +643,7 @@ pnl Bear1990.BN.TreatyIV.v2
       160 xs 0
       sev 40 * pareto [0.9 0.95] + -40
       mixed gamma 0.22360679774997896
-  note{@Bear1990, Treaty IV, retrospective rating.}
+  note{@Bear1990, Treaty IV, retrospective rating.} tags{topic:Bear1990}
 
 pnl Bear1990.BN.TreatyIV.v3
   retro basic 0 lcm 1.3333333333 min 360 max 1200 premium
@@ -646,7 +653,7 @@ pnl Bear1990.BN.TreatyIV.v3
       160 xs 0
       sev 40 * pareto [0.9 0.95] + -40
       mixed gamma 0.31622776601683794
-  note{@Bear1990, Treaty IV, retrospective rating.}
+  note{@Bear1990, Treaty IV, retrospective rating.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyV.v2
   18000 premium
@@ -658,7 +665,7 @@ xpnl Bear1990.BN.TreatyV.v2
       mixed gamma 0.22360679774997896
       aggregate net of
         80% po 100000 xs 0 deposit 5625 pc 0.25 after 0.2 as "PC layer"
-  note{@Bear1990, Treaty V, a three year profit commission.}
+  note{@Bear1990, Treaty V, a three year profit commission.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyV.v3
   18000 premium
@@ -670,7 +677,7 @@ xpnl Bear1990.BN.TreatyV.v3
       mixed gamma 0.31622776601683794
       aggregate net of
         80% po 100000 xs 0 deposit 5625 pc 0.25 after 0.2 as "PC layer"
-  note{@Bear1990, Treaty V, a three year profit commission.}
+  note{@Bear1990, Treaty V, a three year profit commission.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyVI.v3
   25000 premium
@@ -682,7 +689,7 @@ xpnl Bear1990.BN.TreatyVI.v3
       mixed gamma 0.22360679774997896
       aggregate net of
         100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
-  note{@Bear1990, Treaty VI, a sliding scale commission.}
+  note{@Bear1990, Treaty VI, a sliding scale commission.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyVI.v4
   25000 premium
@@ -694,7 +701,7 @@ xpnl Bear1990.BN.TreatyVI.v4
       mixed gamma 0.31622776601683794
       aggregate net of
         100000 xs 0 deposit 5000 slide 0.4 at 0.35 and 0.25 at 0.55 and 0.2 at 0.65 as Slide
-  note{@Bear1990, Treaty VI, a sliding scale commission.}
+  note{@Bear1990, Treaty VI, a sliding scale commission.} tags{topic:Bear1990}
 
 xpnl Bear1990.BN.TreatyIIp
   1172 premium
@@ -706,10 +713,10 @@ xpnl Bear1990.BN.TreatyIIp
       occurrence net of
         700 xs 0 deposit 1172 reinstatements [1 1 1] as Layer
       poisson
-  note{@Bear1990, Treaty II with paid rather than free reinstatements.}
+  note{@Bear1990, Treaty II with paid rather than free reinstatements.} tags{topic:Bear1990}
 
 
-# Risk load by layer, and a misprinted basic limit  [Wang2000.qmd]
+# Wang and risk loads by layer  [Wang2000.qmd]
 # ----------------------------------------------------------------------
 
 agg Wang2000.Wang.Layers
@@ -728,39 +735,39 @@ agg Wang2000.Wang.Layers
     3000000 xs 2000000 and
     5000000 xs 5000000
   fixed
-  note{@Wang2000, Table 1's ground up loss ceded to the paper's layer tower.}
+  note{@Wang2000, Table 1's ground up loss ceded to the paper's layer tower.} tags{topic:Wang2000}
 
 distortion Wang2000.wang_a wang 0.1
-  note{@Wang2000, the Wang transform at the paper lambda.}
+  note{@Wang2000, the Wang transform at the paper lambda.} tags{topic:Wang2000}
 
 distortion Wang2000.ph_r ph 0.9245
-  note{@Wang2000, the proportional hazard transform at the paper r.}
+  note{@Wang2000, the proportional hazard transform at the paper r.} tags{topic:Wang2000}
 
 distortion Wang2000.tmp ph 0.9
-  note{@Wang2000, a proportional hazard transform from the sweep over r.}
+  note{@Wang2000, a proportional hazard transform from the sweep over r.} tags{topic:Wang2000}
 
 distortion Wang2000.tmp.v2 ph 0.95
-  note{@Wang2000, a proportional hazard transform from the sweep over r.}
+  note{@Wang2000, a proportional hazard transform from the sweep over r.} tags{topic:Wang2000}
 
 
-# Pricing weather options from 22 observations  [Wang2002.qmd]
+# Wang and the pricing of weather options  [Wang2002.qmd]
 # ----------------------------------------------------------------------
 
 agg Wang2002.HDD
   1 claim
   dsev [972.5 1147 1244 901 1573 1055 1488 1065.5 1018.5 1155 1474.5 1129.5 1077.5 1129.5 1090.5 938.5 1199.5 1156 1040 940.5 1090.5 1517.5]
   fixed
-  note{@Wang2002, the 22 observed heating degree day totals as a discrete severity.}
+  note{@Wang2002, the 22 observed heating degree day totals as a discrete severity.} tags{topic:Wang2002}
 
 distortion Wang2002.wang25 wang 0.25
-  note{@Wang2002, the Wang transform used to price the option.}
+  note{@Wang2002, the Wang transform used to price the option.} tags{topic:Wang2002}
 
 
-# A horizontal line that settles a misprint  [Denuit2019.qmd]
+# Denuit and conditional mean risk sharing  [Denuit2019.qmd]
 # ----------------------------------------------------------------------
 
 port Denuit2019.D61a
-  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.}
+  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.} tags{topic:Denuit2019}
   agg P1
     0.08 claims
     dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
@@ -779,7 +786,7 @@ port Denuit2019.D61a
     poisson
 
 port Denuit2019.D61b
-  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.}
+  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.} tags{topic:Denuit2019}
   agg P1
     0.08 claims
     dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
@@ -798,7 +805,7 @@ port Denuit2019.D61b
     poisson
 
 port Denuit2019.Denuit61
-  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.}
+  note{@Denuit2019, Section 6.1's two participant pool under conditional mean risk sharing.} tags{topic:Denuit2019}
   agg P1
     0.08 claims
     dsev [1 2 3 4] [0.1 0.2 0.4 0.3]
@@ -817,11 +824,11 @@ port Denuit2019.Denuit61
     poisson
 
 
-# Mortality credits, and what happens as the fund grows  [Denuit2022b.qmd]
+# Denuit, Hieber and Robert on mortality credits  [Denuit2022b.qmd]
 # ----------------------------------------------------------------------
 
 port Denuit2022b.Fund100
-  note{@Denuit2022b, Example 4.5's two group mortality pool at n = 100.}
+  note{@Denuit2022b, Example 4.5's two group mortality pool at n = 100.} tags{topic:Denuit2022b}
   agg Low
     6 claims
     dsev [1]
@@ -832,7 +839,7 @@ port Denuit2022b.Fund100
     binomial 0.2
 
 port Denuit2022b.Fund500
-  note{@Denuit2022b, Example 4.5's two group mortality pool at n = 500.}
+  note{@Denuit2022b, Example 4.5's two group mortality pool at n = 500.} tags{topic:Denuit2022b}
   agg Low
     30 claims
     dsev [1]
@@ -843,11 +850,11 @@ port Denuit2022b.Fund500
     binomial 0.2
 
 
-# A non-monotone allocation, and the algorithm that repairs it  [Denuit2025a.qmd]
+# Denuit et al. on comonotonic allocations  [Denuit2025a.qmd]
 # ----------------------------------------------------------------------
 
 port Denuit2025a.Denuit.Pool.v2
-  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.} tags{topic:Denuit2025a}
   hints{log2=16; bs=0.002; normalize=False; padding=1}
   agg Agent1
     1 claim
@@ -863,7 +870,7 @@ port Denuit2025a.Denuit.Pool.v2
     fixed
 
 port Denuit2025a.Denuit.PoolAlt
-  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.} tags{topic:Denuit2025a}
   hints{log2=16; bs=0.002; normalize=False; padding=1}
   agg A1
     1 claim
@@ -879,7 +886,7 @@ port Denuit2025a.Denuit.PoolAlt
     fixed
 
 port Denuit2025a.Denuit.PoolB
-  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.}
+  note{@Denuit2025a, Section 3.2's three agent pool of truncated severities.} tags{topic:Denuit2025a}
   hints{log2=16; bs=0.002; normalize=False; padding=1}
   agg B1
     1 claim
@@ -895,11 +902,11 @@ port Denuit2025a.Denuit.PoolB
     fixed
 
 
-# Where a conditional expectation given the sum turns over  [Denuit2025.qmd]
+# Denuit, Ortega-Jiménez and Robert on conditional expectations given the sum  [Denuit2025.qmd]
 # ----------------------------------------------------------------------
 
 port Denuit2025.K
-  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.}
+  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.} tags{topic:Denuit2025}
   hints{log2=20; bs=0.01; normalize=False; padding=1}
   agg X
     1 claim
@@ -911,7 +918,7 @@ port Denuit2025.K
     fixed
 
 port Denuit2025.K.v2
-  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.}
+  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.} tags{topic:Denuit2025}
   hints{log2=20; bs=0.01; normalize=False; padding=1}
   agg X
     1 claim
@@ -923,7 +930,7 @@ port Denuit2025.K.v2
     fixed
 
 port Denuit2025.K.v3
-  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.}
+  note{@Denuit2025, a two agent pool where the conditional mean allocation turns over.} tags{topic:Denuit2025}
   hints{log2=18; bs=0.002; normalize=False; padding=1}
   agg X
     1 claim
@@ -935,7 +942,7 @@ port Denuit2025.K.v3
     fixed
 
 
-# Twenty eight stop loss premiums, and the grid they need  [Gerber1982.qmd]
+# Gerber and compound Poisson stop loss premiums  [Gerber1982.qmd]
 # ----------------------------------------------------------------------
 
 agg Gerber1982.Gerber
@@ -943,59 +950,59 @@ agg Gerber1982.Gerber
   sev 2 * uniform + 1
   poisson
   hints{log2=18; bs=0.0009765625}
-  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.}
+  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.} tags{topic:Gerber1982}
 
 agg Gerber1982.Gerber.v2
   10 claims
   sev 2 * uniform + 1
   poisson
   hints{log2=18; bs=0.0078125}
-  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.}
+  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.} tags{topic:Gerber1982}
 
 agg Gerber1982.Gerber.v3
   100 claims
   sev 2 * uniform + 1
   poisson
-  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.}
+  note{@Gerber1982, a compound Poisson on a uniform severity, for the stop loss table.} tags{topic:Gerber1982}
 
 
-# An exact table a lattice method cannot match  [Robertson1992.qmd]
+# Robertson and the sum of uniform claims  [Robertson1992.qmd]
 # ----------------------------------------------------------------------
 
 agg Robertson1992.Robertson
   5 claims
   sev chistogram xps [0 0.2 0.4 0.6 0.8 1] [0.2 0.2 0.2 0.2 0.2]
   fixed
-  note{@Robertson1992, Table 4's compound Poisson on a tabulated severity.}
+  note{@Robertson1992, Table 4's compound Poisson on a tabulated severity.} tags{topic:Robertson1992}
 
 agg Robertson1992.Robertson2
   5 claims
   sev uniform
   fixed
-  note{@Robertson1992, the same model with a continuous uniform severity.}
+  note{@Robertson1992, the same model with a continuous uniform severity.} tags{topic:Robertson1992}
 
 
-# Discretization error is O(h squared), and Richardson removes it  [Embrechts1993.qmd]
+# Embrechts, Grübel and Pitts on discretization error  [Embrechts1993.qmd]
 # ----------------------------------------------------------------------
 
 agg Embrechts1993.EGP
   20 claims
   sev expon 1
   poisson
-  note{@Embrechts1993, the compound Poisson whose discretization error is O(h squared).}
+  note{@Embrechts1993, the compound Poisson whose discretization error is O(h squared).} tags{topic:Embrechts1993}
 
 
-# Aliasing, and the tilt that removes it  [Grubel1999.qmd]
+# Grübel and Hermesmeier on aliasing and exponential tilting  [Grubel1999.qmd]
 # ----------------------------------------------------------------------
 
 agg Grubel1999.Levy
   20 claims
   sev levy
   poisson
-  note{@Grubel1999, a compound Poisson Levy severity, the aliasing case tilting repairs.}
+  note{@Grubel1999, a compound Poisson Levy severity, the aliasing case tilting repairs.} tags{topic:Grubel1999}
 
 
-# GEMAct's accuracy table measures the length of the grid  [Pittarello2024.qmd]
+# Pittarello, Luini and Marchione's GEMAct package  [Pittarello2024.qmd]
 # ----------------------------------------------------------------------
 
 agg Pittarello2024.PLM.XL
@@ -1003,14 +1010,14 @@ agg Pittarello2024.PLM.XL
   20 xs 5
   sev gamma 5 !
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Layer1
   0.5 claims
   100 xs 100
   sev 83.34 * genpareto 0.834 !
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Layer3
   0.5 claims
@@ -1019,7 +1026,7 @@ agg Pittarello2024.PLM.Layer3
   poisson
   aggregate ceded to
     200 xs 0
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 xpnl Pittarello2024.PLM.Layer2
   1 premium
@@ -1030,41 +1037,41 @@ xpnl Pittarello2024.PLM.Layer2
       occurrence net of
         200 xs 100 deposit 1 reinstatements [0.6 0.6] as Layer
       poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.RS
   0.5 claims
   100 xs 0
   sev 100 * pareto 1.2 + -100 !
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Layer2Net
   0.5 claims
   200 xs 100
   sev 83.34 * genpareto 0.834 !
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Table1
   3 claims
   inf xs 10000
   sev lognorm 84541.68 cv 2.1022565437545127
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Gross
   3 claims
   sev lognorm 84541.68 cv 2.1022565437545127
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.XL1M
   3 claims
   1000000 xs 10000
   sev lognorm 84541.68 cv 2.1022565437545127
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.SL
   3 claims
@@ -1072,7 +1079,7 @@ agg Pittarello2024.PLM.SL
   poisson
   aggregate ceded to
     1000000 xs 50000
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.XLAgg
   3 claims
@@ -1081,40 +1088,40 @@ agg Pittarello2024.PLM.XLAgg
   poisson
   aggregate ceded to
     1000000 xs 50000
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Cut
   3 claims
   819150 xs 10000
   sev lognorm 84541.68 cv 2.1022565437545127
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 agg Pittarello2024.PLM.Cut.v2
   3 claims
   1638300 xs 10000
   sev lognorm 84541.68 cv 2.1022565437545127
   poisson
-  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.}
+  note{@Pittarello2024, a GEMAct paper example: layers, reinstatements and Parodi lognormal contracts.} tags{topic:Pittarello2024}
 
 
-# Three discretization designs, and the one that is not a bound  [Embrechts2009a.qmd]
+# Embrechts and Frei's three discretization designs  [Embrechts2009a.qmd]
 # ----------------------------------------------------------------------
 
 agg Embrechts2009a.EF
   50 claims
   sev expon
   poisson
-  note{@Embrechts2009a, the compound Poisson exponential compared across three designs.}
+  note{@Embrechts2009a, the compound Poisson exponential compared across three designs.} tags{topic:Embrechts2009a}
 
 agg Embrechts2009a.EF1
   20 claims
   sev 3 * pareto 4 + -3
   poisson
-  note{@Embrechts2009a, the compound Poisson Pareto compared across the same three.}
+  note{@Embrechts2009a, the compound Poisson Pareto compared across the same three.} tags{topic:Embrechts2009a}
 
 
-# A severity with no mean, and the quantile it still produces  [Schaller2008.qmd]
+# Schaller and Temnov on a severity with no mean  [Schaller2008.qmd]
 # ----------------------------------------------------------------------
 
 agg Schaller2008.SchallerTemnov
@@ -1122,124 +1129,147 @@ agg Schaller2008.SchallerTemnov
   sev 12000 * genpareto 1 + 7000
   poisson
   hints{log2=20; bs=4.76837158203125; padding=2; normalize=False}
-  note{@Schaller2008, a generalized Pareto severity with no mean.}
+  note{@Schaller2008, a generalized Pareto severity with no mean.} tags{topic:Schaller2008}
 
 
-# 92,832 convolutions in under a second  [Bruno2006.qmd]
+# Bruno et al. on thresholded direct convolution  [Bruno2006.qmd]
 # ----------------------------------------------------------------------
 
 agg Bruno2006.B
   504.814259 claims
   dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.0103301 0.030799 0.0293511 0.0103301 0.0730414 0.0111568 0.0264554 0.1002133 0.0815418 0.0252146 0.0212857 0.0254214 0.0991756 0.4556837]
   poisson
-  note{@Bruno2006, Table 6's compound Poisson at the smaller lambda.}
+  note{@Bruno2006, Table 6's compound Poisson at the smaller lambda.} tags{topic:Bruno2006}
 
 agg Bruno2006.B8
   dfreq [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17] [0.79870839980732 0.168928395537711 0.0275621536510322 0.00411140723243176 0.000591554176846273 8.41033531369783e-05 1.19716064327213e-05 1.71994460232325e-06 2.50751602571129e-07 3.72405307143863e-08 5.65056685224704e-09 8.77932283380845e-10 1.39934149169577e-10 2.29163277016947e-11 3.86088331748775e-12 6.69927670844654e-13 1.19834141403275e-13 2.211580538677e-14]
   dsev [14 15 16 17 18 19 20 24 26 28 30 31 55 60] [0.0103301 0.030799 0.0293511 0.0103301 0.0730414 0.0111568 0.0264554 0.1002133 0.0815418 0.0252146 0.0212857 0.0254214 0.0991756 0.4556837]
-  note{@Bruno2006, Table 8's model, with the frequency given as a discrete law.}
+  note{@Bruno2006, Table 8's model, with the frequency given as a discrete law.} tags{topic:Bruno2006}
 
 
-# Accurate FFT convolution: what breaks, and how you know  [Wilson2016a.qmd]
+# Gollini and Rougier on a catastrophe model event loss table  [Gollini2016.qmd]
+# ----------------------------------------------------------------------
+
+agg Gollini2016.Hurricane
+  2.974183 claims
+  dsev [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 24] [0.58889746 0.21928748 0.0672295 0.05374453 0.01379374 0.01411 0.00846236 0.0061182 0.00446063 0.00941256 0.00198404 0.00452247 7.436e-05 0.00025122 0.00253892 0.00435067 0.0007371 1.486e-05 4.95e-06 4.95e-06]
+  poisson
+  note{@Gollini2016, the US hurricane event loss table merged to $1m, 20 rows.} tags{topic:Gollini2016}
+
+agg Gollini2016.Hurricane.Capped
+  2.974183 claims
+  5 xs 0
+  dsev [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 24] [0.58889746 0.21928748 0.0672295 0.05374453 0.01379374 0.01411 0.00846236 0.0061182 0.00446063 0.00941256 0.00198404 0.00452247 7.436e-05 0.00025122 0.00253892 0.00435067 0.0007371 1.486e-05 4.95e-06 4.95e-06]
+  poisson
+  note{@Gollini2016, the same table with each event loss capped at $5m.} tags{topic:Gollini2016}
+
+agg Gollini2016.Hurricane.Gamma
+  2.974183 claims
+  sev gamma [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 24] cv 0.5 wts [0.58889746 0.21928748 0.0672295 0.05374453 0.01379374 0.01411 0.00846236 0.0061182 0.00446063 0.00941256 0.00198404 0.00452247 7.436e-05 0.00025122 0.00253892 0.00435067 0.0007371 1.486e-05 4.95e-06 4.95e-06]
+  poisson
+  note{@Gollini2016, the same table with each event loss gamma, coefficient of variation 0.5.} tags{topic:Gollini2016}
+
+
+# Wilson and Keich on accurate FFT convolution  [Wilson2016a.qmd]
 # ----------------------------------------------------------------------
 
 agg Wilson2016a.Toy
   dfreq [2]
   dsev [1 2 3] [0.99999 1e-05 1e-20]
-  note{@Wilson2016a, the adversarial severity that breaks naive FFT convolution.}
+  note{@Wilson2016a, the adversarial severity that breaks naive FFT convolution.} tags{topic:Wilson2016a}
 
 nttagg Wilson2016a.Wilson
   dfreq [2]
   dsev [1 2 3] [99998999999999999999/100000000000000000000 1/100000 1/100000000000000000000]
-  note{@Wilson2016a, the adversarial severity that breaks naive FFT convolution.}
+  note{@Wilson2016a, the adversarial severity that breaks naive FFT convolution.} tags{topic:Wilson2016a}
 
 
-# sisFFT: keeping the FFT and fixing the tail  [Wilson2017.qmd]
+# Wilson and Keich's sisFFT for small tail probabilities  [Wilson2017.qmd]
 # ----------------------------------------------------------------------
 
 agg Wilson2017.WK
   dfreq [2]
   dsev [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127] [0.05698071412216734 0.06620214484224507 0.07439431506585613 0.0808594823064372 0.08500523661668595 0.08643386270782825 0.08500523661668595 0.0808594823064372 0.07439431506585613 0.06620214484224507 0.05698071412216734 0.0474359096066097 0.03819531491351482 0.02974654116430425 0.022407137097008607 0.016325247924520128 0.011504207774114473 0.007841103119752254 0.005169173762132145 0.003296010711360087 0.0020327296165158883 0.0012125345785902368 0.0006995715951974206 0.00039038553710257675 0.00021070691529164931 0.00010999865526234663 5.554173985207159e-05 2.7125334425354087e-05 1.2813100714451682e-05 5.854056311225143e-06 2.586920418962627e-06 1.105688414827683e-06 4.570944696450248e-07 1.827690656905043e-07 7.068429552096851e-08 2.644031917226084e-08 9.566079154710707e-09 3.347532207218618e-09 1.1330239115747578e-09 3.709171412794566e-10 1.1744600532204117e-10 3.59685651045085e-11 1.0654461224833036e-11 3.0525542488755614e-12 8.458995729331485e-13 2.2672412675735592e-13 5.8776021715289e-14 1.473757926702887e-14 3.574173561367906e-15 8.38394921987302e-16 1.902151734895072e-16 4.174122530025176e-17 8.859490495024046e-18 1.818761770055943e-18 3.611323587025658e-19 6.935543648882527e-20 1.2883033361832961e-20 2.3146177051578186e-21 4.0222024620549385e-22 6.760395460348606e-23 1.0990154370000577e-23 1.7280607304882195e-24 2.628074830109522e-25 3.865805235535093e-26 5.500038508200373e-27 7.568590490625302e-28 1.0073671919033027e-28 1.2968331832718913e-29 1.6147449836629747e-30 1.9446761623098232e-31 2.2652396490885474e-32 2.5521402435349255e-33 2.781111713376742e-34 2.931270180098265e-35 2.9882490005560692e-36 2.9464646373490424e-37 2.81001863961723e-38 2.5920339497460392e-39 2.3125742607080913e-40 1.9956032700263374e-41 1.6656212138890558e-42 1.3446269064639106e-43 1.0499070900667768e-44 7.929092000468263e-46 5.791880098166922e-47 4.092033548360507e-48 2.796290748421717e-49 1.8482000741056655e-50 1.1815147781965363e-51 7.305548867286579e-53 4.3690806287813747e-54 2.5272650181927225e-55 1.4139531828455055e-56 7.651433198651694e-58 4.004737637015077e-59 2.0273506236978068e-60 9.92675213472881e-62 4.701203037982131e-63 2.1534478334709612e-64 9.540765472727624e-66 4.088420924459984e-67 1.6945387385131509e-68 6.79314552283295e-70 2.6339883633345665e-71 9.878256594055475e-73 3.583193580753452e-74 1.2571403239902966e-75 4.2659991042454884e-77 1.4001716502139405e-78 4.4449340074571594e-80 1.364812125339333e-81 4.0532551594801475e-83 1.1642829388275267e-84 3.234719599335948e-86 8.692371190637349e-88 2.2592453900859697e-89 5.679525621992663e-91 1.3809699827592993e-92 3.247730108931048e-94 7.387528029916211e-96 1.625331188442783e-97 3.4586619315136957e-99 7.118653852801502e-101 1.4171347738069365e-102 2.7286507445183277e-104 5.081691135606408e-106 9.153603493842637e-108 1.5947750937110134e-109]
-  note{@Wilson2017, the severity on which sisFFT repairs the far tail.}
+  note{@Wilson2017, the severity on which sisFFT repairs the far tail.} tags{topic:Wilson2017}
 
 nttagg Wilson2017.WKExact
   dfreq [2]
   dsev [0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127] [1205358117644464993026277671413006936568364083140364778999451729673320026365429640939960919606862622140585468053187333193728/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1400426335829845571578239240903718494240992908282963197796760858189765888474030421110930534260994701597220333948174021427200/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1573721792587088323607174978513381315466353452020437828182885922698434682244972635717390325105316323559806642234255552282624/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1710484589182713984733850472785009606042168348558983000441053632322834670128289594452784428261092752944166817515916197101568/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1798183009404404637114502989356361510338483795743649982320353691105560694753443765327880796704603260059644846490769095131136/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1828403867155415900352023315833425430502538418938488808713379747360107136484943839244557826584717589578838721505449490776064/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1798183009404404637114502989356361510338483795743649982320353691105560694753443765327880796704603260059644846490769095131136/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1710484589182713984733850472785009606042168348558983000441053632322834670128289594452784428261092752944166817515916197101568/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1573721792587088323607174978513381315466353452020437828182885922698434682244972635717390325105316323559806642234255552282624/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1400426335829845571578239240903718494240992908282963197796760858189765888474030421110930534260994701597220333948174021427200/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1205358117644464993026277671413006936568364083140364778999451729673320026365429640939960919606862622140585468053187333193728/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1003449317774209101198776908958032931966745512655787540624096940438563791956493606424881103384812167280098942250835540705280/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 807975708908869439055713759870618876350391614263234561870011277656071302354946918037857271458269590271099332279742251401216/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 629252114800900947379402453429443003186120769031262480876931008153913106157642058431167863770034541568864688745244354674688/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 473995895087326177017354864967349380069772866535632559592943819909599420191519448400824882861151991084404440331258974699520/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 345340882639508754312749608325884551698892210350267941445122813107456673596747962872349020052668501988692522480855452483584/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 243357606889009672483962818081653453450050851948183188732113370560204918349387313680794176669313762808538302506956643893248/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 165869056614786132888418232616071000448877563500334719844117981893444776514591846043306132448610096193232896837611232952320/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 109347621413484767781423719021475726766639830306382822553434803324463796814833557062658932272148193144518776368895126142976/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 69723121726117719748398527279250511405343102260107132147207836848998277765362662349865586200220555278067854137062437421056/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 42999937469905313897590207881557829194415197377584601087521896496775806664549500501821183874679808813113556582729278029824/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 25649703057332634936172538728110726076880792157810482055377409618008696859547996311142758397615333375910318516272963256320/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 14798591315243856106537654401817081545391640991405614766728830592144140679220836262616014801829551206596040741123860201472/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 8258134061793453263677951301251472752706197167084011910401337997610303167518352971119782132964474897910424825416631975936/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 342865388354279593448190547927286379706055331763597908952895694068926096888706010176656921846249099558170212214725672960/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 2326888563842404196481004954309742675186020122274748162447835653882003379024738995937815344166105724555018308281725616128/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1174918356678628624629807900675906528412750175263449612205435732702261514133998388152370878327944749636851218083433414656/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 573803655273981668947549422759910474371542444030025783374150737454414259455901988936957466344560671053085696182741630976/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 271045654591964260811681935548264762561903847514211727613764521247545203596686658667607249792985009825331682080358137856/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 123835483717427392334182127176158012843642828271004570376674925846261763080635738633334547217123790736229955100167110656/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 4209474913823052789532313212755869163703589774902053606664538636019988748602925084809321070353799902241179008069795840/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 23389501639810185903080132608269139681992638968681328487826080334719386187200273466264191164896438838576472783729983488/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 9669280878715415673313573867870162251940271233152830746704018462976132061280405204731135320864365821631307977020407808/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 3866258617117596739622747496583708673880163757965187820361730441100814736330819140403025394980812490237305652544274432/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1495240814523842219421271577625914199950480117230506143069709668971190513547379998903833649675562174371170015342755840/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 559312985777352723995746129050830378585664530250914502107947225192233403260165522648545942201058092495318752927154176/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 202358839140527633589967536586058938216891733112586434937966673160854986245795286030618377762680932179762788979179520/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 70812996681582809010235068433086664829032561563551488794677248178551735039811054969061130051335612666506104755191808/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 23967751024914192168625610405357225837093358893640938953459750621331576657667924926074108210787444723952935032061952/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 7846303685420821730428171130451954793553810428264894078196115060004861472048535233805314259448110972959234344353792/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 2484428250518611744482900105548202137110723749245096557175665478476052315343530996672392893250466386615913668411392/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 58528577602845524783257799027302512564591225675933164010786850079901108721650259243874461879561011083571288342528/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 225382245981444531601429006267405903217032933603999602507054933838190629049058539481755439628396641827007978536960/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 64573094600807164624871219547884597305272125869913170797866366408771815875981456959592313179869133099481836814336/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 17893982773906561046690049019618152394538722223845996026659770611952398112963239323235695246397275784057754484736/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 4796074792374625251979549075449362730205380956982401064027935116004000249380519102368930317862297720681098379264/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1243335679252385986852502677783648818083452146194204678907544873761842388046622475761103793097302014424183209984/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 311755671679643245493343371512832903940906398723532475295544434969182839169791596980762877687339485458335793152/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 75607320519505727021826081637377370181834058614468490005930450106424940558029877712845199092650381326468251648/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 17735230956260507168615321462379650768932693893037186448398712152063552221322261709546643181661778754274328576/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 4023772025270764663363960179116935166999947329231961743019457400035325914523628894265478642957823747706322944/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 882985156139198802772834217700396606398455487209339174708070010117053784855494729364198585641731255288463360/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 187411810309635839803077259860094909704171172174578568919451508029159566717644373361057574882878283621335040/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 38473706364895962725199542058439062794698996614101383967434768995906838771856792750578193921016286184210432/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 7639318439796230698353285019405207758257139450622989681649710088395914326810719817718101248305114602536960/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1467130408287710217918718615624209608295770915021383550456069242399535721780973652074011417257570146975744/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 272524995198834608824668032822779109857887150760271661070964275294583842918403247449929086139610827849728/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 3766379937137633820986323801048421391669363478995440382687878659901092976403261820811435210261254897664/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 8508483024717601537247761617560275614608896838532798805717157171761412662020893505809657991023923560448/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1430079926542702945392533139397807279656300214837916417956771406313105670297386638275287400446515216384/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 232483428614883693032179434399352881564282052377927483127115496246739106023717996069735954244570185728/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 36555035530280787358517442556024927566097163973147598026127234126557671038739616141581592495896133632/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 5559374569188217961062549858886832022752689505070895209797778283607619035583213632046961844157415424/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 817764360041941170651170679707953959325765778250831831809843350534954678837876197967547409247502336/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 116346665101506272449488672858675929656696339994615594378200370733461876145604692410044088062050304/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 16010438141302310602652815368001605223354741550834044869063391190113607025842259299563104148389888/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 2130963503907680176832937160266515985715220084964942736851653261364983782802710773733499313586176/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 274329381224685467519544594254405302167888610674099687388524286096841744313918528098056861122560/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 34157977904784700044894772772937613372503661984523254464443829999984439815353540192853796323328/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 4113727310268873343595833904901864065519209588409820327089520841031334567917144267903899533312/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 479184061046499993985278642572300100837402767145451781216235861840338616934011762354306416640/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 53987441317713958320163987446428485787049708129190593251331370706493046888436281815844519936/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 5883105593600545227096258926721739147448933879601608616748989632891217080859290347205820416/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 620074767581063999456849092489699420140041738041297246921509785275115394915594096280076288/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 63212794817570702867116106272678105375541781709768299473136451514859894629672328143831040/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 6232889713116735185262273990310220420536817288970492324798712779249501073394437852233728/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 594425470121863798703825127612131976605627094789411725717004622902509388663847250821120/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 4217795726243895345944045400280191293441983223604095949093477821378621502166044508160/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 4891971258597696636099600544501699047994452585784837233235563930401833821084302966784/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 422145744956239541180914445295221510367142111964527960065904003617258534021000855552/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 35234203045920629220627145158770873085164034037143097115968530624312646010377601024/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 2844395655404593371547291080145731972543359694765537569711679877190073940977909760/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 222095151540430048507826354908376718145301382923867411669476783217503251826999296/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 16773035500788984801790417056137904475417185164291317699804829304443547512995840/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1225202211011422281040455498658148601599842887091245464891903217647871978373120/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 86562022452276912867942402989271766548567656283494376264217775218475495587840/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 5915215007094807691352898849862253227186077328171082491560939053776921165824/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 390964380961961583586498752257021378186544486971410803630541826185119137792/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 24993516682902623691992519205820809329910586081190939954417330930772344832/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 1545400538882762390853241425446013609190491633340054276674019432643690496/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 92422618489016964457902015912769594094388265730066303213438688500383744/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 5346123599971505277901344396909639879721541065331423674660056299732992/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 299104701155197174394496001947202307450710031399870130608214797975552/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 16185681874459411955255517072780713913673901840963380638216875933696/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 847153829884087180002240627808056496779303670889127562725700927488/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 42886151380034188386540350682400158112874903226599463296996212736/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 2099884399796422986716191781534167308006323110383174654915248128/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 99448266520094004299501368473174613161597235985286843204632576/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 4555358540142106215841569800878569472994581914469055057625088/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 201823358802384445309590069126248539431657473409151120965632/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 8648560176131899625422141005486893436053278715541337407488/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 358459183180933343621465711928022956629833546790573441024/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 14370078063134321249735543782855049725031877050477051904/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 557188393378039413409403377751982373029875240247754752/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 20896257544774412108092684252728958490671585796554752/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 757981281244151377064293626040350338887020607176704/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 26593283672982160721487355737712580007702395092992/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 902420534628906900134755656093488576587972476928/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 29618938454554161151870127647498989121182892032/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 940272050082660677211585104944333892582637568/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 28870950455451871087004894571445562600587264/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 857417125185351197355938116253837076463616/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 24628997954322829953983694447471675572224/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 684265823521225510329160108615305003008/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 18387660347235902429453858496307003392/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 477916048025018824257192693348696064/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 12014349799409276963402213970935808/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 292127503943424488260421745115136/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 528475415022442723044831002624/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 12021094150846467526780518400/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 264476278986104632304992256/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 73163811643351634051858432/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 115835781394366336073728/1627214692406765680108669003682722115253377716459480889599771229162386701797723199015750158927294386987529989670462808338231 29977772825769414754304/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 577213075650494791680/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 10749703221571559424/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 193633415217406368/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003 3373553902642219/21153791001287953841412697047875387498293910313973251564797025979111027123370401587204752066054827030837889865716016508397003]
-  note{@Wilson2017, the severity on which sisFFT repairs the far tail.}
+  note{@Wilson2017, the severity on which sisFFT repairs the far tail.} tags{topic:Wilson2017}
 
 nttagg Wilson2017.DiceOfDice
   dfreq [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200]
   dsev [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100 101 102 103 104 105 106 107 108 109 110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200]
-  note{@Wilson2017, the severity on which sisFFT repairs the far tail.}
+  note{@Wilson2017, the severity on which sisFFT repairs the far tail.} tags{topic:Wilson2017}
 
 
-# The log-normal left tail: saddlepoint, importance sampling, and FFT  [Asmussen2016a.qmd]
+# Asmussen, Jensen and Rojas-Nandayapa on the lognormal left tail  [Asmussen2016a.qmd]
 # ----------------------------------------------------------------------
 
 agg Asmussen2016a.S
   dfreq [4]
   sev lognorm 0.25
-  note{@Asmussen2016a, a sum of independent lognormals, the saddlepoint test case.}
+  note{@Asmussen2016a, a sum of independent lognormals, the saddlepoint test case.} tags{topic:Asmussen2016a}
 
 agg Asmussen2016a.S.v2
   dfreq [64]
   sev lognorm 0.25
-  note{@Asmussen2016a, a sum of independent lognormals, the saddlepoint test case.}
+  note{@Asmussen2016a, a sum of independent lognormals, the saddlepoint test case.} tags{topic:Asmussen2016a}
 
 
-# State-dependent importance sampling, and what `aggregate` computes instead  [BenAmar2023.qmd]
+# Ben Amar et al. on state-dependent importance sampling  [BenAmar2023.qmd]
 # ----------------------------------------------------------------------
 
 agg BenAmar2023.S10
   dfreq [10]
   sev lognorm 0.6907755278982137
-  note{@BenAmar2023, a sum of independent lognormals, the importance sampling test case.}
+  note{@BenAmar2023, a sum of independent lognormals, the importance sampling test case.} tags{topic:BenAmar2023}
 
 agg BenAmar2023.S9
   dfreq [9]
   sev lognorm 0.6907755278982137
-  note{@BenAmar2023, a sum of independent lognormals, the importance sampling test case.}
+  note{@BenAmar2023, a sum of independent lognormals, the importance sampling test case.} tags{topic:BenAmar2023}
 
 
-# Where the FFT floor is, and why it cannot be pushed lower  [BenRached2024.qmd]
+# Ben Rached, Hoel and Meo on the FFT accuracy floor  [BenRached2024.qmd]
 # ----------------------------------------------------------------------
 
 agg BenRached2024.S
   dfreq [16]
   sev lognorm 0.125
-  note{@BenRached2024, a sum of 16 heavy tailed variables, the FFT floor test case.}
+  note{@BenRached2024, a sum of 16 heavy tailed variables, the FFT floor test case.} tags{topic:BenRached2024}
 
 agg BenRached2024.L
   dfreq [16]
   sev 0.1 * levy
-  note{@BenRached2024, a sum of 16 Levy variables, the heaviest tailed case.}
+  note{@BenRached2024, a sum of 16 Levy variables, the heaviest tailed case.} tags{topic:BenRached2024}
 
 
-# k-moment tilting, and the exact answer it is approximating  [Liu2026.qmd]
+# Liu, Wu and Yao on k-moment tilting  [Liu2026.qmd]
 # ----------------------------------------------------------------------
 
 agg Liu2026.T
   dfreq [1]
   sev pareto 2.5
-  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.} tags{topic:Liu2026}
 
 agg Liu2026.T.v2
   dfreq [5]
   sev pareto 2.5
-  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.} tags{topic:Liu2026}
 
 agg Liu2026.T.v3
   dfreq [1]
   sev 1.1 * pareto 2.6
-  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.} tags{topic:Liu2026}
 
 agg Liu2026.T.v4
   dfreq [1]
   sev 1.2 * pareto 2.7
-  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.}
+  note{@Liu2026, a Pareto claim used in the k-moment tilting comparison.} tags{topic:Liu2026}
 
 port Liu2026.Paretos
-  note{@Liu2026, Table 2's portfolio of non-identically distributed Paretos.}
+  note{@Liu2026, Table 2's portfolio of non-identically distributed Paretos.} tags{topic:Liu2026}
   hints{log2=22;bs=1/8;padding=1;normalize=False}
   agg P0
     dfreq [1]
@@ -1258,7 +1288,7 @@ port Liu2026.Paretos
     sev 0.8 * pareto 2.9
 
 port Liu2026.P
-  note{@Liu2026, the same portfolio rebuilt across the grid sweep.}
+  note{@Liu2026, the same portfolio rebuilt across the grid sweep.} tags{topic:Liu2026}
   agg P0
     dfreq [1]
     sev pareto 2.5
@@ -1276,7 +1306,7 @@ port Liu2026.P
     sev 0.8 * pareto 2.9
 
 port Liu2026.LT
-  note{@Liu2026, Table C.1's light tailed portfolio, against an exact reference.}
+  note{@Liu2026, Table C.1's light tailed portfolio, against an exact reference.} tags{topic:Liu2026}
   hints{log2=18;bs=1/1024;padding=1;normalize=False}
   agg C0
     dfreq [1]
@@ -1295,72 +1325,72 @@ port Liu2026.LT
     sev 0.5555555555555556 * expon + 0.8
 
 
-# Why this one is not a reproduction  [Jin2016.qmd]
+# Jin, Provost and Ren's moment-based density approximations  [Jin2016.qmd]
 # ----------------------------------------------------------------------
 
 agg Jin2016.J
   3 claims
   sev 2 * gamma 3
   poisson
-  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.} tags{topic:Jin2016}
 
 agg Jin2016.J.v2
   15 claims
   sev 2 * invgauss 1.5
   poisson
-  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.} tags{topic:Jin2016}
 
 agg Jin2016.J.v3
   50 claims
   sev 2 * gamma 3
   mixed gamma 0.3162277660168379
-  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.} tags{topic:Jin2016}
 
 agg Jin2016.J.v4
   50 claims
   sev 2 * invgauss 1.5
   mixed gamma 0.3162277660168379
-  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.} tags{topic:Jin2016}
 
 agg Jin2016.J.v5
   3 claims
   sev 100 * lomax 20
   poisson
-  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.} tags{topic:Jin2016}
 
 agg Jin2016.J.v6
   6 claims
   sev 100 * lomax 20
   mixed gamma 0.5773502691896257
-  note{@Jin2016, a test aggregate from the paper that did not reproduce.}
+  note{@Jin2016, a test aggregate from the paper that did not reproduce.} tags{topic:Jin2016}
 
 agg Jin2016.NB
   50 claims
   dsev [1]
   mixed gamma 0.31622776601683794
-  note{@Jin2016, a negative binomial carrier, for the frequency check.}
+  note{@Jin2016, a negative binomial carrier, for the frequency check.} tags{topic:Jin2016}
 
 agg Jin2016.U
   dfreq [1]
   sev 2 * gamma 2
-  note{@Jin2016, a single claim severity from the bivariate convergence test.}
+  note{@Jin2016, a single claim severity from the bivariate convergence test.} tags{topic:Jin2016}
 
 agg Jin2016.V
   dfreq [1]
   sev 1.5 * gamma 3
-  note{@Jin2016, the other single claim severity from that test.}
+  note{@Jin2016, the other single claim severity from that test.} tags{topic:Jin2016}
 
 agg Jin2016.X
   15 claims
   sev 2 * gamma 2
   poisson
-  note{@Jin2016, a marginal of the paper's bivariate example.}
+  note{@Jin2016, a marginal of the paper's bivariate example.} tags{topic:Jin2016}
 
 agg Jin2016.Y
   16 claims
   sev 1.5 * gamma 3
   poisson
-  note{@Jin2016, the other marginal of that example.}
+  note{@Jin2016, the other marginal of that example.} tags{topic:Jin2016}
 
 
 # Provenance of the named severity curves  [severity-curves.qmd]
@@ -1370,77 +1400,77 @@ agg Berens1997.Lognorm
   1 claim
   sev lognorm 150000 cv 0.25
   fixed
-  note{@Berens1997, a carrier for the shipped Berens1997.Lognorm severity curve.}
+  note{@Berens1997, a carrier for the shipped Berens1997.Lognorm severity curve.} tags{topic:Berens1997}
 
 agg Berens1997.Pareto
   1 claim
   sev 50000 * pareto 1.5
   fixed
-  note{@Berens1997, a carrier for the shipped Berens1997.Pareto severity curve.}
+  note{@Berens1997, a carrier for the shipped Berens1997.Pareto severity curve.} tags{topic:Berens1997}
 
 agg Bodoff2017.Pareto
   1 claim
   sev 50000 * lomax 1.5
   fixed
-  note{@Bodoff2017, a carrier for the shipped Bodoff2017.Pareto severity curve.}
+  note{@Bodoff2017, a carrier for the shipped Bodoff2017.Pareto severity curve.} tags{topic:Bodoff2017}
 
 agg Jin2016.Gamma
   1 claim
   sev gamma 6 cv 0.5774
   fixed
-  note{@Jin2016, a carrier for the shipped Jin2016.Gamma severity curve.}
+  note{@Jin2016, a carrier for the shipped Jin2016.Gamma severity curve.} tags{topic:Jin2016}
 
 agg Jin2016.Pareto
   1 claim
   sev 100 * lomax 20
   fixed
-  note{@Jin2016, a carrier for the shipped Jin2016.Pareto severity curve.}
+  note{@Jin2016, a carrier for the shipped Jin2016.Pareto severity curve.} tags{topic:Jin2016}
 
 agg Kang2019.Pareto
   1 claim
   sev 3.5 * lomax 3.5
   fixed
-  note{@Kang2019, a carrier for the shipped Kang2019.Pareto severity curve.}
+  note{@Kang2019, a carrier for the shipped Kang2019.Pareto severity curve.} tags{topic:Kang2019}
 
 agg Mack2003.AmericanPareto
   1 claim
   sev 10000 * lomax 1.5
   fixed
-  note{@Mack2003, a carrier for the shipped Mack2003.AmericanPareto severity curve.}
+  note{@Mack2003, a carrier for the shipped Mack2003.AmericanPareto severity curve.} tags{topic:Mack2003}
 
 agg Mack2003.Lognorm
   1 claim
   sev lognorm 10000 cv 4.953
   fixed
-  note{@Mack2003, a carrier for the shipped Mack2003.Lognorm severity curve.}
+  note{@Mack2003, a carrier for the shipped Mack2003.Lognorm severity curve.} tags{topic:Mack2003}
 
 agg Mack2003.RiebesellPareto
   1 claim
   sev 10000 * lomax 0.737
   fixed
-  note{@Mack2003, a carrier for the shipped Mack2003.RiebesellPareto severity curve.}
+  note{@Mack2003, a carrier for the shipped Mack2003.RiebesellPareto severity curve.} tags{topic:Mack2003}
 
 agg Mata2005.Lognorm
   1 claim
   sev 11048 * lognorm 2.29
   fixed
-  note{@Mata2005, a carrier for the shipped Mata2005.Lognorm severity curve.}
+  note{@Mata2005, a carrier for the shipped Mata2005.Lognorm severity curve.} tags{topic:Mata2005}
 
 agg Venter1983.Piecewise
   1 claim
   sev chistogram xps [0 1000 5000 6000 7000 8000 9000 10000 12500 15000 17500 20000 25000 35000 50000 75000 100000 125000 150000 175000 200000 225000 250000 300000] [0.38935 0.38935 0.00568 0.00543 0.00517 0.00495 0.00473 0.01098 0.00989 0.00896 0.00815 0.01426 0.02237 0.02353 0.02459 0.01517 0.01021 0.00732 0.00547 0.00423 0.00337 0.00274 0.0241]
   fixed
-  note{@Venter1983, a carrier for the shipped Venter1983.Piecewise severity curve.}
+  note{@Venter1983, a carrier for the shipped Venter1983.Piecewise severity curve.} tags{topic:Venter1983}
 
 agg Bodoff2017.XPL
   1 claim
   1000000 xs 0
   sev 50000 * lomax 1.5
   fixed
-  note{@Bodoff2017, a shipped Pareto curve under a 1,000,000 policy limit.}
+  note{@Bodoff2017, a shipped Pareto curve under a 1,000,000 policy limit.} tags{topic:Bodoff2017}
 
 agg Jin2016.J.v7
   3 claims
   sev gamma 6 cv 0.5774
   poisson
-  note{@Jin2016, a shipped Gamma curve carried by a compound Poisson.}
+  note{@Jin2016, a shipped Gamma curve carried by a compound Poisson.} tags{topic:Jin2016}

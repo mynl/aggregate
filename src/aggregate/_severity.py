@@ -1832,7 +1832,10 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         layer form ``limit xs attachment``, which is meaningless for a discrete
         or signed severity (e.g. ``dsev [-2 5]`` is *not* a ``5 xs 0`` layer).
         For a continuous severity keep the familiar ``unlimited`` /
-        ``limit xs attachment`` rendering.
+        ``limit xs attachment`` rendering, followed by the deductible form
+        as DecL spells it when the retention ends before infinity:
+        ``1,000 xs 50 franchise`` (``retention_end`` equal to the attachment)
+        or ``1,000 xs 50 to 80 disappearing`` ([Deductible-Forms-Follow-Ups]).
 
         Private since a149: this was the public ``support_description``, whose
         content now reads out through :attr:`tail_description` and
@@ -1859,7 +1862,13 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             return f'signed, support [{lo:g}, {hi:g}]'
         if self.limit == np.inf and self.attachment == 0:
             return 'unlimited'
-        return f'{self.limit:,.0f} xs {self.attachment:,.0f}'
+        layer = f'{self.limit:,.0f} xs {self.attachment:,.0f}'
+        d2 = getattr(self, 'retention_end', np.inf)
+        if not np.isfinite(d2):
+            return layer
+        if d2 == self.attachment:
+            return f'{layer} franchise'
+        return f'{layer} to {d2:,.0f} disappearing'
 
     @property
     def info(self):

@@ -7504,8 +7504,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         xs = np.hstack((self.xs - self.bs / 2, self.xs[-1] + self.bs / 2))
         ans = []
         for s in self.sevs:
-            # density at xs
+            # density at xs; a point mass is marked inf in the pdf (at the
+            # limit, or at 0 unconditionally), so read it as 0 here: the
+            # quadratic term wants the density part only, and one inf makes
+            # the gradient, and the whole term, nan
             f = s.pdf(xs)
+            f = np.where(np.isfinite(f), f, 0.0)
             # derv of f = -S''
             df = np.gradient(f, self.bs)
             # integral to quadratic adjustment term approx to S

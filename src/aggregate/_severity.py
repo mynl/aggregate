@@ -810,40 +810,64 @@ def make_layer_attachment_pdf(attachment, limit, detachment, pattach, pdetach,
                               conditional):
     """Decorator that wraps a PDF for the layered-loss transform.
 
+    Parameters
+    ----------
+    attachment, limit : float
+        The layer ``limit xs attachment``; the payment lives on ``[0, limit]``.
+    detachment : float
+        ``attachment + limit``, the ground-up loss at which the payment
+        reaches the limit. Not used by the wrapper, which works in payment
+        space; kept so the signature matches the other layer wrappers.
+    pattach, pdetach : float
+        ``S(attachment)`` and ``S(detachment)`` of the ground-up law.
+    conditional : bool
+        Whether the severity is conditional on a loss above the attachment.
+
+    Returns
+    -------
+    callable
+        A decorator taking the ground-up ``fzpdf`` and returning the payment
+        density.
+
     Notes
     -----
-    Three resolved bodies depending on construction:
+    The payment is ``min(max(X - attachment, 0), limit)``. On the open
+    interval ``(0, limit)`` its density is ``f(x + attachment)``, divided by
+    ``pattach`` when conditional. Point masses are marked with ``inf``: at
+    ``limit`` when ``pdetach > 0`` (the probability ``S(detachment)`` that
+    the layer is exhausted) and, unconditionally with ``pattach < 1``, at 0
+    (the probability ``1 - pattach`` of a loss at or below the attachment).
+    The density is 0 above ``limit``. Below 0 it is 0 when unconditional;
+    the conditional body is left unmasked there, as it always was, because
+    :meth:`~aggregate.distributions.Aggregate.severity_error_analysis`
+    differentiates the density on a grid that starts at ``-bs / 2`` and its
+    quadratic term relies on the body continuing smoothly past 0.
 
-    - Conditional: rescaled by ``pattach`` with a point mass at ``limit``
-      when ``pdetach > 0`` (the layer ceiling absorbs detachment probability).
-    - Unconditional with ``pattach < 1``: extra ``inf`` at x = 0 marks the
-      lump from ``P(X <= attachment)``.
-    - Unconditional with ``pattach == 1``: no mass at zero; otherwise as above.
-
-    The point masses at ``limit`` / ``detachment`` reflect the absorbed
-    probability beyond the policy ceiling.
+    The point mass tests come **before** the range tests, as in
+    :func:`make_layer_retention_pdf`, so ``x == limit`` is reported as the
+    mass and not swallowed by ``x >= limit`` ([Deductible-Forms-Follow-Ups]).
+    The limit, not the detachment, is the top of the payment's support: the
+    detachment is a ground-up loss.
     """
     def actual_decorator(fzpdf):
+        top_mass = np.inf if pdetach > 0 else 0.0
         if conditional:
-            limit_mass = np.inf if pdetach > 0 else 0
+            def wrapper(x):
+                x = np.asarray(x, dtype=float)
+                return np.where(x == limit, top_mass,
+                                np.where(x > limit, 0.0,
+                                         fzpdf(x + attachment) / pattach))
+        else:
+            zero_mass = np.inf if pattach < 1 else None
 
             def wrapper(x):
-                return np.where(x >= limit, 0,
-                                np.where(x == limit, limit_mass,
-                                         fzpdf(x + attachment) / pattach))
-        elif pattach < 1:
-            def wrapper(x):
-                return np.where(x < 0, 0,
-                                np.where(x == 0, np.inf,
-                                         np.where(x == detachment, np.inf,
-                                                  np.where(x > detachment, 0,
-                                                           fzpdf(x + attachment)))))
-        else:
-            def wrapper(x):
-                return np.where(x < 0, 0,
-                                np.where(x == detachment, np.inf,
-                                         np.where(x > detachment, 0,
-                                                  fzpdf(x + attachment))))
+                x = np.asarray(x, dtype=float)
+                body = fzpdf(x + attachment)
+                at_zero = body if zero_mass is None else zero_mass
+                return np.where(x == limit, top_mass,
+                                np.where(x > limit, 0.0,
+                                         np.where(x < 0, 0.0,
+                                                  np.where(x == 0, at_zero, body))))
         return wrapper
 
     return actual_decorator

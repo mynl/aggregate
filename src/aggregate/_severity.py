@@ -1833,7 +1833,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         or signed severity (e.g. ``dsev [-2 5]`` is *not* a ``5 xs 0`` layer).
         For a continuous severity keep the familiar ``unlimited`` /
         ``limit xs attachment`` rendering, followed by the deductible form
-        as DecL spells it when the retention ends before infinity:
+        in its DecL syntax when the retention ends before infinity:
         ``1,000 xs 50 franchise`` (``retention_end`` equal to the attachment)
         or ``1,000 xs 50 to 80 disappearing`` ([Deductible-Forms-Follow-Ups]).
 

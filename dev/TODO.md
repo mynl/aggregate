@@ -141,8 +141,8 @@
   `1000 xs 50` on a lognormal); the retention wrapper tests the mass first.
   (2) `feasible_bucket` and `size_biased_cdf` return their no-reading values
   under a finite `retention_end`, so bucket sizing has no feasibility reading
-  for a franchise or disappearing deductible. (3) The `qd` one-liner prints
-  `1,000 xs 50` with no modifier for a franchise.
+  for a franchise or disappearing deductible. (3), the `qd` one-liner showing
+  the form, DONE at **1.11.1** (#23).
 
 - **[Snapshot-Portability]** (promised in #8): untouched `master` at 1.0.1
   fails 56 fast tests on macOS (Apple Silicon): 44 exhibit snapshots, chart
@@ -381,6 +381,11 @@
   obligation cannot be netted, and it supports GAAP / STAT / IFRS shapes. Plain
   `summary_df` stays the simple net card; this is the detail view between it and
   the full `xpnl` walk.
+- **[Support-Phrase-Rounding]** (from the #23 review): `Severity._support_phrase`
+  formats the limit, attachment and retention end with `,.0f`, so a small layer
+  shows wrong: `1 xs 0.5` as `1 xs 0`, `1 xs 0.5 franchise` as a franchise at
+  zero, `1 xs 0.4 to 0.6 disappearing` as `1 xs 0 to 1 disappearing`. Pick a
+  format that keeps the thousands separator and the significant digits.
 
 ## Grammar, parser and unparser
 

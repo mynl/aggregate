@@ -269,7 +269,7 @@ def test_tail_report_reads_the_limit():
     ('inf xs 50 franchise', 'inf xs 50 franchise'),
 ], ids=['ordinary', 'franchise', 'disappearing', 'unlimited-franchise'])
 def test_layer_phrase_names_the_deductible_form(layers, phrase, capsys):
-    """``[Deductible-Forms-Follow-Ups]``: the form is spelled as DecL writes it.
+    """``[Deductible-Forms-Follow-Ups]``: the phrase shows the form in DecL syntax.
 
     The phrase feeds ``tail_description`` (the severity in the ``qd``
     one-liner and the ``info`` card) and ``tail_explanation``.

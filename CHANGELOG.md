@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.11.1 - 2026-10-25
+
+**[Deductible-Forms-Follow-Ups] The layer phrase shows the deductible form: `1,000 xs 50 franchise` or `1,000 xs 50 to 80 disappearing`, where it showed `1,000 xs 50` for every form.** The phrase is the severity in the `qd` one-liner, the `layer` row of `Severity.info`, and the `Declared support` sentence of `tail_explanation`; an ordinary layer is unchanged. Contributed by @KasraBashirioskooei (#23).
+
 ## 1.11.0 - 2026-10-22
 
 **Release 1.11.0, the first since 1.6.0, covers 1.6.1 to 1.11.0.** New: the deductible forms on the layers clause, `franchise` (1.7.0) and `to d2 disappearing` (1.11.0); an annual aggregate deductible `aad` and aggregate limit `agglimit` on an occurrence layer, in DecL (1.8.0) and in `pnl` / `xpnl` (1.9.0); `qd` wraps printed strings at 72 characters (1.7.1); and `scripts/check_wheel.py` for release builds (1.6.1). Changed: `aad`, `agglimit`, `franchise` and `disappearing` are new reserved words, so a program that uses one as a name must rename it; exhibits require `greater_tables>=8.1.0`, and some tables render with different decimals (1.10.0). Fixed: κ columns condition on the whole level set, so κ numbers move on rounding-sensitive ledgers (1.10.1); a `fixed` count or a `dfreq` outcome that is not a non-negative whole number now raises instead of returning negative probabilities (1.10.2). Thanks to @KasraBashirioskooei for four pull requests: the wheel check (#17), both deductible forms (#15, #20) and the input guards (#19).

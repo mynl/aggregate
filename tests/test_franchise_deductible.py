@@ -256,3 +256,30 @@ def test_tail_report_reads_the_limit():
     sev = Severity(exp_attachment=1000, exp_limit=100, exp_retention_end=1000,
                    **LOGNORM)
     assert _tail.severity_support(sev)[1] == 100
+
+
+# ---------------------------------------------------------------------------
+# The qd one-liner names the deductible form
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('layers, phrase', [
+    ('1000 xs 50', '1,000 xs 50'),
+    ('1000 xs 50 franchise', '1,000 xs 50 franchise'),
+    ('1000 xs 50 to 80 disappearing', '1,000 xs 50 to 80 disappearing'),
+    ('inf xs 50 franchise', 'inf xs 50 franchise'),
+], ids=['ordinary', 'franchise', 'disappearing', 'unlimited-franchise'])
+def test_layer_phrase_names_the_deductible_form(layers, phrase, capsys):
+    """``[Deductible-Forms-Follow-Ups]``: the form is spelled as DecL writes it.
+
+    The phrase feeds ``tail_description`` (the severity in the ``qd``
+    one-liner and the ``info`` card) and ``tail_explanation``.
+    """
+    from aggregate import qd
+    a = build(f'agg Q.Phrase 10 claims {layers} sev lognorm 100 cv 2 poisson')
+    sev = a.sevs[0]
+    assert sev.tail_description.endswith(f'; {phrase}')
+    assert f'Declared support: {phrase}.' in sev.tail_explanation
+    qd(a)
+    # qd wraps at 72 characters, so compare with the line breaks folded
+    one_liner = ' '.join(capsys.readouterr().out.split())
+    assert f'; {phrase}. Updated with bucket size' in one_liner

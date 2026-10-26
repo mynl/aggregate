@@ -690,6 +690,8 @@ def _lower_elt(name, declared):
         'rate_inexact': int((rate != canon).sum()),
         'severity_atoms': int(len(xs)),
         'max_event_exposure': max_event_exposure,
+        'moments': _elt_moments(event_rate[positive], event_loss[positive]),
+        'mass_error': abs(float(weights.sum()) / total_rate - 1),
     }
     return lowered, meta
 
@@ -840,5 +842,277 @@ def _lower_ylt(name, declared):
         'zero_probability': float(p[zero].sum()),
         'outcomes': int(len(xs)), 'probability_residual': float(residual),
         'mean': float(p @ totals),
+        'moments': _ylt_moments(p, totals),
+        'mass_error': abs(float(ps.sum()) - 1),
     }
     return lowered, meta
+
+
+# ----------------------------------------------------------------------
+# Moments of the table, computed from its rows
+# ----------------------------------------------------------------------
+
+def _mean_cv_skew(e1, e2, e3):
+    """Mean, CV and skewness from the first three raw moments.
+
+    A zero variance gives CV 0 (``nan`` at mean 0) and skewness ``nan``, the
+    degenerate conventions; the variance is floored at zero against rounding.
+    """
+    var = max(e2 - e1 * e1, 0.0)
+    sd = var ** 0.5
+    cv = sd / e1 if e1 else np.nan
+    skew = (e3 - 3 * e1 * e2 + 2 * e1 ** 3) / sd ** 3 if sd > 0 else np.nan
+    return {'mean': float(e1), 'cv': float(cv), 'skew': float(skew)}
+
+
+def _elt_moments(rate, loss):
+    """Severity and annual moments of a deterministic ELT, from its events.
+
+    Notes
+    -----
+    With event rates :math:`\\lambda_e`, occurrence losses :math:`m_e` and
+    :math:`C_r = \\sum_e \\lambda_e m_e^r`, the severity raw moments are
+    :math:`C_r / \\Lambda` and the annual cumulants of the compound Poisson are
+    :math:`\\kappa_r = C_r`, so the annual mean is :math:`C_1`, the CV
+    :math:`\\sqrt{C_2} / C_1` and the skewness :math:`C_3 / C_2^{3/2}`. Computed
+    from the events before equal losses coalesce, so comparing them with the
+    lowered severity checks the coalescing.
+    """
+    c = [float(rate @ loss ** r) for r in (1, 2, 3)]
+    total = float(rate.sum())
+    sev = _mean_cv_skew(*(x / total for x in c))
+    annual = {'mean': c[0],
+              'cv': c[1] ** 0.5 / c[0] if c[0] else np.nan,
+              'skew': c[2] / c[1] ** 1.5 if c[1] > 0 else np.nan}
+    return {'severity': sev, 'annual': annual}
+
+
+def _ylt_moments(prob, totals):
+    """Annual moments of a YLT, from its years, before equal totals coalesce.
+
+    The one synthetic claim is the whole year, so the severity is the annual
+    outcome and the two agree. Population moments: the weights are the year
+    probabilities, with no small-sample correction.
+    """
+    m = _mean_cv_skew(*(float(prob @ totals ** r) for r in (1, 2, 3)))
+    return {'severity': dict(m), 'annual': dict(m)}
+
+
+# ----------------------------------------------------------------------
+# Report frames
+# ----------------------------------------------------------------------
+
+#: Index and columns of the three report frames, also those of their empty
+#: forms.
+SUMMARY_INDEX = ['part', 'item']
+STATS_INDEX = ['component', 'measure']
+STATS_COLUMNS = ['table', 'model', 'estimate', 'error']
+VALIDATION_COLUMNS = ['check', 'value', 'tolerance', 'status', 'detail']
+
+#: Tolerance on the lowered severity's total weight against the event rate
+#: (ELT) or one (YLT): pure rounding, so a few ulps of a sum.
+MASS_TOLERANCE = 1e-12
+
+
+def summary_frame(agg):
+    """The ``loss_table_summary_df`` of an aggregate.
+
+    Parameters
+    ----------
+    agg : Aggregate
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by ``(part, item)`` with one ``value`` column. Part ``table``
+        describes the combined table, part ``grid`` the selected grid (``n/a``
+        before ``update``), and one part per source and unit its origin, form,
+        rows and, for a file, the resolved path, size, modification time,
+        SHA-256 digest and ignored columns. Empty for an aggregate not
+        declared from a loss table.
+    """
+    meta = agg._loss_table_meta
+    rows = []
+    if meta:
+        def add(part, item, value):
+            rows.append((part, item, value))
+
+        add('table', 'kind', meta['table'])
+        add('table', 'form', meta['form'])
+        add('table', 'units', ', '.join(meta['units']))
+        add('table', 'unit labels', ', '.join(
+            f'{u}: {lab}' for u, lab in meta['unit_labels'].items()) or 'none')
+        add('table', 'sources', len({s['source'] for s in meta['sources']}))
+        if meta['table'] == 'elt':
+            no2u = any(s['no2u'] and s['form'] == 'ELT6'
+                       for s in meta['sources'])
+            add('table', 'rows', meta['rows'])
+            add('table', 'events', meta['events'])
+            add('table', 'events with zero rate', meta['events_zero_rate'])
+            add('table', 'event rate', meta['rate'])
+            add('table', 'mean annual loss', meta['aal'])
+            add('table', 'severity atoms', meta['severity_atoms'])
+            add('table', 'largest event exposure',
+                'n/a' if meta['max_event_exposure'] is None
+                else meta['max_event_exposure'])
+            add('table', 'secondary uncertainty',
+                'removed by no2u' if no2u else 'none')
+        else:
+            add('table', 'years', meta['years'])
+            add('table', 'years with zero probability',
+                meta['years_zero_probability'])
+            add('table', 'zero-loss years', meta['zero_years'])
+            add('table', 'probability of zero', meta['zero_probability'])
+            add('table', 'year probabilities',
+                'equally likely' if meta['probabilities'] == 'uniform'
+                else 'supplied')
+            add('table', 'alignment', meta['alignment'])
+            add('table', 'annual outcomes', meta['outcomes'])
+            add('table', 'mean annual loss', meta['mean'])
+        updated = agg.bs > 0
+        add('grid', 'bs', agg.bs if updated else 'n/a')
+        add('grid', 'log2', agg.log2 if updated else 'n/a')
+        for s in meta['sources']:
+            part = f"source {s['source']}, unit {s['unit']}"
+            add(part, 'origin', s['origin'])
+            add(part, 'form', s['form'])
+            if meta['table'] == 'elt':
+                add(part, 'effective form', s['effective_form'])
+                add(part, 'no2u', s['no2u'])
+            add(part, 'rows', s['rows'])
+            for key in ('resolved', 'bytes', 'modified', 'sha256'):
+                if key in s:
+                    add(part, key, s[key])
+            if 'ignored_columns' in s:
+                add(part, 'ignored columns',
+                    ', '.join(s['ignored_columns']) or 'none')
+    index = pd.MultiIndex.from_tuples([r[:2] for r in rows],
+                                      names=SUMMARY_INDEX)
+    return pd.DataFrame({'value': [r[2] for r in rows]}, index=index,
+                        dtype=object)
+
+
+def stats_frame(agg):
+    """The ``loss_table_stats_df`` of an aggregate.
+
+    Parameters
+    ----------
+    agg : Aggregate
+
+    Returns
+    -------
+    pandas.DataFrame
+        Indexed by ``(component, measure)``, components ``severity`` and
+        ``annual``, measures ``mean``, ``cv`` and ``skew``, gross of
+        reinsurance. ``table`` is computed from the table's rows, ``model`` is
+        the aggregate's theoretical value (``stats_df`` column ``mixed``),
+        ``estimate`` the value from the discretized density (``stats_df``
+        column ``gross_empirical``, ``nan`` before ``update``), and ``error``
+        is ``estimate / table - 1``, or ``estimate - table`` where the table
+        value is zero (a symmetric skewness, a degenerate CV). Empty for an
+        aggregate not declared from a loss table.
+
+    Notes
+    -----
+    ``table`` and ``model`` are both exact for a deterministic table, but they
+    are computed independently, before and after equal losses coalesce, so
+    their agreement checks the lowering. ``estimate`` differs from them by the
+    ordinary discretization and FFT error that ``validation_df`` reports.
+    """
+    meta = agg._loss_table_meta
+    if not meta:
+        return pd.DataFrame(
+            columns=STATS_COLUMNS, dtype=float,
+            index=pd.MultiIndex.from_tuples([], names=STATS_INDEX))
+    updated = agg.bs > 0
+    rows, index = [], []
+    for component, key in (('severity', 'sev'), ('annual', 'agg')):
+        for measure in ('mean', 'cv', 'skew'):
+            table = meta['moments'][component][measure]
+            model = float(agg.stats_df.loc[(key, measure), 'mixed'])
+            est = (float(agg.stats_df.loc[(key, measure), 'gross_empirical'])
+                   if updated else np.nan)
+            if not (np.isfinite(table) and np.isfinite(est)):
+                error = np.nan
+            else:
+                error = est / table - 1 if table else est - table
+            index.append((component, measure))
+            rows.append([table, model, est, error])
+    return pd.DataFrame(rows, columns=STATS_COLUMNS,
+                        index=pd.MultiIndex.from_tuples(index, names=STATS_INDEX))
+
+
+def validation_frame(agg):
+    """The ``loss_table_validation_df`` of an aggregate.
+
+    Parameters
+    ----------
+    agg : Aggregate
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per check: ``check``, the measured ``value``, the
+        ``tolerance``, a ``status`` of ``pass``, ``warning`` or ``not
+        computed`` (a grid check before ``update``, or a measure undefined for
+        the table), and a ``detail``. Input that fails a structural check
+        raises when the aggregate is built, so those rows record what was
+        checked and passed. Empty for an aggregate not declared from a loss
+        table.
+    """
+    meta = agg._loss_table_meta
+    rows = []
+    if meta:
+        eps = agg.validation_eps
+
+        def add(check, value, tolerance, status, detail):
+            rows.append([check, value, tolerance, status, detail])
+
+        def against(check, value, tolerance, detail):
+            if not np.isfinite(value):
+                add(check, value, tolerance, 'not computed', detail)
+            else:
+                add(check, value, tolerance,
+                    'pass' if abs(value) <= tolerance else 'warning', detail)
+
+        if meta['table'] == 'elt':
+            projected = sum(s['form'] != s['effective_form']
+                            for s in meta['sources'])
+            add('form projection', projected, np.nan, 'pass',
+                f'{projected} ELT6 source(s) read as ELT4 under no2u; '
+                f"combined form {meta['form']}")
+            add('one row per event and unit', 0, 0, 'pass',
+                'no event repeats within a unit')
+            add('event rate agreement', meta['rate_inexact'], RATE_RTOL,
+                'pass', 'unit rows whose rate differs from the first row of '
+                'the event, within the relative tolerance')
+            add('zero-rate events', meta['events_zero_rate'], np.nan, 'pass',
+                'excluded from the count and the moments')
+            against('severity mass', meta['mass_error'], MASS_TOLERANCE,
+                    'lowered severity weight against the event rate')
+        else:
+            add('year completeness', meta['years'], np.nan, 'pass',
+                'every unit lists the same years')
+            against('probability sum', meta['probability_residual'],
+                    PROB_RTOL + PROB_ATOL,
+                    'roundoff normalized away; a material shortfall raises')
+            against('severity mass', meta['mass_error'], MASS_TOLERANCE,
+                    'lowered outcome probabilities against one')
+        stats = stats_frame(agg)
+        for component in ('severity', 'annual'):
+            table = stats.loc[(component, 'mean'), 'table']
+            model = stats.loc[(component, 'mean'), 'model']
+            against(f'{component} mean, table against model',
+                    model / table - 1 if table else model - table, eps,
+                    'independent sums before and after coalescing')
+        for component in ('severity', 'annual'):
+            for measure in ('mean', 'cv', 'skew'):
+                if agg.bs <= 0:
+                    detail = 'needs update'
+                elif not np.isfinite(stats.loc[(component, measure), 'table']):
+                    detail = 'undefined for this table (zero variance)'
+                else:
+                    detail = 'discretized density against the table'
+                against(f'{component} {measure} estimate',
+                        stats.loc[(component, measure), 'error'], eps, detail)
+    return pd.DataFrame(rows, columns=VALIDATION_COLUMNS)

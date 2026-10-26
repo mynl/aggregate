@@ -26,12 +26,11 @@
   through the PGF machinery. Number one finding of the a89 review. Design
   before code (where Iman Conover and the switcheroo come in), then reweigh
   `bivariate.py`, about 2k LOC for two perils.
-- **[DecL-Loss-Tables]**: `agg ... elt` and `agg ... ylt` from event and year
-  loss tables (`dev/done/plan-elt.md`). Deterministic import executing in four
-  bumps from 1.11.2 (inline tables 1.12.0, file sources 1.13.0; the report
-  frames remain); the two
-  secondary-uncertainty steps wait on the eltq plan in `V:/dev/eltq/dev/` and
-  an eltq release.
+- **[DecL-Loss-Tables]**: secondary uncertainty for `elt` (ELT6 without
+  `no2u`), `[ELT-Single-Event-Uncertainty]` then
+  `[ELT-Shared-Event-Uncertainty]` in `dev/done/plan-elt.md`, with
+  `elt_max_log2`. Waits on the eltq plan in `V:/dev/eltq/dev/`, built against
+  the local eltq. The deterministic import landed at 1.11.2 to 1.14.0.
 
 ## Outside contributions
 

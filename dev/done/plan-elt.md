@@ -7,8 +7,8 @@ csl: D:/Projects/Biblio/journal-of-risk-and-uncertainty.csl
 
 `[DecL-Loss-Tables]`. Drafted 2026-10-26 against aggregate 1.11.1 and the
 local eltq 2.10.0 source. **Status: `[Loss-Table-Deterministic-Import]`
-executing from 2026-10-26 in four bumps (rulings 13 to 16); the two
-uncertainty steps wait on the eltq half, drafted as its own plan in
+done, 1.11.2 to 1.14.0 (2026-10-26, rulings 13 to 17). The two uncertainty
+steps are open and wait on the eltq half, drafted as its own plan in
 `V:/dev/eltq/dev/`.** The author's rulings below are settled; the remaining
 recommendations are proposals.
 
@@ -104,10 +104,14 @@ where they conflict):
     reserved words are `elt`, `ylt`, `no2u` and `unit`; the source follows
     the unit clause directly.
 16. **[Eltq-Reflected-Plan]** The eltq prerequisites (`[Eltq-Model-Moments-And-Windows]`,
-    `[Eltq-Windowed-Shared-Events]`) are drafted as a reflected plan in
-    `V:/dev/eltq/dev/`, to be reviewed and executed there. eltq 2.10.0 is
-    local only (PyPI stops at 1.12.0), so the uncertainty steps also need an
-    eltq release before aggregate can declare the dependency.
+    `[Eltq-Windowed-Shared-Events]`) are drafted as a reflected plan,
+    `V:/dev/eltq/dev/plan-model-moments-and-windowed-views.md`, to be
+    reviewed and executed there.
+17. **[Eltq-Local-Dependency]** The uncertainty steps build against the
+    current local eltq, not a PyPI release, which follows in due course. A
+    release is not a prerequisite for `[ELT-Single-Event-Uncertainty]` or
+    `[ELT-Shared-Event-Uncertainty]`; the new eltq APIs still are. This
+    supersedes the release wording in `[ELT-Dependency]` and ruling 16.
 
 Units may represent business units, perils, regions, or their combinations;
 their names do not determine dependence. ELT event identity determines shared
@@ -1736,6 +1740,32 @@ portfolio units and pnl engines carry the base with the merged source dict;
 - *Numeric text.* A non-numeric entry in a numeric column reads as missing
   and fails the finite check, so the message is "must be finite and
   nonnegative" rather than naming the text.
+
+**1.14.0 `[Loss-Table-Reports]`.** `Aggregate.loss_table_summary_df`,
+`loss_table_stats_df` and `loss_table_validation_df`, built by
+`_loss_table.summary_frame`, `stats_frame` and `validation_frame` from
+`_loss_table_meta`, which now also records the table's own severity and
+annual moments (computed from the events or years before coalescing) and
+the lowered severity's mass error. Three `df-loss-table` rows in
+`dev/FEATURES.csv`; the DecL reference names the frames. Tests:
+`tests/test_loss_table_reports.py`. This completes
+`[Loss-Table-Deterministic-Import]`. Divergences:
+
+- *Summary shape.* One `(part, item)` to `value` frame rather than columns:
+  it mixes combined facts with per-source ones, which share no columns.
+- *Stats rows.* Severity and annual mean, CV and skewness, gross of
+  reinsurance, with `table`, `model` (`stats_df` `mixed`), `estimate`
+  (`stats_df` `gross_empirical`) and `error`. The overflow rows of
+  `[Loss-Table-Audit]` belong to the uncertainty steps, which have a window.
+- *Error at zero.* `error` is absolute where the table value is zero (a
+  symmetric skewness, a degenerate CV); a measure undefined for the table
+  (skewness at zero variance) is `not computed` with that reason.
+- *Structural rows always pass.* Invalid input raises at build, as ruled,
+  so those validation rows record what was checked.
+
+**Open.** `[ELT-Single-Event-Uncertainty]` and
+`[ELT-Shared-Event-Uncertainty]`, after the eltq plan executes (ruling 17:
+against the local eltq). `elt_max_log2` is designed there (ruling 14).
 
 Planning checks on 2026-10-26: read the implementation article before tracing
 the current eltq sizing and overflow code; checked the beta-tail examples

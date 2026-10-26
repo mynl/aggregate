@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.14.0 - 2026-10-26
+
+**[Loss-Table-Reports] `Aggregate.loss_table_summary_df`, `loss_table_stats_df` and `loss_table_validation_df` report an `elt` or `ylt` declaration.** The summary lists what was read, combined and per source, with each file's resolved path and SHA-256 digest; the stats frame sets the severity and annual mean, CV and skewness computed from the table beside the model's and the discretized estimate; the validation frame lists each check with value, tolerance and a `pass`, `warning` or `not computed` status. All three are empty for any other aggregate. This completes the deterministic part of `[DecL-Loss-Tables]`.
+
 ## 1.13.0 - 2026-10-26
 
 **[Loss-Table-Files] An `elt` or `ylt` source can be a quoted CSV, TSV, Parquet or Feather path.** Columns are matched through one alias table after ignoring case, spaces and underscores, a `unit` column splits a long file into units, and identifiers stay exact (a floating point identifier column raises). A relative path resolves against the declaring `.agg` file's directory or the session's working directory at registration, and `to_agg` writes it absolute. Each source's audit records the resolved path, size, modification time and SHA-256 digest. Parquet and Feather need `pyarrow`; Excel is not read.

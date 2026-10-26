@@ -3966,6 +3966,44 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return '\n'.join(s)
 
     @property
+    def loss_table_summary_df(self):
+        """What an ``elt`` or ``ylt`` declaration read, one fact per row.
+
+        Indexed by ``(part, item)``: the combined table (kind, form, units,
+        events or years, rate or probabilities, mean annual loss), the grid,
+        and each source with its origin, form, rows and, for a file, resolved
+        path, size, modification time and SHA-256 digest. Empty, with the same
+        index names, for an aggregate not declared from a loss table. A fresh
+        frame on every call. See ``aggregate._loss_table.summary_frame``.
+        """
+        return _loss_table.summary_frame(self)
+
+    @property
+    def loss_table_stats_df(self):
+        """Severity and annual mean, CV and skewness: table, model, estimate.
+
+        ``table`` is computed from the declared rows, ``model`` is the
+        theoretical value from :attr:`stats_df`, ``estimate`` the gross value
+        from the discretized density (``nan`` before :meth:`update`), and
+        ``error`` is ``estimate / table - 1``. Empty for an aggregate not
+        declared from a loss table. See ``aggregate._loss_table.stats_frame``.
+        """
+        return _loss_table.stats_frame(self)
+
+    @property
+    def loss_table_validation_df(self):
+        """The loss table checks, with value, tolerance and status.
+
+        One row per check: form projection, event and rate consistency or
+        year completeness and probabilities, the lowered severity's mass, the
+        table against the model, and each moment estimate against the table
+        at :attr:`validation_eps`. A grid check is ``not computed`` before
+        :meth:`update`. Empty for an aggregate not declared from a loss table.
+        See ``aggregate._loss_table.validation_frame``.
+        """
+        return _loss_table.validation_frame(self)
+
+    @property
     def validation_score(self):
         """Continuous validation score: how well the grid reproduces theory (float).
 

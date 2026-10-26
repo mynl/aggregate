@@ -42,6 +42,7 @@ from ._grid_distribution import GridDistribution, return_period_map, period_to_p
 from ._labeled import LabeledMixin
 from .decl_writer import spec_to_decl
 from ._program import ProgramMixin
+from . import _loss_table
 from . import _program
 import aggregate.random_agg as ar
 from .spectral import choquet_weights
@@ -2631,7 +2632,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                  approximate='exact',
                  label=None, label_map=None,
                  note='', hints='', tags=(), _tweedie=None,
-                 exp_retention_end=None):
+                 exp_retention_end=None, _loss_table_meta=None):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
         It allows for very flexible creation of Aggregate distributions. Severity
@@ -2791,6 +2792,13 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             underwriter-applied stamp because a parsed spec is splatted
             straight into this constructor at eleven call sites and there is no
             choke point to pop it at. See dev/done/plan-tweedie.md.
+        :param _loss_table_meta: private provenance, the audit record
+            ``aggregate._loss_table.resolve`` writes when the aggregate is
+            declared from an ``elt`` or ``ylt`` table, or ``None``. The
+            frequency and severity arguments carry the lowered law; this
+            carries what the table was (sources, forms, units, counts) for
+            :attr:`info` and ``decl_writer``. An argument, like ``_tweedie``,
+            so ``Aggregate(**a.spec)`` keeps it. See dev/done/plan-elt.md.
         """
 
         # have to be ready for inputs to be in a list, e.g. comes that way from Pandas via Excel
@@ -2814,6 +2822,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self._spec.get('_tweedie') is None:
             self._spec.pop('_tweedie', None)
         self._tweedie = _tweedie
+        # Same rule for the loss table audit ([DecL-Loss-Tables]).
+        if self._spec.get('_loss_table_meta') is None:
+            self._spec.pop('_loss_table_meta', None)
+        self._loss_table_meta = _loss_table_meta
 
         # Method-of-moments approximation (the ``approximate`` DecL keyword). When
         # not ``'exact'`` the requested freq x sev aggregate is replaced, right
@@ -3922,6 +3934,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             ('claim count', f'{self.n:,.3f}'),
             ('frequency distribution', self.frequency.freq_name),
             ('severity distribution', sev_desc),
+            ('loss table', _loss_table.describe(self._loss_table_meta)
+             if self._loss_table_meta else INFO_NA),
             ('approximate', getattr(self, 'approximation', '') or 'exact'),
             ('bs', bss),
             ('log2', self.log2 if updated else INFO_NA),

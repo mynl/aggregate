@@ -28,7 +28,8 @@
   `bivariate.py`, about 2k LOC for two perils.
 - **[DecL-Loss-Tables]**: `agg ... elt` and `agg ... ylt` from event and year
   loss tables (`dev/done/plan-elt.md`). Deterministic import executing in four
-  bumps from 1.11.2 (`[Quote-Safe-Statements]` landed); the two
+  bumps from 1.11.2 (inline tables landed at 1.12.0; file sources and the
+  report frames remain); the two
   secondary-uncertainty steps wait on the eltq plan in `V:/dev/eltq/dev/` and
   an eltq release.
 

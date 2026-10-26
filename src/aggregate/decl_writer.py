@@ -924,6 +924,61 @@ def _render_tweedie(spec: dict) -> str:
     return f'tweedie {_fmt_num(p)} {_fmt_num(mean)} {_fmt_num(dispersion)}'
 
 
+def _loss_table_sources(spec: dict):
+    """The declared ``elt`` / ``ylt`` sources of a parsed spec, or ``None``."""
+    for key in ('elt_sources', 'ylt_sources'):
+        if key in spec:
+            return spec[key]
+    return None
+
+
+def _fmt_lt_id(ident: str) -> str:
+    """A loss table identifier: bare when it is canonical integer text, else quoted."""
+    return ident if ident.isdigit() and str(int(ident)) == ident else f'"{ident}"'
+
+
+def _render_loss_table(source: dict) -> str:
+    """Render one ``elt`` / ``ylt`` source clause.
+
+    Inverts ``elt_source`` / ``ylt_source``: the keyword, ``no2u`` when set,
+    ``unit NAME [as LABEL]`` when declared, then the quoted path, the flat
+    vector, or the matrix with one bracketed row per event or year. An omitted
+    unit stays omitted rather than rendering as ``unit Total``.
+    """
+    parts = [source['table']]
+    if source.get('no2u'):
+        parts.append('no2u')
+    if source.get('unit'):
+        parts.append(f"unit {source['unit']}{_render_label(source.get('unit_label'))}")
+    if 'path' in source:
+        parts.append(f'"{source["path"]}"')
+    elif 'values' in source:
+        parts.append(_fmt_seq(source['values']))
+    else:
+        rows = ' '.join(
+            '[' + ' '.join([_fmt_lt_id(r[0]), *(_fmt_num(v) for v in r[1:])]) + ']'
+            for r in source['rows'])
+        parts.append(f'[{rows}]')
+    return ' '.join(parts)
+
+
+def _render_loss_table_body(spec: dict, orientation: bool = True) -> list:
+    """The clauses of a loss table body, or ``[]`` when the spec is not one.
+
+    The sources, then occurrence and aggregate reinsurance, ``approximate`` and
+    orientation, in grammar order. Like a ``tweedie`` body it replaces the
+    exposure, severity and frequency clauses, whose lowered values must not be
+    rendered. ``orientation=False`` for a pnl engine, which renders none.
+    """
+    sources = _loss_table_sources(spec)
+    if sources is None:
+        return []
+    return [*(_render_loss_table(s) for s in sources),
+            _render_reins(spec, 'occurrence', 'occ_reins', 'occ_kind'),
+            _render_reins(spec, 'aggregate', 'agg_reins', 'agg_kind'),
+            _render_orientation(spec) if orientation else '']
+
+
 def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     """Render an ordinary loss aggregate (``agg NAME ...``).
 
@@ -945,6 +1000,10 @@ def _render_agg(name: str, spec: dict, trailer: bool = True) -> _Block:
     if tweedie:
         return _Block(f'agg {name}{_render_label(spec.get("label"))}',
                       [tweedie, *_render_trailer(spec, trailer)])
+    loss_table = _render_loss_table_body(spec)
+    if loss_table:
+        return _Block(f'agg {name}{_render_label(spec.get("label"))}',
+                      [*loss_table, *_render_trailer(spec, trailer)])
     return _Block(f'agg {name}{_render_label(spec.get("label"))}', [
         _render_exposure(spec),
         _render_layers(spec),
@@ -1048,7 +1107,9 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
         # does; `_merge_engine_spec` copies `_tweedie` into the pnl spec because
         # it is structure, not metadata, so it is not on the skip list there.
         tweedie = _render_tweedie(spec)
-        engine = _Block(f'agg {engine_name}{engine_label}', [tweedie] if tweedie else [
+        loss_table = _render_loss_table_body(spec, orientation=False)
+        engine = _Block(f'agg {engine_name}{engine_label}', [tweedie] if tweedie
+                        else loss_table if loss_table else [
             _render_exposure(spec),
             _render_layers(spec),
             _render_sev_clause(spec),

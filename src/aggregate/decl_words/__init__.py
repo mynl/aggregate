@@ -60,7 +60,7 @@ __all__ = ['decl_words']
 
 
 #: The discrete declaration keywords, each a reserved word in the grammar.
-_DECLARATIONS = ('dbvsev', 'dfreq', 'dsev', 'dwait', 'nttagg')
+_DECLARATIONS = ('dbvsev', 'dfreq', 'dsev', 'dwait', 'elt', 'nttagg', 'ylt')
 
 #: Severity distribution names mapped to their shape parameter count. Every
 #: name but the three the library special cases (``cantor``, ``dhistogram``,

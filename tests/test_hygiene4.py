@@ -90,7 +90,8 @@ def test_portfolio_value_type_read_only():
 
 AGG_INFO_LABELS = [
     'aggregate object name', 'value_type', 'claim count',
-    'frequency distribution', 'severity distribution', 'approximate',
+    'frequency distribution', 'severity distribution', 'loss table',
+    'approximate',
     'bs', 'log2', 'padding', 'sev_calc', 'dsev_bucket', 'normalize',
     'x_min', 'x_max', 'premium', 'expected loss', 'loss ratio', 'P(X=0)',
     'validation_eps', 'reinsurance', 'occurrence reinsurance',

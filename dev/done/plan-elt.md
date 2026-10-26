@@ -1676,6 +1676,41 @@ recorded.
 `"a [1] "`. The spec snapshot regenerated with no diff. Tests:
 `tests/test_quoted_literals.py`.
 
+**1.12.0 `[Loss-Table-Inline]`.** Grammar `agg_body_elt` / `agg_body_ylt`
+with `lt_row` and the text-keeping `LT_INT` terminal; transformer records
+`elt_sources` / `ylt_sources`; `src/aggregate/_loss_table.py` validates and
+lowers at `Underwriter._factory` (agg, pnl, xpnl, portfolio units, and units
+of a pnl portfolio engine); `Aggregate(..., _loss_table_meta=...)` carries
+the audit and `info` gains a `loss table` row; `decl_writer` renders the
+sources. Keyword mirrors updated (`ID` exclusion, `_TERMINAL_LABELS`,
+`agg.sublime-syntax`, `decl_words._DECLARATIONS`), grammar reference
+regenerated, spec snapshot and `FEATURES.csv` unchanged. Docs: the
+"Event and Year Loss Tables" section of `docs/4_dec_Language_Reference.rst`
+and the `info` catalogue. Tests: `tests/test_elt.py`, `tests/test_ylt.py`,
+corpus section LT of `decl-testers.agg`. Every oracle in
+`[ELT-Probability-Oracles]` that needs no uncertainty engine, and every row
+of `[YLT-Probability-Oracles]`, is a test case. Divergences:
+
+- *Refusal slots.* Both bodies keep `occ_reins` and `approx_clause` in the
+  grammar so that occurrence terms on a YLT, and `approximate` on either, are
+  refused by the transformer with guidance instead of a bare parse error. The
+  plan said the YLT body has no `occ_reins` slot; the effect is the same.
+- *Algebra on references.* `@`, `*`, `+` and `-` on an `agg.NAME` loss table
+  raise, beside the existing `sev agg.NAME` refusal: the symbolic spec has no
+  exposure or severity keys to rewrite. The plan was silent.
+- *Bivariate.* A loss table inside `bivariate`, `clash` or the `netceded`
+  family raises, as a `sev agg.NAME` reference does. The plan was silent.
+- *Writer scope.* `spec_to_decl` already refuses a dense `Aggregate.spec`, so
+  only recipes render; `_loss_table_meta` holds the audit and no copy of the
+  declared sources. `Aggregate(**a.spec)` keeps the audit and the law.
+- *Hash stability.* `_loss_table_meta` is dropped from `_spec` when unset, as
+  `_tweedie` is, so ordinary spec hashes are unchanged.
+- *Unit labels* are recorded in the audit only; the report frames show them.
+- *Pnl portfolio engines.* `_build_pnl_from_port` now lowers loss table
+  units; it still does not resolve `sev agg.NAME` units, an existing gap left
+  alone.
+- *`elt_max_log2`* deferred (ruling 14).
+
 Planning checks on 2026-10-26: read the implementation article before tracing
 the current eltq sizing and overflow code; checked the beta-tail examples
 with SciPy and the weighted YLT moments with exact rational arithmetic.

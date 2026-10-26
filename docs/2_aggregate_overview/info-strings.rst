@@ -24,6 +24,9 @@ claim count                  ``self.n``, format ``,.3f``
 frequency distribution       ``self.frequency.freq_name``
 severity distribution        single component: ``Severity.tail_description``;
                              else ``{k} components``
+loss table                   ``elt`` / ``ylt`` source: form, event or year            not a loss table
+                             count, units, and the uncertainty or probability
+                             convention
 approximate                  method-of-moments marker; one row, no continuation
                              (fit detail lives in the note)
 bs                           bucket size (``1/n`` form for ``bs < 1``)                 not updated

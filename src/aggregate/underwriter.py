@@ -25,6 +25,7 @@ from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .spectral import Distortion
 from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
 from .contract_terms import _annual_terms_label
+from . import _loss_table
 from .parser import (UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM,
                      DERIVE_PREMIUM)
 from .recipe import Recipe
@@ -1685,6 +1686,19 @@ class Underwriter(HelpMixin):
                 "its own agg and reference that agg by name from an ordinary "
                 "aggregate.")
 
+        # ---- event and year loss tables (``agg NAME elt ...`` / ``ylt``)
+        # Recorded symbolically by the parser and lowered here, beside the
+        # severity reference and for the same reason: ``Aggregate.__init__``
+        # needs the frequency and severity arrays. A pnl / xpnl carries the
+        # sources of its merged agg engine. See dev/done/plan-elt.md.
+        if kind in ('agg', 'pnl', 'xpnl') and _loss_table.is_loss_table(spec):
+            spec = _loss_table.resolve(name, spec)
+        elif (kind not in ('agg', 'pnl', 'xpnl', 'port')
+              and _loss_table.carries_loss_table(spec)):
+            raise ValueError(
+                f"{name}: an elt or ylt body is not supported in a '{kind}' "
+                "body. Declare the table as its own agg.")
+
         if kind == 'agg':
             # A pure aggregate ignores what it cannot use and says so: the
             # reinsurance-economics / feature clauses parse everywhere (the
@@ -2023,6 +2037,9 @@ class Underwriter(HelpMixin):
             # built, since that is where the ``Aggregate`` objects appear.
             unit_meta = {}
             for i, unit in enumerate(agg_list):
+                if _loss_table.is_loss_table(unit):
+                    agg_list[i] = _loss_table.resolve(
+                        f"{name}.{unit.get('name', i)}", unit)
                 if 'sev_ref' in unit:
                     agg_list[i], unit_meta[i] = self._resolve_sev_ref(
                         f"{name}.{unit.get('name', i)}", unit)
@@ -3070,7 +3087,9 @@ class Underwriter(HelpMixin):
                 "Use 'pnl' for the net-net book P&L (or 'xpnl' over a single agg "
                 "engine).")
         port_spec = deepcopy(port_spec)
-        port_units = [k for _i, _j, k in port_spec['spec']]
+        port_units = [_loss_table.resolve(f"{name}.{k.get('name', i)}", k)
+                      if _loss_table.is_loss_table(k) else k
+                      for i, (_kind, _name, k) in enumerate(port_spec['spec'])]
         engine = Portfolio(name, port_units, uw=self,
                            label=port_spec.get('label'))
         engine.program = program

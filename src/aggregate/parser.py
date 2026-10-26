@@ -573,6 +573,11 @@ class UnderwritingTransformer(Transformer):
         # so the conversion happens in the ntt_* rule callbacks, never here.
         return str(tok)
 
+    def LT_INT(self, tok):
+        # Keep the TEXT: a loss table identifier is exact, and a float would
+        # merge two ids above 2**53. ``lt_id_int`` normalizes it.
+        return str(tok)
+
     # ----- answer dispatch ------------------------------------------
     def answer_sev(self, c):
         return c[0]
@@ -793,6 +798,140 @@ class UnderwritingTransformer(Transformer):
         if "name" in bagg:
             del bagg["name"]
         return {**bagg, **occ_reins, **agg_reins}
+
+    # ----- event and year loss tables ([DecL-Loss-Tables]) -------------
+    # Each source becomes a small dict recorded symbolically under
+    # ``elt_sources`` / ``ylt_sources``; the underwriter reads, validates and
+    # lowers the whole list at construction (``aggregate._loss_table``). Only
+    # shape is checked here: row widths, and what the grammar cannot express.
+    def _loss_table_body(self, table, c):
+        """Assemble an ``agg_body_elt`` / ``agg_body_ylt`` spec fragment.
+
+        Parameters
+        ----------
+        table : {'elt', 'ylt'}
+            The body kind.
+        c : list
+            Children: sources, occurrence reinsurance, aggregate reinsurance,
+            approximation and orientation fragments.
+
+        Returns
+        -------
+        dict
+            ``{'<table>_sources': [...], **reinsurance, **orientation}``.
+
+        Notes
+        -----
+        A YLT row is a whole year's loss, so an occurrence treaty applied to it
+        would transform the annual total while appearing to price an event
+        layer; it is refused here and, for a referenced YLT, again in
+        ``_loss_table.resolve``. ``approximate`` on a loss table is deferred.
+        """
+        sources, occ_reins, agg_reins, approx, orientation = c
+        if table == 'ylt' and occ_reins:
+            raise ValueError(
+                "DecL: a ylt holds annual outcomes, so occurrence reinsurance "
+                "cannot apply: an annual total does not identify its "
+                "occurrences. Write annual terms as 'aggregate net of ...', or "
+                "declare the events with elt for occurrence terms.")
+        if approx.get("approximate", "exact") != "exact":
+            raise ValueError(
+                f"DecL: approximate is not supported on an {table} body yet.")
+        return {f"{table}_sources": sources, **occ_reins, **agg_reins,
+                **orientation}
+
+    def agg_body_elt(self, c):
+        return self._loss_table_body('elt', c)
+
+    def agg_body_ylt(self, c):
+        return self._loss_table_body('ylt', c)
+
+    def lt_sources_one(self, c):
+        return [c[0]]
+
+    def lt_sources_cons(self, c):
+        lst, src = c
+        lst.append(src)
+        return lst
+
+    #: Inline row widths, identifier included, mapped to the table form.
+    _ELT_ROW_FORMS = {3: 'ELT3', 4: 'ELT4', 6: 'ELT6'}
+    _YLT_ROW_FORMS = {2: 'YLT2', 3: 'YLT3'}
+
+    @staticmethod
+    def _check_rows(table, rows, forms):
+        """Refuse a ragged inline matrix or a width with no table form."""
+        widths = sorted({len(r) for r in rows})
+        if len(widths) > 1:
+            raise ValueError(
+                f"DecL: {table} rows have mixed widths {widths}; every row of "
+                "one source has the same number of fields.")
+        if widths[0] not in forms:
+            allowed = ', '.join(f'{w} ({f})' for w, f in forms.items())
+            raise ValueError(
+                f"DecL: an {table} row has {widths[0]} fields, identifier "
+                f"included; allowed: {allowed}.")
+
+    def elt_source(self, c):
+        _elt, no2u, unit, data = c
+        if 'rows' in data:
+            self._check_rows('elt', data['rows'], self._ELT_ROW_FORMS)
+        return {"table": "elt", "no2u": no2u, **unit, **data}
+
+    def ylt_source(self, c):
+        _ylt, unit, data = c
+        if 'rows' in data:
+            self._check_rows('ylt', data['rows'], self._YLT_ROW_FORMS)
+        return {"table": "ylt", **unit, **data}
+
+    def no2u_set(self, c):
+        return True
+
+    def no2u_none(self, c):
+        return False
+
+    def unit_some(self, c):
+        _unit, name, as_label = c
+        return {"unit": name, **({"unit_label": as_label["label"]}
+                                 if "label" in as_label else {})}
+
+    def unit_none(self, c):
+        return {}
+
+    def lt_path(self, c):
+        path = str(c[0])[1:-1]
+        if not path.strip():
+            raise ValueError("DecL: a loss table path is empty.")
+        return {"path": path}
+
+    def lt_matrix(self, c):
+        return {"rows": c[0]}
+
+    def lt_vector(self, c):
+        return {"values": [float(v) for v in c[0]]}
+
+    def lt_rows_one(self, c):
+        return [c[0]]
+
+    def lt_rows_cons(self, c):
+        lst, row = c
+        lst.append(row)
+        return lst
+
+    def lt_row(self, c):
+        ident, values = c
+        return [ident, *(float(v) for v in values)]
+
+    def lt_id_int(self, c):
+        # Decimal text without leading zeros, so the integer 7 and the string
+        # "7" name the same event while the string "007" stays distinct.
+        return str(int(c[0]))
+
+    def lt_id_string(self, c):
+        ident = str(c[0])[1:-1]
+        if not ident:
+            raise ValueError("DecL: a loss table identifier is empty.")
+        return ident
 
     def agg_out_named(self, c):
         _, name, as_label, body, trailer = c
@@ -2746,6 +2885,7 @@ class UnderwritingTransformer(Transformer):
     def builtin_agg_inhomog(self, c):
         expr, _at, bagg = c
         bid = bagg.copy()
+        self._refuse_loss_table_algebra(bid, 'scaled')
         bid["name"] += "_i_scaled"
         if bid.get("freq_name") == "renewal":
             # the count of a renewal aggregate comes solely from the wait
@@ -2779,6 +2919,24 @@ class UnderwritingTransformer(Transformer):
                 f"{operation}: a reference is another object's output law, not "
                 "a parameterized family. Scale or shift the referenced "
                 "declaration itself, or use '@' to scale the exposure.")
+        UnderwritingTransformer._refuse_loss_table_algebra(bid, operation)
+
+    @staticmethod
+    def _refuse_loss_table_algebra(bid, operation):
+        """Refuse ``@``, ``*``, ``+`` and ``-`` on a loss table aggregate.
+
+        Its rates, losses and probabilities are data held symbolically until
+        construction, so there are no exposure or severity keys to rewrite,
+        and scaling only some of them would build a different table from the
+        one the program names. Edit the table instead.
+        """
+        for key in ("elt_sources", "ylt_sources"):
+            if key in bid:
+                raise ValueError(
+                    f"DecL: {bid.get('name', 'the aggregate')} is declared from "
+                    f"{'an elt' if key == 'elt_sources' else 'a ylt'}, which "
+                    f"cannot be {operation}: the table's "
+                    "rates and losses are data. Edit the table itself.")
 
     def builtin_agg_homog(self, c):
         expr, _times, bagg = c

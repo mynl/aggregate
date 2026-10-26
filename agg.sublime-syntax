@@ -113,7 +113,7 @@ contexts:
       scope: support.type.builtin.distortion.decl
 
   keywords:
-    - match: '\b(?:aad|aggregate|agglimit|agg|and|approximate|approx|as|at|basic|bivariate|bv|cede|ceded|clash|claims|claim|copula|corridor|cv|deposit|derive|disappearing|distortion|dist|exposure|expenses|expense|exp|franchise|free|grossceded|grossnet|inherit|lcm|less|loss|lr|max|min|mixed|netceded|net|no|occurrence|of|payoff|pc|peel|picks|pnl|xpnl|po|port|premium|prem|rate|reinstatements|reinstatement|retro|rol|sev|slide|splice|ssev|swing|to|tower|tweedie|after|wait|wts|xps|xs|years|year|zm|zt){{keyword_boundary}}'
+    - match: '\b(?:aad|aggregate|agglimit|agg|and|approximate|approx|as|at|basic|bivariate|bv|cede|ceded|clash|claims|claim|copula|corridor|cv|deposit|derive|disappearing|distortion|dist|exposure|expenses|expense|exp|franchise|free|grossceded|grossnet|inherit|lcm|less|loss|lr|max|min|mixed|netceded|net|no2u|no|occurrence|of|payoff|pc|peel|picks|pnl|xpnl|po|port|premium|prem|rate|reinstatements|reinstatement|retro|rol|sev|slide|splice|ssev|swing|to|tower|tweedie|unit|after|wait|wts|xps|xs|years|year|zm|zt){{keyword_boundary}}'
       scope: keyword.control.decl
 
   frequencies:
@@ -124,7 +124,7 @@ contexts:
   # with the frequency DISTRIBUTION names above: it declares an outcome and
   # probability pair, it is not a named distribution.
   discrete:
-    - match: '\b(?:dfreq|dsev|dbvsev|dwait|nttagg){{keyword_boundary}}'
+    - match: '\b(?:dfreq|dsev|dbvsev|dwait|nttagg|elt|ylt){{keyword_boundary}}'
       scope: storage.type.discrete.decl
 
   operators:
@@ -155,7 +155,7 @@ contexts:
   identifiers:
     # Mirrors the Lark ID token. Placing this before numbers prevents
     # names such as mydist.1 from splitting and coloring .1 as a number.
-    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
+    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|unit|wait|wts|xps|xs|ylt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
       scope: variable.other.identifier.decl
 
   numbers:

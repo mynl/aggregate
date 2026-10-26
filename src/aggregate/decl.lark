@@ -84,6 +84,49 @@ agg_body: exposures layers sev_clause occ_reins freq agg_reins approx_clause ori
         | exposures_years layers sev_clause occ_reins wait_clause agg_reins approx_clause orientation -> agg_body_renewal
         | TWEEDIE expr expr expr                                                             -> agg_body_tweedie
         | builtin_agg occ_reins agg_reins                                                    -> agg_body_rename
+        | elt_sources occ_reins agg_reins approx_clause orientation                          -> agg_body_elt
+        | ylt_sources occ_reins agg_reins approx_clause orientation                          -> agg_body_ylt
+
+// Event and year loss tables ([DecL-Loss-Tables], dev/done/plan-elt.md). An ELT
+// body is one or more ``elt`` sources and determines its own Poisson count and
+// event severity; a YLT body is one or more ``ylt`` sources, each row a whole
+// annual outcome. A source is a quoted file path or an inline matrix, with an
+// optional ``no2u`` (ELT only) and ``unit NAME [as LABEL]``. The transformer
+// records the sources symbolically and validates their shape; the underwriter
+// reads and lowers them at construction, so parsing never opens a file.
+// ``occ_reins`` and ``approx_clause`` are in both productions only so their use
+// is refused with guidance rather than a bare parse error: a YLT outcome is an
+// annual total, and ``approximate`` on a loss table is deferred.
+elt_sources: elt_sources elt_source   -> lt_sources_cons
+           | elt_source               -> lt_sources_one
+elt_source: ELT no2u_flag unit_clause elt_data
+
+ylt_sources: ylt_sources ylt_source   -> lt_sources_cons
+           | ylt_source               -> lt_sources_one
+ylt_source: YLT unit_clause ylt_data
+
+no2u_flag: NO2U   -> no2u_set
+         |        -> no2u_none
+
+unit_clause: UNIT name as_label   -> unit_some
+           |                      -> unit_none
+
+elt_data: STRING              -> lt_path
+        | "[" lt_rows "]"     -> lt_matrix
+
+ylt_data: STRING              -> lt_path
+        | "[" lt_rows "]"     -> lt_matrix
+        | "[" numberl "]"     -> lt_vector
+
+lt_rows: lt_rows lt_row   -> lt_rows_cons
+       | lt_row           -> lt_rows_one
+
+// A row leads with an exact identifier: an unsigned integer kept as text
+// (``LT_INT``, never routed through the float ``NUMBER``) or a quoted string.
+lt_row: "[" lt_id numberl "]"
+
+lt_id: LT_INT   -> lt_id_int
+     | STRING   -> lt_id_string
 
 // Orientation suffix on an ``agg`` -- the variable's sign convention / role.
 // ``payoff`` marks an asset-return / direct-payoff primitive ("more is
@@ -935,6 +978,11 @@ PART_OF.2:    /po(?![a-zA-Z0-9._:~\-])/
 ZM.2:         /zm(?![a-zA-Z0-9._:~\-])/
 ZT.2:         /zt(?![a-zA-Z0-9._:~\-])/
 DISTORTION.2: /(?:distortion|dist)(?![a-zA-Z0-9._:~\-])/
+// Event and year loss tables ([DecL-Loss-Tables]).
+ELT.2:        /elt(?![a-zA-Z0-9._:~\-])/
+YLT.2:        /ylt(?![a-zA-Z0-9._:~\-])/
+NO2U.2:       /no2u(?![a-zA-Z0-9._:~\-])/
+UNIT.2:       /unit(?![a-zA-Z0-9._:~\-])/
 
 FREQ.2: /(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|neyman|logarithmic|negbin)(?![a-zA-Z0-9._:~\-])/
 
@@ -971,6 +1019,13 @@ NUMBER.2: /-?(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // the dynamic lexer cannot see the two compete.
 NTT_NUMBER: /(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)*)?/
 
+// LT_INT is a loss table row's integer event or year identifier, kept as text
+// by its callback so ``12345678901234567890`` keeps every digit. Only ``lt_id``
+// uses it, so it never competes with NUMBER. The lookahead refuses a decimal,
+// an exponent, a ``%`` or an ``_`` separator: ``[1.5 .1 100]`` must fail rather
+// than read as event 1 at rate .5.
+LT_INT: /\d+(?![0-9.eE_%a-zA-Z])/
+
 // ID is the catch-all identifier — priority 1 (default).
 // Two negative lookaheads at the start of the match make the grammar
 // unambiguous:
@@ -989,7 +1044,7 @@ NTT_NUMBER: /(\d(?:_?\d)*\.?(?:\d(?:_?\d)*)?|\.\d(?:_?\d)*)([eE][+\-]?\d(?:_?\d)
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|wait|wts|xps|xs|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|unit|wait|wts|xps|xs|ylt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

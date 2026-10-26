@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.12.0 - 2026-10-26
+
+**[Loss-Table-Inline] `agg NAME elt ...` and `agg NAME ylt ...` declare an aggregate from an inline event or year loss table.** An `elt` source holds rows `[id rate mean]`, `[id rate mean max]`, or `[id rate mean max sdi sdc]` under `no2u` (mean only). Rows sharing an event identifier across `unit NAME` sources are one occurrence, and the body lowers to compound Poisson. A `ylt` source holds annual losses, `[year loss]` or `[year loss prob]`; units sum within aligned years, the body lowers to `dfreq [1] dsev`, and occurrence terms raise. An ELT6 source without `no2u`, and file sources, raise `NotImplementedError` until later steps of `dev/done/plan-elt.md`. `elt`, `ylt`, `no2u` and `unit` are new reserved words, so a program using one as a name must rename it. `Aggregate.info` gains a `loss table` row, and the DecL reference has an "Event and Year Loss Tables" section. Docs await a rebuild.
+
 ## 1.11.2 - 2026-10-26
 
 **[Quote-Safe-Statements] A quoted string is text when a program is split into statements: `as "Cat #1"` keeps its `#1` and `as "a[1]"` keeps its spacing.** Before, the comment stripper cut a label at `#` or `//` (so the statement failed to lex) and the bracket pass respaced `[` and `]` inside it. Both `UnderwritingLexer.preprocess` and `raw_statements` now lift quoted strings the way they already lifted `note{}` bodies. The first step of `[DecL-Loss-Tables]` (`dev/done/plan-elt.md`), which needs quoted file paths.

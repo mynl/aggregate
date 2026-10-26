@@ -153,6 +153,30 @@ and the layer ``y xs d1`` pays :math:`g(x) = \min(x - r(x), y)`. Setting :math:`
 
 **Moments** come from the same partial expectations as an ordinary layer, so the theoretical moments that validation compares against are exact. The library entries ``SevLayer.Franchise`` and ``SevLayer.Disappearing`` set both forms beside ``SevLayer``.
 
+.. _loss tables:
+
+Event and Year Loss Tables (elt, ylt)
+=====================================
+
+An aggregate can be declared directly from a catastrophe model's event loss table (ELT) or from a year loss table (YLT) of simulated annual outcomes. The table replaces the exposure, severity and frequency clauses; occurrence and aggregate reinsurance, orientation and the trailer follow as usual, and the result is an ordinary :class:`~aggregate.Aggregate`::
+
+    agg Basic as "My easy example" elt [[1 .1 100] [2 .1 40] [3 .1 80]]
+    agg Shared elt unit Personal as "Personal lines" [[1 .1 300] [2 .1 100]]
+               elt unit Commercial [[1 .1 200] [3 .1 200]]
+               occurrence net of 1000 xs 500 aggregate net of 2000 xs 1000
+    agg Annual as "Four equally likely years" ylt [0 0 100 300]
+    agg Weighted ylt [[1 0 .5] [2 100 .3] [3 300 .2]] aggregate net of 150 xs 50
+
+**Event loss tables.** Each row is ``[id rate mean]`` (ELT3), ``[id rate mean max]`` (ELT4) or ``[id rate mean max sdi sdc]`` (ELT6): an event identifier, its annual rate, the mean loss given the event, the maximum loss, and the independent and correlated standard deviations of the secondary uncertainty. Event identifiers are exact: an unsigned integer or a quoted string, so ``7`` and ``"7"`` name the same event and ``"007"`` another. An identifier names one physical event, so rows sharing it are the same occurrence. Let event :math:`e` have rate :math:`\lambda_e` and unit means :math:`\mu_{eu}`. Its occurrence loss is :math:`m_e = \sum_u \mu_{eu}`, and with :math:`\Lambda = \sum_e \lambda_e` the annual loss is compound Poisson with expected count :math:`\Lambda` and severity atoms :math:`m_e` of probability :math:`\lambda_e / \Lambda`, equal losses combined. The annual cumulants are :math:`\kappa_r = \sum_e \lambda_e m_e^r`, so ``Basic`` has rate 0.3, mean 22 and variance 1,800. A zero-loss event keeps its rate, and the probability of no annual loss is :math:`\exp[-\Lambda(1 - p_0)]` where :math:`p_0` is the severity's mass at zero.
+
+**Units.** ``unit NAME`` names the business unit, peril or region a source belongs to, with an optional ``as`` label; an omitted unit is ``Total``. Several sources may contribute to one aggregate. Rows for the same event in different units are one occurrence: their means add before an occurrence treaty applies, and the event is counted once. Every row of an event carries the same rate, and an event appears at most once per unit. Units that share no events combine as independent catalogs; distinct catalogs must use distinct event identifiers.
+
+**Maximums and secondary uncertainty.** The ELT4 maximum is reported (the largest event exposure, the sum of an event's unit maximums, is in the audit) but does not change the law: ``[1 .1 100]`` and ``[1 .1 100 1000]`` give the same aggregate. ELT3 and ELT4 sources may be combined, and the combination is ELT3, dropping every maximum. Secondary uncertainty, the ELT6 law, is not yet supported. ``elt no2u ...`` converts an ELT6 source to ELT4, each row an atom at its mean; an ELT6 source without ``no2u`` is refused, and mixing one with ELT3 or ELT4 sources is an error naming the sources that need ``no2u``.
+
+**Year loss tables.** A source is a flat vector of annual losses (YLT1), rows ``[year loss]`` (YLT2), or rows ``[year loss prob]`` (YLT3). Each row is a complete annual outcome, so the aggregate is ``dfreq [1] dsev`` over the annual totals, with no Poisson compounding: ``ylt [0 0 100 300]`` is ``dfreq [1] dsev [0 0 100 300]``, probability one half at zero, mean 100 and variance 15,000 (population moments). Years are equally likely unless probabilities are supplied, and supplied probabilities must sum to one. Zero-loss years must be listed: they determine the probability of no loss. Units are aligned by year identifier, or by position for flat vectors, and summed within each year before equal totals are combined, which keeps whatever dependence the simulation produced. Every unit supplies the same complete set of years. A YLT takes aggregate reinsurance only: an annual total does not identify its occurrences, so occurrence terms are refused, including through a reference ``agg NEW agg.YLT occurrence ...`` or a ``pnl`` engine.
+
+**Limits.** A loss table body cannot be combined with ``claims``, ``dfreq``, ``sev`` or ``dsev`` clauses, or with ``approximate``, and an ``elt`` and a ``ylt`` source cannot share an aggregate. The table is data, so ``@``, ``*``, ``+`` and ``-`` on a reference to it are refused. A loss table may be a portfolio unit or a ``pnl`` engine; it cannot be a ``bivariate`` component. The ``loss table`` row of ``info`` summarizes the form, event or year count and units. ``elt``, ``ylt``, ``no2u`` and ``unit`` are reserved words.
+
 Dec Language Grammar Specification
 ===================================
 

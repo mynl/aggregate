@@ -14,10 +14,16 @@ event's unit losses summed before any occurrence treaty. A YLT lowers to
 eltq. Secondary uncertainty, an ELT6 source without ``no2u``, is refused until
 ``[ELT-Single-Event-Uncertainty]`` lands.
 
-A leaf module: it imports only numpy and pandas.
+A leaf module: it imports only numpy, pandas and the standard library.
 """
 
+import copy
 from dataclasses import dataclass, field
+from datetime import datetime
+import hashlib
+import io
+from pathlib import Path
+import re
 
 import numpy as np
 import pandas as pd
@@ -191,6 +197,7 @@ class _Source:
     no2u: bool = False
     implicit_ids: bool = False
     effective_form: str = field(default='')
+    file: dict = None
 
     @property
     def where(self):
@@ -198,8 +205,8 @@ class _Source:
         return f'{self.table} source {self.index + 1} (unit {self.unit})'
 
 
-def _source(table, index, raw):
-    """Normalize one declared source.
+def _sources(table, index, raw):
+    """Normalize one declared source into one source per unit.
 
     Parameters
     ----------
@@ -211,26 +218,313 @@ def _source(table, index, raw):
 
     Returns
     -------
-    _Source
+    list of _Source
+        One entry, except for a file with a ``unit`` column and no ``unit``
+        clause, which gives one entry per unit in order of appearance.
     """
-    unit = raw.get('unit') or DEFAULT_UNIT
-    common = dict(index=index, table=table, unit=unit,
-                  unit_label=raw.get('unit_label'), no2u=bool(raw.get('no2u')))
+    common = dict(index=index, table=table, unit_label=raw.get('unit_label'),
+                  no2u=bool(raw.get('no2u')))
     if 'path' in raw:
-        raise NotImplementedError(
-            f"{table} source {index + 1} (unit {unit}): file sources "
-            f"(\"{raw['path']}\") are not supported yet; write the table inline.")
+        return _file_sources(table, raw, common)
+    unit = raw.get('unit') or DEFAULT_UNIT
     if 'values' in raw:
         values = np.asarray(raw['values'], dtype=float)
         ids = np.array([str(i + 1) for i in range(len(values))], dtype=object)
-        return _Source(origin='inline', form='YLT1', ids=ids,
-                       fields=values.reshape(-1, 1), implicit_ids=True, **common)
+        return [_Source(origin='inline', form='YLT1', ids=ids, unit=unit,
+                        fields=values.reshape(-1, 1), implicit_ids=True,
+                        **common)]
     rows = raw['rows']
     forms = ELT_FORMS if table == 'elt' else YLT_FORMS
     ids = np.array([r[0] for r in rows], dtype=object)
     fields = np.array([r[1:] for r in rows], dtype=float).reshape(len(rows), -1)
-    return _Source(origin='inline', form=forms[len(rows[0])], ids=ids,
-                   fields=fields, **common)
+    return [_Source(origin='inline', form=forms[len(rows[0])], ids=ids,
+                    unit=unit, fields=fields, **common)]
+
+
+# ----------------------------------------------------------------------
+# Files
+# ----------------------------------------------------------------------
+
+#: Readers by file extension, ``(pandas reader, keyword arguments)``. A small
+#: explicit registry: arbitrary pandas readers, expressions and pickles are not
+#: part of the syntax. Delimited text is read entirely as text, so identifiers
+#: keep every digit and leading zero; the numeric columns are converted after.
+_READERS = {
+    '.csv': ('read_csv', {'dtype': str, 'keep_default_na': False,
+                          'encoding': 'utf-8-sig'}),
+    '.tsv': ('read_csv', {'sep': '\t', 'dtype': str, 'keep_default_na': False,
+                          'encoding': 'utf-8-sig'}),
+    '.parquet': ('read_parquet', {}),
+    '.feather': ('read_feather', {}),
+}
+
+#: Header aliases. A header is matched after lowercasing and removing spaces
+#: and underscores, so ``Event ID``, ``event_id`` and ``EVENTID`` agree. ``id``
+#: is an event in an ELT and a year in a YLT, and ``loss`` is the conditional
+#: mean in an ELT (not rate times mean) and the annual loss in a YLT.
+_ALIASES = {
+    'elt': {
+        'event_id': ('id', 'event_id', 'event', 'eventid'),
+        'rate': ('rate', 'frequency', 'freq', 'annual_rate'),
+        'mean': ('mean', 'mean_loss', 'meanloss', 'loss'),
+        'max': ('max', 'max_loss', 'maximum_loss', 'exposure', 'limit'),
+        'sdi': ('sdi', 'sd_indep', 'sdind', 'stddevi'),
+        'sdc': ('sdc', 'sd_corr', 'sdcor', 'stddevc'),
+        'unit': ('unit', 'unit_id'),
+    },
+    'ylt': {
+        'year_id': ('year_id', 'year', 'trial_id', 'trial', 'simulation_id',
+                    'sample_id', 'id'),
+        'loss': ('loss', 'annual_loss', 'annual_loss_amount'),
+        'prob': ('prob', 'probability', 'p'),
+        'unit': ('unit', 'unit_id'),
+    },
+}
+
+
+def _header_key(text):
+    """A header as matched against :data:`_ALIASES`."""
+    return re.sub(r'[\s_]+', '', str(text).strip().lower())
+
+
+def resolve_path(path, base=None):
+    """The file a source path names.
+
+    Parameters
+    ----------
+    path : str
+        The path as written in the program.
+    base : str, optional
+        The directory recorded when the program was registered (see
+        :func:`stamp_base`); the current directory when absent.
+
+    Returns
+    -------
+    pathlib.Path
+        ``path`` itself when absolute (after ``~`` expansion), else ``base /
+        path``.
+    """
+    p = Path(path).expanduser()
+    if not p.is_absolute():
+        p = Path(base) / p if base else Path.cwd() / p
+    return p
+
+
+def _read_table(table, raw):
+    """Read a source file into a frame with canonical column names.
+
+    Returns
+    -------
+    (pandas.DataFrame, dict)
+        The canonical columns, and the file record for the audit: authored
+        and resolved path, size, modification time, SHA-256 digest of the
+        bytes read, and any columns ignored.
+    """
+    where = f"{table} file \"{raw['path']}\""
+    path = resolve_path(raw['path'], raw.get('base'))
+    reader = _READERS.get(path.suffix.lower())
+    if reader is None:
+        raise LossTableError(
+            f'{where}: unsupported file type {path.suffix!r}; use '
+            f"{', '.join(_READERS)}.")
+    try:
+        data = path.read_bytes()
+        stat = path.stat()
+    except OSError as e:
+        raise LossTableError(f'{where}: cannot read {path} ({e}).') from None
+    fn, kwargs = reader
+    try:
+        df = getattr(pd, fn)(io.BytesIO(data), **kwargs)
+    except ImportError as e:
+        raise LossTableError(
+            f'{where}: reading {path.suffix} files needs an engine that is not '
+            f'installed ({e}); pip install pyarrow.') from None
+    except Exception as e:
+        raise LossTableError(f'{where}: cannot parse {path} ({e}).') from None
+
+    lookup = {_header_key(a): canon
+              for canon, aliases in _ALIASES[table].items() for a in aliases}
+    rename, ignored = {}, []
+    for col in df.columns:
+        canon = lookup.get(_header_key(col))
+        if canon is None:
+            ignored.append(str(col))
+        elif canon in rename.values():
+            first = next(c for c, v in rename.items() if v == canon)
+            raise LossTableError(
+                f'{where}: columns {first!r} and {col!r} both mean {canon}.')
+        else:
+            rename[col] = canon
+    df = df[list(rename)].rename(columns=rename)
+    record = {'path': raw['path'], 'resolved': path.as_posix(),
+              'bytes': int(stat.st_size),
+              'modified': datetime.fromtimestamp(stat.st_mtime).isoformat(
+                  timespec='seconds'),
+              'sha256': hashlib.sha256(data).hexdigest(),
+              'ignored_columns': ignored}
+    return df, record
+
+
+def _file_ids(where, column):
+    """Exact text identifiers from a file column.
+
+    Integers become decimal text, as an inline integer does; text is kept as
+    written, stripped of surrounding space. A floating point column is refused:
+    its values may already have lost digits.
+    """
+    if pd.api.types.is_float_dtype(column):
+        raise LossTableError(
+            f'{where}: the identifier column holds floating point numbers, '
+            'which may already have lost digits; store it as integers or text.')
+    if pd.api.types.is_integer_dtype(column):
+        return np.array([str(int(v)) for v in column], dtype=object)
+    ids = []
+    for v in column:
+        if not isinstance(v, str):
+            raise LossTableError(
+                f'{where}: identifier {v!r} is neither an integer nor text.')
+        ids.append(v.strip())
+    ids = np.array(ids, dtype=object)
+    empty = np.array([len(i) == 0 for i in ids], dtype=bool)
+    if empty.any():
+        rows = np.flatnonzero(empty)[:MAX_EXAMPLES] + 1
+        raise LossTableError(
+            f"{where}: empty identifier in rows {', '.join(map(str, rows))}.")
+    return ids
+
+
+def _file_sources(table, raw, common):
+    """Read one file source and split it by unit.
+
+    The form is set by which loss columns are present, never by the unit or by
+    ignored columns: ELT3 ``event_id rate mean``, ELT4 adds ``max``, ELT6 adds
+    ``max sdi sdc``; YLT1 ``loss``, YLT2 adds ``year_id``, YLT3 adds ``prob``.
+    """
+    df, record = _read_table(table, raw)
+    where = f"{table} file \"{raw['path']}\""
+    cols = set(df.columns)
+    if table == 'elt':
+        need = ['event_id', 'rate', 'mean']
+        missing = [c for c in need if c not in cols]
+        if missing:
+            raise LossTableError(f"{where}: no {', '.join(missing)} column.")
+        sd = {'sdi', 'sdc'} & cols
+        if sd and (len(sd) == 1 or 'max' not in cols):
+            found = sorted(sd | ({'max'} & cols))
+            raise LossTableError(
+                f'{where}: secondary uncertainty needs max, sdi and sdc '
+                f"columns together; found {', '.join(found)}.")
+        value_cols = need[1:] + (['max'] if 'max' in cols else []) + (
+            ['sdi', 'sdc'] if sd else [])
+        form = {2: 'ELT3', 3: 'ELT4', 5: 'ELT6'}[len(value_cols)]
+        id_col = 'event_id'
+    else:
+        if 'loss' not in cols:
+            raise LossTableError(f'{where}: no loss column.')
+        if 'prob' in cols and 'year_id' not in cols:
+            raise LossTableError(
+                f'{where}: a probability column needs a year identifier column.')
+        value_cols = ['loss'] + (['prob'] if 'prob' in cols else [])
+        id_col = 'year_id' if 'year_id' in cols else None
+        form = 'YLT3' if 'prob' in cols else 'YLT2' if id_col else 'YLT1'
+
+    if len(df) == 0:
+        raise LossTableError(f'{where} has no rows.')
+    fields = np.column_stack([
+        pd.to_numeric(df[c], errors='coerce').to_numpy(dtype=float)
+        for c in value_cols])
+    if id_col:
+        ids = _file_ids(where, df[id_col])
+    else:
+        ids = np.array([str(i + 1) for i in range(len(df))], dtype=object)
+
+    clause_unit = raw.get('unit')
+    if 'unit' in cols:
+        units = df['unit'].astype(str).str.strip().to_numpy(dtype=object)
+        if clause_unit is not None and (units != clause_unit).any():
+            other = sorted(set(units) - {clause_unit})[:MAX_EXAMPLES]
+            raise LossTableError(
+                f"{where}: the clause says unit {clause_unit} but the unit "
+                f"column also holds {', '.join(other)}.")
+        names = list(dict.fromkeys(units))
+        if len(names) > 1 and not id_col:
+            raise LossTableError(
+                f'{where}: a file holding several units needs a year '
+                'identifier column to align them.')
+    else:
+        units = None
+        names = [clause_unit or DEFAULT_UNIT]
+
+    out = []
+    for name in names:
+        mask = slice(None) if units is None else units == name
+        out.append(_Source(origin=raw['path'], form=form, ids=ids[mask],
+                           fields=fields[mask], unit=name,
+                           implicit_ids=id_col is None, file=record, **common))
+    return out
+
+
+def _walk_sources(node, visit):
+    """Call ``visit`` on every file source dict inside a parsed spec."""
+    if isinstance(node, dict):
+        if node.get('table') in ('elt', 'ylt') and 'path' in node:
+            visit(node)
+        for v in node.values():
+            _walk_sources(v, visit)
+    elif isinstance(node, (list, tuple)):
+        for v in node:
+            _walk_sources(v, visit)
+
+
+def carries_file_source(spec):
+    """Whether ``spec`` holds a file source anywhere inside it."""
+    found = []
+    _walk_sources(spec, found.append)
+    return bool(found)
+
+
+def stamp_base(spec, base):
+    """Record ``base`` on every file source of ``spec`` that has none.
+
+    Called when a parsed statement is registered, so a relative path keeps
+    meaning the file it named then: an ``.agg`` file's directory, or the
+    working directory of a session. A source merged in from a reference
+    already carries its own base and keeps it, which is how the base travels
+    through ``agg.NAME``, portfolio units and ``pnl`` engines.
+
+    Parameters
+    ----------
+    spec : object
+        A parsed spec, walked through nested dicts, lists and tuples and
+        modified in place.
+    base : str or pathlib.Path
+        The directory.
+
+    Returns
+    -------
+    object
+        ``spec``.
+    """
+    base = Path(base).resolve().as_posix()
+    _walk_sources(spec, lambda node: node.setdefault('base', base))
+    return spec
+
+
+def with_absolute_paths(spec):
+    """A copy of ``spec`` whose relative file paths are made absolute.
+
+    For export to a file in another directory: the relative path written in a
+    session or another ``.agg`` file would otherwise name a different file
+    beside the export. A source without a recorded base is left as written.
+    """
+    spec = copy.deepcopy(spec)
+
+    def _absolute(node):
+        if node.get('base'):
+            node['path'] = resolve_path(node['path'], node['base']).as_posix()
+
+    _walk_sources(spec, _absolute)
+    return spec
 
 
 def _examples(src, mask):
@@ -273,6 +567,10 @@ def _source_summary(src):
     if src.table == 'elt':
         out['effective_form'] = src.effective_form
         out['no2u'] = src.no2u
+    if src.file:
+        out.update({k: src.file[k] for k in
+                    ('resolved', 'bytes', 'modified', 'sha256',
+                     'ignored_columns')})
     return out
 
 
@@ -288,7 +586,8 @@ def _lower_elt(name, declared):
     (dict, dict)
         Frequency and severity spec keys, and the audit record.
     """
-    sources = [_source('elt', k, raw) for k, raw in enumerate(declared)]
+    sources = [s for k, raw in enumerate(declared)
+               for s in _sources('elt', k, raw)]
     for src in sources:
         if len(src.ids) == 0:
             raise LossTableError(f'{name}: {src.where} has no rows.')
@@ -426,7 +725,8 @@ def _lower_ylt(name, declared):
     (dict, dict)
         Frequency and severity spec keys, and the audit record.
     """
-    sources = [_source('ylt', k, raw) for k, raw in enumerate(declared)]
+    sources = [s for k, raw in enumerate(declared)
+               for s in _sources('ylt', k, raw)]
     seen = {}
     for src in sources:
         if src.unit in seen:

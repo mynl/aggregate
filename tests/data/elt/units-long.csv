@@ -1,0 +1,5 @@
+Event ID,Unit,Annual Rate,Mean Loss,Exposure,Notes
+1,Personal,0.1,300,3000,coastal
+2,Personal,0.1,100,1000,
+1,Commercial,0.1,200,1000,
+007,Commercial,0.1,200,4000,leading zeros kept

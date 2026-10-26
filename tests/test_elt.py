@@ -189,11 +189,6 @@ def test_quoted_path_is_verbatim(underwriter):
     assert spec['elt_sources'][0]['path'] == path
 
 
-def test_file_source_waits_for_its_bump():
-    with pytest.raises(NotImplementedError, match='file sources'):
-        build('agg LT.File elt "wind.csv"', update=False)
-
-
 def test_portfolio_and_pnl_embedding():
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')

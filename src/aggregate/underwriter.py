@@ -287,11 +287,15 @@ def _entry_to_decl(r, layout='terse'):
     is still right; the warning says which entry did not render canonically.
     """
     from .decl_writer import format_program, spec_to_decl
+    # A relative loss table path names a file beside the program it was
+    # written in; written elsewhere it would name another, so export it whole.
+    spec = (_loss_table.with_absolute_paths(r.spec)
+            if _loss_table.carries_file_source(r.spec) else r.spec)
     try:
         if layout == 'spread':
-            return format_program((r.kind, r.name, r.spec), layout='spread',
+            return format_program((r.kind, r.name, spec), layout='spread',
                                   trailer=True)
-        return spec_to_decl(r.spec, r.kind, r.name)
+        return spec_to_decl(spec, r.kind, r.name)
     except NotImplementedError:
         return r.program
     except Exception as e:                     # noqa: BLE001 - reported, not raised
@@ -2698,6 +2702,13 @@ class Underwriter(HelpMixin):
                     continue
                 logger.info('answer out: %s object %s parsed successfully...adding a recipe',
                             kind, name)
+                if _loss_table.carries_file_source(spec):
+                    # Fix what a relative loss table path means now, so a
+                    # later change of directory cannot redirect the recipe:
+                    # the .agg file's directory, or the session's.
+                    _loss_table.stamp_base(
+                        spec, Path.cwd() if source == 'session'
+                        else Path(source).resolve().parent)
                 self.add_recipe(kind, name, spec, program_line, source=source,
                                 as_read=raw[i] if raw else '')
                 # Hand back a detached copy: _build_work / build_many set

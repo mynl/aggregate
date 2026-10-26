@@ -1711,6 +1711,32 @@ of `[YLT-Probability-Oracles]`, is a test case. Divergences:
   alone.
 - *`elt_max_log2`* deferred (ruling 14).
 
+**1.13.0 `[Loss-Table-Files]`.** `_loss_table._read_table` reads CSV, TSV
+(as text, so identifiers stay exact), Parquet and Feather from one read of
+the bytes, maps headers through `_ALIASES`, and records resolved path, size,
+modification time, SHA-256 and ignored columns in the per-source audit. A
+`unit` column splits a long file. `Underwriter._interpret_program` stamps a
+`base` directory on each file source when the statement is registered (the
+`.agg` file's directory or the session's working directory), so references,
+portfolio units and pnl engines carry the base with the merged source dict;
+`_entry_to_decl` exports such paths absolute. Tests:
+`tests/test_loss_table_files.py`, fixtures under `tests/data/elt` and
+`tests/data/ylt`; Parquet and Feather fixtures are written from the CSV into
+`tmp_path` rather than committed as binaries. Divergences:
+
+- *Excel* is not read: `openpyxl` is not a dependency, and the plan's
+  acceptance suite named only CSV and Parquet. `.xlsx` raises "unsupported
+  file type".
+- *Base on the source, not the recipe.* The plan suggested `recipe.py` might
+  need a base field. A key on the source dict travels through `agg.NAME`
+  merges without any lookup, which a recipe attribute would not.
+- *No extra.* Parquet and Feather need `pyarrow`, already in the `dev`
+  extra; a missing engine raises a message naming it. The `elt` extra waits
+  for eltq.
+- *Numeric text.* A non-numeric entry in a numeric column reads as missing
+  and fails the finite check, so the message is "must be finite and
+  nonnegative" rather than naming the text.
+
 Planning checks on 2026-10-26: read the implementation article before tracing
 the current eltq sizing and overflow code; checked the beta-tail examples
 with SciPy and the weighted YLT moments with exact rational arithmetic.

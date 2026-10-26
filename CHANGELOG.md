@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.13.0 - 2026-10-26
+
+**[Loss-Table-Files] An `elt` or `ylt` source can be a quoted CSV, TSV, Parquet or Feather path.** Columns are matched through one alias table after ignoring case, spaces and underscores, a `unit` column splits a long file into units, and identifiers stay exact (a floating point identifier column raises). A relative path resolves against the declaring `.agg` file's directory or the session's working directory at registration, and `to_agg` writes it absolute. Each source's audit records the resolved path, size, modification time and SHA-256 digest. Parquet and Feather need `pyarrow`; Excel is not read.
+
 ## 1.12.0 - 2026-10-26
 
 **[Loss-Table-Inline] `agg NAME elt ...` and `agg NAME ylt ...` declare an aggregate from an inline event or year loss table.** An `elt` source holds rows `[id rate mean]`, `[id rate mean max]`, or `[id rate mean max sdi sdc]` under `no2u` (mean only). Rows sharing an event identifier across `unit NAME` sources are one occurrence, and the body lowers to compound Poisson. A `ylt` source holds annual losses, `[year loss]` or `[year loss prob]`; units sum within aligned years, the body lowers to `dfreq [1] dsev`, and occurrence terms raise. An ELT6 source without `no2u`, and file sources, raise `NotImplementedError` until later steps of `dev/done/plan-elt.md`. `elt`, `ylt`, `no2u` and `unit` are new reserved words, so a program using one as a name must rename it. `Aggregate.info` gains a `loss table` row, and the DecL reference has an "Event and Year Loss Tables" section. Docs await a rebuild.

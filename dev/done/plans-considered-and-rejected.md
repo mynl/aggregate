@@ -7,6 +7,44 @@ Append new entries at the top.
 
 ---
 
+## Renormalized unit capital above the frame (declined 2026-10-19)
+
+**Origin.** #12, the far tail half of `[Unit-Capital-Above-Frame]` (was
+`[Unit-Capital-Far-Tail]`), landed at `1.5.3` (#13).
+
+**What was proposed.** Above the augmented frame, renormalize unit capital by
+the sum of unit margins, or let units inherit their shares from the last row.
+
+**Why rejected.** The warning is the intended signal: a request that reaches
+layers with `S <= VALIDATION_NOISE` should be told so, not given a
+manufactured answer.
+
+**What we do instead.** `unit_capital_at` and `pentagon_at` use the last row
+and warn.
+
+---
+
+## `[NTT-CRT-ProcessPool]` and `[NTT-CRT-Gmpy2]` (superseded 2026-10-10)
+
+**Origin.** Stages 2 and 3 of `dev/done/plan-ntt-crt.md`, after stage 1
+`[NTT-CRT-ProductTree]` (`1.2.0a4`) took the 1000 x 1000 headline case to
+212 s.
+
+**What was proposed.** A process pool for the CRT reconstruction; and a gmpy2
+hybrid (CPython integers low in the product tree, `mpz` from 16 primes up),
+measured at 2.0x on the reconstruction and shelved as the fallback if the Rust
+engine stalled.
+
+**Why rejected.** `[NTT-Rust-Integration]` (`1.2.0a8` to `1.2.0a10`) moved the
+transform and the reconstruction into the optional compiled engine and took the
+headline case to 10.7 s. Threads without a GIL are what the process pool
+approximated, and the engine did not stall.
+
+**What we do instead.** The optional `aggregate-ntt` engine; the pure-Python
+path stays as it is.
+
+---
+
 ## `Portfolio.var_dict` renamed to `q_dict` (rejected 2026-07-29)
 
 **Origin.** Decision 5 of 5 in `[FCC-Surface-Sweep]`, executed as

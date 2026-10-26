@@ -487,6 +487,42 @@ def feasible_bucket(severity, delta):
     return 2.0 * q_lo, float(q_hi)
 
 
+def _fmt_layer_number(x, sig=6):
+    """Format a limit, attachment or retention end for the layer phrase.
+
+    Parameters
+    ----------
+    x : float
+        The value. ``inf`` renders as ``inf``.
+    sig : int
+        Significant digits kept for a value that is not a whole number.
+
+    Returns
+    -------
+    str
+        A whole number with thousands separators (``1,000``), otherwise the
+        value to ``sig`` significant digits in fixed notation with trailing
+        zeros dropped (``0.5``, ``12,345.7``, ``0.00000025``).
+
+    Notes
+    -----
+    ``,.0f`` rounded a small layer out of existence (``1 xs 0.5`` printed as
+    ``1 xs 0``) and ``,g`` switches to scientific notation from six digits
+    (``1.23457e+06``), so the phrase picks the decimals from the magnitude:
+    ``sig - 1 - floor(log10 |x|)`` of them, and none for a value that is
+    already a whole number ([Support-Phrase-Rounding]).
+    """
+    x = float(x)
+    if np.isinf(x):
+        return 'inf' if x > 0 else '-inf'
+    if x.is_integer():
+        return f'{int(x):,}'
+    decimals = max(0, sig - 1 - int(np.floor(np.log10(abs(x)))))
+    out = f'{x:,.{decimals}f}'
+    # strip only a fractional tail: with no decimals the zeros are the integer's
+    return out.rstrip('0').rstrip('.') if decimals else out
+
+
 def validate_discrete_distribution(xs, ps, allow_negative=False):
     """
     Make sure that outcomes are distinct and sorted in ascending order, and
@@ -1836,6 +1872,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         in its DecL syntax when the retention ends before infinity:
         ``1,000 xs 50 franchise`` (``retention_end`` equal to the attachment)
         or ``1,000 xs 50 to 80 disappearing`` ([Deductible-Forms-Follow-Ups]).
+        The numbers keep their significant digits through
+        :func:`_fmt_layer_number`, so ``1 xs 0.5`` reads as written.
 
         Private since a149: this was the public ``support_description``, whose
         content now reads out through :attr:`tail_description` and
@@ -1862,13 +1900,14 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             return f'signed, support [{lo:g}, {hi:g}]'
         if self.limit == np.inf and self.attachment == 0:
             return 'unlimited'
-        layer = f'{self.limit:,.0f} xs {self.attachment:,.0f}'
+        layer = (f'{_fmt_layer_number(self.limit)} xs '
+                 f'{_fmt_layer_number(self.attachment)}')
         d2 = getattr(self, 'retention_end', np.inf)
         if not np.isfinite(d2):
             return layer
         if d2 == self.attachment:
             return f'{layer} franchise'
-        return f'{layer} to {d2:,.0f} disappearing'
+        return f'{layer} to {_fmt_layer_number(d2)} disappearing'
 
     @property
     def info(self):

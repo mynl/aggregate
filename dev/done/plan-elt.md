@@ -6,9 +6,11 @@ csl: D:/Projects/Biblio/journal-of-risk-and-uncertainty.csl
 # Plan: event and year loss tables in DecL
 
 `[DecL-Loss-Tables]`. Drafted 2026-10-26 against aggregate 1.11.1 and the
-local eltq 2.10.0 source. **Status: draft for discussion.** The author's rulings
-below are settled; the remaining recommendations are proposals. This document
-plans the implementation and does not authorize starting it.
+local eltq 2.10.0 source. **Status: `[Loss-Table-Deterministic-Import]`
+executing from 2026-10-26 in four bumps (rulings 13 to 16); the two
+uncertainty steps wait on the eltq half, drafted as its own plan in
+`V:/dev/eltq/dev/`.** The author's rulings below are settled; the remaining
+recommendations are proposals.
 
 ## Goal
 
@@ -80,6 +82,32 @@ Author, 2026-10-26:
     expected loss must not force a grid reaching $M$. Retain $M$ in the
     probability model and distinguish it from the numerical window. Check
     eltq's existing windowing behavior before designing the adapter.
+
+Author, 2026-10-26, at the execution review (these supersede the text below
+where they conflict):
+
+13. **[Loss-Table-Step-Bumps]** `[Loss-Table-Deterministic-Import]` lands as
+    four bumps, one commit each: `[Quote-Safe-Statements]` (both splitters
+    lift quoted strings), `[Loss-Table-Inline]` (grammar, exact IDs, ELT3/4
+    and `no2u` lowering, YLT1/2/3, writer, composition, `info`),
+    `[Loss-Table-Files]` (readers, aliases, path base, digests) and
+    `[Loss-Table-Reports]` (the three `loss_table_*_df` frames).
+14. **[ELT-Grid-Budget-Deferred]** `elt_max_log2` moves to
+    `[ELT-Single-Event-Uncertainty]`, where it is designed with the window
+    contract it serves. In `_bucket_window.bs_window`, `log2` is a cap that
+    the `moment` and `bounded_small` methods fill, so a default ELT budget
+    of 24 would allocate $2^{24}$ buckets for every ELT; a true budget needs
+    a rule for choosing `log2` below the cap. Deterministic ELTs and YLTs
+    size like any aggregate: the build default, `hints{log2=...}` or
+    `build(..., log2=...)`.
+15. **[DecL-No-Data-Word]** The optional `data` filler is dropped. The new
+    reserved words are `elt`, `ylt`, `no2u` and `unit`; the source follows
+    the unit clause directly.
+16. **[Eltq-Reflected-Plan]** The eltq prerequisites (`[Eltq-Model-Moments-And-Windows]`,
+    `[Eltq-Windowed-Shared-Events]`) are drafted as a reflected plan in
+    `V:/dev/eltq/dev/`, to be reviewed and executed there. eltq 2.10.0 is
+    local only (PyPI stops at 1.12.0), so the uncertainty steps also need an
+    eltq release before aggregate can declare the dependency.
 
 Units may represent business units, perils, regions, or their combinations;
 their names do not determine dependence. ELT event identity determines shared
@@ -165,17 +193,16 @@ Proposed surface, with braces denoting optional material in this sketch only:
 
 ```text
 agg NAME {as "Human name"}
-    elt {no2u} {unit UNIT {as "Human unit name"}} {data} SOURCE
-    {elt {no2u} {unit UNIT {as "Human unit name"}} {data} SOURCE}
+    elt {no2u} {unit UNIT {as "Human unit name"}} SOURCE
+    {elt {no2u} {unit UNIT {as "Human unit name"}} SOURCE}
     {occurrence reinsurance}
     {aggregate reinsurance}
     {existing orientation and trailer clauses}
 ```
 
-`SOURCE` is an inline matrix or a double-quoted local file path. `data` is
-optional to reconcile the introductory sketch with the shorter examples;
-the canonical writer omits it. Modifier order is fixed: `no2u`, then `unit`,
-then `data`, then the source. Every clause has its own explicit metadata;
+`SOURCE` is an inline matrix or a double-quoted local file path. Modifier
+order is fixed: `no2u`, then `unit`, then the source (ruling 15 dropped an
+optional `data` filler). Every clause has its own explicit metadata;
 there is no state inherited from the preceding clause.
 
 An omitted unit is `Total`. `unit` uses existing DecL identifier rules and
@@ -293,19 +320,19 @@ are the canonical writer's Windows path spelling. Literal double quotes in
 paths can remain unsupported under the existing `STRING` contract. Reuse
 one scanner or masking helper rather than allowing the two splitters to drift.
 
-New reserved words are `elt`, `ylt`, `no2u`, `unit`, and `data`. Adding a word to the
+New reserved words are `elt`, `ylt`, `no2u`, and `unit`. Adding a word to the
 reserved set can invalidate an existing user identifier of that exact spelling.
 Check the corpora, document this compatibility change, and give a rename
 diagnostic where possible. Human labels remain free to contain these words.
 
 ### [YLT-Syntax] annual observations
 
-Use the same source, unit, label, and optional `data` conventions:
+Use the same source, unit, and label conventions:
 
 ```text
 agg NAME {as "Human name"}
-    ylt {unit UNIT {as "Human unit name"}} {data} SOURCE
-    {ylt {unit UNIT {as "Human unit name"}} {data} SOURCE}
+    ylt {unit UNIT {as "Human unit name"}} SOURCE
+    {ylt {unit UNIT {as "Human unit name"}} SOURCE}
     {aggregate reinsurance}
     {existing orientation and trailer clauses}
 ```
@@ -1288,7 +1315,7 @@ No `elt_bs` is introduced.
 `decl_writer._elt_div` already exists and means elementwise division; it is
 unrelated and keeps its name. `unit`, `data`, and `peril` occur in prose
 and other APIs; this does not justify ambiguous generic Aggregate attributes.
-Only `unit` and `data` become keywords here, alongside `elt`, `ylt`, and `no2u`.
+Only `unit` becomes a keyword here, alongside `elt`, `ylt`, and `no2u`.
 
 ## Implementation sequence
 
@@ -1471,7 +1498,7 @@ suite need only carry small deterministic fixtures, not rebuild the articles.
 Test each material boundary rather than every helper in isolation:
 
 - Parser/writer round trips for ELT3/4/6 and YLT1/2/3, `no2u` where applicable,
-  optional `data`, unit and aggregate labels, repeated sources, multiline matrices, and standard
+  unit and aggregate labels, repeated sources, multiline matrices, and standard
   reinsurance. Confirm parsing never opens an input path.
 - Missing columns, duplicate aliases, partial SD columns, ragged matrices,
   nonfinite or negative inputs, mean above maximum, empty data, conflicting
@@ -1629,8 +1656,25 @@ full exposure coverage is not an acceptable silent fallback.
 
 ## Execution log
 
-No implementation has started. Record final rulings, actual versions,
-acceptance results, and material deviations here as the plan is executed.
+Record final rulings, actual versions, acceptance results, and material
+deviations here as the plan is executed.
+
+**Execution review, 2026-10-26.** The integration table checked out against
+1.11.1 except for the grid budget (ruling 14). Two clarifications from the
+check: `multiunit_views` already accepts `grid_length` but has no window or
+overflow policy (a short grid raises `GridOverflowError`), and its `views`
+default is all four views, so the adapter passes `('ground_up',)`
+explicitly. `Recipe` stores no base directory, and `_add` keeps a relative
+`source` as given, so `[Loss-Table-Files]` adds one. Rulings 13 to 16 were
+recorded.
+
+**1.11.2 `[Quote-Safe-Statements]`.** `parser._lift_literals` and
+`_restore_literals` replace the trailer-only lift in both `preprocess` and
+`raw_statements`: one alternation lifts quoted strings and single-line
+`note`/`tags`/`hints` bodies, whichever starts first. Fixes existing labels:
+`as "Cat #1"` was truncated to `as "Cat` and `as "a[1]"` became
+`"a [1] "`. The spec snapshot regenerated with no diff. Tests:
+`tests/test_quoted_literals.py`.
 
 Planning checks on 2026-10-26: read the implementation article before tracing
 the current eltq sizing and overflow code; checked the beta-tail examples

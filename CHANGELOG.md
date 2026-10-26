@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.11.2 - 2026-10-26
+
+**[Quote-Safe-Statements] A quoted string is text when a program is split into statements: `as "Cat #1"` keeps its `#1` and `as "a[1]"` keeps its spacing.** Before, the comment stripper cut a label at `#` or `//` (so the statement failed to lex) and the bracket pass respaced `[` and `]` inside it. Both `UnderwritingLexer.preprocess` and `raw_statements` now lift quoted strings the way they already lifted `note{}` bodies. The first step of `[DecL-Loss-Tables]` (`dev/done/plan-elt.md`), which needs quoted file paths.
+
 ## 1.11.1 - 2026-10-25
 
 **[Deductible-Forms-Follow-Ups] The layer phrase shows the deductible form: `1,000 xs 50 franchise` or `1,000 xs 50 to 80 disappearing`, where it showed `1,000 xs 50` for every form.** The phrase is the severity in the `qd` one-liner, the `layer` row of `Severity.info`, and the `Declared support` sentence of `tail_explanation`; an ordinary layer is unchanged. Contributed by @KasraBashirioskooei (#23).

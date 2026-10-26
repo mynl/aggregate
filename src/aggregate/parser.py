@@ -85,7 +85,75 @@ GRAMMAR_FILE = Path(__file__).parent / "decl.lark"
 # character but ``}``, newlines included. The lift deliberately does NOT match
 # across a newline: a body spelled over two lines keeps exactly the behavior it
 # had before, rather than acquiring a new one here.
-_TRAILER_BODY_RE = re.compile(r"\b(note|tags|hints)\{([^}\n]*)\}")
+#
+# Quoted strings (the ``STRING`` terminal, ``/"[^"\n]*"/``) are the same kind of
+# literal and get the same lift ([Quote-Safe-Statements], 1.11.2): a display
+# label ``as "Cat #1"`` lost everything from the ``#`` on, and ``as "a[1]"``
+# came back as ``"a [1] "``. One alternation lifts both, so whichever literal
+# starts first wins: a ``"`` inside a note body is prose, and a ``note{`` inside
+# a quoted string is text.
+_LITERAL_RE = re.compile(r'"[^"\n]*"|\b(note|tags|hints)\{([^}\n]*)\}')
+
+#: The placeholder :func:`_lift_literals` writes, restored by
+#: :func:`_restore_literals`.
+_LITERAL_PLACEHOLDER_RE = re.compile(r"__DECL_LITERAL_(\d+)__")
+
+
+def _lift_literals(program: str) -> tuple[str, list[str]]:
+    """Replace quoted strings and single-line trailer bodies by placeholders.
+
+    Parameters
+    ----------
+    program : str
+        Raw DecL source.
+
+    Returns
+    -------
+    tuple[str, list[str]]
+        The text with every literal replaced by ``__DECL_LITERAL_<i>__``, and
+        the list of lifted literals in index order. A quoted string is lifted
+        with its quotes; a trailer keeps its ``note{`` ... ``}`` frame and only
+        the body is lifted.
+
+    Notes
+    -----
+    Shared by :meth:`UnderwritingLexer.preprocess` and
+    :meth:`UnderwritingLexer.raw_statements`, so the two splitters cannot
+    disagree on what counts as a literal. The placeholder alphabet
+    (``A-Za-z0-9_``) is inert through comment stripping, bracket handling and
+    statement splitting. A string never spans a line, so lifting it cannot hide
+    a statement boundary.
+    """
+    lifted = []
+
+    def _lift(m):
+        if m.group(1) is None:
+            lifted.append(m.group(0))
+            return f'__DECL_LITERAL_{len(lifted) - 1}__'
+        lifted.append(m.group(2))
+        return f'{m.group(1)}{{__DECL_LITERAL_{len(lifted) - 1}__}}'
+
+    return _LITERAL_RE.sub(_lift, program), lifted
+
+
+def _restore_literals(text: str, lifted: list[str]) -> str:
+    """Put back the literals :func:`_lift_literals` lifted from ``text``.
+
+    Parameters
+    ----------
+    text : str
+        Text containing placeholders written by :func:`_lift_literals`.
+    lifted : list[str]
+        The literals it returned.
+
+    Returns
+    -------
+    str
+        ``text`` with every placeholder replaced by its literal, verbatim.
+    """
+    if not lifted:
+        return text
+    return _LITERAL_PLACEHOLDER_RE.sub(lambda m: lifted[int(m.group(1))], text)
 
 #: A whole-line comment, optional indent then ``#`` or ``//``. The line form of
 #: preprocess step 1, for the line-at-a-time scan in ``raw_statements``.
@@ -209,9 +277,10 @@ class UnderwritingLexer:
         The preprocessor performs seven steps:
 
         **Step 0b**
-            ``note{...}`` / ``tags{...}`` / ``hints{...}`` bodies are lifted out
-            behind an indexed placeholder, and restored in step 7. They are free
-            text, so a ``#``, a ``//`` or a ``[`` in a note is prose, not DecL.
+            ``note{...}`` / ``tags{...}`` / ``hints{...}`` bodies and quoted
+            strings are lifted out behind an indexed placeholder, and restored in
+            step 7. They are free text, so a ``#``, a ``//`` or a ``[`` in a note
+            or a quoted label is prose, not DecL.
             Kept its historical name: a step 0 lifted ``doc{{{ ... }}}`` bodies
             here until 1.0.0a301, when the clause was retired
             (``dev/done/plan-decommission-docs.md``). Renumbering the rest to
@@ -238,7 +307,7 @@ class UnderwritingLexer:
             Each paragraph is flattened: its newlines, indentation, and repeated
             spaces collapse to single spaces. Empty paragraphs are dropped.
         **Step 7**
-            The trailer bodies lifted in step 0b are put back verbatim, so what
+            The literals lifted in step 0b are put back verbatim, so what
             reaches the lexer is exactly what was written.
 
         Parameters
@@ -251,17 +320,11 @@ class UnderwritingLexer:
         list[str]
             Non-empty, whitespace-normalised DecL statements ready for parsing.
         """
-        # 0b. Lift every single-line note/tags/hints body behind an indexed
-        # placeholder. Same reasoning as step 0, smaller scope: the body is
-        # prose, so a ``#``, ``//`` or ``[`` in it must not be read as DecL
-        # punctuation by steps 2 and 3. Restored in step 7.
-        bodies = []
-
-        def _lift_trailer(m):
-            bodies.append(m.group(2))
-            return f'{m.group(1)}{{__DECL_TRAILER_{len(bodies) - 1}__}}'
-
-        program = _TRAILER_BODY_RE.sub(_lift_trailer, program)
+        # 0b. Lift every single-line note/tags/hints body and every quoted
+        # string behind an indexed placeholder. The text is prose, so a ``#``,
+        # ``//`` or ``[`` in it must not be read as DecL punctuation by steps 2
+        # and 3. Restored in step 7.
+        program, literals = _lift_literals(program)
 
         # 1. Remove full-line comments ENTIRELY (line + its newline), so a
         # comment is transparent: it never separates statements and never
@@ -320,13 +383,9 @@ class UnderwritingLexer:
         statements = (re.sub(r"\s*\n\s*", " ", p).strip()
                       for p in re.split(r"\n\s*\n", program))
 
-        # 7. Put the step-0b bodies back. Only placeholders this call wrote are
-        # ever matched, so the restore cannot misfire on real note text.
-        if not bodies:
-            return [s for s in statements if s]
-        placeholder = re.compile(r"__DECL_TRAILER_(\d+)__")
-        return [placeholder.sub(lambda m: bodies[int(m.group(1))], s)
-                for s in statements if s]
+        # 7. Put the step-0b literals back. Only placeholders this call wrote
+        # are ever matched, so the restore cannot misfire on real note text.
+        return [_restore_literals(s, literals) for s in statements if s]
 
     @staticmethod
     def raw_statements(program: str) -> list[str]:
@@ -354,11 +413,12 @@ class UnderwritingLexer:
         by the time it reaches its paragraph split, comment lines are gone,
         newlines inside brackets are spaces and a line-final ``;`` has become a
         blank line, so the source span of a statement no longer exists to be
-        kept. Only the trailer lift is shared, and it is shared deliberately.
-        ``note{...}`` bodies are free text, so a ``#``, a ``//`` or a ``;`` in
-        one is prose; lifting them behind placeholders first is what stops
-        ``note{layer is 5# of limit}`` losing its tail to the comment stripper
-        and merging two statements into one.
+        kept. Only the literal lift (:func:`_lift_literals`) is shared, and it
+        is shared deliberately. ``note{...}`` bodies and quoted strings are free
+        text, so a ``#``, a ``//``, a ``[`` or a ``;`` in one is prose; lifting
+        them behind placeholders first is what stops ``note{layer is 5# of
+        limit}`` losing its tail to the comment stripper and merging two
+        statements into one.
 
         The result is **not** guaranteed equal to the matching
         :meth:`preprocess` output with its whitespace collapsed, and the
@@ -370,13 +430,7 @@ class UnderwritingLexer:
         that each returned statement **parses to the same spec** as its
         ``preprocess`` counterpart: it is DecL, not a comment.
         """
-        bodies = []
-
-        def _lift_trailer(m):
-            bodies.append(m.group(2))
-            return f'{m.group(1)}{{__DECL_TRAILER_{len(bodies) - 1}__}}'
-
-        program = _TRAILER_BODY_RE.sub(_lift_trailer, program)
+        program, literals = _lift_literals(program)
 
         blocks, current, depth = [], [], 0
         for line in program.splitlines():
@@ -400,13 +454,11 @@ class UnderwritingLexer:
         if current:
             blocks.append(current)
 
-        placeholder = re.compile(r'__DECL_TRAILER_(\d+)__')
         out = []
         for block in blocks:
             text = '\n'.join(block).strip('\n')
             if text.strip():
-                out.append(placeholder.sub(
-                    lambda m: bodies[int(m.group(1))], text))
+                out.append(_restore_literals(text, literals))
         return out
 
     def tokenize(self, text: str) -> _TokenizedText:

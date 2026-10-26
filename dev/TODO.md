@@ -26,6 +26,11 @@
   through the PGF machinery. Number one finding of the a89 review. Design
   before code (where Iman Conover and the switcheroo come in), then reweigh
   `bivariate.py`, about 2k LOC for two perils.
+- **[DecL-Loss-Tables]**: `agg ... elt` and `agg ... ylt` from event and year
+  loss tables (`dev/done/plan-elt.md`). Deterministic import executing in four
+  bumps from 1.11.2 (`[Quote-Safe-Statements]` landed); the two
+  secondary-uncertainty steps wait on the eltq plan in `V:/dev/eltq/dev/` and
+  an eltq release.
 
 ## Outside contributions
 
@@ -151,5 +156,5 @@
 `[Range-Sugar-Round-Trip]`, `[Rate-Based-Reins-Clauses]`,
 `[Reinstatement-Event-Date-Terms]`, `[Paper-Reproductions]`,
 `[Joint-Padding-Window-Tradeoff]`, `[Multi-Window-Splice-Conditional]`,
-`[Data-To-Dsev-Preprocessors]`, `[Parameter-Risk-Predictive]`,
+`[Data-To-Dsev-Preprocessors]` (its ELT and YLT limb is `[DecL-Loss-Tables]`), `[Parameter-Risk-Predictive]`,
 `[Individual-Risk-Model-Census]`.

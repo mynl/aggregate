@@ -59,6 +59,12 @@
   `xsden_to_mwrangler` as the deficit in place of the raw-sum shortfall. Retires
   the 1e-12 relocation gate and fixes `J.Re14` at tall grids and
   `Bruno2006.B7`, the residual of `[Moment-Deficit-Genuine-Only]`.
+- **[Analytic-Layer-Tail-Cancellation]**: `_moms_analytic` differences lower
+  partial expectations and expands about 0, so a thin layer far in the tail
+  cancels catastrophically (lognormal sigma 1, `10 xs 1e5`: third moment off by
+  1.7e7 relative). Difference upper partial expectations (`sf`, `betaincc`, the
+  Type-I tail) once `F(a) > 1/2`, for all six analytic kinds. Measurements in
+  `dev/done/plan-beta-lomax-exact.md`.
 
 ## Tests
 
@@ -69,6 +75,12 @@
   consumers. Evidence in `dev/done/plan-a400-v1-loose-ends.md` phase 4.
 
 ## Reporting
+
+- **[Feasibility-Lomax-Beta]**: after `[Beta-Lomax-Exact-Moments]`, add `lomax`
+  (and `beta`, unmeasured) to `_FEASIBILITY_KINDS` for consistency with `pareto`.
+  Deferred because every unlimited lomax with shape up to about 2.5 in
+  `library.agg` then raises `InfeasibleGridWarning` at log2 16 (shape 2.5 needs
+  17.0, 1.8 needs 24.8). Measurements in `dev/done/plan-beta-lomax-exact.md`.
 
 ## Grammar, parser and unparser
 

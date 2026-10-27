@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.integrate import quad, IntegrationWarning
 import scipy.stats as ss
 from scipy.optimize import newton
-from scipy.special import loggamma, binom
+from scipy.special import betainc, loggamma, binom
 from scipy.optimize import NoConvergence  # noqa
 from ._help import HelpMixin
 from .constants import (FIG_H, FIG_W, INFO_NA, IgnoredDecLClauseWarning,
@@ -101,11 +101,17 @@ def _partial_e_pareto_type_1(alpha, lam, a, n):
 
         \int_\lambda^a x^k f(x)\,dx
           = \alpha\lambda^\alpha\,
-            \frac{a^{k-\alpha} - \lambda^{k-\alpha}}{k - \alpha},
+            \frac{a^{k-\alpha} - \lambda^{k-\alpha}}{k - \alpha}
+          = \alpha\lambda^k\,
+            \frac{\mathrm{expm1}\big((k-\alpha)\log(a/\lambda)\big)}{k - \alpha},
         \qquad k \neq \alpha
 
     and :math:`\alpha\lambda^\alpha\log(a/\lambda)` at the removable case
-    :math:`k = \alpha`, which is the limit of the same expression.
+    :math:`k = \alpha`, which is the limit of the same expression. The code
+    evaluates the second form: :math:`\lambda^\alpha` overflows once
+    :math:`\alpha\log_{10}\lambda > 308` (scale ``1e8``, shape 60), while
+    :math:`\lambda^k` stays small, and ``expm1`` keeps the digits near
+    :math:`k = \alpha`.
 
     Checks: ``k = 0`` gives :math:`1 - (\lambda/a)^\alpha`, the cdf. With
     ``a = inf`` and :math:`k < \alpha` it gives
@@ -130,34 +136,123 @@ def _partial_e_pareto_type_1(alpha, lam, a, n):
         elif d == 0:
             ans.append(alpha * lam ** alpha * np.log(a / lam))
         else:
-            ans.append(alpha * lam ** alpha * (a ** d - lam ** d) / d)
+            ans.append(alpha * lam ** k * np.expm1(d * np.log(a / lam)) / d)
+    return ans
+
+
+def _partial_e_lomax(alpha, lam, a, n):
+    r"""Partial expected values of a Lomax (shifted Pareto) severity.
+
+    The scipy parameterization is ``ss.lomax(alpha, scale=lam)``, the same law
+    as ``ss.pareto(alpha, loc=-lam, scale=lam)``: support :math:`[0, \infty)`
+    and :math:`S(x) = (1 + x/\lambda)^{-\alpha}`.
+
+    Parameters
+    ----------
+    alpha : float
+        Shape (tail index).
+    lam : float
+        Scale.
+    a : float
+        Upper limit of integration; may be ``np.inf``.
+    n : int
+        Highest power required; returns ``k = 0 .. n``.
+
+    Returns
+    -------
+    list of float
+        :math:`\mathsf P[X^k; X \le a]` for ``k = 0, ..., n``, ``inf`` where
+        ``a = inf`` and the moment does not exist.
+
+    Notes
+    -----
+    :math:`X = Y - \lambda` with :math:`Y` Type-I Pareto on
+    :math:`[\lambda, \infty)`, so expanding :math:`x^k` about :math:`-\lambda`
+
+    .. math::
+
+        \mathsf P[X^k; X \le a] = \sum_{i=0}^{k}\binom{k}{i}(-\lambda)^{k-i}\,
+            \mathsf P[Y^i; Y \le \lambda + a],
+
+    with the inner terms from :func:`_partial_e_pareto_type_1`, which handles
+    the removable case :math:`i = \alpha`. The inline sum this replaces
+    divided by :math:`i - \alpha` and returned nan at integer shapes.
+
+    At ``a = inf`` an infinite inner term up to ``k`` means the ``k``-th moment
+    does not exist; the answer is ``inf`` directly, rather than the
+    ``inf - inf`` the alternating sum would form.
+
+    The sum alternates, so a single partial moment at :math:`a \ll \lambda`
+    loses about :math:`(\lambda/a)^k` ulps. Layer moments are unaffected in
+    practice, because the :math:`x^k S(x)` term dominates there.
+    """
+    if a <= 0:
+        return [0.0] * (n + 1)
+    inner = _partial_e_pareto_type_1(alpha, lam, lam + a, n)
+    ans = []
+    for k in range(n + 1):
+        if not np.all(np.isfinite(inner[:k + 1])):
+            ans.append(np.inf)
+        else:
+            ans.append(sum(binom(k, i) * (-lam) ** (k - i) * inner[i]
+                           for i in range(k + 1)))
     return ans
 
 
 def _partial_e(sev_name, fz, a, n):
+    r"""Partial expected values of a frozen scipy law, in closed form.
+
+    Parameters
+    ----------
+    sev_name : str
+        scipy.stats name of the law, one of :data:`_ANALYTIC_KINDS`:
+        ``lognorm``, ``gamma``, ``pareto``, ``expon``, ``lomax``, ``beta``.
+    fz : scipy.stats frozen distribution
+        The law itself.
+    a : float
+        Upper limit of integration; may be ``np.inf``.
+    n : int
+        Highest power required.
+
+    Returns
+    -------
+    list of float
+        :math:`\mathsf P[X^k; X \le a] = \int_0^a x^k f(x)\,dx` for
+        ``k = 0, ..., n``.
+
+    Raises
+    ------
+    NotImplementedError
+        For a kind outside :data:`_ANALYTIC_KINDS`.
+
+    Notes
+    -----
+    Computing moments is a bottleneck, so the common kinds have closed forms.
+    The exponential is handled apart from the gamma (for mixed exponentials)
+    although it is a special case. A ``pareto`` or ``lomax`` shifted other
+    than the standard way, or a ``beta`` whose support does not start at 0,
+    falls back to :func:`_partial_e_numeric`.
+
+    **Beta.** ``ss.beta(p, q, scale=s)`` is :math:`X = sT`,
+    :math:`T \sim \mathrm{Beta}(p, q)`. Since :math:`t^k f_{p,q}(t) = r_k
+    f_{p+k,q}(t)` with :math:`r_k = B(p+k, q)/B(p, q) = \prod_{j<k}
+    (p+j)/(p+q+j)`,
+
+    .. math::
+
+        \mathsf P[X^k; X \le a] = s^k\, r_k\, I_{\min(a/s,\,1)}(p+k,\, q),
+
+    with :math:`I` the regularized incomplete beta, valid for all
+    :math:`p, q > 0`. It is the shift-the-shape-and-read-the-cdf device of the
+    gamma branch. Quadrature returns nan or raises on the badly skewed betas
+    an ELT row produces (tiny :math:`p`, huge :math:`q`); this form does not.
+    ``betainc`` is called directly because constructing a frozen
+    ``ss.beta`` costs about half a millisecond.
+
+    To do: Weibull, Burr, invgamma, invgauss.
     """
-    Compute the partial expected value of fz. Computing moments is a bottleneck, so you
-    want analytic computation for the most commonly used types.
 
-    Exponential (for mixed exponentials) implemented separate from gamma even though it
-    is a special case.
-
-    .. math:
-
-        \\int_0^a x^k fz.pdf(x)dx
-
-    for k=0,...,n as a np.array
-
-    To do: beta? weibull? Burr? invgamma, etc.
-
-    :param sev_name: scipy.stats name for distribution
-    :param fz: frozen scipy.stats instance
-    :param a: double, limit for integral
-    :param n: int, power
-    :return: partial expected value
-    """
-
-    if sev_name not in ['lognorm', 'gamma', 'pareto', 'expon']:
+    if sev_name not in _ANALYTIC_KINDS:
         raise NotImplementedError(f'{sev_name} NYI for analytic moments')
 
     if a == 0:
@@ -210,14 +305,30 @@ def _partial_e(sev_name, fz, a, n):
         if λ + loc != 0:
             logger.debug('Pareto not shifted to x>0 range...using numeric moments.')
             return _partial_e_numeric(fz, a, n)
+        # shifted Pareto, the same law as lomax
+        return _partial_e_lomax(α, λ, a, n)
+
+    elif sev_name == 'lomax':
+        α = fz.args[0]
+        λ = fz.kwds.get('scale', 1.0)
+        if fz.kwds.get('loc', 0.0) != 0:
+            logger.debug('Lomax with nonzero loc...using numeric moments.')
+            return _partial_e_numeric(fz, a, n)
+        return _partial_e_lomax(α, λ, a, n)
+
+    elif sev_name == 'beta':
+        p, q = fz.args[:2]
+        lo, hi = fz.support()
+        if lo != 0:
+            logger.debug('Beta with support not starting at 0...using numeric moments.')
+            return _partial_e_numeric(fz, a, n)
+        t = min(a / hi, 1.0)
         ans = []
-        # will return inf if the Pareto does not have the relevant moments
-        # TODO: formula for shape=1,2,3
+        r = 1.0
         for k in range(n + 1):
-            b = [α * (-1) ** (k - i) * binom(k, i) * λ ** (k + α - i) *
-                 ((λ + a) ** (i - α) - λ ** (i - α)) / (i - α)
-                 for i in range(k + 1)]
-            ans.append(sum(b))
+            ans.append(hi ** k * r * betainc(p + k, q, t))
+            # r_{k+1} = r_k (p + k) / (p + q + k), the ratio B(p+k+1, q)/B(p, q)
+            r *= (p + k) / (p + q + k)
         return ans
 
 
@@ -288,8 +399,16 @@ def _moms_analytic(fz, limit, attachment, n, analytic=True):
 
 
 #: Severity kinds whose partial expected values :func:`_partial_e` computes in
-#: closed form, and so the kinds :func:`feasible_bucket` can read. Everything
-#: else reports nothing rather than guessing; see that function's Notes.
+#: closed form, and so the kinds whose layered moments :meth:`Severity.moms`
+#: computes exactly rather than by quadrature.
+_ANALYTIC_KINDS = ('lognorm', 'gamma', 'pareto', 'expon', 'lomax', 'beta')
+
+#: The kinds :func:`feasible_bucket` reads. Everything else reports nothing
+#: rather than guessing; see that function's Notes. A subset of
+#: :data:`_ANALYTIC_KINDS`: ``lomax`` and ``beta`` are left out because reading
+#: them moves warnings, since every unlimited lomax with shape up to about 2.5
+#: in ``library.agg`` would raise ``InfeasibleGridWarning`` at ``log2 = 16``
+#: (``[Feasibility-Lomax-Beta]``).
 _FEASIBILITY_KINDS = ('lognorm', 'gamma', 'pareto', 'expon')
 
 
@@ -450,8 +569,9 @@ def feasible_bucket(severity, delta):
     exactly: a discrete or histogram kind (which is exact on its own lattice,
     so the question does not arise), a signed or reflected law (whose ``fz``
     is patched, and whose closed forms would answer for the unreflected
-    base), and any continuous kind outside :data:`_FEASIBILITY_KINDS`, the
-    four :func:`_partial_e` handles in closed form. The alternative was
+    base), and any continuous kind outside the four of
+    :data:`_FEASIBILITY_KINDS`, each with closed form partial expected values
+    from :func:`_partial_e`. The alternative was
     quadrature inside a bisection at sizing time, which is both slow and
     fragile on exactly the heavy tails the reading is for. A franchise or
     disappearing deductible (finite ``retention_end``) also returns ``None``:
@@ -2499,10 +2619,12 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
            ``_build`` (histograms and meta-severities populate ``sev1`` /
            ``sev2`` / ``sev3`` directly from the support) and the layer is
            the trivial ``[0, inf]``, return those values immediately.
-        2. **Analytic shortcut.** For ``lognorm``, ``pareto``, ``gamma``,
-           and ``expon`` (with no shift/truncation), delegate to
-           :func:`_moms_analytic`, which computes layered
-           moments in closed form via partial expected values. Defensive
+        2. **Analytic shortcut.** For the kinds of :data:`_ANALYTIC_KINDS`
+           (``lognorm``, ``gamma``, ``pareto``, ``expon``, ``lomax`` and
+           ``beta``) with no shift or truncation, or a ``pareto`` shifted by
+           ``-scale`` (a Lomax), delegate to :func:`_moms_analytic`, which
+           computes layered moments in closed form via partial expected
+           values; see :meth:`_uses_closed_form_moments`. Defensive
            ``np.inf`` overrides are applied when the underlying moment does
            not formally exist (e.g. pareto shape <= 1).
         3. **Numerical fallback** :func:`_numerical_moms` integrates the
@@ -2559,17 +2681,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             return self.sev1, self.sev2, self.sev3
 
         # 2. Closed-form via partial expected values for the supported kinds.
-        # ``not self.sev_reflect`` is required, not defensive: ``sev -lognorm``
-        # leaves sev_loc at 0 with the default splice, so it satisfies every
-        # other clause here and would be handed the UNREFLECTED closed form.
-        # A reflected law has no partial-expected-value shortcut, so it belongs
-        # on the numerical path below.
-        if (isinstance(self.sev_name, str)
-                and self.sev_name in ('lognorm', 'pareto', 'gamma', 'expon')
-                and not self.sev_reflect
-                and self.sev_loc == 0
-                and self.sev_lb == 0
-                and self.sev_ub == np.inf):
+        if self._uses_closed_form_moments():
             logger.info('Analytic moments')
             ma = _moms_analytic(self.fz, self.limit, self.attachment, 3)
             ex1a, ex2a, ex3a = ma[1:]
@@ -2592,8 +2704,40 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             return ex1a, ex2a, ex3a
 
         # 3. Numerical fallback for everything else (scipy zoo minus the
-        #    four analytic specials, plus any histogram with a layer).
+        #    analytic kinds, plus any histogram with a layer).
         return _numerical_moms(self)
+
+    def _uses_closed_form_moments(self):
+        """Whether :meth:`moms` and :meth:`_retention_moms` take the closed form.
+
+        Returns
+        -------
+        bool
+            True for a kind of :data:`_ANALYTIC_KINDS`, unreflected, with no
+            splice, and either no shift or a ``pareto`` shifted by
+            ``-scale``.
+
+        Notes
+        -----
+        ``not self.sev_reflect`` is required, not defensive: ``sev -lognorm``
+        leaves ``sev_loc`` at 0 with the default splice, so it satisfies every
+        other clause here and would be handed the UNREFLECTED closed form. A
+        reflected law has no partial-expected-value shortcut, so it belongs on
+        the numerical path.
+
+        The one shift admitted is ``sev s * pareto a - s``, the Lomax
+        written as a shifted Pareto, so it and ``sev s * lomax a`` take the
+        same path; :func:`_partial_e` sends both to :func:`_partial_e_lomax`.
+        """
+        if not (isinstance(self.sev_name, str)
+                and self.sev_name in _ANALYTIC_KINDS):
+            return False
+        lomax_shift = (self.sev_name == 'pareto'
+                       and self.sev_loc == -self.sev_scale)
+        return (not self.sev_reflect
+                and (self.sev_loc == 0 or lomax_shift)
+                and self.sev_lb == 0
+                and self.sev_ub == np.inf)
 
     def _retention_moms(self):
         """First three moments of the payment under a finite retention end.
@@ -2607,22 +2751,17 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         -----
         A discrete law sums ``g(x)^m`` over its atoms exactly. Otherwise the
         moments come from :func:`_moms_retention` on partial expectations:
-        closed form for the four kinds :func:`_partial_e` covers, under the
-        same conditions as the ordinary analytic path in :meth:`moms`, and
-        :func:`_partial_e_numeric` on the (spliced) law for everything else.
+        closed form for the kinds of :data:`_ANALYTIC_KINDS`, under the same
+        conditions as the ordinary analytic path in :meth:`moms`
+        (:meth:`_uses_closed_form_moments`), and :func:`_partial_e_numeric` on
+        the (spliced) law for everything else.
         """
         a, r, y = self.attachment, self.retention_end, self._exp_limit
         if isinstance(self.fz, _DiscreteRV):
             g = _retention_payment(self.fz.xk, a, r, y)
             raw = [float(np.sum(g ** m * self.fz.pk)) for m in (1, 2, 3)]
         else:
-            analytic = (isinstance(self.sev_name, str)
-                        and self.sev_name in ('lognorm', 'pareto', 'gamma', 'expon')
-                        and not self.sev_reflect
-                        and self.sev_loc == 0
-                        and self.sev_lb == 0
-                        and self.sev_ub == np.inf)
-            if analytic:
+            if self._uses_closed_form_moments():
                 def pe(t):
                     return _partial_e(self.sev_name, self.fz, t, 3)
             else:

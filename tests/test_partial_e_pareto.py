@@ -99,7 +99,7 @@ def test_dispatch_takes_the_analytic_branch():
 
 
 def test_shifted_pareto_still_uses_its_own_closed_form():
-    """loc = -scale is the Lomax branch and is untouched."""
+    """loc = -scale is the Lomax law, sharing ``_partial_e_lomax`` with ``lomax``."""
     alpha, lam = 3.5, 12.0
     fz = ss.pareto(alpha, scale=lam, loc=-lam)
     analytic = _partial_e('pareto', fz, 100.0, 3)

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.17.0 - 2026-10-27
+
+**[Beta-Lomax-Exact-Moments] Beta and Lomax severities, and a Pareto shifted by its scale, compute layered moments in closed form.** `Severity.moms()` no longer uses quadrature for `beta`, `lomax` or `sev s * pareto a - s`, so their theoretical moments, and the `stats_df` errors computed from them, move to the exact values (beta by up to about `2e-5` relative on skewed shapes). Skewed ELT betas such as shapes `1e-5 1` or `1e-6 10` at scale `1e8` now return finite moments where quadrature returned nan or raised `ZeroDivisionError`, and a shifted Pareto with an integer shape no longer returns nan for a finite layer. The Type-I Pareto closed form no longer overflows at large scale and shape. Bucket feasibility readings are unchanged: `lomax` and `beta` still report none (`[Feasibility-Lomax-Beta]`). The `Port.Bounded` regression baseline was re-captured.
+
 ## 1.16.0 - 2026-10-27
 
 **[ELT-Single-Event-Uncertainty] An ELT6 with secondary uncertainty updates: eltq quantizes the event severity on the grid, and the sizer checks the severity tail.** With an automatic `bs`, a grid whose edge leaves more than `1e-12` of annual event rate, or more than `validation_eps / 10` of the first three cumulants, above it is widened by growing `bs` at the same `log2`; a given `bs` is honored with a `DefectiveDistributionWarning` naming the `bs` that would pass. `SeverityElt.tail_measures`, `tail_report` and `last_quantization` expose the measurement, and the summary and validation frames gain the severity edge, the tail rate and moment shares, the quantized mass and eltq's mean error. A table sharing an event across units still refuses `update`. A loss table CV or skewness within `1e-12` of zero now gets an absolute estimate error, which removes a false warning on symmetric tables. Docs await a rebuild.

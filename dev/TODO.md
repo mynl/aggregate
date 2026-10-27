@@ -26,14 +26,15 @@
   through the PGF machinery. Number one finding of the a89 review. Design
   before code (where Iman Conover and the switcheroo come in), then reweigh
   `bivariate.py`, about 2k LOC for two perils.
-- **[DecL-Loss-Tables]**: secondary uncertainty for `elt` (ELT6 without
-  `no2u`), executing as `dev/done/plan-elt-uncertainty.md`: model moments with
-  no grid landed at 1.15.0 (`[ELT-Uncertainty-Moments]`), then
-  `[ELT-Single-Event-Uncertainty]`. `[ELT-Shared-Event-Uncertainty]` stays
-  open: a shared event builds with model moments and refuses `update` until
-  eltq decides `[Eltq-Windowed-Shared-Events]`. No ELT grid budget
-  (`elt_max_log2` was dropped, ruling 18). The deterministic import landed at
-  1.11.2 to 1.14.0.
+- **[DecL-Loss-Tables]**: secondary uncertainty for one-row events landed
+  as `dev/done/plan-elt-uncertainty.md`, 1.15.0 (model moments) and 1.16.0
+  (the grid). Open: `[ELT-Shared-Event-Uncertainty]`, a shared event builds
+  with model moments and refuses `update` until eltq decides
+  `[Eltq-Windowed-Shared-Events]`; and `[ELT-Grid-Retune]`, the author's trial
+  of the automatic `bs` choice (the moment window can land 10 times coarser
+  than the tail needs, and the ladder may not shrink `bs`; measurements in the
+  plan's execution log). No ELT grid budget (`elt_max_log2` was dropped,
+  ruling 18). The deterministic import landed at 1.11.2 to 1.14.0.
 - **[ELT-Eltq-Extra]**: once eltq 2.13 or later is on PyPI, declare the
   optional `elt` extra (`eltq>=` that version) in `pyproject.toml`, add it to
   `all`, and drop the `importorskip` in the ELT6 tests. Until then eltq is

@@ -3386,27 +3386,153 @@ class SeverityElt(Severity):
         Raises
         ------
         NotImplementedError
-            Always, until ``[ELT-Single-Event-Uncertainty]`` lands; a shared
-            event names the event and its units.
+            For a shared event (one event with rows for two or more units),
+            naming the event and its units, until
+            ``[ELT-Shared-Event-Uncertainty]`` lands.
         """
-        prefix = f'{owner}: ' if owner else ''
-        alternatives = ('build(..., update=False) gives the theoretical '
-                        'statistics, and no2u on every elt clause gives the '
-                        'mean-only model.')
         example = self.sev_name.shared_example()
-        if example is not None:
-            event, units = example
-            raise NotImplementedError(
-                f'{prefix}event {event} has rows for units '
-                f"{', '.join(units)}, and a shared event with secondary "
-                'uncertainty cannot be put on a grid yet '
-                f'([ELT-Shared-Event-Uncertainty]). {alternatives}')
+        if example is None:
+            return
+        event, units = example
+        prefix = f'{owner}: ' if owner else ''
         raise NotImplementedError(
-            f'{prefix}secondary uncertainty cannot be put on a grid yet '
-            f'([ELT-Single-Event-Uncertainty]). {alternatives}')
+            f'{prefix}event {event} has rows for units {", ".join(units)}, '
+            'and a shared event with secondary uncertainty cannot be put on a '
+            'grid yet ([ELT-Shared-Event-Uncertainty]). build(..., '
+            'update=False) gives the theoretical statistics, and no2u on every '
+            'elt clause gives the mean-only model.')
+
+    def tail_measures(self, edge, node=None):
+        """eltq's tail measures of a one-row model at candidate edges.
+
+        Parameters
+        ----------
+        edge : float or array_like
+            Edges :math:`t \\ge 0`.
+        node : float or array_like, optional
+            The top node :math:`c \\le t` of each edge; the edge itself when
+            omitted.
+
+        Returns
+        -------
+        eltq.TailMoments
+            Per edge: ``rate_above`` :math:`R(t)`, ``moments_above``
+            :math:`T_r(t)`, ``excess_above`` :math:`D_r(t, c)` and the atoms
+            in the final half bucket :math:`(c, t]`.
+
+        Raises
+        ------
+        NotImplementedError
+            For a shared model: eltq's one-row tail would treat each unit row
+            as its own event, and its multi-unit bound is too loose to use.
+        """
+        self.check_grid_supported()
+        from ._loss_table import import_eltq
+        return import_eltq().tail_moments_arrays(
+            **self.sev_name.columns(), edge=edge, top_node=node,
+            mean_is_loss_rate=False, variance_policy='bernoulli')
+
+    @staticmethod
+    def tail_targets():
+        """The tail check's targets ``(rate, share)`` from the settings.
+
+        Returns
+        -------
+        (float, float)
+            :math:`10^{-w}` with :math:`w` = ``discretization.window_nines``,
+            and :math:`\\varepsilon / 10` with :math:`\\varepsilon` =
+            ``validation.eps``.
+        """
+        from .config import get_settings
+        settings = get_settings()
+        return (10.0 ** -settings.discretization.window_nines,
+                settings.validation.eps / 10)
+
+    def tail_report(self, edge, node):
+        """The ``[ELT-Grid]`` tail check at one or more edges.
+
+        Parameters
+        ----------
+        edge, node : float or array_like
+            Edges :math:`t` and their top nodes :math:`c`, for a grid of
+            :math:`n` nodes at spacing :math:`h` the pair :math:`t = (n -
+            1/2) h`, :math:`c = (n - 1) h`.
+
+        Returns
+        -------
+        dict
+            Arrays ``edge``, ``node``, ``rate_above`` (:math:`R`),
+            ``shares`` (shape ``(E, 3)``, :math:`D_r / C_r`, zero where
+            :math:`C_r` is zero), ``top_half_rate`` and ``passed``, and the
+            scalars ``rate_target`` and ``share_target``.
+
+        Notes
+        -----
+        The check passes when :math:`R(t) \\le 10^{-w}` and
+        :math:`D_r(t, c) \\le (\\varepsilon / 10) C_r` for :math:`r = 1, 2,
+        3`. :math:`R` bounds the probability of an overflowing occurrence in a
+        year, :math:`1 - e^{-R} \\le R`, the same allowance as the annual
+        window; :math:`D_r` is what the ``top_bucket`` overflow takes from the
+        :math:`r`-th annual cumulant. Both are nonincreasing as the edge grows
+        with the node in a fixed ratio, and zero at the largest support
+        :math:`B`, so a passing edge always exists. The atoms in the final half
+        bucket :math:`(c, t]` stay on the grid at :math:`c` and are reported,
+        not tested.
+        """
+        tm = self.tail_measures(np.atleast_1d(np.asarray(edge, dtype=float)),
+                                np.atleast_1d(np.asarray(node, dtype=float)))
+        c = np.asarray(self.sev_name.moments.raw_moments, dtype=float)
+        excess = np.asarray(tm.excess_above, dtype=float)
+        shares = np.divide(excess, c, out=np.zeros_like(excess), where=c > 0)
+        rate_target, share_target = self.tail_targets()
+        rate = np.asarray(tm.rate_above, dtype=float)
+        passed = (rate <= rate_target) & np.all(shares <= share_target, axis=1)
+        return dict(edge=np.asarray(tm.edge, dtype=float),
+                    node=np.asarray(tm.top_node, dtype=float),
+                    rate_above=rate, shares=shares,
+                    top_half_rate=np.asarray(tm.top_half_rate, dtype=float),
+                    passed=passed, rate_target=rate_target,
+                    share_target=share_target)
+
+    def passing_edge(self, edge, n):
+        """The smallest edge on the ``[ELT-Grid]`` ladder that passes.
+
+        Parameters
+        ----------
+        edge : float
+            The failing edge the ladder starts from.
+        n : int
+            The node count of the grid the ladder is for.
+
+        Returns
+        -------
+        (float, float)
+            The passing edge :math:`t_k` and its node :math:`c_k = t_k (n -
+            1) / (n - 1/2)`.
+
+        Notes
+        -----
+        One vectorized eltq call over :math:`t_k = t \\cdot 2^{k/4}`,
+        :math:`k = 1, 2, \\ldots`, below the largest support :math:`B`, with
+        :math:`B` itself last. The measures are nonincreasing along the ladder
+        and zero at :math:`B`, so the search always ends.
+        """
+        upper = float(self.sev_name.moments.max_support)
+        ratio = (n - 1) / (n - 0.5)
+        k = 1
+        edges = []
+        while edge * 2.0 ** (k / 4) < upper:
+            edges.append(edge * 2.0 ** (k / 4))
+            k += 1
+        edges.append(max(upper, edge))
+        edges = np.asarray(edges)
+        report = self.tail_report(edges, edges * ratio)
+        first = int(np.argmax(report['passed'])) if report['passed'].any() \
+            else len(edges) - 1
+        return float(edges[first]), float(edges[first] * ratio)
 
     def quantize(self, xs, bs):
-        """The severity pmf on the grid ``xs``.
+        """The severity pmf on the grid ``xs``, quantized by eltq.
 
         Parameters
         ----------
@@ -3415,9 +3541,81 @@ class SeverityElt(Severity):
         bs : float
             Bucket size.
 
+        Returns
+        -------
+        numpy.ndarray
+            The pmf on ``xs``: eltq's rate-weighted ``secondary`` array divided
+            by the total rate :math:`\\Lambda`.
+
         Raises
         ------
         NotImplementedError
-            Until ``[ELT-Single-Event-Uncertainty]`` lands.
+            For a shared model (``[ELT-Shared-Event-Uncertainty]``).
+
+        Notes
+        -----
+        eltq's survival method buckets each event's law by the nearest node,
+        top edge :math:`(n - 1/2) h` strict, the rounding of ``sev_calc
+        ='discrete'``, and the ``top_bucket`` policy moves the mass above the
+        top edge onto the top node, so the rate is exact and the moments fall
+        by :math:`D_r`. The tail check of :meth:`tail_report` is measured at
+        this grid, whoever chose it, and stored in :attr:`last_quantization`
+        with eltq's metadata (scalars only); a failing grid is honored with
+        one warning per table. Every call quantizes from the model, so a
+        later wider or finer grid recovers the tail.
         """
         self.check_grid_supported(self.name)
+        from ._loss_table import import_eltq
+        from .constants import DefectiveDistributionWarning
+        xs = np.asarray(xs, dtype=float)
+        n = len(xs)
+        if not (n >= 2 and xs[0] == 0 and np.isclose(xs[1], bs)
+                and np.isclose(xs[-1], (n - 1) * bs)):
+            raise ValueError(
+                'internal error: an elt severity quantizes on a grid starting '
+                f'at zero with step bs={bs}; got {xs[0]}, {xs[1]}, ..., {xs[-1]}.')
+        model = self.sev_name
+        rate = float(model.moments.total_rate)
+        _, secondary, meta = import_eltq().quantize_arrays(
+            **model.columns(), bucket_size=float(bs), grid_length=n,
+            method='survival', overflow='top_bucket', normalize=False,
+            mean_is_loss_rate=False, variance_policy='bernoulli')
+        mass = float(secondary.sum())
+        edge, node = (n - 0.5) * bs, (n - 1) * bs
+        report = self.tail_report(edge, node)
+        c1 = float(model.moments.raw_moments[0])
+        record = dict(
+            bs=float(bs), grid_length=n, edge=float(edge), node=float(node),
+            rate=rate, mass=mass,
+            mass_error=abs(mass / rate - 1) if rate > 0 else 0.0,
+            rate_above=float(report['rate_above'][0]),
+            shares=tuple(float(s) for s in report['shares'][0]),
+            top_half_rate=float(report['top_half_rate'][0]),
+            passed=bool(report['passed'][0]),
+            rate_target=report['rate_target'],
+            share_target=report['share_target'],
+            secondary_mean_error=float(meta.secondary_mean_error),
+            relative_mean_error=(float(meta.secondary_mean_error) / c1
+                                 if c1 > 0 else 0.0),
+            interpolation_error=(None if meta.interpolation_error is None
+                                 else float(meta.interpolation_error)),
+            passing_edge=None, passing_bs=None)
+        if not record['passed']:
+            from .utilities import round_bucket
+            t_k, _ = self.passing_edge(edge, n)
+            record['passing_edge'] = t_k
+            record['passing_bs'] = float(round_bucket(t_k / (n - 0.5)))
+            s1, s2, s3 = record['shares']
+            warn_once(
+                f'elt severity ({model!r}): the grid edge {edge:,.6g} '
+                f'(bs={bs:g}, {n:,d} nodes) clips the severity tail: rate '
+                f'above {record["rate_above"]:.3g} against '
+                f'{record["rate_target"]:.0e}, moment shares above the node '
+                f'{s1:.3g}, {s2:.3g}, {s3:.3g} against '
+                f'{record["share_target"]:.0e}. An edge of {t_k:,.6g} passes, '
+                f'reached at this log2 by bs={record["passing_bs"]:g}; the '
+                'grid is honored as given.',
+                DefectiveDistributionWarning,
+                key=f'elt-tail-{model.digest}', stacklevel=4)
+        self.last_quantization = record
+        return secondary / rate if rate > 0 else secondary

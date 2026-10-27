@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.16.0 - 2026-10-27
+
+**[ELT-Single-Event-Uncertainty] An ELT6 with secondary uncertainty updates: eltq quantizes the event severity on the grid, and the sizer checks the severity tail.** With an automatic `bs`, a grid whose edge leaves more than `1e-12` of annual event rate, or more than `validation_eps / 10` of the first three cumulants, above it is widened by growing `bs` at the same `log2`; a given `bs` is honored with a `DefectiveDistributionWarning` naming the `bs` that would pass. `SeverityElt.tail_measures`, `tail_report` and `last_quantization` expose the measurement, and the summary and validation frames gain the severity edge, the tail rate and moment shares, the quantized mass and eltq's mean error. A table sharing an event across units still refuses `update`. A loss table CV or skewness within `1e-12` of zero now gets an absolute estimate error, which removes a false warning on symmetric tables. Docs await a rebuild.
+
 ## 1.15.0 - 2026-10-27
 
 **[ELT-Uncertainty-Moments] An ELT6 source without `no2u` builds with secondary uncertainty and reports eltq's model moments before any grid.** Each row is a beta on `[0, max]` with SD `sdi + sdc`, a two-point law on `{0, max}` where that variance is inadmissible, or an atom at zero SD; rows sharing an event across units sum under Burke's coupling. `stats_df`, `info` (`secondary uncertainty`) and the three `loss_table_*_df` frames carry the model, with new summary rows for the row laws, `largest event support`, the moment method and the eltq version. `build(..., update=False)` works; `update` raises `NotImplementedError` until the next step. This needs eltq 2.13 or later, installed by hand (`uv pip install` of a local eltq checkout, then sync with `--inexact`), and raises `ImportError` with that guidance without it; ELT3, ELT4, `no2u` and YLT tables never import it.

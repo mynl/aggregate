@@ -802,6 +802,73 @@ def snap_bs_to_reference(agg, b0, pinned):
                      f'(= {_fmt_bs(d)} x 2^{m}) to match {ref}')
 
 
+def _elt_severity(agg):
+    """The one-row ELT severity of ``agg`` with secondary uncertainty, or None."""
+    for s in (agg.sevs if agg.sevs is not None else []):
+        if getattr(s, 'sev_kind', '') == 'elt' and not s.shared:
+            return s
+    return None
+
+
+def elt_tail_check(agg, bs, log2, pinned):
+    """Whether an ELT severity's tail fits the grid, and the node that would.
+
+    The final query at the end of bucket selection for an aggregate declared
+    from an ELT6 table with secondary uncertainty, in the style of
+    :func:`snap_bs_to_reference`: the winning candidate is chosen, and this
+    asks one question about it.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        The aggregate being sized; read for ``sevs`` only.
+    bs : float
+        The selected bucket size.
+    log2 : int
+        The selected grid's ``log2``; the severity grid has ``n = 2**log2``
+        nodes from zero.
+    pinned : bool
+        Whether ``bs`` came from an explicit ``bs`` (a call argument or a
+        ``hints{bs=...}``) rather than from the estimator.
+
+    Returns
+    -------
+    (float or None, str)
+        The top node :math:`c_k` a passing grid must reach, or ``None`` to
+        leave the grid alone, and a note fragment for the winning row.
+
+    Notes
+    -----
+    Nothing is done for an aggregate without a one-row ELT severity or with a
+    pinned ``bs``: a pinned grid is honored, and
+    :meth:`~aggregate._severity.SeverityElt.quantize` measures and warns. A
+    grid that passes :meth:`~aggregate._severity.SeverityElt.tail_report` at
+    :math:`t = (n - 1/2) h`, :math:`c = (n - 1) h` is left alone. Otherwise
+    the ladder of :meth:`~aggregate._severity.SeverityElt.passing_edge` gives
+    the smallest passing edge :math:`t_k` and its node :math:`c_k`; the caller
+    widens the winning window to reach :math:`c_k` and reruns the sizer, which
+    buys the reach with ``bs`` at the same count, so the bucket only grows and
+    the annual window only widens (the author's ruling of 2026-08-21 recorded
+    at :func:`severity_feasibility`). Grid reach :math:`t \\ge t_k` and
+    :math:`c \\ge c_k` passes, since both measures fall as either grows.
+    """
+    sev = _elt_severity(agg)
+    if sev is None or pinned:
+        return None, ''
+    n = 1 << int(log2)
+    edge, node = (n - 0.5) * bs, (n - 1) * bs
+    report = sev.tail_report(edge, node)
+    if report['passed'][0]:
+        return None, ''
+    t_k, c_k = sev.passing_edge(edge, n)
+    rate = float(report['rate_above'][0])
+    share = float(report['shares'][0].max())
+    agg._bs_elt_tail = dict(edge=float(edge), rate_above=rate,
+                            max_share=share, ladder_edge=t_k, node=c_k)
+    return c_k, (f'; elt tail fails at edge {edge:,.6g} (rate above {rate:.2g}, '
+                 f'largest moment share {share:.2g}), ladder edge {t_k:,.6g}')
+
+
 def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                window_convention=None):
     """Decide ``(bs, log2, x_min)`` for ``update`` and build ``_bs_window_df``.
@@ -862,6 +929,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     N0 = 1 << log2
     agg._bs_clip = None    # cleared each sizing; set only if the tail clips
     agg._bs_snap = None    # ditto; set only if a reference lattice moved bs
+    agg._bs_elt_tail = None  # ditto; set only if an ELT tail moved bs
     m = agg.actual_m
     try:
         ex2 = float(agg.stats_df['mixed'][('agg', 'ex2')])
@@ -1345,6 +1413,33 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                           'log2': int(_l2),
                           'W': float(float(_sel['x_max']) - _x0),
                           'note': _sel['note'] + snap_note}
+
+    # ---- ELT severity tail ([ELT-Grid]) --------------------------------
+    # Another final query, for an ELT6 with secondary uncertainty and an
+    # automatic bs: does the severity grid, ``n = 2**log2`` nodes from zero
+    # whatever the output origin, reach far enough into the severity's tail?
+    # If not, widen the winner's window so its top node reaches the passing
+    # node and rerun ``_size``. Rerunning with the coarser bs as a lattice, as
+    # the snap does, would shrink log2 back to the old window and lose the
+    # reach; widening the window keeps the count and buys the reach with bs.
+    # The loop confirms at the realized grid; reaching the node passes, so it
+    # runs once.
+    for _ in range(8):
+        node, elt_note = elt_tail_check(
+            agg, float(rows[selected]['bs']), int(rows[selected]['log2']),
+            bs_in > 0)
+        if node is None:
+            break
+        _sel = rows[selected]
+        _forig = (selected == 'windowed')
+        _gcap = (log2 + WINDOW_LOG2_GROWTH) if _forig else None
+        _x_hi = max(float(_sel['x_max']), float(_sel['x_min']) + node)
+        _x0, _bs, _l2 = _size(float(_sel['x_min']), _x_hi, lattice, _forig,
+                              _gcap)
+        rows[selected] = {**_sel, 'x_min': float(_x0), 'x_max': float(_x_hi),
+                          'bs': float(_bs), 'log2': int(_l2),
+                          'W': float(_x_hi - _x0),
+                          'note': _sel['note'] + elt_note}
 
     # ---- realized grid (the ``used`` row) ---------------------------
     sel_bs = float(rows[selected]['bs'])

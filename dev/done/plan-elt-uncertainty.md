@@ -7,8 +7,9 @@ csl: D:/Projects/Biblio/journal-of-risk-and-uncertainty.csl
 
 `[ELT-Uncertainty]`, the open half of `[DecL-Loss-Tables]`. Drafted
 2026-10-27 against aggregate 1.14.0 and the local eltq 2.14.0. **Status:
-ruled 2026-10-27 (rulings 18 to 22); executing from 2026-10-27, see the
-execution log.** It plans the two open steps of `dev/done/plan-elt.md`,
+ruled 2026-10-27 (rulings 18 to 22); executed 2026-10-27 as 1.15.0 and
+1.16.0, see the execution log; `[ELT-Shared-Event-Uncertainty]` stays
+pending.** It plans the two open steps of `dev/done/plan-elt.md`,
 `[ELT-Single-Event-Uncertainty]` in full and `[ELT-Shared-Event-Uncertainty]`
 only as far as parsing, theoretical moments and a refusal at `update`.
 
@@ -633,6 +634,110 @@ Divergences:
 5. **A test the plan did not list.** `tests/test_loss_table_files.py`
    `test_no2u_file` also asserted the construction refusal; that half became
    `test_elt6_file_with_secondary_uncertainty`.
+
+### [ELT-Single-Event-Uncertainty], 1.16.0
+
+Landed: `SeverityElt.quantize`, `tail_measures`, `last_quantization`, the
+tail check and the automatic choice in `bs_window`, the grid rows of the
+summary and validation frames, the one-row refusal removed, the DecL reference
+section. Every acceptance case passes; two of them needed their thresholds
+restated (divergence 7).
+
+**Measured edges (eltq 2.14.0, rust backend, 2026-10-27).** Default build,
+`log2` 16, no hints:
+
+| row | moment window `bs` | severity edge | passes | severity mean error | ladder's passing grid |
+|---|---|---|---|---|---|
+| $\mu=20{,}000$, $\sigma=60{,}000$, $M=10^9$ | 800 | 52.4M (0.052 M) | yes, $R=9\times10^{-135}$ | $-7.0\times10^{-4}$ | `bs` 80, edge 5.24M: every estimate within $\varepsilon$ ($5\times10^{-5}$), no warning |
+| $\mu=100$, $\sigma=10{,}000$, $M=10^9$ | 2,000 | 131M (0.13 M) | yes, $R=8\times10^{-69}$ | $-6.9\times10^{-4}$ | `bs` 400, edge 26.2M: mean and CV $1.4\times10^{-4}$ |
+| beta row plus the remote two-point row | 200 after the ladder (moment window 100) | 13.1M, ladder edge $M$ | yes | about $-1$ (the body is lost) | the ladder's grid is this one |
+
+The ladder from the edge at $\mu+40\sigma$ passes at 4.07M and 15.2M,
+within one rung ($2^{1/4}$) of the plan's 4.31M and 15.6M. At the $2^{16}$
+edge of `bs` 40 (2.62M) the first row has $R=4.8\times10^{-10}$ and third
+moment share $1.3\times10^{-5}$ (the plan quoted $6.9\times10^{-10}$ and
+$1.7\times10^{-5}$ "near" $\mu+40\sigma$; at exactly 2.42M they are
+$1.6\times10^{-9}$ and $3.5\times10^{-5}$); at `bs` 6 (edge 393,213) the
+second row's moment shares are 0.39, 0.83 and 0.97. The tail targets
+themselves needed no retuning.
+
+**Finding for the author (ruling 21).** On both large-exposure rows the
+ordinary moment window (twelve nines from three moments) already reaches 8 to
+12 times past the passing edge, so the tail check never fires and the bucket
+is that much coarser than the tail needs; the severity mean misses
+$\varepsilon$ by a factor of 7, and the validation frame says so. The grid the
+ladder would choose is clean on the first row. Under `[ELT-Grid]`'s "the
+bucket only grows" the choice cannot shrink `bs`; TODO `[ELT-Grid-Retune]`
+holds the question. The alternative is to let it take
+the smallest `bs` whose edge passes at the count, in both directions, at the
+cost of an annual window narrower than the moment window (the multi-claim tail
+above the edge, about $10^{-10}$ on the first row, would then alias). The
+remote two-point row shows the other side of the same trade: reaching $M$ at
+`log2` 16 puts `bs` at 200 and loses the body on $[0, 100]$; only a larger
+`log2` helps. Both are recorded, not changed.
+
+**Performance baseline.** A synthetic 250,000-row one-row ELT6 read from
+Parquet (lognormal means, maximums 2 to 50 times the mean), one fresh process
+per row, peak working set:
+
+| `log2` | `bs` | `build` | `build` peak | direct `quantize_arrays` | direct peak |
+|---|---|---|---|---|---|
+| 16 | 40,000 | 1.23 s | 323 MB | 0.27 s | 166 MB |
+| 20 | 4,000 | 1.42 s | 382 MB | 0.38 s | 171 MB |
+| 22 | 800 | 1.79 s | 720 MB | 0.51 s | 217 MB |
+
+`build(..., update=False)` alone takes 0.90 s, most of the gap: reading,
+validating and lowering the table (`_lower_elt` builds `unit_code` with a
+Python loop over the rows, from 1.12.0) and the model moments. One
+`tail_report` takes 0.01 s. No ladder fired on this table. The budget is the
+author's to set from this.
+
+Divergences:
+
+6. **The choice widens the window rather than rerunning `_size` with
+   $h^\ast$.** Passing the coarser bucket to `_size` as a lattice, as the snap
+   does, shrinks `log2` to what the old window needs, so the edge never grows.
+   The winner's window top is raised to its origin plus the passing node
+   $c_k$ and `_size` reruns with the bucket free. It lands on
+   `round_bucket`$(c_k/(n-1))$, the plan's $h^\ast$, or one rung finer when
+   that already reaches $c_k$; either way $t\ge t_k$ and $c\ge c_k$, so the
+   confirming check passes the first time. The outcome is in the winning
+   row's note and in `agg._bs_elt_tail`.
+7. **Two acceptance thresholds restated.** "Grid top under $M/10$" fails for
+   the second large-exposure row (0.13 M), so the test asserts under $M/5$.
+   "Its edge within one rung of 4.31M and 15.6M" cannot apply to the default
+   build, which never runs the ladder, so the test runs the ladder from the
+   $\mu+40\sigma$ edge.
+8. **Targets from the settings.** The tail check reads `validation.eps` and
+   `discretization.window_nines` from the settings (the severity does not
+   know its aggregate), so a per-aggregate `validation_eps` override does not
+   move it. The validation rows use the targets stored with the measurement,
+   so they always agree with it.
+9. **The warning.** `DefectiveDistributionWarning`, once per table (the
+   `warn_once` key is the model digest, since the severity does not know its
+   aggregate's name), with the measured $R$ and shares, the passing edge and
+   the `bs` reaching it at the current `log2`.
+10. **`sev_calc` and `discretization_calc` do not apply.** eltq buckets by
+    the nearest node, which is `sev_calc='discrete'`; other values are
+    ignored for an ELT severity, as the kernel branch's comment says.
+11. **`SHAPE_NOISE` in `stats_frame`.** A table CV or skewness within
+    $10^{-12}$ of zero now gets an absolute error. The symmetric beta row's
+    skewness computes to $7\times10^{-15}$, and the relative error
+    ($3\times10^7$) raised a false `warning`. Deterministic tables are
+    treated the same way.
+12. **The rate mass is reported, not raised.** `quantize` records
+    $|m/\Lambda-1|$ and the `quantized mass against event rate` row grades it
+    against `MASS_TOLERANCE`.
+13. **More public names on `SeverityElt`.** Besides `tail_measures`:
+    `tail_report(edge, node)` (the check at one or more edges),
+    `passing_edge(edge, n)` (the ladder) and the static `tail_targets()`.
+14. **Test mechanics.** The edge exactly at $M$ is tested by calling
+    `quantize` on a hand grid with $(n-1/2)h\ge M$; the treaty test builds
+    the hand aggregate from the ELT spec with the quantized severity as
+    atoms (a 1,600-atom inline `dsev` exceeds the parser's recursion limit);
+    the `agg.NAME` case compares densities with the direct declaration.
+15. **A Portfolio unit's shared refusal does not name the unit:** the
+    severity carries no name. The message names the event and its units.
 
 ## References
 

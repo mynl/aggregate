@@ -1220,11 +1220,64 @@ VALIDATION_COLUMNS = ['check', 'value', 'tolerance', 'status', 'detail']
 #: (ELT) or one (YLT): pure rounding, so a few ulps of a sum.
 MASS_TOLERANCE = 1e-12
 
+#: A table CV or skewness (dimensionless) at most this in magnitude is zero up
+#: to rounding, so its estimate error is absolute, not relative: a symmetric
+#: beta row's skewness computes to about 1e-14, not 0.
+SHAPE_NOISE = 1e-12
+
 
 def _row_laws(secondary):
     """The rows by effective law, for example ``2 beta, 1 two-point, 0 atom``."""
     return (f"{secondary['beta_rows']} beta, {secondary['two_point_rows']} "
             f"two-point, {secondary['atom_rows']} atom")
+
+
+def _grid_rows(agg, add, against, eps):
+    """The validation rows of an ELT6 grid, from the last quantization.
+
+    The tail rate and the three moment shares against the ``[ELT-Grid]``
+    targets, the quantized rate mass against :math:`\\Lambda`, and eltq's
+    secondary mean error relative to :math:`C_1` against ``eps``. Read from
+    ``SeverityElt.last_quantization``, so they describe the grid actually
+    used; ``not computed`` before ``update`` (and for a shared table, which
+    never reaches a grid), never ``pass``.
+    """
+    q = _last_quantization(agg) if agg.bs > 0 else None
+    checks = [('tail rate above edge', 'rate_above', 'rate_target',
+               'annual rate of events above the severity grid edge'),
+              ('tail mean share', 0, 'share_target',
+               'excess of C1 above the top node, moved onto it'),
+              ('tail second moment share', 1, 'share_target',
+               'excess of C2 above the top node, moved onto it'),
+              ('tail third moment share', 2, 'share_target',
+               'excess of C3 above the top node, moved onto it')]
+    for check, key, target, detail in checks:
+        if q is None:
+            add(check, np.nan, np.nan, 'not computed', 'needs update')
+            continue
+        value = q[key] if isinstance(key, str) else q['shares'][key]
+        tol = q[target]
+        add(check, value, tol, 'pass' if value <= tol else 'warning',
+            f"{detail}; edge {q['edge']:,.6g}")
+    if q is None:
+        add('quantized mass against event rate', np.nan, MASS_TOLERANCE,
+            'not computed', 'needs update')
+        add('secondary mean error', np.nan, eps, 'not computed', 'needs update')
+        return
+    against('quantized mass against event rate', q['mass_error'],
+            MASS_TOLERANCE, 'eltq severity rate mass against the event rate, '
+            'before dividing by it')
+    against('secondary mean error', q['relative_mean_error'], eps,
+            "eltq's quantized severity mean against the model, relative to "
+            'C1: rounding, interpolation and tail together')
+
+
+def _last_quantization(agg):
+    """The ``last_quantization`` record of an ELT severity, or None."""
+    for s in (agg.sevs if agg.sevs is not None else []):
+        if getattr(s, 'sev_kind', '') == 'elt':
+            return s.last_quantization
+    return None
 
 
 def _moment_method(secondary):
@@ -1304,6 +1357,11 @@ def summary_frame(agg):
         updated = agg.bs > 0
         add('grid', 'bs', agg.bs if updated else 'n/a')
         add('grid', 'log2', agg.log2 if updated else 'n/a')
+        if meta.get('secondary') is not None:
+            q = _last_quantization(agg) if updated else None
+            add('grid', 'severity edge', 'n/a' if q is None else q['edge'])
+            add('grid', 'tail rate above edge',
+                'n/a' if q is None else q['rate_above'])
         for s in meta['sources']:
             part = f"source {s['source']}, unit {s['unit']}"
             add(part, 'origin', s['origin'])
@@ -1341,8 +1399,9 @@ def stats_frame(agg):
         ``estimate`` the value from the discretized density (``stats_df``
         column ``gross_empirical``, ``nan`` before ``update``), and ``error``
         is ``estimate / table - 1``, or ``estimate - table`` where the table
-        value is zero (a symmetric skewness, a degenerate CV). Empty for an
-        aggregate not declared from a loss table.
+        value is zero (a symmetric skewness, a degenerate CV), or a CV or
+        skewness within :data:`SHAPE_NOISE` of zero. Empty for an aggregate
+        not declared from a loss table.
 
     Notes
     -----
@@ -1372,8 +1431,11 @@ def stats_frame(agg):
                    if updated else np.nan)
             if not (np.isfinite(table) and np.isfinite(est)):
                 error = np.nan
+            elif table == 0 or (measure != 'mean'
+                                and abs(table) <= SHAPE_NOISE):
+                error = est - table
             else:
-                error = est / table - 1 if table else est - table
+                error = est / table - 1
             index.append((component, measure))
             rows.append([table, model, est, error])
     return pd.DataFrame(rows, columns=STATS_COLUMNS,
@@ -1440,6 +1502,7 @@ def validation_frame(agg):
                         'pass' if secondary['converged'] else 'warning',
                         f"{_moment_method(secondary)}; shared events under "
                         "Burke's coupling")
+                _grid_rows(agg, add, against, eps)
         else:
             add('year completeness', meta['years'], np.nan, 'pass',
                 'every unit lists the same years')

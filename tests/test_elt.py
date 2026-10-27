@@ -230,8 +230,6 @@ def test_bivariate_body_is_refused():
 
 
 @pytest.mark.parametrize('program, error, match', [
-    ('agg LT.E elt [[1 .1 50 100 10 10]]', NotImplementedError,
-     'secondary uncertainty'),
     ('agg LT.E elt [[1 .1 50 100 10 10]] elt no2u [[2 .1 50 100 10 10]]',
      LossTableError, 'Add no2u to elt source 1'),
     ('agg LT.E elt [[1 .1 50 100 10 10]] elt [[2 .1 50]]',

@@ -27,10 +27,17 @@
   before code (where Iman Conover and the switcheroo come in), then reweigh
   `bivariate.py`, about 2k LOC for two perils.
 - **[DecL-Loss-Tables]**: secondary uncertainty for `elt` (ELT6 without
-  `no2u`), `[ELT-Single-Event-Uncertainty]` then
-  `[ELT-Shared-Event-Uncertainty]` in `dev/done/plan-elt.md`, with
-  `elt_max_log2`. Waits on the eltq plan in `V:/dev/eltq/dev/`, built against
-  the local eltq. The deterministic import landed at 1.11.2 to 1.14.0.
+  `no2u`), executing as `dev/done/plan-elt-uncertainty.md`: model moments with
+  no grid landed at 1.15.0 (`[ELT-Uncertainty-Moments]`), then
+  `[ELT-Single-Event-Uncertainty]`. `[ELT-Shared-Event-Uncertainty]` stays
+  open: a shared event builds with model moments and refuses `update` until
+  eltq decides `[Eltq-Windowed-Shared-Events]`. No ELT grid budget
+  (`elt_max_log2` was dropped, ruling 18). The deterministic import landed at
+  1.11.2 to 1.14.0.
+- **[ELT-Eltq-Extra]**: once eltq 2.13 or later is on PyPI, declare the
+  optional `elt` extra (`eltq>=` that version) in `pyproject.toml`, add it to
+  `all`, and drop the `importorskip` in the ELT6 tests. Until then eltq is
+  installed by hand, like `aggregate-ntt`.
 
 ## Outside contributions
 

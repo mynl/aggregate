@@ -1468,8 +1468,16 @@ pnl LT.PnL 30 premium less agg LT.PnL_e elt [[1 .1 100] [2 .1 40]] occurrence ne
 agg LT.Y1 ylt [0 0 100 300]                                                  note{mean 100, variance 15000};
 agg LT.Y3 ylt [[1 0 .5] [2 100 .3] [3 300 .2]] aggregate net of 150 xs 50     note{net mean 45, variance 3225};
 agg LT.Aligned ylt unit A [[1 0] [2 100]] ylt unit B [[1 100] [2 0]]          note{every year totals 100: variance zero};
-pnl LT.YPnL 120 premium less agg LT.YPnL_e ylt [0 0 100 300] aggregate net of 150 xs 50   note{a ylt engine with annual terms}
-# agg LT.Active elt [[1 .1 50 100 10 10]]                                    note{refused: secondary uncertainty is a later step}
+pnl LT.YPnL 120 premium less agg LT.YPnL_e ylt [0 0 100 300] aggregate net of 150 xs 50   note{a ylt engine with annual terms};
+# ELT6 with secondary uncertainty ([ELT-Uncertainty], 1.15.0): eltq's model
+# moments with no grid; tests/test_elt_uncertainty.py and
+# dev/done/plan-elt-uncertainty.md.
+agg LT.Beta elt [[1 .1 50 100 10 10]]                                        note{beta(2.625, 2.625) on [0, 100]: mean 5, variance 290, C3 18500};
+agg LT.TwoPoint elt [[1 .1 50 100 30 30]]                                    note{inadmissible variance: two points on 0 and 100, variance 500};
+agg LT.Atom elt [[1 .1 50 100 0 0]]                                          note{zero SDs: an atom, the no2u moments};
+agg LT.Disjoint elt unit Wind [[1 .1 50 100 10 10]] elt unit Quake [[2 .2 30 200 5 20]]   note{distinct ids: one-row events};
+agg LT.Comonotone elt unit A [[1 .1 50 100 0 60]] elt unit B [[1 .1 20 100 0 60]]       note{shared, Burke loading 1: event moments 70, 11000, 1900000};
+agg LT.Independent elt unit A [[1 .1 50 100 60 0]] elt unit B [[1 .1 20 100 60 0]]      note{shared, Burke loading 0: event moments 70, 9000, 1300000}
 # agg LT.Mixed elt [[1 .1 50 100 10 10]] elt [[2 .1 50]]                     note{refused: active ELT6 with ELT3}
 # agg LT.YOcc ylt [0 100] occurrence net of 50 xs 50                         note{refused: occurrence terms on annual outcomes}
 # agg LT.Missing ylt unit A [[1 0] [2 100]] ylt unit B [[1 100] [3 0]]       note{refused: different year sets}

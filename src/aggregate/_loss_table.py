@@ -10,11 +10,14 @@ rulings: ``dev/done/plan-elt.md``.
 
 An ELT lowers to compound Poisson with one count per physical event and the
 event's unit losses summed before any occurrence treaty. A YLT lowers to
-``dfreq [1] dsev``, each year a whole annual outcome. Neither path imports
-eltq. Secondary uncertainty, an ELT6 source without ``no2u``, is refused until
-``[ELT-Single-Event-Uncertainty]`` lands.
+``dfreq [1] dsev``, each year a whole annual outcome. A deterministic ELT (ELT3,
+ELT4, or ELT6 under ``no2u``) lowers to ``dhistogram`` atoms, and neither it
+nor a YLT imports eltq. An ELT6 with secondary uncertainty lowers to an
+:class:`EltModel` passed as the severity, whose moments come from eltq;
+``dev/done/plan-elt-uncertainty.md`` has the design.
 
-A leaf module: it imports only numpy, pandas and the standard library.
+A leaf module: it imports only numpy, pandas and the standard library, and
+eltq lazily, at the first ELT6 lowering (:func:`import_eltq`).
 """
 
 import copy
@@ -53,9 +56,155 @@ MAX_EXAMPLES = 5
 ELT_FORMS = {3: 'ELT3', 4: 'ELT4', 6: 'ELT6'}
 YLT_FORMS = {2: 'YLT2', 3: 'YLT3'}
 
+#: The oldest eltq with every function the ELT6 path calls; 2.13.0 added
+#: ``multiunit_moments``.
+ELTQ_MIN_VERSION = (2, 13, 0)
+
+#: Relative tolerance on the shared-event moment integration, eltq's
+#: ``multiunit_moments`` ``rtol`` on ``C_2`` and ``C_3``.
+SHARED_MOMENT_RTOL = 1e-6
+
 
 class LossTableError(ValueError):
     """An event or year loss table that cannot be built as declared."""
+
+
+def import_eltq():
+    """Import eltq for the secondary uncertainty path, or refuse with guidance.
+
+    Returns
+    -------
+    module
+        The ``eltq`` package, version at least :data:`ELTQ_MIN_VERSION`.
+
+    Raises
+    ------
+    ImportError
+        eltq is missing or older than :data:`ELTQ_MIN_VERSION`. The message
+        gives the minimum version, the install command and ``no2u`` as the
+        mean-only alternative.
+
+    Notes
+    -----
+    Called only when an ELT6 source without ``no2u`` is lowered, so parsing,
+    ELT3 and ELT4 tables, all-``no2u`` ELT6 tables and YLTs never import eltq.
+    Until eltq 2.13 or later is on PyPI it is installed by hand into the
+    development environment (``uv pip install`` of a local checkout, a
+    maturin build), so it is not a declared dependency.
+    """
+    need = '.'.join(map(str, ELTQ_MIN_VERSION))
+    advice = (f'install eltq {need} or later (pip install "eltq>={need}", or '
+              'uv pip install a local eltq checkout), or add no2u to every elt '
+              'clause for the mean-only model, in which each event row is an '
+              'atom at its mean.')
+    try:
+        import eltq
+    except ImportError as e:
+        raise ImportError(
+            'Secondary uncertainty (an ELT6 source without no2u) needs the '
+            f'eltq package, which is not installed: {advice}') from e
+    found = re.match(r'(\d+)\.(\d+)\.(\d+)', str(getattr(eltq, '__version__', '')))
+    if found is None or tuple(int(g) for g in found.groups()) < ELTQ_MIN_VERSION:
+        raise ImportError(
+            'Secondary uncertainty (an ELT6 source without no2u) needs eltq '
+            f"{need} or later; found {getattr(eltq, '__version__', 'unknown')}: "
+            f'{advice}')
+    return eltq
+
+
+@dataclass(frozen=True, eq=False, repr=False)
+class EltModel:
+    """The prepared ELT6 table of one aggregate: rows, model moments, digest.
+
+    Built by :func:`_lower_elt` and passed to ``Aggregate`` as ``sev_name``,
+    where :class:`~aggregate._severity.SeverityElt` wraps it. Carried by
+    reference through ``Aggregate(**spec)`` and ``copy``: the arrays are
+    read-only, so a rebuilt object neither rereads a file nor recomputes the
+    moments.
+
+    Attributes
+    ----------
+    event_ids : numpy.ndarray
+        Text event identifier of each row (object dtype).
+    event_code, unit_code : numpy.ndarray
+        Integer event and unit codes of each row; ``units[unit_code]`` names
+        the unit.
+    units : tuple of str
+        Unit names in order of first appearance.
+    rate, mean, max, sdi, sdc : numpy.ndarray
+        The ELT6 columns as read-only float64 arrays, positive-rate events
+        only, stably sorted by event so each event's rows are contiguous. Every
+        row of an event carries the event's canonical rate.
+    shared : bool
+        Whether some event has rows for two or more units.
+    moments : eltq.ModelMoments
+        The model moments: ``moments_arrays`` for one-row events,
+        ``multiunit_moments`` under Burke's coupling for shared events.
+    digest : str
+        SHA-256 of the canonical row bytes and identifiers.
+    eltq_version, eltq_backend : str
+        ``eltq.__version__`` and ``eltq.BACKEND`` of the computation.
+
+    Notes
+    -----
+    The table specifies the Lévy measure
+    :math:`\\nu = \\sum_e \\lambda_e \\mathsf P(X_e \\in \\cdot)`, with
+    :math:`X_e` the event total. Its mass :math:`\\Lambda` is the Poisson
+    rate and :math:`\\nu / \\Lambda` the severity, so the annual cumulants
+    are :math:`\\kappa_r = C_r = \\sum_e \\lambda_e \\mathsf P X_e^r`, the
+    ``raw_moments`` eltq returns. ``repr`` and ``str`` are compact and
+    content addressed, because ``Aggregate._spec_hash`` serializes the spec
+    with ``default=str`` and a million-row table must not reach a message.
+    """
+    event_ids: np.ndarray
+    event_code: np.ndarray
+    unit_code: np.ndarray
+    units: tuple
+    rate: np.ndarray
+    mean: np.ndarray
+    max: np.ndarray
+    sdi: np.ndarray
+    sdc: np.ndarray
+    shared: bool
+    moments: object
+    digest: str
+    eltq_version: str
+    eltq_backend: str
+
+    @property
+    def rows(self):
+        """Number of positive-rate rows."""
+        return int(len(self.rate))
+
+    @property
+    def events(self):
+        """Number of positive-rate events."""
+        return int(len(np.unique(self.event_code)))
+
+    def columns(self):
+        """The five ELT6 columns as eltq keywords, ``rate`` to ``sd_corr``.
+
+        eltq orders its columns differently from function to function, so
+        every call passes them by keyword.
+        """
+        return dict(rate=self.rate, max_loss=self.max, mean_loss=self.mean,
+                    sd_indep=self.sdi, sd_corr=self.sdc)
+
+    def shared_example(self):
+        """One shared event and its units, for messages: ``(event, units)``."""
+        counts = np.bincount(self.event_code)
+        if not (counts > 1).any():
+            return None
+        code = int(np.flatnonzero(counts > 1)[0])
+        rows = self.event_code == code
+        return (str(self.event_ids[rows][0]),
+                [self.units[u] for u in self.unit_code[rows]])
+
+    def __repr__(self):
+        return (f'EltModel(rows={self.rows}, events={self.events}, '
+                f'units={len(self.units)}, sha256={self.digest[:8]})')
+
+    __str__ = __repr__
 
 
 def is_loss_table(spec):
@@ -118,8 +267,9 @@ def resolve(name, spec):
     ------
     LossTableError
         Malformed, inconsistent or incomplete input, before anything is built.
-    NotImplementedError
-        An ELT6 source without ``no2u`` (secondary uncertainty).
+    ImportError
+        An ELT6 source without ``no2u`` (secondary uncertainty) when eltq is
+        missing or too old; see :func:`import_eltq`.
 
     Notes
     -----
@@ -131,6 +281,12 @@ def resolve(name, spec):
     keeps its rate and its zero atom, so the annual zero mass is
     :math:`\\exp[-\\Lambda(1 - p_0)]`. Annual cumulants are
     :math:`\\kappa_r = \\sum_e \\lambda_e m_e^r`.
+
+    ELT6 without ``no2u``: event :math:`e` has a random total :math:`X_e`, a
+    beta, two-point or atom law per unit row as eltq classifies it (summed
+    under Burke's coupling for a shared event), and the severity is the
+    :class:`EltModel` with cumulants :math:`\\kappa_r = \\sum_e \\lambda_e
+    \\mathsf P X_e^r`.
 
     YLT: year :math:`j` has probability :math:`p_j` (:math:`1/n` unless a
     probability column is supplied) and total :math:`a_j = \\sum_u y_{ju}`,
@@ -166,14 +322,22 @@ def describe(meta):
     Returns
     -------
     str
-        For example ``ELT3, 3 events, 1 unit, no secondary uncertainty`` or
-        ``YLT1, 4 years, 1 unit, equally likely years``.
+        For example ``ELT3, 3 events, 1 unit, no secondary uncertainty``,
+        ``ELT6, 3 events, 1 unit, secondary uncertainty`` or ``YLT1, 4 years,
+        1 unit, equally likely years``. An ELT6 with a shared event adds
+        ``shared events (model moments only)``.
     """
     units = len(meta['units'])
     unit_text = f"{units} unit{'s' if units != 1 else ''}"
     if meta['table'] == 'elt':
-        return (f"{meta['form']}, {meta['events']:,d} events, {unit_text}, "
-                'no secondary uncertainty')
+        secondary = meta.get('secondary')
+        if secondary is None:
+            law = 'no secondary uncertainty'
+        elif secondary['shared']:
+            law = 'secondary uncertainty, shared events (model moments only)'
+        else:
+            law = 'secondary uncertainty'
+        return f"{meta['form']}, {meta['events']:,d} events, {unit_text}, {law}"
     law = ('equally likely years' if meta['probabilities'] == 'uniform'
            else 'supplied year probabilities')
     return f"{meta['form']}, {meta['years']:,d} years, {unit_text}, {law}"
@@ -606,19 +770,15 @@ def _lower_elt(name, declared):
                               else src.form)
 
     effective = {src.effective_form for src in sources}
-    if 'ELT6' in effective:
+    if 'ELT6' in effective and len(effective) > 1:
         active = [src.where for src in sources if src.effective_form == 'ELT6']
-        if len(effective) > 1:
-            raise LossTableError(
-                f'{name}: an ELT6 source with secondary uncertainty cannot be '
-                'combined with ELT3 or ELT4 sources, including an ELT6 '
-                f"converted by no2u. Add no2u to {', '.join(active)} for the "
-                'mean-only model.')
-        raise NotImplementedError(
-            f'{name}: secondary uncertainty (an ELT6 source without no2u) is '
-            'not supported yet. Add no2u to every elt clause for the mean-only '
-            'model, in which each event row is an atom at its mean.')
-    form = 'ELT3' if 'ELT3' in effective else 'ELT4'
+        raise LossTableError(
+            f'{name}: an ELT6 source with secondary uncertainty cannot be '
+            'combined with ELT3 or ELT4 sources, including an ELT6 '
+            f"converted by no2u. Add no2u to {', '.join(active)} for the "
+            'mean-only model.')
+    form = ('ELT6' if 'ELT6' in effective
+            else 'ELT3' if 'ELT3' in effective else 'ELT4')
     unit_labels = _unit_labels(name, sources)
 
     ids = np.concatenate([src.ids for src in sources])
@@ -664,21 +824,15 @@ def _lower_elt(name, declared):
     if total_rate <= 0:
         raise LossTableError(
             f'{name}: the table has no event with a positive rate.')
-    event_loss = np.bincount(event_code, weights=mean, minlength=n_events)
-    xs, inv = np.unique(event_loss[positive], return_inverse=True)
-    weights = np.bincount(inv, weights=event_rate[positive])
 
     # an event's exposure sums its unit maximums; a combined ELT3 has none,
     # and a partial total would mislead, so it reports no exposure at all
     max_event_exposure = None
-    if form == 'ELT4':
+    if form != 'ELT3':
         maxes = np.concatenate([src.fields[:, 2] for src in sources])
         exposure = np.bincount(event_code, weights=maxes, minlength=n_events)
         max_event_exposure = float(exposure[positive].max())
 
-    lowered = {'exp_en': total_rate, 'freq_name': 'poisson',
-               'sev_name': 'dhistogram', 'sev_xs': xs,
-               'sev_ps': weights / total_rate}
     meta = {
         'table': 'elt', 'form': form, 'units': units,
         'unit_labels': unit_labels,
@@ -686,14 +840,146 @@ def _lower_elt(name, declared):
         'rows': int(len(ids)), 'events': int(positive.sum()),
         'events_zero_rate': int((~positive).sum()),
         'rate': total_rate,
-        'aal': float(event_rate[positive] @ event_loss[positive]),
         'rate_inexact': int((rate != canon).sum()),
-        'severity_atoms': int(len(xs)),
         'max_event_exposure': max_event_exposure,
+    }
+
+    if form == 'ELT6':
+        fields = np.concatenate([src.fields for src in sources])
+        model = _elt_model(name, ids, event_code, unit_code, units, canon,
+                           positive[event_code], fields)
+        mom = model.moments
+        c = [float(x) for x in mom.raw_moments]
+        lowered = {'exp_en': float(mom.total_rate), 'freq_name': 'poisson',
+                   'sev_name': model}
+        meta.update({
+            'rate': float(mom.total_rate), 'aal': c[0],
+            'severity_atoms': None,
+            'moments': _cumulant_moments(c, float(mom.total_rate)),
+            'mass_error': None,
+            'secondary': {
+                'shared': model.shared,
+                'beta_rows': int(mom.beta_rows),
+                'two_point_rows': int(mom.two_point_rows),
+                'atom_rows': int(mom.atom_rows),
+                'rate_at_zero': float(mom.rate_at_zero),
+                'max_support': float(mom.max_support),
+                'method': str(mom.method),
+                'achieved_error': [float(e) for e in mom.achieved_error],
+                'converged': bool(mom.converged),
+                'rtol': None if mom.rtol is None else float(mom.rtol),
+                'eltq_version': model.eltq_version,
+                'eltq_backend': model.eltq_backend,
+            },
+        })
+        return lowered, meta
+
+    event_loss = np.bincount(event_code, weights=mean, minlength=n_events)
+    xs, inv = np.unique(event_loss[positive], return_inverse=True)
+    weights = np.bincount(inv, weights=event_rate[positive])
+    lowered = {'exp_en': total_rate, 'freq_name': 'poisson',
+               'sev_name': 'dhistogram', 'sev_xs': xs,
+               'sev_ps': weights / total_rate}
+    meta.update({
+        'aal': float(event_rate[positive] @ event_loss[positive]),
+        'severity_atoms': int(len(xs)),
         'moments': _elt_moments(event_rate[positive], event_loss[positive]),
         'mass_error': abs(float(weights.sum()) / total_rate - 1),
-    }
+    })
     return lowered, meta
+
+
+def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
+    """Prepare the :class:`EltModel` of an ELT6 table and compute its moments.
+
+    Parameters
+    ----------
+    name : str
+        Object name, for messages.
+    ids : numpy.ndarray
+        Text event identifier of each row.
+    event_code, unit_code : numpy.ndarray
+        Integer event and unit code of each row.
+    units : list of str
+        Unit names; ``units[unit_code]`` names a row's unit.
+    canon : numpy.ndarray
+        The canonical (first row's) rate of each row's event.
+    keep : numpy.ndarray
+        Boolean, the rows whose event has a positive rate.
+    fields : numpy.ndarray
+        The ``rate mean max sdi sdc`` columns, one row per table row.
+
+    Returns
+    -------
+    EltModel
+
+    Raises
+    ------
+    LossTableError
+        eltq dropped a row of the validated table, or a model moment leaves
+        double precision.
+
+    Notes
+    -----
+    eltq's defaults agree with the parent plan's rulings, and are passed
+    explicitly anyway so that a later change of default cannot silently
+    change the model: ``variance_policy='bernoulli'`` (an inadmissible
+    variance becomes the two-point law on :math:`\\{0, M\\}` with the same
+    mean), ``mean_is_loss_rate=False``, and Burke's coupling for a shared
+    event with :data:`SHARED_MOMENT_RTOL`. Rows are stably sorted by event
+    so each event's rows are contiguous, as ``multiunit_moments`` requires.
+    """
+    eltq = import_eltq()
+    rows = np.flatnonzero(keep)
+    rows = rows[np.argsort(event_code[rows], kind='stable')]
+    codes, _ = pd.factorize(event_code[rows])
+
+    def _frozen(values, dtype=np.float64):
+        out = np.ascontiguousarray(values, dtype=dtype)
+        out.setflags(write=False)
+        return out
+
+    rate = _frozen(canon[rows])
+    mean, mx, sdi, sdc = (_frozen(fields[rows, j]) for j in (1, 2, 3, 4))
+    event_ids = _frozen(ids[rows], dtype=object)
+    event_code = _frozen(codes, dtype=np.int64)
+    unit_code = _frozen(unit_code[rows], dtype=np.int64)
+    shared = bool((np.bincount(event_code) > 1).any())
+    if shared:
+        moments = eltq.multiunit_moments(
+            event_id=event_ids,
+            unit_id=np.asarray(units, dtype=object)[unit_code],
+            rate=rate, mean_loss=mean, sd_indep=sdi, sd_corr=sdc, max_loss=mx,
+            coupling='burke', variance_policy='bernoulli',
+            rtol=SHARED_MOMENT_RTOL)
+    else:
+        moments = eltq.moments_arrays(
+            rate=rate, max_loss=mx, mean_loss=mean, sd_indep=sdi, sd_corr=sdc,
+            mean_is_loss_rate=False, variance_policy='bernoulli',
+            event_ids=list(event_ids))
+    if moments.dropped_rows:
+        found = '; '.join(f'{k}: {v.count} ({", ".join(map(str, v.examples))})'
+                          for k, v in moments.diagnostics.items() if v.count)
+        raise LossTableError(
+            f'{name}: eltq dropped {moments.dropped_rows} row(s) of a '
+            'validated table, which is a bug to report, not a smaller '
+            f'portfolio: {found or "no diagnostics"}.')
+    if any(moments.moment_overflow):
+        orders = [str(r + 1) for r, o in enumerate(moments.moment_overflow) if o]
+        raise LossTableError(
+            f"{name}: the model moment of order {', '.join(orders)} leaves "
+            'double precision; rescale the losses (for example to thousands).')
+
+    digest = hashlib.sha256()
+    for column in (rate, mean, mx, sdi, sdc, unit_code):
+        digest.update(column.tobytes())
+    digest.update('\x1f'.join(map(str, event_ids)).encode('utf-8'))
+    digest.update('\x1f'.join(units).encode('utf-8'))
+    return EltModel(
+        event_ids=event_ids, event_code=event_code, unit_code=unit_code,
+        units=tuple(units), rate=rate, mean=mean, max=mx, sdi=sdi, sdc=sdc,
+        shared=shared, moments=moments, digest=digest.hexdigest(),
+        eltq_version=str(eltq.__version__), eltq_backend=str(eltq.BACKEND))
 
 
 # ----------------------------------------------------------------------
@@ -878,8 +1164,29 @@ def _elt_moments(rate, loss):
     from the events before equal losses coalesce, so comparing them with the
     lowered severity checks the coalescing.
     """
-    c = [float(rate @ loss ** r) for r in (1, 2, 3)]
-    total = float(rate.sum())
+    return _cumulant_moments([float(rate @ loss ** r) for r in (1, 2, 3)],
+                             float(rate.sum()))
+
+
+def _cumulant_moments(c, total):
+    """Severity and annual mean, CV and skewness from :math:`C_1, C_2, C_3`.
+
+    Parameters
+    ----------
+    c : list of float
+        :math:`C_r = \\sum_e \\lambda_e \\mathsf P X_e^r`, the annual cumulants
+        of the compound Poisson.
+    total : float
+        The total event rate :math:`\\Lambda`.
+
+    Returns
+    -------
+    dict
+        ``{'severity': {...}, 'annual': {...}}``, each with ``mean``, ``cv``
+        and ``skew``. The severity raw moments are :math:`C_r / \\Lambda`; the
+        annual mean is :math:`C_1`, the CV :math:`\\sqrt{C_2} / C_1` and the
+        skewness :math:`C_3 / C_2^{3/2}`.
+    """
     sev = _mean_cv_skew(*(x / total for x in c))
     annual = {'mean': c[0],
               'cv': c[1] ** 0.5 / c[0] if c[0] else np.nan,
@@ -914,6 +1221,21 @@ VALIDATION_COLUMNS = ['check', 'value', 'tolerance', 'status', 'detail']
 MASS_TOLERANCE = 1e-12
 
 
+def _row_laws(secondary):
+    """The rows by effective law, for example ``2 beta, 1 two-point, 0 atom``."""
+    return (f"{secondary['beta_rows']} beta, {secondary['two_point_rows']} "
+            f"two-point, {secondary['atom_rows']} atom")
+
+
+def _moment_method(secondary):
+    """How eltq computed the model moments, for the summary frame."""
+    if secondary['method'] == 'closed_form':
+        return 'closed form'
+    e2, e3 = secondary['achieved_error']
+    return (f'factor integration, achieved error {e2:.2g} (C2) and '
+            f'{e3:.2g} (C3)')
+
+
 def summary_frame(agg):
     """The ``loss_table_summary_df`` of an aggregate.
 
@@ -946,17 +1268,27 @@ def summary_frame(agg):
         if meta['table'] == 'elt':
             no2u = any(s['no2u'] and s['form'] == 'ELT6'
                        for s in meta['sources'])
+            secondary = meta.get('secondary')
             add('table', 'rows', meta['rows'])
             add('table', 'events', meta['events'])
             add('table', 'events with zero rate', meta['events_zero_rate'])
             add('table', 'event rate', meta['rate'])
             add('table', 'mean annual loss', meta['aal'])
-            add('table', 'severity atoms', meta['severity_atoms'])
+            add('table', 'severity atoms',
+                'n/a' if meta['severity_atoms'] is None
+                else meta['severity_atoms'])
             add('table', 'largest event exposure',
                 'n/a' if meta['max_event_exposure'] is None
                 else meta['max_event_exposure'])
-            add('table', 'secondary uncertainty',
-                'removed by no2u' if no2u else 'none')
+            if secondary is None:
+                add('table', 'secondary uncertainty',
+                    'removed by no2u' if no2u else 'none')
+            else:
+                add('table', 'secondary uncertainty', _row_laws(secondary))
+                add('table', 'largest event support', secondary['max_support'])
+                add('table', 'model moments', _moment_method(secondary))
+                add('table', 'eltq', f"{secondary['eltq_version']} "
+                    f"({secondary['eltq_backend']} backend)")
         else:
             add('table', 'years', meta['years'])
             add('table', 'years with zero probability',
@@ -1018,6 +1350,12 @@ def stats_frame(agg):
     are computed independently, before and after equal losses coalesce, so
     their agreement checks the lowering. ``estimate`` differs from them by the
     ordinary discretization and FFT error that ``validation_df`` reports.
+
+    For an ELT6 with secondary uncertainty, ``table`` holds eltq's model
+    moments (the severity from ``severity_moments``, the annual values from
+    ``raw_moments``) and ``model`` the same values through ``stats_df``, so
+    their agreement checks the plumbing; ``estimate`` against ``table`` then
+    measures quantization, overflow and FFT error together.
     """
     meta = agg._loss_table_meta
     if not meta:
@@ -1088,8 +1426,20 @@ def validation_frame(agg):
                 'the event, within the relative tolerance')
             add('zero-rate events', meta['events_zero_rate'], np.nan, 'pass',
                 'excluded from the count and the moments')
-            against('severity mass', meta['mass_error'], MASS_TOLERANCE,
-                    'lowered severity weight against the event rate')
+            secondary = meta.get('secondary')
+            if secondary is None:
+                against('severity mass', meta['mass_error'], MASS_TOLERANCE,
+                        'lowered severity weight against the event rate')
+            else:
+                add('row classification', secondary['two_point_rows'], np.nan,
+                    'pass', f'{_row_laws(secondary)} rows; a two-point row '
+                    'replaces an inadmissible beta variance, keeping the mean')
+                if secondary['shared']:
+                    error = max(secondary['achieved_error'])
+                    add('moment integration', error, secondary['rtol'],
+                        'pass' if secondary['converged'] else 'warning',
+                        f"{_moment_method(secondary)}; shared events under "
+                        "Burke's coupling")
         else:
             add('year completeness', meta['years'], np.nan, 'pass',
                 'every unit lists the same years')
@@ -1104,7 +1454,9 @@ def validation_frame(agg):
             model = stats.loc[(component, 'mean'), 'model']
             against(f'{component} mean, table against model',
                     model / table - 1 if table else model - table, eps,
-                    'independent sums before and after coalescing')
+                    'eltq model moments against stats_df'
+                    if meta.get('secondary') is not None
+                    else 'independent sums before and after coalescing')
         for component in ('severity', 'annual'):
             for measure in ('mean', 'cv', 'skew'):
                 if agg.bs <= 0:

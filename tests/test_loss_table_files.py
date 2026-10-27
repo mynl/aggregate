@@ -73,9 +73,16 @@ def test_no2u_file():
               update=False)
     assert a.actual_m == pytest.approx(0.1 * 50 + 0.2 * 20)
     assert a._loss_table_meta['sources'][0]['form'] == 'ELT6'
-    with pytest.raises(NotImplementedError, match='secondary uncertainty'):
-        build(f'agg LT.Six2 elt {_q(DATA / "elt/six-columns.csv")}',
+
+
+def test_elt6_file_with_secondary_uncertainty():
+    """The same file without no2u: the same mean, eltq's model around it."""
+    pytest.importorskip('eltq', minversion='2.13')
+    a = build(f'agg LT.Six2 elt {_q(DATA / "elt/six-columns.csv")}',
               update=False)
+    assert a.actual_m == pytest.approx(0.1 * 50 + 0.2 * 20)
+    assert type(a.sevs[0]).__name__ == 'SeverityElt'
+    assert a._loss_table_meta['form'] == 'ELT6'
 
 
 @pytest.mark.parametrize('name, form, mean, var', [

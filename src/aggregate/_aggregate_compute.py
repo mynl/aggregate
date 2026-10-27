@@ -379,7 +379,12 @@ def discretize_severities(sevs, xs, bs, *, i0=0, sev_calc='discrete',
     # (plan §6).
     beds = []
     for sev in sevs:
-        if (dsev_bucket == 'linear'
+        if getattr(sev, 'sev_kind', '') == 'elt':
+            # An ELT with secondary uncertainty: eltq quantizes the model on
+            # the grid by the nearest-node rule ([ELT-Quantize]), so neither
+            # sev_calc nor discretization_calc applies and sf is never called.
+            appx = sev.quantize(xs, bs)
+        elif (dsev_bucket == 'linear'
                 and rebucket is not None
                 and sev.sev_kind in ('dhistogram', 'fixed')
                 and sev.exp_attachment is None):

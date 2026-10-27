@@ -1235,13 +1235,19 @@ def _classify_sev(sev_name, sev_xs):
     -------
     str
         One of ``'fixed'``, ``'dhistogram'``, ``'chistogram'``, ``'copy'``,
-        ``'meta'``, ``'cantor'``, ``'scipy'``. Unrecognized string ``sev_name``
-        values are classified as ``'scipy'`` so the catchall ``SeverityScipy``
-        can raise a clearer error when scipy itself can't resolve the name.
+        ``'meta'``, ``'cantor'``, ``'elt'``, ``'scipy'``. Unrecognized string
+        ``sev_name`` values are classified as ``'scipy'`` so the catchall
+        ``SeverityScipy`` can raise a clearer error when scipy itself can't
+        resolve the name.
     """
     # Local imports to avoid distributions <-> portfolio / _aggregate cycles.
     from .portfolio import Portfolio
     from ._aggregate import Aggregate
+    from ._loss_table import EltModel
+
+    if isinstance(sev_name, EltModel):
+        # an ELT6 table with secondary uncertainty ([ELT-Severity])
+        return 'elt'
 
     if sev_xs is not None:
         if sev_name == 'fixed':
@@ -3264,3 +3270,154 @@ class SeverityCopy(Severity):
 
     def _build(self):
         self.fz = self.sev_name
+
+
+class _EltLaw:
+    """The frozen law of an ELT severity: its support, and refusals.
+
+    An ELT severity with secondary uncertainty is a rate-weighted mixture of
+    beta, two-point and atom laws with no distribution function worth
+    evaluating pointwise; eltq evaluates it on a grid. This object supplies
+    what the ``Severity`` machinery reads at construction and sizing, the
+    support :math:`[0, B]` with :math:`B` the largest event support, and makes
+    every pointwise method exist and raise, because the base constructor reads
+    them as attributes and a missing one would fail as an ``AttributeError``,
+    which ``Underwriter.build`` logs and swallows.
+
+    Parameters
+    ----------
+    upper : float
+        :math:`B`, eltq's ``max_support``.
+    """
+
+    def __init__(self, upper):
+        self.upper = float(upper)
+
+    def support(self):
+        """``(0, B)``."""
+        return 0.0, self.upper
+
+    def _refuse(self, *args, **kwargs):
+        raise NotImplementedError(
+            'An elt severity with secondary uncertainty has no pointwise '
+            'distribution function. Use the discretized severity after update '
+            '(sev_density_df), or SeverityElt.tail_measures for the tail rate '
+            'and moments above an edge.')
+
+    cdf = sf = pdf = ppf = isf = stats = _refuse
+
+
+class SeverityElt(Severity):
+    """The event severity of an ELT6 table with secondary uncertainty.
+
+    Wraps the :class:`~aggregate._loss_table.EltModel` that
+    ``_loss_table.resolve`` passes as ``sev_name``. The moments are eltq's
+    model moments, available before any grid exists; the severity reaches a
+    grid only through :meth:`quantize`, never through ``sf``.
+
+    Notes
+    -----
+    The ``elt`` clause states the Lévy measure
+    :math:`\\nu = \\sum_e \\lambda_e \\mathsf P(X_e \\in \\cdot)` of the
+    annual loss; its mass :math:`\\Lambda` is the Poisson rate and
+    :math:`\\nu / \\Lambda` this severity, so its raw moments are
+    :math:`C_r / \\Lambda`. Everything after the severity is the ordinary
+    ``Aggregate``.
+
+    The support :math:`[0, B]` reaches every sizing and reporting consumer
+    through ``fz.support()``; ``limit`` stays infinite on purpose, because a
+    finite ``limit`` makes ``detachment`` finite and sends the moment and
+    attachment code into ``fz.sf``. ``support_atoms`` is ``None``: a beta
+    mixture sits on no lattice.
+
+    A table with a shared event (one event with rows for two or more units)
+    builds with its model moments and refuses a grid until
+    ``[ELT-Shared-Event-Uncertainty]`` lands.
+    """
+    sev_kind = 'elt'
+
+    def _build(self):
+        model = self.sev_name
+        self.fz = _EltLaw(model.moments.max_support)
+        self.sev1, self.sev2, self.sev3 = (
+            float(v) for v in model.moments.severity_moments)
+        self.long_name = 'elt'
+        #: Scalars describing the last quantization (``None`` before one).
+        self.last_quantization = None
+
+    @property
+    def model(self):
+        """The :class:`~aggregate._loss_table.EltModel` this severity wraps."""
+        return self.sev_name
+
+    @property
+    def shared(self):
+        """Whether some event has rows for two or more units."""
+        return bool(self.sev_name.shared)
+
+    def moms(self):
+        """The severity raw moments :math:`C_r / \\Lambda`, from eltq.
+
+        Returns
+        -------
+        (float, float, float)
+        """
+        return self.sev1, self.sev2, self.sev3
+
+    def _compute_attachment_probs(self):
+        """No layer clause and no pointwise law: the histogram convention.
+
+        The base method calls ``fz.sf(0)`` on every non-histogram severity
+        without a layer clause, which an ELT severity cannot answer. With no
+        layer clause (an ``elt`` body admits none) the base sets ``pattach =
+        1`` and ``pdetach = 0``; this sets the same values with no call.
+        """
+        self.pattach = self.moment_pattach = 1
+        self.pdetach = 0
+
+    def check_grid_supported(self, owner=''):
+        """Raise ``NotImplementedError`` when this severity cannot reach a grid.
+
+        Parameters
+        ----------
+        owner : str
+            Name of the aggregate, for the message.
+
+        Raises
+        ------
+        NotImplementedError
+            Always, until ``[ELT-Single-Event-Uncertainty]`` lands; a shared
+            event names the event and its units.
+        """
+        prefix = f'{owner}: ' if owner else ''
+        alternatives = ('build(..., update=False) gives the theoretical '
+                        'statistics, and no2u on every elt clause gives the '
+                        'mean-only model.')
+        example = self.sev_name.shared_example()
+        if example is not None:
+            event, units = example
+            raise NotImplementedError(
+                f'{prefix}event {event} has rows for units '
+                f"{', '.join(units)}, and a shared event with secondary "
+                'uncertainty cannot be put on a grid yet '
+                f'([ELT-Shared-Event-Uncertainty]). {alternatives}')
+        raise NotImplementedError(
+            f'{prefix}secondary uncertainty cannot be put on a grid yet '
+            f'([ELT-Single-Event-Uncertainty]). {alternatives}')
+
+    def quantize(self, xs, bs):
+        """The severity pmf on the grid ``xs``.
+
+        Parameters
+        ----------
+        xs : numpy.ndarray
+            The severity grid, ``0, bs, 2 bs, ...``.
+        bs : float
+            Bucket size.
+
+        Raises
+        ------
+        NotImplementedError
+            Until ``[ELT-Single-Event-Uncertainty]`` lands.
+        """
+        self.check_grid_supported(self.name)

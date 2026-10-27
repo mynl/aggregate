@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.15.0 - 2026-10-27
+
+**[ELT-Uncertainty-Moments] An ELT6 source without `no2u` builds with secondary uncertainty and reports eltq's model moments before any grid.** Each row is a beta on `[0, max]` with SD `sdi + sdc`, a two-point law on `{0, max}` where that variance is inadmissible, or an atom at zero SD; rows sharing an event across units sum under Burke's coupling. `stats_df`, `info` (`secondary uncertainty`) and the three `loss_table_*_df` frames carry the model, with new summary rows for the row laws, `largest event support`, the moment method and the eltq version. `build(..., update=False)` works; `update` raises `NotImplementedError` until the next step. This needs eltq 2.13 or later, installed by hand (`uv pip install` of a local eltq checkout, then sync with `--inexact`), and raises `ImportError` with that guidance without it; ELT3, ELT4, `no2u` and YLT tables never import it.
+
 ## 1.14.0 - 2026-10-26
 
 **[Loss-Table-Reports] `Aggregate.loss_table_summary_df`, `loss_table_stats_df` and `loss_table_validation_df` report an `elt` or `ylt` declaration.** The summary lists what was read, combined and per source, with each file's resolved path and SHA-256 digest; the stats frame sets the severity and annual mean, CV and skewness computed from the table beside the model's and the discretized estimate; the validation frame lists each check with value, tolerance and a `pass`, `warning` or `not computed` status. All three are empty for any other aggregate. This completes the deterministic part of `[DecL-Loss-Tables]`.

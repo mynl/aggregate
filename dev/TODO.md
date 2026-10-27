@@ -35,10 +35,6 @@
   than the tail needs, and the ladder may not shrink `bs`; measurements in the
   plan's execution log). No ELT grid budget (`elt_max_log2` was dropped,
   ruling 18). The deterministic import landed at 1.11.2 to 1.14.0.
-- **[ELT-Eltq-Extra]**: once eltq 2.13 or later is on PyPI, declare the
-  optional `elt` extra (`eltq>=` that version) in `pyproject.toml`, add it to
-  `all`, and drop the `importorskip` in the ELT6 tests. Until then eltq is
-  installed by hand, like `aggregate-ntt`.
 
 ## Outside contributions
 

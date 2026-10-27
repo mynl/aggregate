@@ -88,15 +88,14 @@ def import_eltq():
     -----
     Called only when an ELT6 source without ``no2u`` is lowered, so parsing,
     ELT3 and ELT4 tables, all-``no2u`` ELT6 tables and YLTs never import eltq.
-    Until eltq 2.13 or later is on PyPI it is installed by hand into the
-    development environment (``uv pip install`` of a local checkout, a
-    maturin build), so it is not a declared dependency.
+    It is the optional ``elt`` extra, ``pip install aggregate[elt]``, also
+    included in ``all``.
     """
     need = '.'.join(map(str, ELTQ_MIN_VERSION))
-    advice = (f'install eltq {need} or later (pip install "eltq>={need}", or '
-              'uv pip install a local eltq checkout), or add no2u to every elt '
-              'clause for the mean-only model, in which each event row is an '
-              'atom at its mean.')
+    advice = (f'install eltq {need} or later (pip install "aggregate[elt]" or '
+              f'pip install "eltq>={need}"), or add no2u to every elt clause '
+              'for the mean-only model, in which each event row is an atom at '
+              'its mean.')
     try:
         import eltq
     except ImportError as e:

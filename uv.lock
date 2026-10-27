@@ -30,6 +30,7 @@ all = [
     { name = "attrs" },
     { name = "bokeh" },
     { name = "datashader" },
+    { name = "eltq" },
     { name = "holoviews" },
     { name = "ipython-autotime" },
     { name = "ipywidgets" },
@@ -56,6 +57,9 @@ dev = [
     { name = "sphinx-toggleprompt" },
     { name = "sphinxcontrib-bibtex" },
 ]
+elt = [
+    { name = "eltq" },
+]
 massive = [
     { name = "zarr" },
 ]
@@ -77,11 +81,12 @@ viz = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aggregate", extras = ["massive", "notebook", "numba", "viz"], marker = "extra == 'all'" },
+    { name = "aggregate", extras = ["elt", "massive", "notebook", "numba", "viz"], marker = "extra == 'all'" },
     { name = "attrs", marker = "extra == 'notebook'" },
     { name = "bokeh", marker = "extra == 'viz'" },
     { name = "datashader", marker = "extra == 'viz'" },
     { name = "docutils", marker = "extra == 'dev'", specifier = ">=0.20,<0.22" },
+    { name = "eltq", marker = "extra == 'elt'", specifier = ">=2.13" },
     { name = "greater-tables", specifier = ">=8.1.0" },
     { name = "holoviews", marker = "extra == 'viz'" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6" },
@@ -114,7 +119,7 @@ requires-dist = [
     { name = "sphinxcontrib-bibtex", marker = "extra == 'dev'" },
     { name = "zarr", marker = "extra == 'massive'", specifier = ">=3" },
 ]
-provides-extras = ["dev", "notebook", "numba", "massive", "viz", "all"]
+provides-extras = ["dev", "notebook", "numba", "massive", "viz", "elt", "all"]
 
 [[package]]
 name = "alabaster"
@@ -620,6 +625,20 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/25/71/80cc718ff6d7abfbabacb1f57aaa42e9c1552bfdd01e64ddd704e4a03638/donfig-0.8.1.post1.tar.gz", hash = "sha256:3bef3413a4c1c601b585e8d297256d0c1470ea012afa6e8461dc28bfb7c23f52", size = 19506, upload-time = "2024-05-23T14:14:31.513Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0c/d5/c5db1ea3394c6e1732fb3286b3bd878b59507a8f77d32a2cebda7d7b7cd4/donfig-0.8.1.post1-py3-none-any.whl", hash = "sha256:2a3175ce74a06109ff9307d90a230f81215cbac9a751f4d1c6194644b8204f9d", size = 21592, upload-time = "2024-05-23T14:13:55.283Z" },
+]
+
+[[package]]
+name = "eltq"
+version = "2.14.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/25/48/e5e979c178a59c9c6bd464a750e99d418129333f3eabb1ea73075c41b149/eltq-2.14.0.tar.gz", hash = "sha256:1f7a0b072fef1cabe8adf10d792cd3376da1d5ab3cf5b8f4f058fd75d18361e9", size = 278176, upload-time = "2026-10-27T22:56:14.735Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7e/27/20dcc46d12ca368457618c1f78af392fb7cd87b6b05652bde5c55e411503/eltq-2.14.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:97fe15a9e85dbf287159bd072cc0d84f171047628434ba1d9e8af982247d9325", size = 981036, upload-time = "2026-10-27T22:56:09.903Z" },
+    { url = "https://files.pythonhosted.org/packages/10/35/9a4865febd1a8a4df978a7c50f6135ff3da35bb1a2f79b8c14b51f9a96c6/eltq-2.14.0-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:c248ec8ca9b4cf770742bbadc43c76d322433eb00e792af78c9b100357c55200", size = 1241304, upload-time = "2026-10-27T22:56:11.487Z" },
+    { url = "https://files.pythonhosted.org/packages/08/b7/870c63f038cba343498784827ad51dd49d3011813e02ef5a0a90733a764b/eltq-2.14.0-cp312-abi3-win_amd64.whl", hash = "sha256:23868f4817f08b97f39646bbec1580e97d6259d465bedff21c5fa24428b3941d", size = 1113026, upload-time = "2026-10-27T22:56:13.178Z" },
 ]
 
 [[package]]

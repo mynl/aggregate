@@ -104,6 +104,7 @@ uv add "aggregate[numba]"     # numba-compiled TVaR paths
 uv add "aggregate[viz]"       # interactive bivariate exploration: holoviews, datashader, bokeh
 uv add "aggregate[massive]"   # disk-backed bivariate grids via zarr
 uv add "aggregate[notebook]"  # JupyterLab, widgets
+uv add "aggregate[elt]"       # secondary uncertainty in event loss tables via eltq
 uv add "aggregate[dev]"       # documentation build and test tooling
 uv add "aggregate[all]"       # all of the above except dev
 ```

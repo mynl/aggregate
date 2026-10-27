@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.18.0 - 2026-10-27
+
+**[ELT-Eltq-Extra] eltq is the optional `elt` extra, also in `all`.** `pip install aggregate[elt]` installs eltq 2.13 or later from PyPI for secondary uncertainty in an ELT6 source; it is no longer installed by hand. In a dev checkout `uv sync --all-extras` now replaces a local eltq build with the published wheel, so re-install a checkout after syncing to test an unreleased eltq. The ELT6 tests still skip where eltq is absent, like the other extras' tests.
+
 ## 1.17.0 - 2026-10-27
 
 **[Beta-Lomax-Exact-Moments] Beta and Lomax severities, and a Pareto shifted by its scale, compute layered moments in closed form.** `Severity.moms()` no longer uses quadrature for `beta`, `lomax` or `sev s * pareto a - s`, so their theoretical moments, and the `stats_df` errors computed from them, move to the exact values (beta by up to about `2e-5` relative on skewed shapes). Skewed ELT betas such as shapes `1e-5 1` or `1e-6 10` at scale `1e8` now return finite moments where quadrature returned nan or raised `ZeroDivisionError`, and a shifted Pareto with an integer shape no longer returns nan for a finite layer. The Type-I Pareto closed form no longer overflows at large scale and shape. Bucket feasibility readings are unchanged: `lomax` and `beta` still report none (`[Feasibility-Lomax-Beta]`). The `Port.Bounded` regression baseline was re-captured.

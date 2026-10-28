@@ -3966,42 +3966,49 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         return '\n'.join(s)
 
     @property
-    def loss_table_summary_df(self):
-        """What an ``elt`` or ``yelt`` declaration read, one fact per row.
+    def elt_description(self) -> str:
+        """Short narrative of an ``elt`` or ``yelt`` declaration (str).
 
-        Indexed by ``(part, item)``: the combined table (kind, form, units,
-        events or years, rate or probabilities, mean annual loss), the grid,
-        and each source with its origin, form, rows and, for a file, resolved
-        path, size, modification time and SHA-256 digest. Empty, with the same
-        index names, for an aggregate not declared from a loss table. A fresh
-        frame on every call. See ``aggregate._loss_table.summary_frame``.
+        A few aligned lines: what the table is (form, events and rows or
+        years, units), the event rate and mean annual loss or the annual
+        outcomes, the secondary uncertainty of an ELT6, the grid (``n/a``
+        before :meth:`update`) and a one-line verdict of the checks, counting
+        them by status and naming each warning. The verbose form is
+        :attr:`elt_explanation`; the table itself is :attr:`elt_df`. The empty
+        string for an aggregate not declared from a loss table. See
+        ``aggregate._loss_table.short_narrative``.
         """
-        return _loss_table.summary_frame(self)
+        return _loss_table.short_narrative(self)
 
     @property
-    def loss_table_stats_df(self):
-        """Severity and annual mean, CV and skewness: table, model, estimate.
+    def elt_explanation(self) -> str:
+        """Long narrative of an ``elt`` or ``yelt`` declaration (str).
 
-        ``table`` is computed from the declared rows, ``model`` is the
-        theoretical value from :attr:`stats_df`, ``estimate`` the gross value
-        from the discretized density (``nan`` before :meth:`update`), and
-        ``error`` is ``estimate / table - 1``. Empty for an aggregate not
-        declared from a loss table. See ``aggregate._loss_table.stats_frame``.
+        Three paragraphs: the model in words (for an ELT6 the row laws and the
+        roll-up of shared events, for ELT3 and ELT4 the coalescing of equal
+        event totals, for a YELT the annual outcomes and their
+        probabilities), each source with its provenance (for a file the
+        resolved path, size, modification time and SHA-256 prefix), and every
+        check with its value, tolerance and status, warnings first. The empty
+        string for an aggregate not declared from a loss table. See
+        ``aggregate._loss_table.long_narrative``.
         """
-        return _loss_table.stats_frame(self)
+        return _loss_table.long_narrative(self)
 
     @property
-    def loss_table_validation_df(self):
-        """The loss table checks, with value, tolerance and status.
+    def elt_df(self):
+        """The table the model uses, one row per event or year (DataFrame).
 
-        One row per check: form projection, event and rate consistency or
-        year completeness and probabilities, the lowered severity's mass, the
-        table against the model, and each moment estimate against the table
-        at :attr:`validation_eps`. A grid check is ``not computed`` before
-        :meth:`update`. Empty for an aggregate not declared from a loss table.
-        See ``aggregate._loss_table.validation_frame``.
+        For an ELT, indexed by ``event``: ``rate``, ``mean`` and, as the form
+        has them, ``max``, ``sdi`` and ``sdc``, then ``units``, the number of
+        input rows behind the row (more than one for a shared ELT6 event,
+        shown as its rolled-up row). For a YELT, indexed by ``year``: ``prob``
+        and ``loss``. Zero-rate events and zero-probability years are left
+        out, as the model leaves them out. An empty frame for an aggregate not
+        declared from a loss table, and a fresh frame on every call. See
+        ``aggregate._loss_table.table_in_use``.
         """
-        return _loss_table.validation_frame(self)
+        return _loss_table.table_in_use(self)
 
     @property
     def validation_score(self):

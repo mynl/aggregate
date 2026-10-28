@@ -1464,6 +1464,8 @@ agg LT.Distinct elt unit A [[1 .1 100]] elt unit B [[2 .1 40]]               not
 agg LT.MeanOnly elt no2u [[1 .1 50 100 10 10]]                               note{ELT6 to ELT4: mean 5, variance 250};
 agg LT.Treaty elt unit A [[1 .1 60] [2 .2 30]] elt unit B [[1 .1 60]] occurrence net of 100 xs 50 aggregate net of 200 xs 100   note{the occurrence layer sees the event total};
 agg LT.Ids elt unit A [[7 .1 100] ["007" .1 5]] elt unit B [["7" .1 40]]     note{7 and "7" one event, "007" another};
+agg LT.ZeroRate elt [[1 .1 100] [2 .1 40] [3 0 80]]                          note{a zero-rate event, counted and left out of elt_df};
+agg LT.UnitsMax elt unit A [[1 .1 60 300] [2 .2 40 500]] elt unit B [[3 .3 7 9] [1 .1 50 100]]   note{ELT4 over two units: event 1 totals 110, max 400};
 pnl LT.PnL 30 premium less agg LT.PnL_e elt [[1 .1 100] [2 .1 40]] occurrence net of 50 xs 50   note{an elt engine};
 agg LT.Y1 yelt [0 0 100 300]                                                 note{mean 100, variance 15000};
 agg LT.Y3 yelt [[1 0 .5] [2 100 .3] [3 300 .2]] aggregate net of 150 xs 50    note{net mean 45, variance 3225};

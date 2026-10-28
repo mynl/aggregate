@@ -20,6 +20,7 @@ import pandas as pd
 import pytest
 
 from aggregate import Aggregate, _loss_table, build
+from aggregate._loss_table import _check_rows, _moment_rows, _summary_rows
 from aggregate.constants import DefectiveDistributionWarning
 
 BETA = 'agg LT.Beta elt [[1 .1 50 100 10 10]]'
@@ -80,6 +81,16 @@ def _annual(a):
     return e1, e2 - e1 ** 2, e3 - 3 * e1 * e2 + 2 * e1 ** 3
 
 
+def _checks(a):
+    """The loss table checks of ``a`` by name."""
+    return {c.check: c for c in _check_rows(a)}
+
+
+def _statuses(a):
+    """The status of each loss table check of ``a``, by name."""
+    return {c.check: c.status for c in _check_rows(a)}
+
+
 # ----------------------------------------------------------------------
 # [ELT-Uncertainty-Moments]: model moments with no grid
 # ----------------------------------------------------------------------
@@ -92,11 +103,12 @@ def test_beta_row_moments(eltq):
     assert m == pytest.approx(5, rel=1e-12)
     assert v == pytest.approx(290, rel=1e-12)
     assert k3 == pytest.approx(18_500, rel=1e-12)
-    stats = a.loss_table_stats_df
-    assert stats.loc[('annual', 'mean'), 'table'] == pytest.approx(5)
-    assert stats.loc[('annual', 'cv'), 'table'] == pytest.approx(290 ** 0.5 / 5)
-    np.testing.assert_allclose(stats['table'], stats['model'], rtol=1e-12,
-                               atol=1e-12)
+    moments = _moment_rows(a)
+    assert moments[('annual', 'mean')]['table'] == pytest.approx(5)
+    assert moments[('annual', 'cv')]['table'] == pytest.approx(290 ** 0.5 / 5)
+    np.testing.assert_allclose([r['table'] for r in moments.values()],
+                               [r['model'] for r in moments.values()],
+                               rtol=1e-12, atol=1e-12)
     secondary = a._loss_table_meta['secondary']
     assert (secondary['beta_rows'], secondary['two_point_rows'],
             secondary['atom_rows']) == (1, 0, 0)
@@ -109,9 +121,9 @@ def test_two_point_row(eltq):
     assert (m, v) == (pytest.approx(5), pytest.approx(500))
     secondary = a._loss_table_meta['secondary']
     assert secondary['rate_at_zero'] == pytest.approx(0.05)
-    v = a.loss_table_validation_df.set_index('check')
-    assert v.loc['row classification', 'value'] == 1
-    assert v.loc['row classification', 'status'] == 'pass'
+    v = _checks(a)
+    assert v['row classification'].value == 1
+    assert v['row classification'].status == 'pass'
 
 
 def test_atom_row_matches_no2u(eltq):
@@ -169,8 +181,7 @@ def test_shared_event_coupling(eltq, burke, program, e2, e3, method):
     assert meta['secondary']['converged']
     assert 'shared events (model moments only)' in a.info
     if method == 'factor_integration':
-        v = a.loss_table_validation_df.set_index('check')
-        assert v.loc['moment integration', 'status'] == 'pass'
+        assert _checks(a)['moment integration'].status == 'pass'
 
 
 def test_shared_refusal_names_the_event(eltq, burke):
@@ -223,7 +234,7 @@ def test_spec_hash_is_content_addressed(eltq):
 
 def test_summary_and_info_rows(eltq):
     a = build(BETA, update=False)
-    s = a.loss_table_summary_df['value']
+    s = _summary_rows(a)
     assert s[('table', 'form')] == 'ELT6'
     assert s[('table', 'secondary uncertainty')] == '1 beta, 0 two-point, 0 atom'
     assert s[('table', 'largest event support')] == 100
@@ -246,13 +257,14 @@ def _quiet_build(program, **kwargs):
 def test_fine_grid_oracles(eltq, program):
     """Quantization error separated from FFT error: every estimate within eps."""
     a = _quiet_build(program, bs=1 / 64, log2=16)
-    errors = a.loss_table_stats_df['error'].dropna()
+    errors = [r['error'] for r in _moment_rows(a).values()
+              if np.isfinite(r['error'])]
     assert len(errors) >= 4
-    assert (errors.abs() <= EPS).all(), errors
+    assert all(abs(e) <= EPS for e in errors), errors
     q = a.sevs[0].last_quantization
     assert q['passed']
     assert q['mass'] == pytest.approx(0.1, rel=1e-12)
-    v = a.loss_table_validation_df.set_index('check')['status']
+    v = _statuses(a)
     assert v['quantized mass against event rate'] == 'pass'
     assert v['secondary mean error'] == 'pass'
 
@@ -324,17 +336,17 @@ def test_forty_sd_pinned_grids_warn(eltq):
     reported."""
     with pytest.warns(DefectiveDistributionWarning, match='clips the severity tail'):
         a = build(LARGE_1, bs=40, log2=16)
-    v = a.loss_table_validation_df.set_index('check')['status']
+    v = _statuses(a)
     assert v['tail rate above edge'] == 'warning'
     assert v['tail third moment share'] == 'warning'
     assert a.bs == 40
     with pytest.warns(DefectiveDistributionWarning, match='clips the severity tail'):
         b = build(LARGE_2, bs=6, log2=16)
-    v = b.loss_table_validation_df.set_index('check')
+    v = _checks(b)
     for check in ('tail mean share', 'tail second moment share',
                   'tail third moment share'):
-        assert v.loc[check, 'status'] == 'warning'
-    assert v.loc['tail mean share', 'value'] == pytest.approx(0.38, abs=0.02)
+        assert v[check].status == 'warning'
+    assert v['tail mean share'].value == pytest.approx(0.38, abs=0.02)
 
 
 def test_remote_two_point_row(eltq):
@@ -366,7 +378,7 @@ def test_remote_two_point_row(eltq):
     # a pinned edge below M warns on the second and third moment shares
     with pytest.warns(DefectiveDistributionWarning, match='clips the severity tail'):
         b = build(REMOTE, bs=100, log2=16)
-    v = b.loss_table_validation_df.set_index('check')['status']
+    v = _statuses(b)
     assert v['tail rate above edge'] == 'pass'
     assert v['tail mean share'] == 'pass'
     assert v['tail second moment share'] == 'warning'
@@ -425,12 +437,12 @@ def test_disjoint_units_update_like_one_unit(eltq):
 
 def test_grid_rows_before_and_after_update(eltq):
     a = build(BETA, update=False)
-    v = a.loss_table_validation_df.set_index('check')['status']
+    v = _statuses(a)
     assert v['tail rate above edge'] == 'not computed'
     assert v['secondary mean error'] == 'not computed'
-    assert a.loss_table_summary_df.loc[('grid', 'severity edge'), 'value'] == 'n/a'
+    assert _summary_rows(a)[('grid', 'severity edge')] == 'n/a'
     a.update(bs=1 / 16, log2=12)
-    s = a.loss_table_summary_df['value']
+    s = _summary_rows(a)
     assert s[('grid', 'severity edge')] == pytest.approx((2 ** 12 - 0.5) / 16)
     assert s[('grid', 'tail rate above edge')] == 0
 
@@ -458,11 +470,11 @@ def test_rollup_oracle(eltq):
     assert (secondary['shared_events'], secondary['shared_rows'],
             secondary['shared_inadmissible_rows']) == (1, 2, 0)
     assert (secondary['beta_rows'], secondary['two_point_rows']) == (1, 0)
-    s = a.loss_table_summary_df['value']
+    s = _summary_rows(a)
     assert s[('table', 'shared events')] == (
         '1 events from 2 rows, rolled up; 0 of the rows have inadmissible '
         'variance')
-    assert 'moment integration' not in set(a.loss_table_validation_df['check'])
+    assert 'moment integration' not in _checks(a)
 
 
 @pytest.mark.parametrize('program, e2, e3, laws', [
@@ -479,7 +491,7 @@ def test_rollup_corpus_regressions(eltq, program, e2, e3, laws):
     assert a.est_m == pytest.approx(7, rel=1e-3)
     secondary = a._loss_table_meta['secondary']
     assert (secondary['beta_rows'], secondary['two_point_rows']) == laws
-    assert a.loss_table_summary_df.loc[('table', 'shared events'), 'value'] \
+    assert _summary_rows(a)[('table', 'shared events')] \
         == '1 events from 2 rows, rolled up; 2 of the rows have inadmissible variance'
 
 
@@ -519,7 +531,7 @@ def test_one_row_tables_unchanged(eltq, program):
     model = a.sevs[0].model
     assert model.digest == DIGESTS_1_18_2[a.name]
     assert model.shared_rule is None and model.rolled_columns is None
-    assert ('table', 'shared events') not in a.loss_table_summary_df.index
+    assert ('table', 'shared events') not in _summary_rows(a)
     assert 'rolled up' not in a.info
 
 

@@ -16,8 +16,9 @@ nor a YELT imports eltq. An ELT6 with secondary uncertainty lowers to an
 :class:`EltModel` passed as the severity, whose moments come from eltq;
 ``dev/done/plan-elt-uncertainty.md`` has the design.
 
-A leaf module: it imports only numpy, pandas and the standard library, and
-eltq lazily, at the first ELT6 lowering (:func:`import_eltq`).
+A leaf module: it imports only numpy, pandas and the standard library, eltq
+lazily at the first ELT6 lowering (:func:`import_eltq`), and the formatters of
+``constants`` and ``_bucket_window`` lazily in the report renderers.
 """
 
 import copy
@@ -27,6 +28,7 @@ import hashlib
 import io
 from pathlib import Path
 import re
+from typing import NamedTuple
 
 import numpy as np
 import pandas as pd
@@ -923,6 +925,8 @@ def _lower_elt(name, declared):
             'severity_atoms': None,
             'moments': _cumulant_moments(c, float(mom.total_rate)),
             'mass_error': None,
+            # the EltModel holds the rows; see table_in_use
+            'event_table': None,
             'secondary': {
                 'shared': model.shared,
                 'shared_rule': model.shared_rule,
@@ -955,8 +959,29 @@ def _lower_elt(name, declared):
         'severity_atoms': int(len(xs)),
         'moments': _elt_moments(event_rate[positive], event_loss[positive]),
         'mass_error': abs(float(weights.sum()) / total_rate - 1),
+        'event_table': _frozen_columns(
+            event=event_ids[positive], rate=event_rate[positive],
+            mean=event_loss[positive],
+            max=None if form == 'ELT3' else exposure[positive],
+            units=np.bincount(event_code, minlength=n_events)[positive]),
     })
     return lowered, meta
+
+
+def _frozen_columns(**columns):
+    """Copies of ``columns`` as read-only arrays, a ``None`` kept as ``None``.
+
+    The ``event_table`` of the audit: the per-event (or per-year) arrays that
+    :func:`table_in_use` reports. Read-only because the audit rides in the
+    spec, by reference, into every ``Aggregate(**spec)``.
+    """
+    out = {}
+    for key, values in columns.items():
+        if values is not None:
+            values = np.array(values)
+            values.setflags(write=False)
+        out[key] = values
+    return out
 
 
 def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
@@ -1252,6 +1277,8 @@ def _lower_yelt(name, declared):
         'mean': float(p @ totals),
         'moments': _yelt_moments(p, totals),
         'mass_error': abs(float(ps.sum()) - 1),
+        'event_table': _frozen_columns(year=ref.ids[support], prob=p[support],
+                                       loss=totals[support]),
     }
     return lowered, meta
 
@@ -1328,15 +1355,8 @@ def _yelt_moments(prob, totals):
 
 
 # ----------------------------------------------------------------------
-# Report frames
+# Reports: elt_description, elt_explanation and elt_df
 # ----------------------------------------------------------------------
-
-#: Index and columns of the three report frames, also those of their empty
-#: forms.
-SUMMARY_INDEX = ['part', 'item']
-STATS_INDEX = ['component', 'measure']
-STATS_COLUMNS = ['table', 'model', 'estimate', 'error']
-VALIDATION_COLUMNS = ['check', 'value', 'tolerance', 'status', 'detail']
 
 #: Tolerance on the lowered severity's total weight against the event rate
 #: (ELT) or one (YELT): pure rounding, so a few ulps of a sum.
@@ -1346,6 +1366,18 @@ MASS_TOLERANCE = 1e-12
 #: to rounding, so its estimate error is absolute, not relative: a symmetric
 #: beta row's skewness computes to about 1e-14, not 0.
 SHAPE_NOISE = 1e-12
+
+#: The status of a check, in the order the reports count them.
+CHECK_STATUSES = ('pass', 'warning', 'not computed')
+
+
+class _Check(NamedTuple):
+    """One loss table check: the measured value, its tolerance and the verdict."""
+    check: str
+    value: object
+    tolerance: float
+    status: str
+    detail: str
 
 
 def _row_laws(secondary):
@@ -1394,16 +1426,22 @@ def _grid_rows(agg, add, against, eps):
             'C1: rounding, interpolation and tail together')
 
 
-def _last_quantization(agg):
-    """The ``last_quantization`` record of an ELT severity, or None."""
+def _elt_severity(agg):
+    """The :class:`~aggregate._severity.SeverityElt` of an aggregate, or None."""
     for s in (agg.sevs if agg.sevs is not None else []):
         if getattr(s, 'sev_kind', '') == 'elt':
-            return s.last_quantization
+            return s
     return None
 
 
+def _last_quantization(agg):
+    """The ``last_quantization`` record of an ELT severity, or None."""
+    s = _elt_severity(agg)
+    return None if s is None else s.last_quantization
+
+
 def _moment_method(secondary):
-    """How eltq computed the model moments, for the summary frame."""
+    """How eltq computed the model moments, for the reports."""
     if secondary['method'] == 'closed_form':
         return 'closed form'
     e2, e3 = secondary['achieved_error']
@@ -1411,8 +1449,11 @@ def _moment_method(secondary):
             f'{e3:.2g} (C3)')
 
 
-def summary_frame(agg):
-    """The ``loss_table_summary_df`` of an aggregate.
+def _summary_rows(agg):
+    """What an ``elt`` or ``yelt`` declaration read, one fact per entry.
+
+    The facts behind both narratives (``[Loss-Table-Private-Helpers]``), and
+    what a test inspects.
 
     Parameters
     ----------
@@ -1420,122 +1461,119 @@ def summary_frame(agg):
 
     Returns
     -------
-    pandas.DataFrame
-        Indexed by ``(part, item)`` with one ``value`` column. Part ``table``
-        describes the combined table, part ``grid`` the selected grid (``n/a``
-        before ``update``), and one part per source and unit its origin, form,
-        rows and, for a file, the resolved path, size, modification time,
-        SHA-256 digest and ignored columns. A table with shared events adds
-        the row ``('table', 'shared events')``: the events, the input rows
-        they hold, the rule, and how many of those rows have inadmissible
-        variance. The row classification counts model rows, which are the
-        rolled rows under the roll-up. Empty for an aggregate not declared
-        from a loss table.
+    dict
+        Keyed by ``(part, item)`` in reading order. Part ``table`` describes
+        the combined table, part ``grid`` the selected grid (``n/a`` before
+        ``update``), and one part per source and unit its origin, form, rows
+        and, for a file, the resolved path, size, modification time, SHA-256
+        digest and ignored columns. A table with shared events adds
+        ``('table', 'shared events')``: the events, the input rows they hold,
+        the rule, and how many of those rows have inadmissible variance. The
+        row classification counts model rows, which are the rolled rows under
+        the roll-up. Empty for an aggregate not declared from a loss table.
     """
     meta = agg._loss_table_meta
-    rows = []
-    if meta:
-        def add(part, item, value):
-            rows.append((part, item, value))
+    rows = {}
+    if not meta:
+        return rows
 
-        add('table', 'kind', meta['table'])
-        add('table', 'form', meta['form'])
-        add('table', 'units', ', '.join(meta['units']))
-        add('table', 'unit labels', ', '.join(
-            f'{u}: {lab}' for u, lab in meta['unit_labels'].items()) or 'none')
-        add('table', 'sources', len({s['source'] for s in meta['sources']}))
-        if meta['table'] == 'elt':
-            no2u = any(s['no2u'] and s['form'] == 'ELT6'
-                       for s in meta['sources'])
-            secondary = meta.get('secondary')
-            add('table', 'rows', meta['rows'])
-            add('table', 'events', meta['events'])
-            add('table', 'events with zero rate', meta['events_zero_rate'])
-            add('table', 'event rate', meta['rate'])
-            add('table', 'mean annual loss', meta['aal'])
-            add('table', 'severity atoms',
-                'n/a' if meta['severity_atoms'] is None
-                else meta['severity_atoms'])
-            add('table', 'largest event exposure',
-                'n/a' if meta['max_event_exposure'] is None
-                else meta['max_event_exposure'])
-            if secondary is None:
-                add('table', 'secondary uncertainty',
-                    'removed by no2u' if no2u else 'none')
-            else:
-                add('table', 'secondary uncertainty', _row_laws(secondary))
-                if secondary['shared']:
-                    how = ('rolled up' if secondary['shared_rule'] == 'rollup'
-                           else "under Burke's coupling")
-                    add('table', 'shared events',
-                        f"{secondary['shared_events']:,d} events from "
-                        f"{secondary['shared_rows']:,d} rows, {how}; "
-                        f"{secondary['shared_inadmissible_rows']:,d} of the "
-                        'rows have inadmissible variance')
-                add('table', 'largest event support', secondary['max_support'])
-                add('table', 'model moments', _moment_method(secondary))
-                add('table', 'eltq', f"{secondary['eltq_version']} "
-                    f"({secondary['eltq_backend']} backend)")
+    def add(part, item, value):
+        rows[(part, item)] = value
+
+    add('table', 'kind', meta['table'])
+    add('table', 'form', meta['form'])
+    add('table', 'units', ', '.join(meta['units']))
+    add('table', 'unit labels', ', '.join(
+        f'{u}: {lab}' for u, lab in meta['unit_labels'].items()) or 'none')
+    add('table', 'sources', len({s['source'] for s in meta['sources']}))
+    if meta['table'] == 'elt':
+        no2u = any(s['no2u'] and s['form'] == 'ELT6' for s in meta['sources'])
+        secondary = meta.get('secondary')
+        add('table', 'rows', meta['rows'])
+        add('table', 'events', meta['events'])
+        add('table', 'events with zero rate', meta['events_zero_rate'])
+        add('table', 'event rate', meta['rate'])
+        add('table', 'mean annual loss', meta['aal'])
+        add('table', 'severity atoms',
+            'n/a' if meta['severity_atoms'] is None else meta['severity_atoms'])
+        add('table', 'largest event exposure',
+            'n/a' if meta['max_event_exposure'] is None
+            else meta['max_event_exposure'])
+        if secondary is None:
+            add('table', 'secondary uncertainty',
+                'removed by no2u' if no2u else 'none')
         else:
-            add('table', 'years', meta['years'])
-            add('table', 'years with zero probability',
-                meta['years_zero_probability'])
-            add('table', 'zero-loss years', meta['zero_years'])
-            add('table', 'probability of zero', meta['zero_probability'])
-            add('table', 'year probabilities',
-                'equally likely' if meta['probabilities'] == 'uniform'
-                else 'supplied')
-            add('table', 'alignment', meta['alignment'])
-            add('table', 'annual outcomes', meta['outcomes'])
-            add('table', 'mean annual loss', meta['mean'])
-        updated = agg.bs > 0
-        add('grid', 'bs', agg.bs if updated else 'n/a')
-        add('grid', 'log2', agg.log2 if updated else 'n/a')
-        if meta.get('secondary') is not None:
-            q = _last_quantization(agg) if updated else None
-            add('grid', 'severity edge', 'n/a' if q is None else q['edge'])
-            add('grid', 'tail rate above edge',
-                'n/a' if q is None else q['rate_above'])
-        for s in meta['sources']:
-            part = f"source {s['source']}, unit {s['unit']}"
-            add(part, 'origin', s['origin'])
-            add(part, 'form', s['form'])
-            if meta['table'] == 'elt':
-                add(part, 'effective form', s['effective_form'])
-                add(part, 'no2u', s['no2u'])
-            add(part, 'rows', s['rows'])
-            for key in ('resolved', 'bytes', 'modified', 'sha256'):
-                if key in s:
-                    add(part, key, s[key])
-            if 'ignored_columns' in s:
-                add(part, 'ignored columns',
-                    ', '.join(s['ignored_columns']) or 'none')
-    index = pd.MultiIndex.from_tuples([r[:2] for r in rows],
-                                      names=SUMMARY_INDEX)
-    return pd.DataFrame({'value': [r[2] for r in rows]}, index=index,
-                        dtype=object)
+            add('table', 'secondary uncertainty', _row_laws(secondary))
+            if secondary['shared']:
+                how = ('rolled up' if secondary['shared_rule'] == 'rollup'
+                       else "under Burke's coupling")
+                add('table', 'shared events',
+                    f"{secondary['shared_events']:,d} events from "
+                    f"{secondary['shared_rows']:,d} rows, {how}; "
+                    f"{secondary['shared_inadmissible_rows']:,d} of the "
+                    'rows have inadmissible variance')
+            add('table', 'largest event support', secondary['max_support'])
+            add('table', 'model moments', _moment_method(secondary))
+            add('table', 'eltq', f"{secondary['eltq_version']} "
+                f"({secondary['eltq_backend']} backend)")
+    else:
+        add('table', 'years', meta['years'])
+        add('table', 'years with zero probability',
+            meta['years_zero_probability'])
+        add('table', 'zero-loss years', meta['zero_years'])
+        add('table', 'probability of zero', meta['zero_probability'])
+        add('table', 'year probabilities',
+            'equally likely' if meta['probabilities'] == 'uniform'
+            else 'supplied')
+        add('table', 'alignment', meta['alignment'])
+        add('table', 'annual outcomes', meta['outcomes'])
+        add('table', 'mean annual loss', meta['mean'])
+    updated = agg.bs > 0
+    add('grid', 'bs', agg.bs if updated else 'n/a')
+    add('grid', 'log2', agg.log2 if updated else 'n/a')
+    if meta.get('secondary') is not None:
+        q = _last_quantization(agg) if updated else None
+        add('grid', 'severity edge', 'n/a' if q is None else q['edge'])
+        add('grid', 'tail rate above edge',
+            'n/a' if q is None else q['rate_above'])
+    for s in meta['sources']:
+        part = f"source {s['source']}, unit {s['unit']}"
+        add(part, 'origin', s['origin'])
+        add(part, 'form', s['form'])
+        if meta['table'] == 'elt':
+            add(part, 'effective form', s['effective_form'])
+            add(part, 'no2u', s['no2u'])
+        add(part, 'rows', s['rows'])
+        for key in ('resolved', 'bytes', 'modified', 'sha256'):
+            if key in s:
+                add(part, key, s[key])
+        if 'ignored_columns' in s:
+            add(part, 'ignored columns',
+                ', '.join(s['ignored_columns']) or 'none')
+    return rows
 
 
-def stats_frame(agg):
-    """The ``loss_table_stats_df`` of an aggregate.
+def _moment_rows(agg):
+    """Severity and annual mean, CV and skewness: table, model and estimate.
 
     Parameters
     ----------
     agg : Aggregate
+        Declared from a loss table.
 
     Returns
     -------
-    pandas.DataFrame
-        Indexed by ``(component, measure)``, components ``severity`` and
+    dict
+        Keyed by ``(component, measure)``, components ``severity`` and
         ``annual``, measures ``mean``, ``cv`` and ``skew``, gross of
-        reinsurance. ``table`` is computed from the table's rows, ``model`` is
-        the aggregate's theoretical value (``stats_df`` column ``mixed``),
-        ``estimate`` the value from the discretized density (``stats_df``
-        column ``gross_empirical``, ``nan`` before ``update``), and ``error``
-        is ``estimate / table - 1``, or ``estimate - table`` where the table
-        value is zero (a symmetric skewness, a degenerate CV), or a CV or
-        skewness within :data:`SHAPE_NOISE` of zero. Empty for an aggregate
-        not declared from a loss table.
+        reinsurance. Each value is a dict: ``table`` computed from the
+        table's rows, ``model`` the aggregate's theoretical value
+        (``stats_df`` column ``mixed``), ``estimate`` the value from the
+        discretized density (``stats_df`` column ``gross_empirical``, ``nan``
+        before ``update``), and ``error``, which is ``estimate / table - 1``,
+        or ``estimate - table`` where the table value is zero (a symmetric
+        skewness, a degenerate CV) or a CV or skewness within
+        :data:`SHAPE_NOISE` of zero.
 
     Notes
     -----
@@ -1551,12 +1589,8 @@ def stats_frame(agg):
     measures quantization, overflow and FFT error together.
     """
     meta = agg._loss_table_meta
-    if not meta:
-        return pd.DataFrame(
-            columns=STATS_COLUMNS, dtype=float,
-            index=pd.MultiIndex.from_tuples([], names=STATS_INDEX))
     updated = agg.bs > 0
-    rows, index = [], []
+    out = {}
     for component, key in (('severity', 'sev'), ('annual', 'agg')):
         for measure in ('mean', 'cv', 'skew'):
             table = meta['moments'][component][measure]
@@ -1570,14 +1604,387 @@ def stats_frame(agg):
                 error = est - table
             else:
                 error = est / table - 1
-            index.append((component, measure))
-            rows.append([table, model, est, error])
-    return pd.DataFrame(rows, columns=STATS_COLUMNS,
-                        index=pd.MultiIndex.from_tuples(index, names=STATS_INDEX))
+            out[(component, measure)] = {'table': table, 'model': model,
+                                         'estimate': est, 'error': error}
+    return out
 
 
-def validation_frame(agg):
-    """The ``loss_table_validation_df`` of an aggregate.
+def _check_rows(agg):
+    """The loss table checks, with value, tolerance and status.
+
+    The checks behind both narratives (``[Loss-Table-Private-Helpers]``), and
+    what a test inspects.
+
+    Parameters
+    ----------
+    agg : Aggregate
+
+    Returns
+    -------
+    list of _Check
+        One per check: ``check``, the measured ``value``, the ``tolerance``, a
+        ``status`` of ``pass``, ``warning`` or ``not computed`` (a grid check
+        before ``update``, or a measure undefined for the table), and a
+        ``detail``. Input that fails a structural check raises when the
+        aggregate is built, so those checks record what was checked and
+        passed. Empty for an aggregate not declared from a loss table.
+    """
+    meta = agg._loss_table_meta
+    rows = []
+    if not meta:
+        return rows
+    eps = agg.validation_eps
+
+    def add(check, value, tolerance, status, detail):
+        rows.append(_Check(check, value, tolerance, status, detail))
+
+    def against(check, value, tolerance, detail):
+        if not np.isfinite(value):
+            add(check, value, tolerance, 'not computed', detail)
+        else:
+            add(check, value, tolerance,
+                'pass' if abs(value) <= tolerance else 'warning', detail)
+
+    if meta['table'] == 'elt':
+        projected = sum(s['form'] != s['effective_form']
+                        for s in meta['sources'])
+        add('form projection', projected, np.nan, 'pass',
+            f'{projected} ELT6 source(s) read as ELT4 under no2u; '
+            f"combined form {meta['form']}")
+        add('one row per event and unit', 0, 0, 'pass',
+            'no event repeats within a unit')
+        add('event rate agreement', meta['rate_inexact'], RATE_RTOL,
+            'pass', 'unit rows whose rate differs from the first row of '
+            'the event, within the relative tolerance')
+        add('zero-rate events', meta['events_zero_rate'], np.nan, 'pass',
+            'excluded from the count and the moments')
+        secondary = meta.get('secondary')
+        if secondary is None:
+            against('severity mass', meta['mass_error'], MASS_TOLERANCE,
+                    'lowered severity weight against the event rate')
+        else:
+            add('row classification', secondary['two_point_rows'], np.nan,
+                'pass', f'{_row_laws(secondary)} rows; a two-point row '
+                'replaces an inadmissible beta variance, keeping the mean')
+            if secondary['shared_rule'] == 'burke':
+                error = max(secondary['achieved_error'])
+                add('moment integration', error, secondary['rtol'],
+                    'pass' if secondary['converged'] else 'warning',
+                    f"{_moment_method(secondary)}; shared events under "
+                    "Burke's coupling")
+            _grid_rows(agg, add, against, eps)
+    else:
+        add('year completeness', meta['years'], np.nan, 'pass',
+            'every unit lists the same years')
+        against('probability sum', meta['probability_residual'],
+                PROB_RTOL + PROB_ATOL,
+                'roundoff normalized away; a material shortfall raises')
+        against('severity mass', meta['mass_error'], MASS_TOLERANCE,
+                'lowered outcome probabilities against one')
+    moments = _moment_rows(agg)
+    for component in ('severity', 'annual'):
+        table = moments[(component, 'mean')]['table']
+        model = moments[(component, 'mean')]['model']
+        against(f'{component} mean, table against model',
+                model / table - 1 if table else model - table, eps,
+                'eltq model moments against stats_df'
+                if meta.get('secondary') is not None
+                else 'independent sums before and after coalescing')
+    for component in ('severity', 'annual'):
+        for measure in ('mean', 'cv', 'skew'):
+            row = moments[(component, measure)]
+            if agg.bs <= 0:
+                detail = 'needs update'
+            elif not np.isfinite(row['table']):
+                detail = 'undefined for this table (zero variance)'
+            else:
+                detail = 'discretized density against the table'
+            against(f'{component} {measure} estimate', row['error'], eps,
+                    detail)
+    return rows
+
+
+def _counted(n, noun):
+    """``1 event``, ``3 events``: a count with its noun in agreement."""
+    return f"{n:,d} {noun}{'' if n == 1 else 's'}"
+
+
+def _units_text(meta):
+    """``1 unit``, or ``2 units: A (Alpha), B`` with the labels given."""
+    units, labels = meta['units'], meta['unit_labels']
+    if list(units) == [DEFAULT_UNIT] and not labels:
+        return '1 unit'
+    names = ', '.join(f'{u} ({labels[u]})' if u in labels else u
+                      for u in units)
+    return f"{_counted(len(units), 'unit')}: {names}"
+
+
+def _checks_text(checks):
+    """``15 pass, 2 warnings (a, b), 1 not computed``: the nonzero counts."""
+    parts = []
+    for status in CHECK_STATUSES:
+        named = [c.check for c in checks if c.status == status]
+        if not named:
+            continue
+        if status == 'warning':
+            parts.append(f"{_counted(len(named), 'warning')} "
+                         f"({', '.join(named)})")
+        else:
+            parts.append(f'{len(named)} {status}')
+    return ', '.join(parts)
+
+
+def _fmt_check_number(x):
+    """A check's value or tolerance for prose: counts whole, the rest ``.3g``."""
+    if isinstance(x, (bool, np.bool_)):
+        return str(x)
+    if isinstance(x, (int, np.integer)):
+        return f'{x:,d}'
+    return f'{x:.3g}'
+
+
+def _check_sentence(c):
+    """One check as a sentence: status, value against tolerance, detail."""
+    name = c.check[:1].upper() + c.check[1:]
+    if c.status == 'not computed' and c.detail == 'needs update':
+        return f'{name}: not computed: needs update.'
+    text = f'{name}: {c.status}'
+    if np.isfinite(c.value):
+        text += f', {_fmt_check_number(c.value)}'
+        if np.isfinite(c.tolerance):
+            text += f' against {_fmt_check_number(c.tolerance)}'
+    return f'{text}; {c.detail}.'
+
+
+def short_narrative(agg):
+    """The ``elt_description`` of an aggregate: a few aligned lines.
+
+    Parameters
+    ----------
+    agg : Aggregate
+
+    Returns
+    -------
+    str
+        For an ELT, the lines ``loss table`` (form, events and rows, units),
+        ``event rate`` (the rate and the mean annual loss), ``secondary
+        uncertainty`` (the row laws and any roll-up, or ``removed by no2u``,
+        when the table has it), ``grid`` (``bs``, ``log2`` and, for an ELT6,
+        the severity edge; ``n/a`` before ``update``) and ``checks`` (the
+        counts by status, naming each warning). For a YELT, ``loss table``,
+        ``annual outcomes``, ``grid`` and ``checks``. The empty string for an
+        aggregate not declared from a loss table.
+
+    Notes
+    -----
+    The facts come from :func:`_summary_rows` and :func:`_check_rows`, and
+    the lines are formatted with :func:`~aggregate.constants.info_row`, as
+    ``tail_description`` is.
+    """
+    meta = agg._loss_table_meta
+    if not meta:
+        return ''
+    # lazy: this module imports only numpy, pandas and the standard library
+    from ._bucket_window import _fmt_bs, fmt_amount
+    from .constants import INFO_NA, info_row
+    s = _summary_rows(agg)
+    lines = []
+    if meta['table'] == 'elt':
+        table = (f"{s[('table', 'form')]}, "
+                 f"{_counted(s[('table', 'events')], 'event')} from "
+                 f"{_counted(s[('table', 'rows')], 'row')}, {_units_text(meta)}")
+        zero = s[('table', 'events with zero rate')]
+        if zero:
+            table += f"; {_counted(zero, 'zero-rate event')} excluded"
+        lines.append(('loss table', table))
+        lines.append(('event rate', f"{s[('table', 'event rate')]:.6g}, mean "
+                      f"annual loss {fmt_amount(s[('table', 'mean annual loss')])}"))
+        law = s[('table', 'secondary uncertainty')]
+        secondary = meta.get('secondary')
+        if secondary is not None:
+            law = f'{law} rows'
+            if secondary['shared']:
+                how = ('rolled up' if secondary['shared_rule'] == 'rollup'
+                       else "under Burke's coupling")
+                law += (f"; {_counted(secondary['shared_events'], 'shared event')}"
+                        f' {how}')
+        if law != 'none':
+            lines.append(('secondary uncertainty', law))
+    else:
+        convention = ('equally likely years'
+                      if s[('table', 'year probabilities')] == 'equally likely'
+                      else 'supplied year probabilities')
+        table = (f"{s[('table', 'form')]}, "
+                 f"{_counted(s[('table', 'years')], 'year')}, "
+                 f'{_units_text(meta)}, {convention}')
+        zero = s[('table', 'years with zero probability')]
+        if zero:
+            table += f"; {_counted(zero, 'zero-probability year')} excluded"
+        lines.append(('loss table', table))
+        lines.append(('annual outcomes',
+                      f"{_counted(s[('table', 'annual outcomes')], 'outcome')}, "
+                      'probability of zero '
+                      f"{s[('table', 'probability of zero')]:.6g}, mean annual "
+                      f"loss {fmt_amount(s[('table', 'mean annual loss')])}"))
+    if agg.bs > 0:
+        grid = f"bs {_fmt_bs(s[('grid', 'bs')])}, log2 {s[('grid', 'log2')]}"
+        edge = s.get(('grid', 'severity edge'), 'n/a')
+        if edge != 'n/a':
+            grid += f', severity edge {fmt_amount(edge)}'
+    else:
+        grid = INFO_NA
+    lines.append(('grid', grid))
+    lines.append(('checks', _checks_text(_check_rows(agg))))
+    return '\n'.join(info_row(label, value) for label, value in lines)
+
+
+def long_narrative(agg):
+    """The ``elt_explanation`` of an aggregate: three paragraphs of prose.
+
+    Parameters
+    ----------
+    agg : Aggregate
+
+    Returns
+    -------
+    str
+        The model in words (the compound Poisson and its severity; for an
+        ELT6 the row laws and the roll-up of shared events; for ELT3 and ELT4
+        the coalescing of equal event totals; for a YELT the annual outcomes
+        and their probabilities), then each source with its provenance, then
+        every check of :func:`_check_rows` as a sentence, warnings first. The
+        paragraphs are separated by a blank line. The empty string for an
+        aggregate not declared from a loss table.
+    """
+    meta = agg._loss_table_meta
+    if not meta:
+        return ''
+    from ._bucket_window import fmt_amount
+    s = _summary_rows(agg)
+    if meta['table'] == 'elt':
+        model = _elt_model_text(meta, s, fmt_amount)
+    else:
+        model = _yelt_model_text(meta, s, fmt_amount)
+
+    sources = []
+    for src in meta['sources']:
+        part = f"source {src['source']}, unit {src['unit']}"
+        label = meta['unit_labels'].get(src['unit'])
+        head = f"Source {src['source']}, unit {src['unit']}" + (
+            f' ({label})' if label else '')
+        if 'resolved' in src:
+            origin = (f"file {src['resolved']} ({src['bytes']:,d} bytes, "
+                      f"modified {src['modified']}, SHA-256 "
+                      f"{src['sha256'][:12]})")
+        else:
+            origin = 'inline'
+        form = src['form']
+        if meta['table'] == 'elt' and src['effective_form'] != src['form']:
+            form += f" read as {src['effective_form']} under no2u"
+        text = f"{head}: {origin}, {form}, {_counted(s[(part, 'rows')], 'row')}"
+        ignored = src.get('ignored_columns')
+        if ignored:
+            text += f", ignoring columns {', '.join(ignored)}"
+        sources.append(text + '.')
+
+    checks = _check_rows(agg)
+    ordered = sorted(checks, key=lambda c: c.status != 'warning')
+    lead = (f"{_counted(len(checks), 'check')}: {_checks_text(checks)}"
+            + (', warnings first.' if any(c.status == 'warning'
+                                          for c in checks) else '.'))
+    paragraphs = [model, ' '.join(sources),
+                  ' '.join([lead] + [_check_sentence(c) for c in ordered])]
+    return '\n\n'.join(paragraphs)
+
+
+def _elt_model_text(meta, s, fmt_amount):
+    """The first paragraph of :func:`long_narrative` for an ELT."""
+    rate = f"{s[('table', 'event rate')]:.6g}"
+    aal = fmt_amount(s[('table', 'mean annual loss')])
+    secondary = meta.get('secondary')
+    if secondary is None:
+        out = [f'The annual loss is compound Poisson with event rate {rate} '
+               'and severity the rate-weighted mixture of the event totals, so '
+               f'the mean annual loss is {aal}.',
+               "An event's unit losses are summed into one event total before "
+               'any occurrence treaty, and equal totals are combined: the '
+               f"{_counted(s[('table', 'events')], 'event')} with a positive "
+               f"rate give {_counted(s[('table', 'severity atoms')], 'severity atom')}."]
+        if s[('table', 'secondary uncertainty')] == 'removed by no2u':
+            out.append('Secondary uncertainty is removed by no2u: each ELT6 '
+                       'row is an atom at its mean.')
+        exposure = s[('table', 'largest event exposure')]
+        if exposure != 'n/a':
+            out.append('The largest event exposure, the sum of the unit '
+                       f'maximums of one event, is {fmt_amount(exposure)}.')
+    else:
+        out = [f'The annual loss is compound Poisson with event rate {rate} '
+               'and severity the rate-weighted mixture of the event laws, so '
+               'its cumulants are the rate-weighted moments of the event '
+               f'totals and the mean annual loss is {aal}.',
+               'The loss given an event is a beta on [0, max] with the mean '
+               'and the standard deviation sdi + sdc of its row; a row whose '
+               'variance is inadmissible becomes the two-point law on 0 and '
+               'max with the same mean, and a row with both standard '
+               f'deviations zero is an atom at its mean: {_row_laws(secondary)} '
+               'rows.']
+        if secondary['shared']:
+            k = _counted(secondary['shared_events'], 'event')
+            r = _counted(secondary['shared_rows'], 'row')
+            j = secondary['shared_inadmissible_rows']
+            if secondary['shared_rule'] == 'rollup':
+                out.append(
+                    'Events with rows for two or more units are rolled up into '
+                    f'one row each, here {k} from {r}: means, maximums and '
+                    'correlated standard deviations add, and independent '
+                    'standard deviations add in quadrature. Of those rows, '
+                    f"{j:,d} {'has' if j == 1 else 'have'} inadmissible "
+                    'variance.')
+            else:
+                out.append(
+                    'Events with rows for two or more units, here '
+                    f"{k} from {r}, keep their rows, coupled by Burke's "
+                    'one-factor Gaussian copula, which has model moments and '
+                    'no grid.')
+        method = s[('table', 'model moments')]
+        out.append(
+            'The largest event support is '
+            f"{fmt_amount(s[('table', 'largest event support')])}, and eltq "
+            f"{s[('table', 'eltq')]} computes the model moments "
+            f"{'in closed form' if method == 'closed form' else 'by ' + method}.")
+    zero = s[('table', 'events with zero rate')]
+    if zero:
+        out.append(f"{_counted(zero, 'event')} with zero rate "
+                   f"{'is' if zero == 1 else 'are'} excluded.")
+    return ' '.join(out)
+
+
+def _yelt_model_text(meta, s, fmt_amount):
+    """The first paragraph of :func:`long_narrative` for a YELT."""
+    convention = ('equally likely' if s[('table', 'year probabilities')]
+                  == 'equally likely' else 'weighted by the supplied '
+                  'probabilities')
+    out = [f"Each of the {_counted(s[('table', 'years')], 'year')} is a whole "
+           f'annual outcome, the years {convention}.',
+           'The units are summed within a year, so the annual loss takes '
+           f"{_counted(s[('table', 'annual outcomes')], 'distinct value')}, "
+           'with no Poisson compounding (dfreq [1] over the outcomes).',
+           'The probability of zero is '
+           f"{s[('table', 'probability of zero')]:.6g}, from "
+           f"{_counted(s[('table', 'zero-loss years')], 'zero-loss year')}, "
+           'and the mean annual loss is '
+           f"{fmt_amount(s[('table', 'mean annual loss')])}."]
+    if s[('table', 'alignment')] != 'single unit':
+        out.append(f"The units are aligned by {s[('table', 'alignment')]}.")
+    zero = s[('table', 'years with zero probability')]
+    if zero:
+        out.append(f"{_counted(zero, 'year')} with zero probability "
+                   f"{'is' if zero == 1 else 'are'} excluded.")
+    return ' '.join(out)
+
+
+def table_in_use(agg):
+    """The ``elt_df`` of an aggregate: the table the model uses.
 
     Parameters
     ----------
@@ -1586,82 +1993,48 @@ def validation_frame(agg):
     Returns
     -------
     pandas.DataFrame
-        One row per check: ``check``, the measured ``value``, the
-        ``tolerance``, a ``status`` of ``pass``, ``warning`` or ``not
-        computed`` (a grid check before ``update``, or a measure undefined for
-        the table), and a ``detail``. Input that fails a structural check
-        raises when the aggregate is built, so those rows record what was
-        checked and passed. Empty for an aggregate not declared from a loss
-        table.
+        One row per positive-rate event, indexed by ``event`` (the identifier
+        as text), in order of first appearance. ELT6 has columns ``rate``,
+        ``mean``, ``max``, ``sdi``, ``sdc`` and ``units``; ELT4 (and an ELT6
+        under ``no2u``) ``rate``, ``mean``, ``max`` and ``units``; ELT3
+        ``rate``, ``mean`` and ``units``. A YELT has one row per year of
+        positive probability, indexed by ``year``, with columns ``prob`` and
+        ``loss``. An empty frame for an aggregate not declared from a loss
+        table. A fresh frame on every call.
+
+    Notes
+    -----
+    ``units`` counts the input rows behind a row: 1 for a one-row event, more
+    for a rolled-up shared event. For ELT6 the five numeric columns are
+    exactly what eltq receives (:meth:`EltModel.columns`), so a shared event
+    shows its rolled row; under the pended Burke rule, which keeps the input
+    rows, the frame shows them, one per event and unit. For the deterministic
+    forms ``mean`` and ``max`` are event totals over units, and for a YELT
+    ``loss`` is the annual total over units. There is no per-row law column:
+    eltq reports the classification as counts only.
     """
     meta = agg._loss_table_meta
-    rows = []
-    if meta:
-        eps = agg.validation_eps
-
-        def add(check, value, tolerance, status, detail):
-            rows.append([check, value, tolerance, status, detail])
-
-        def against(check, value, tolerance, detail):
-            if not np.isfinite(value):
-                add(check, value, tolerance, 'not computed', detail)
-            else:
-                add(check, value, tolerance,
-                    'pass' if abs(value) <= tolerance else 'warning', detail)
-
-        if meta['table'] == 'elt':
-            projected = sum(s['form'] != s['effective_form']
-                            for s in meta['sources'])
-            add('form projection', projected, np.nan, 'pass',
-                f'{projected} ELT6 source(s) read as ELT4 under no2u; '
-                f"combined form {meta['form']}")
-            add('one row per event and unit', 0, 0, 'pass',
-                'no event repeats within a unit')
-            add('event rate agreement', meta['rate_inexact'], RATE_RTOL,
-                'pass', 'unit rows whose rate differs from the first row of '
-                'the event, within the relative tolerance')
-            add('zero-rate events', meta['events_zero_rate'], np.nan, 'pass',
-                'excluded from the count and the moments')
-            secondary = meta.get('secondary')
-            if secondary is None:
-                against('severity mass', meta['mass_error'], MASS_TOLERANCE,
-                        'lowered severity weight against the event rate')
-            else:
-                add('row classification', secondary['two_point_rows'], np.nan,
-                    'pass', f'{_row_laws(secondary)} rows; a two-point row '
-                    'replaces an inadmissible beta variance, keeping the mean')
-                if secondary['shared_rule'] == 'burke':
-                    error = max(secondary['achieved_error'])
-                    add('moment integration', error, secondary['rtol'],
-                        'pass' if secondary['converged'] else 'warning',
-                        f"{_moment_method(secondary)}; shared events under "
-                        "Burke's coupling")
-                _grid_rows(agg, add, against, eps)
+    if not meta:
+        return pd.DataFrame()
+    table = meta['event_table']
+    if meta['table'] == 'yelt':
+        return pd.DataFrame({'prob': table['prob'], 'loss': table['loss']},
+                            index=pd.Index(table['year'], name='year'))
+    if table is None:
+        model = _elt_severity(agg).model
+        columns = model.columns()
+        if model.rolled_columns is not None:
+            starts = np.flatnonzero(np.diff(model.event_code, prepend=-1))
+            ids, units = model.event_ids[starts], np.bincount(model.event_code)
         else:
-            add('year completeness', meta['years'], np.nan, 'pass',
-                'every unit lists the same years')
-            against('probability sum', meta['probability_residual'],
-                    PROB_RTOL + PROB_ATOL,
-                    'roundoff normalized away; a material shortfall raises')
-            against('severity mass', meta['mass_error'], MASS_TOLERANCE,
-                    'lowered outcome probabilities against one')
-        stats = stats_frame(agg)
-        for component in ('severity', 'annual'):
-            table = stats.loc[(component, 'mean'), 'table']
-            model = stats.loc[(component, 'mean'), 'model']
-            against(f'{component} mean, table against model',
-                    model / table - 1 if table else model - table, eps,
-                    'eltq model moments against stats_df'
-                    if meta.get('secondary') is not None
-                    else 'independent sums before and after coalescing')
-        for component in ('severity', 'annual'):
-            for measure in ('mean', 'cv', 'skew'):
-                if agg.bs <= 0:
-                    detail = 'needs update'
-                elif not np.isfinite(stats.loc[(component, measure), 'table']):
-                    detail = 'undefined for this table (zero variance)'
-                else:
-                    detail = 'discretized density against the table'
-                against(f'{component} {measure} estimate',
-                        stats.loc[(component, measure), 'error'], eps, detail)
-    return pd.DataFrame(rows, columns=VALIDATION_COLUMNS)
+            ids, units = model.event_ids, np.ones(model.rows, dtype=np.int64)
+        data = {'rate': columns['rate'], 'mean': columns['mean_loss'],
+                'max': columns['max_loss'], 'sdi': columns['sd_indep'],
+                'sdc': columns['sd_corr'], 'units': units}
+    else:
+        ids = table['event']
+        data = {'rate': table['rate'], 'mean': table['mean']}
+        if table['max'] is not None:
+            data['max'] = table['max']
+        data['units'] = table['units']
+    return pd.DataFrame(data, index=pd.Index(ids, name='event'))

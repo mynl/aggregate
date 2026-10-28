@@ -1,8 +1,8 @@
 # Plan: the yelt keyword, and ELT reporting as two narrative strings and one table
 
 `[YELT-Keyword]` and `[ELT-Reporting-Punchup]`. Drafted 2026-10-28 against
-aggregate 1.18.2. **Status: ruled 2026-10-28 (rulings 28 to 34), ready
-for review and execution.** Two minor bumps. `[YELT-Keyword]` can land at
+aggregate 1.18.2. **Status: ruled 2026-10-28 (rulings 28 to 34), executed
+the same day as 1.20.0 and 1.21.0; see the execution log.** Two minor bumps. `[YELT-Keyword]` can land at
 any time. `[ELT-Reporting-Punchup]` lands after `[ELT-Shared-Event-Rollup]`
 (`dev/plan-elt-shared-rollup.md`), whose rolled columns `elt_df` exposes.
 
@@ -335,3 +335,17 @@ Divergences:
 2. `[YELT-Fixture-Directory]` The synthetic fixtures `tests/data/ylt` moved to `tests/data/yelt` with the test module; the plan named the module only.
 3. `[YELT-Article]` Two parser messages built `an {table}` (a ragged row width, `approximate` on a loss table body) and would have shown `an yelt`; they choose the article from the kind.
 4. `[YELT-Alignment]` The renamed rules in `decl.lark` and the `yelt` lines of `decl-testers.agg` were realigned by hand to their neighbors' columns. The terminal label in `parser_errors` stays `(year loss table)`.
+
+**1.21.0, 2026-10-28, `[ELT-Reporting-Punchup]`.** `Aggregate.elt_description`, `elt_explanation` and `elt_df` in place of the three frames, rendered by `_loss_table.short_narrative`, `long_narrative` and `table_in_use` from the private `_summary_rows` and `_check_rows`. `tests/test_loss_table_reports.py` is rewritten around the acceptance list (descriptions of `LT.Beta`, `LT.Disjoint`, `LT.Rollup`, an ELT3, an ELT4 under `no2u` and a YELT before and after `update`; every check stated once; a pinned `bs` on `LT.Large1` naming its warnings and listing them first; `elt_df` per form, against `EltModel.columns()` and hand sums; the retired names gone), and `tests/test_elt_uncertainty.py` moves to the private helpers. `dev/FEATURES.csv` edited by hand (three rows out, three in) and audited clean by `dev/regen_features.py`. Measured on a synthetic 200,000-event ELT3 file: `event_table` holds 6.1 MB of arrays, `Aggregate(**spec)` shares them by reference, `info` takes 1 ms (`_spec_hash` serializes an array through `str`, which numpy summarizes), `elt_df` 9 ms. No path copies the audit per call; `Portfolio` arithmetic (`__add__` and the like) deep-copies a unit spec once, as it already did the `EltModel`.
+
+Divergences:
+
+5. `[Punchup-Moment-Checks-Kept]` The plan deletes `stats_frame`, but `validation_frame` computed its two `table against model` checks and six `estimate` checks from it. The computation stays as the private `_moment_rows`, so every check of 1.19.0 is still a check, and `stats_frame`, `SUMMARY_INDEX`, `STATS_INDEX`, `STATS_COLUMNS` and `VALIDATION_COLUMNS` are deleted. Dropping the six estimate checks as duplicates of `validation_df` would be a later ruling.
+6. `[Punchup-Helper-Shapes]` `_summary_rows` returns a dict keyed by `(part, item)` and `_check_rows` a list of the named tuple `_Check(check, value, tolerance, status, detail)`, so a test reads `s[(part, item)]` and `c.status` with no frame in between.
+7. `[Punchup-No2u-Line]` The description shows `secondary uncertainty   removed by no2u` for an ELT6 source read under `no2u`, which the plan listed as ELT6 only; it is the summary row's text, and without it the form `ELT4` hides the projection.
+8. `[Punchup-Zero-Counts]` Zero-rate events and zero-probability years are counted on the `loss table` line (`; 1 zero-rate event excluded`), only when there are any, since `elt_df` leaves them out.
+9. `[Punchup-Number-Agreement]` The new prose agrees in number (`1 event`, `1 shared event rolled up`); the `info` row keeps `1 shared events rolled up` under the roll-up plan's ruling.
+10. `[Punchup-Burke-Df]` Under the pended Burke rule, which keeps the input rows, `elt_df` shows one row per event and unit (index repeated, `units` 1), since there is no rolled row; tested in `test_burke_rule_df_shows_the_input_rows`.
+11. `[Punchup-Event-Table-Meta]` `meta['event_table']` is `None` on an ELT6 table (the `EltModel` holds the rows), present on every other loss table. As in 1.19.0, the display-only `id` row of `info` moves for every deterministic loss table and YELT.
+12. `[Punchup-Corpus]` `LT.ZeroRate` and `LT.UnitsMax`, the new principal cases of `elt_df`, are added to `decl-testers.agg`.
+13. `[Punchup-Lazy-Formatters]` The renderers import `info_row`, `_fmt_bs` and `fmt_amount` lazily, keeping `_loss_table` a leaf at import; its module docstring says so.

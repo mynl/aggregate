@@ -32,9 +32,11 @@
   `[ELT-Shared-Event-Uncertainty]`). Open: `[ELT-Grid-Retune]`, the author's
   trial of the automatic `bs` choice (the moment window can land 10 times
   coarser than the tail needs; measurements in the uncertainty plan's
-  execution log), and `[ELT-Reporting-Punchup]`
-  (`dev/done/plan-elt-reporting-punchup.md`; its first half,
-  `[YELT-Keyword]`, renamed the annual table clause `ylt` to `yelt` in 1.20.0). Pended: `[ELT-Burke-Total]`, its
+  execution log). `[ELT-Reporting-Punchup]` landed in 1.20.0 (`[YELT-Keyword]`,
+  the clause `ylt` renamed `yelt`) and 1.21.0 (`elt_description`,
+  `elt_explanation` and `elt_df` replace the three `loss_table_*_df` frames;
+  `dev/done/plan-elt-reporting-punchup.md`, which defers a per-row law column
+  and `Portfolio` narration). Pended: `[ELT-Burke-Total]`, its
   branch kept behind `_loss_table.SHARED_EVENT_RULE`, and `[ELT-Joint-Units]`
   (`dev/note-joint-elt.md`).
 

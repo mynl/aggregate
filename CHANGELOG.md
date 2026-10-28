@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.21.0 - 2026-10-28
+
+**[ELT-Reporting-Punchup] an `elt` or `yelt` aggregate reports through `elt_description`, `elt_explanation` and `elt_df`.** `elt_description` is a few aligned lines: the table, the event rate and mean annual loss (or the annual outcomes), the secondary uncertainty, the grid, and the checks counted by status with each warning named. `elt_explanation` is three paragraphs: the model in words, each source with its provenance, and every check with its value, tolerance and status, warnings first. `elt_df` is the table the model uses, one row per positive-rate event (`rate`, `mean`, then `max`, `sdi` and `sdc` as the form has them, and `units`, the input rows behind a rolled-up shared event) or per year of positive probability (`prob`, `loss`). For any other aggregate the strings are empty and the frame is empty, so the Narrative pane of aLL gains an `elt` section for loss tables only, with no edit there.
+
+Removed: `loss_table_summary_df`, `loss_table_stats_df` and `loss_table_validation_df` (1.14.0, never published), with no deprecation; their facts and checks are in the new pair.
+
 ## 1.20.0 - 2026-10-28
 
 **[YELT-Keyword] the DecL clause for an annual loss table is `yelt`, and `ylt` is gone.** `yelt [0 0 100 300]` (or a file with only a loss column), `yelt [[year loss]]` and `yelt [[year loss prob]]` declare the forms `YELT1`, `YELT2` and `YELT3`, with the semantics of the old `ylt` unchanged. `yelt` is a reserved word and `ylt` an ordinary identifier, with no alias. The spec key is `yelt_sources`, the audit records the table as `yelt`, `info` shows `YELT2, 4 years, ...`, and the error messages, the grammar reference, the Sublime colorer and the corpus follow. `ylt` was never published (the last PyPI release is 1.11.0), so there is no deprecation.

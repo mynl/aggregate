@@ -22,6 +22,7 @@ import json
 import re
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 import pytest
 
@@ -31,6 +32,7 @@ from aggregate.exhibits import (
     EXHIBITS, Exhibit, Perspective, available_exhibits, build_exhibit,
     exhibit_frames,
 )
+from aggregate.exhibits import _bs_label
 
 SNAPSHOT_PATH = Path(__file__).parent / 'data' / 'exhibit_snapshots.json'
 
@@ -435,17 +437,37 @@ def test_sharpen_raw_is_the_audit_frame(probed):
 def test_sharpen_insurer_leads_with_the_score_grid(probed):
     """[Sharpen-Grid-Is-A-Reading]: the grid is a reading, not a new frame.
 
-    ``score`` is a column on the audit, so the grid unstacks it rather than
-    coming from anywhere else. One block raw, two under insurer, which is the
-    smallest exercise of [Perspective-May-Restructure].
+    ``score`` and ``defective`` are columns on the audit, so the grid unstacks
+    them rather than coming from anywhere else. One block raw, two under
+    insurer, which is the smallest exercise of [Perspective-May-Restructure].
+    Rows are the realized bucket sizes and columns the realized log2, the
+    center prefixed ``**`` on both, and the selected cell's flag wrapped in it.
     """
     blocks = exhibit_frames(probed, 'sharpen', Perspective.INSURER)
     assert [b for b, _, _ in blocks] == ['score_grid', 'sharpen_df']
     grid = blocks[0][1]
-    pd.testing.assert_frame_equal(
-        grid, probed.sharpen_df['score'].unstack('d_log2'))
-    assert grid.index.name == 'd_bs'
-    assert grid.columns.name == 'd_log2'
+    walk = probed.sharpen_df
+    assert grid.index.name == 'bs'
+    assert list(grid.columns.names) == [None, 'log2']
+    assert list(dict.fromkeys(grid.columns.get_level_values(0))) == [
+        'score', 'defective']
+    np.testing.assert_array_equal(
+        grid['score'].to_numpy(), walk['score'].unstack('d_log2').to_numpy())
+    center = walk.loc[(0, 0)]
+    star_bs = [b for b in grid.index if b.startswith('**')]
+    star_log2 = [c for c in grid['score'].columns if c.startswith('**')]
+    assert star_bs == ['**' + _bs_label(center['bs'])]
+    assert star_log2 == [f"**{int(center['log2'])}"]
+    flags = grid['defective'].stack().dropna().tolist()
+    picked = [f for f in flags if f.startswith('**')]
+    assert picked == [f"**{walk.loc[walk['selected'], 'defective'].item()}**"]
+
+
+@pytest.mark.parametrize('bs, label', [
+    (0.5, '1/2'), (1 / 64, '1/64'), (2 ** -20, '1/1048576'), (0.3, '0.3'),
+    (1.0, '1'), (2.5, '2.5'), (8.0, '8'), (2 ** 21, '2097152')])
+def test_sharpen_grid_bucket_labels(bs, label):
+    assert _bs_label(bs) == label
 
 
 def test_sharpen_errors_do_not_read_as_zero(probed):

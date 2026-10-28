@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.18.2 - 2026-10-28
+
+**[Sharpen-Grid-Score-Defective] the insurer `score_grid` of the sharpen exhibit shows score and the defective flag side by side.** Rows are the realized bucket sizes (`1/64` rather than `0.015625`) and columns the realized log2, in place of the step offsets `d_bs` and `d_log2`, under two column groups, `score` and `defective`. `**` prefixes the starting grid on both axes and wraps the defective flag of the selected cell, so a better score passed over as defective shows beside the cell that was chosen. The raw `sharpen_df` is unchanged.
+
 ## 1.18.1 - 2026-10-28
 
 **[Format-Matrix-Rows] the spread layout puts each row of a nested array on its own line.** `format_program` and `pprogram` now open an `elt` / `ylt` matrix or a `dbvsev` probability matrix on the clause line, indent each row one level deeper and close the bracket at the clause's level. A one-row matrix stays on one line, and the terse layout (`spec_to_decl`, `to_agg`) is unchanged. `BivariateDiscreteJoint` in `library.agg` is rewritten in the new layout.

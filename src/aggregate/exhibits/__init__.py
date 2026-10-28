@@ -82,6 +82,8 @@ It is not a stability promise, and it does not move this module into the 1.0
 contract.
 """
 
+import pandas as pd
+
 from .._aggregate import Aggregate
 from .._pnl import PnL
 from .._portfolio import Portfolio
@@ -269,30 +271,83 @@ sharpen = register_simple_exhibit(
             'ragged, so a cell it never reached is blank rather than bad.')
 
 
+def _bs_label(bs):
+    """A bucket size as a reader takes it in: ``1/64`` rather than ``0.015625``.
+
+    A bucket below 1 that is the reciprocal of an integer shows as ``1/n``;
+    anything else shows in plain decimals, without an exponent up to twelve
+    digits.
+    """
+    if 0 < bs < 1:
+        n = round(1 / bs)
+        if abs(n * bs - 1) < 1e-9:
+            return f'1/{n}'
+    return f'{bs:.12g}'
+
+
+def _sharpen_grid(walk):
+    """The probe's decision table: score and the defective flag, bs down, log2 across.
+
+    Rows are keyed on the step ``d_bs`` and columns on ``d_log2``, then
+    labeled with the realized bucket size and log2 of that step, so two steps
+    can never collide on one label. The center (the grid the object started
+    on) is prefixed ``**`` on both axes, and the selected cell's defective flag
+    is wrapped in ``**`` rather than its score, which keeps the score columns
+    numeric.
+
+    Notes
+    -----
+    The two halves are side by side because the probe picks the best score
+    among the cells that are **not** defective, so a lower score with
+    ``True`` beside it is a cell passed over, and the table shows why without
+    a reader cross-referencing the audit.
+    """
+    flags = walk['defective'].map(str).where(
+        ~walk['selected'], '**' + walk['defective'].map(str) + '**')
+    grid = pd.concat({'score': walk['score'].unstack('d_log2'),
+                      'defective': flags.unstack('d_log2')}, axis=1)
+    bs = walk['bs'].groupby(level='d_bs').first()
+    log2 = walk['log2'].groupby(level='d_log2').first()
+    grid = grid.rename(
+        index=lambda k: ('**' if k == 0 else '') + _bs_label(bs[k]))
+    grid = grid.rename(
+        columns=lambda j: ('**' if j == 0 else '') + str(int(log2[j])), level=1)
+    grid.index.name = 'bs'
+    grid.columns.names = [None, 'log2']
+    return grid
+
+
 @sharpen.insurer.register(Aggregate)
 @sharpen.insurer.register(Portfolio)
 def _sharpen_insurer(obj, blocks):
-    """Lead with the picture: the score grid, then the walk that produced it.
+    """Lead with the picture: the decision grid, then the walk that produced it.
 
-    Ruling ``[Sharpen-Grid-Is-A-Reading]``: ``score`` is a **column** on
-    ``sharpen_df`` used for deciding, not a second fact, so the grid is a
-    reading of a published frame rather than a frame of its own. That is
-    exactly what an INSURER block is for, and this is the smallest exercise
-    of ``[Perspective-May-Restructure]``: one block raw, two here.
+    Ruling ``[Sharpen-Grid-Is-A-Reading]``: ``score`` and ``defective`` are
+    **columns** on ``sharpen_df`` used for deciding, not second facts, so the
+    grid is a reading of a published frame rather than a frame of its own.
+    That is exactly what an INSURER block is for, and this is the smallest
+    exercise of ``[Perspective-May-Restructure]``: one block raw, two here.
 
     The unstack is the whole translation. A reader comparing grids wants the
-    two step axes on the two axes of a table, not twenty columns of working
-    with the deciding number buried among them.
+    two grid axes on the two axes of a table, not twenty columns of working
+    with the deciding numbers buried among them. See :func:`_sharpen_grid`.
     """
     (walk_name, walk, walk_kw), = blocks
-    grid = walk['score'].unstack('d_log2')
+    grid = _sharpen_grid(walk)
+    # The bs labels are already text (``1/64``, ``**2``); 's' keeps the
+    # sheet's numeric ``bs`` format off them.
+    formatters = {'bs': 's',
+                  **{c: '.5f' for c in grid.columns if c[0] == 'score'}}
     return [
         ('score_grid', grid,
-         dict(formatters={c: '.5f' for c in grid.columns}, caption=(
-             'Every cell the probe walked, scored: steps in bucket size down '
-             'and steps in log2 across, from the grid the object started on. '
-             'Lower is better, and the blanks are where the line search '
-             'stopped rather than cells that failed.'))),
+         dict(formatters=formatters, caption=(
+             'Every cell the probe walked: bucket size down and log2 across, '
+             'score on the left and the defective flag on the right. ** marks '
+             'the grid the object started on and, around its defective flag, '
+             'the cell selected. Lower scores are better, a defective cell '
+             'loses mass off the end of the grid and is never selected, and '
+             'the blanks are where the line search stopped rather than cells '
+             'that failed.'))),
         (walk_name, walk, dict(walk_kw, caption=(
             'The same walk with its working, one row per grid tried. The six '
             'u_ columns are relative errors against the analytic moments and '

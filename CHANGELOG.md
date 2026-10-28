@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.19.0 - 2026-10-28
+
+**[ELT-Shared-Event-Rollup] a shared ELT6 event is rolled up into one row, and the table updates.** When an event has rows for two or more units, the rows become one row before the model is built: means, maximums and correlated SDs add, independent SDs add in quadrature, at the event's rate (the convention of Homer and Li and of Mitchell-Wallace et al., eltq's `coupling='homer'`). The rolled row is classified, quantized and tail checked as a one-row event, so `update` and a `Portfolio` unit work where 1.15.0 to 1.18.2 raised `NotImplementedError`. The model moments of a shared table move from Burke's coupling to the roll-up (the `LT.Comonotone` severity second moment from 11,000 to 14,000, `LT.Independent` from 9,000 to 12,100), and the row classification counts rolled rows. `info` shows `{k} shared events rolled up`, `loss_table_summary_df` gains the row `('table', 'shared events')` with the input rows and how many have inadmissible variance, the `moment integration` validation row goes, and `SeverityElt` gains `grid_supported`. Tables without a shared event are unchanged, digest included. The Burke route stays in the code behind the private `_loss_table.SHARED_EVENT_RULE` (`[ELT-Burke-Total]`, pended).
+
 ## 1.18.2 - 2026-10-28
 
 **[Sharpen-Grid-Score-Defective] the insurer `score_grid` of the sharpen exhibit shows score and the defective flag side by side.** Rows are the realized bucket sizes (`1/64` rather than `0.015625`) and columns the realized log2, in place of the step offsets `d_bs` and `d_log2`, under two column groups, `score` and `defective`. `**` prefixes the starting grid on both axes and wraps the defective flag of the selected cell, so a better score passed over as defective shows beside the cell that was chosen. The raw `sharpen_df` is unchanged.

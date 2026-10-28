@@ -1471,14 +1471,19 @@ agg LT.Aligned ylt unit A [[1 0] [2 100]] ylt unit B [[1 100] [2 0]]          no
 pnl LT.YPnL 120 premium less agg LT.YPnL_e ylt [0 0 100 300] aggregate net of 150 xs 50   note{a ylt engine with annual terms};
 # ELT6 with secondary uncertainty ([ELT-Uncertainty], 1.15.0 and 1.16.0):
 # eltq's model moments with no grid, then eltq's quantization on the grid
-# with the [ELT-Grid] tail check; a shared event refuses update.
-# tests/test_elt_uncertainty.py and dev/done/plan-elt-uncertainty.md.
+# with the [ELT-Grid] tail check. A shared event's rows are rolled up into one
+# row first and update like any other ([ELT-Shared-Event-Rollup], 1.19.0).
+# tests/test_elt_uncertainty.py, dev/done/plan-elt-uncertainty.md and
+# dev/done/plan-elt-shared-rollup.md.
 agg LT.Beta elt [[1 .1 50 100 10 10]]                                        note{beta(2.625, 2.625) on [0, 100]: mean 5, variance 290, C3 18500};
 agg LT.TwoPoint elt [[1 .1 50 100 30 30]]                                    note{inadmissible variance: two points on 0 and 100, variance 500};
 agg LT.Atom elt [[1 .1 50 100 0 0]]                                          note{zero SDs: an atom, the no2u moments};
 agg LT.Disjoint elt unit Wind [[1 .1 50 100 10 10]] elt unit Quake [[2 .2 30 200 5 20]]   note{distinct ids: one-row events};
-agg LT.Comonotone elt unit A [[1 .1 50 100 0 60]] elt unit B [[1 .1 20 100 0 60]]       note{shared, Burke loading 1: event moments 70, 11000, 1900000};
-agg LT.Independent elt unit A [[1 .1 50 100 60 0]] elt unit B [[1 .1 20 100 60 0]]      note{shared, Burke loading 0: event moments 70, 9000, 1300000};
+agg LT.Comonotone elt unit A [[1 .1 50 100 0 60]] elt unit B [[1 .1 20 100 0 60]]       note{shared, inadmissible rows rolled up to the two-point [70 200 0 120]: event moments 70, 14000, 2800000};
+agg LT.Independent elt unit A [[1 .1 50 100 60 0]] elt unit B [[1 .1 20 100 60 0]]      note{shared, inadmissible rows rolled up to a beta [70 200 84.853 0]: event moments 70, 12100, 2236644.17};
+agg LT.Rollup elt unit A [[1 .1 30 300 20 10]] elt unit B [[1 .1 20 200 15 10]]         note{shared, rolled up to [50 500 25 20], beta(1.01111, 9.1): event moments 50, 4525, 562511.47};
+agg LT.RollupThree elt unit A [[1 .1 30 300 20 10] [2 .2 40 100 5 5]] elt unit B [[1 .1 20 200 15 10] [3 .3 7 9 0 0]] elt unit C [[1 .1 10 50 0 0]]   note{event 1 in three units, one an atom, rolls to [60 550 25 20]; events 2 and 3 pass through};
+agg LT.RollupLarge elt unit A [[1 .1 10000 1e9 30000 0]] elt unit B [[1 .1 10000 1e9 30000 0]]   note{shared large exposure, M 2e9: the tail passes far below it};
 agg LT.Large1 elt [[1 .1 20000 1e9 60000 0]]                                 note{large exposure: the tail passes far below M};
 agg LT.Large2 elt [[1 .1 100 1e9 10000 0]]                                   note{large exposure, sd 100 times the mean};
 agg LT.Remote elt [[1 .1 50 100 10 10] [2 5e-7 10 1e7 0 20000]]              note{a rate 5e-13 atom at 1e7 holds most of C3: the edge reaches M};

@@ -4522,7 +4522,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # reproduces the legacy 3-moment bucket sizing exactly, so ordinary
         # aggregates are unchanged.
         x_min_arg = None if (isinstance(x_min, str) and x_min == 'auto') else x_min
-        # An elt severity that cannot reach a grid refuses here, before any
+        # An elt severity that cannot reach a grid (a shared event under the
+        # private Burke rule, [ELT-Burke-Total]) refuses here, before any
         # sizing or tail query ([ELT-Shared-Refusal]).
         for s in (self.sevs if self.sevs is not None else []):
             if getattr(s, 'sev_kind', '') == 'elt':

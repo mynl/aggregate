@@ -26,10 +26,10 @@ severity distribution        single component: ``Severity.tail_description``;
                              else ``{k} components``
 loss table                   ``elt`` / ``ylt`` source: form, event or year            not a loss table
                              count, units, and the uncertainty or probability
-                             convention; an ELT reads ``no secondary
+                             convention; an ELT shows ``no secondary
                              uncertainty``, ``secondary uncertainty`` (ELT6),
-                             or ``secondary uncertainty, shared events (model
-                             moments only)``
+                             or ``secondary uncertainty, {k} shared events
+                             rolled up`` (an ELT6 with shared events)
 approximate                 method-of-moments marker; one row, no continuation
                              (fit detail lives in the note)
 bs                           bucket size (``1/n`` form for ``bs < 1``)                 not updated

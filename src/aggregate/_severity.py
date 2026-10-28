@@ -3470,8 +3470,10 @@ class SeverityElt(Severity):
     mixture sits on no lattice.
 
     A table with a shared event (one event with rows for two or more units)
-    builds with its model moments and refuses a grid until
-    ``[ELT-Shared-Event-Uncertainty]`` lands.
+    is modelled on its rolled rows, one per event
+    (``[ELT-Shared-Event-Rollup]``), and reaches a grid like any other. Only
+    under the private Burke rule (``[ELT-Burke-Total]``) does it build with
+    model moments alone and refuse a grid; see :attr:`grid_supported`.
     """
     sev_kind = 'elt'
 
@@ -3493,6 +3495,12 @@ class SeverityElt(Severity):
     def shared(self):
         """Whether some event has rows for two or more units."""
         return bool(self.sev_name.shared)
+
+    @property
+    def grid_supported(self):
+        """Whether this severity can reach a grid: false only for a shared
+        table under the Burke rule, which has model moments and no grid."""
+        return self.sev_name.shared_rule != 'burke'
 
     def moms(self):
         """The severity raw moments :math:`C_r / \\Lambda`, from eltq.
@@ -3525,24 +3533,27 @@ class SeverityElt(Severity):
         Raises
         ------
         NotImplementedError
-            For a shared event (one event with rows for two or more units),
-            naming the event and its units, until
-            ``[ELT-Shared-Event-Uncertainty]`` lands.
+            For a shared event (one event with rows for two or more units)
+            under the Burke rule (``[ELT-Burke-Total]``), naming the event and
+            its units. The default roll-up reaches a grid and never raises.
         """
-        example = self.sev_name.shared_example()
-        if example is None:
+        if self.grid_supported:
             return
-        event, units = example
+        event, units = self.sev_name.shared_example()
         prefix = f'{owner}: ' if owner else ''
         raise NotImplementedError(
             f'{prefix}event {event} has rows for units {", ".join(units)}, '
-            'and a shared event with secondary uncertainty cannot be put on a '
-            'grid yet ([ELT-Shared-Event-Uncertainty]). build(..., '
-            'update=False) gives the theoretical statistics, and no2u on every '
-            'elt clause gives the mean-only model.')
+            'and under the Burke total rule ([ELT-Burke-Total]) a shared event '
+            'with secondary uncertainty has model moments and no grid; the '
+            'default roll-up has one. build(..., update=False) gives the '
+            'theoretical statistics, and no2u on every elt clause gives the '
+            'mean-only model.')
 
     def tail_measures(self, edge, node=None):
         """eltq's tail measures of a one-row model at candidate edges.
+
+        A shared table's model is its rolled rows, one per event, so the
+        one-row query is exact for it.
 
         Parameters
         ----------
@@ -3562,8 +3573,9 @@ class SeverityElt(Severity):
         Raises
         ------
         NotImplementedError
-            For a shared model: eltq's one-row tail would treat each unit row
-            as its own event, and its multi-unit bound is too loose to use.
+            For a shared table under the Burke rule: eltq's one-row tail
+            would treat each unit row as its own event, and its multi-unit
+            bound is too loose to use.
         """
         self.check_grid_supported()
         from ._loss_table import import_eltq
@@ -3689,19 +3701,22 @@ class SeverityElt(Severity):
         Raises
         ------
         NotImplementedError
-            For a shared model (``[ELT-Shared-Event-Uncertainty]``).
+            For a shared table under the Burke rule (``[ELT-Burke-Total]``).
 
         Notes
         -----
-        eltq's survival method buckets each event's law by the nearest node,
-        top edge :math:`(n - 1/2) h` strict, the rounding of ``sev_calc
-        ='discrete'``, and the ``top_bucket`` policy moves the mass above the
-        top edge onto the top node, so the rate is exact and the moments fall
-        by :math:`D_r`. The tail check of :meth:`tail_report` is measured at
-        this grid, whoever chose it, and stored in :attr:`last_quantization`
-        with eltq's metadata (scalars only); a failing grid is honored with
-        one warning per table. Every call quantizes from the model, so a
-        later wider or finer grid recovers the tail.
+        The rows quantized are ``model.columns()``, the rolled rows for a
+        shared table, so each event's law is bucketed once, whatever its
+        units. eltq's survival method buckets each event's law by the
+        nearest node, top edge :math:`(n - 1/2) h` strict, the rounding of
+        ``sev_calc ='discrete'``, and the ``top_bucket`` policy moves the
+        mass above the top edge onto the top node, so the rate is exact and
+        the moments fall by :math:`D_r`. The tail check of
+        :meth:`tail_report` is measured at this grid, whoever chose it, and
+        stored in :attr:`last_quantization` with eltq's metadata (scalars
+        only); a failing grid is honored with one warning per table. Every
+        call quantizes from the model, so a later wider or finer grid
+        recovers the tail.
         """
         self.check_grid_supported(self.name)
         from ._loss_table import import_eltq

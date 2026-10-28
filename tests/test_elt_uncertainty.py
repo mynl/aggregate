@@ -2,10 +2,11 @@
 
 An ELT6 ``[id rate mean max sdi sdc]`` without ``no2u`` builds an ordinary
 ``Aggregate`` whose severity is the rate-weighted mixture of each event's
-total, beta, two-point or atom per row as eltq classifies it, summed under
-Burke's coupling for a shared event. The model moments come from eltq before
-any grid exists. Plan: ``dev/done/plan-elt-uncertainty.md``; the DecL programs
-are mirrored in ``decl-testers.agg`` section LT.
+total, beta, two-point or atom per row as eltq classifies it, a shared event's
+rows rolled up into one row first. The model moments come from eltq before
+any grid exists. Plans: ``dev/done/plan-elt-uncertainty.md`` and
+``dev/done/plan-elt-shared-rollup.md``; the DecL programs are mirrored in
+``decl-testers.agg`` section LT.
 
 The cases that compute need eltq 2.13 or later and skip without it; the
 refusal without eltq runs everywhere.
@@ -18,7 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from aggregate import Aggregate, build
+from aggregate import Aggregate, _loss_table, build
 from aggregate.constants import DefectiveDistributionWarning
 
 BETA = 'agg LT.Beta elt [[1 .1 50 100 10 10]]'
@@ -33,12 +34,43 @@ COMONOTONE = ('agg LT.Comonotone elt unit A [[1 .1 50 100 0 60]] '
               'elt unit B [[1 .1 20 100 0 60]]')
 INDEPENDENT = ('agg LT.Independent elt unit A [[1 .1 50 100 60 0]] '
                'elt unit B [[1 .1 20 100 60 0]]')
+ROLLUP_A = 'elt unit A [[1 .1 30 300 20 10]]'
+ROLLUP_B = 'elt unit B [[1 .1 20 200 15 10]]'
+ROLLUP = f'agg LT.Rollup {ROLLUP_A} {ROLLUP_B}'
+ROLLUP_THREE = ('agg LT.RollupThree '
+                'elt unit A [[1 .1 30 300 20 10] [2 .2 40 100 5 5]] '
+                'elt unit B [[1 .1 20 200 15 10] [3 .3 7 9 0 0]] '
+                'elt unit C [[1 .1 10 50 0 0]]')
+ROLLUP_LARGE = ('agg LT.RollupLarge elt unit A [[1 .1 10000 1e9 30000 0]] '
+                'elt unit B [[1 .1 10000 1e9 30000 0]]')
+#: Digests of one-row tables at 1.18.2, before the roll-up landed.
+DIGESTS_1_18_2 = {
+    'LT.Beta': 'bbc5b3d3c38fffa9817ce369ee1eb65bf79b0d82b9bdfb01bea2ad9b25266257',
+    'LT.Disjoint': 'e60db2fda3a3eab5a79970e973cfa621577ee280f1a5512982604f2635d44886',
+    'LT.Large1': 'dbdc47b5e60b8ad17b2ba7747fadc129e819b3fdb620ed1c811750b71088d7da',
+}
 
 
 @pytest.fixture
 def eltq():
     """The eltq package, or skip the test."""
     return pytest.importorskip('eltq', minversion='2.13')
+
+
+@pytest.fixture
+def burke(monkeypatch):
+    """The pended Burke total rule in place of the roll-up."""
+    monkeypatch.setattr(_loss_table, 'SHARED_EVENT_RULE', 'burke')
+
+
+def _homer(eltq, model):
+    """eltq's own roll-up of the input rows, an independent oracle."""
+    return eltq.multiunit_moments(
+        event_id=model.event_ids,
+        unit_id=np.asarray(model.units, dtype=object)[model.unit_code],
+        rate=model.rate, mean_loss=model.mean, sd_indep=model.sdi,
+        sd_corr=model.sdc, max_loss=model.max, coupling='homer',
+        variance_policy='bernoulli')
 
 
 def _annual(a):
@@ -123,9 +155,10 @@ def test_disjoint_units_are_one_row_events(eltq):
     (COMONOTONE, 11_000, 1_900_000, 'factor_integration'),
     (INDEPENDENT, 9_000, 1_300_000, 'closed_form'),
 ])
-def test_shared_event_coupling(eltq, program, e2, e3, method):
-    """Two two-point units, means 50 and 20 on M = 100: Burke's loading 1
-    (all correlated SD) is comonotone, loading 0 independent, both exact."""
+def test_shared_event_coupling(eltq, burke, program, e2, e3, method):
+    """Under the Burke rule, two two-point units, means 50 and 20 on M =
+    100: Burke's loading 1 (all correlated SD) is comonotone, loading 0
+    independent, both exact."""
     a = build(program, update=False)
     sev = a.sevs[0]
     assert sev.shared
@@ -140,20 +173,32 @@ def test_shared_event_coupling(eltq, program, e2, e3, method):
         assert v.loc['moment integration', 'status'] == 'pass'
 
 
-def test_shared_refusal_names_the_event(eltq):
+def test_shared_refusal_names_the_event(eltq, burke):
     a = build(COMONOTONE, update=False)
     with pytest.raises(NotImplementedError,
                        match=r'event 1 has rows for units A, B.*'
-                             r'\[ELT-Shared-Event-Uncertainty\]'):
+                             r'\[ELT-Burke-Total\].*default roll-up'):
         a.update()
 
 
-def test_shared_refusal_as_portfolio_unit(eltq):
-    with pytest.raises(NotImplementedError,
-                       match=r'\[ELT-Shared-Event-Uncertainty\]'):
+def test_shared_refusal_as_portfolio_unit(eltq, burke):
+    with pytest.raises(NotImplementedError, match=r'\[ELT-Burke-Total\]'):
         build('port LT.SharedPort agg LT.SharedUnit elt unit A '
               '[[1 .1 50 100 0 60]] elt unit B [[1 .1 20 100 0 60]] '
               'agg LT.Other 2 claims dsev [10] poisson')
+
+
+def test_burke_rule_moves_the_digest(eltq, monkeypatch):
+    """The rule enters a shared table's digest; a bad rule is refused."""
+    rollup = build(COMONOTONE, update=False).sevs[0].model
+    monkeypatch.setattr(_loss_table, 'SHARED_EVENT_RULE', 'burke')
+    burke = build(COMONOTONE, update=False).sevs[0].model
+    assert (rollup.shared_rule, burke.shared_rule) == ('rollup', 'burke')
+    assert rollup.digest != burke.digest
+    assert burke.rolled_columns is None
+    monkeypatch.setattr(_loss_table, 'SHARED_EVENT_RULE', 'matched')
+    with pytest.raises(ValueError, match='SHARED_EVENT_RULE'):
+        build(COMONOTONE, update=False)
 
 
 def test_rebuild_keeps_the_model_without_the_file(eltq, tmp_path):
@@ -388,6 +433,147 @@ def test_grid_rows_before_and_after_update(eltq):
     s = a.loss_table_summary_df['value']
     assert s[('grid', 'severity edge')] == pytest.approx((2 ** 12 - 0.5) / 16)
     assert s[('grid', 'tail rate above edge')] == 0
+
+
+# ----------------------------------------------------------------------
+# [ELT-Shared-Event-Rollup]: a shared event rolled up into one row
+# ----------------------------------------------------------------------
+
+def test_rollup_oracle(eltq):
+    """[30 300 20 10] and [20 200 15 10] roll to [50 500 25 20], a
+    beta(1.01111, 9.1) with SD 45; eltq's homer coupling agrees."""
+    a = _quiet_build(ROLLUP)
+    sev = a.sevs[0]
+    assert sev.shared and sev.grid_supported
+    np.testing.assert_allclose(sev.moms(), (50, 4525, 562511.4678899),
+                               rtol=1e-12)
+    np.testing.assert_allclose(sev.moms(),
+                               _homer(eltq, sev.model).severity_moments,
+                               rtol=1e-12)
+    assert abs(a.est_m / 5 - 1) <= a.validation_eps
+    assert sev.last_quantization['passed']
+    assert '1 shared events rolled up' in a.info
+    secondary = a._loss_table_meta['secondary']
+    assert secondary['shared_rule'] == 'rollup'
+    assert (secondary['shared_events'], secondary['shared_rows'],
+            secondary['shared_inadmissible_rows']) == (1, 2, 0)
+    assert (secondary['beta_rows'], secondary['two_point_rows']) == (1, 0)
+    s = a.loss_table_summary_df['value']
+    assert s[('table', 'shared events')] == (
+        '1 events from 2 rows, rolled up; 0 of the rows have inadmissible '
+        'variance')
+    assert 'moment integration' not in set(a.loss_table_validation_df['check'])
+
+
+@pytest.mark.parametrize('program, e2, e3, laws', [
+    (COMONOTONE, 14_000, 2_800_000, (0, 1)),
+    (INDEPENDENT, 12_100, 2_236_644.1717791, (1, 0)),
+])
+def test_rollup_corpus_regressions(eltq, program, e2, e3, laws):
+    """Two inadmissible unit rows each: comonotone rolls to the two-point
+    [70 200 0 120], independent to the beta [70 200 84.853 0]."""
+    a = _quiet_build(program)
+    sev = a.sevs[0]
+    np.testing.assert_allclose(sev.moms(), (70, e2, e3), rtol=1e-12)
+    assert sev.last_quantization is not None
+    assert a.est_m == pytest.approx(7, rel=1e-3)
+    secondary = a._loss_table_meta['secondary']
+    assert (secondary['beta_rows'], secondary['two_point_rows']) == laws
+    assert a.loss_table_summary_df.loc[('table', 'shared events'), 'value'] \
+        == '1 events from 2 rows, rolled up; 2 of the rows have inadmissible variance'
+
+
+def test_rollup_portfolio_unit_updates(eltq):
+    p = _quiet_build(f'port LT.RollupPort agg LT.RollupUnit {ROLLUP_A} '
+                     f'{ROLLUP_B} agg LT.RollupOther 2 claims dsev [10] poisson')
+    assert p.agg_list[0].sevs[0].last_quantization is not None
+    assert p.est_m == pytest.approx(5 + 20, rel=1e-4)
+
+
+def test_rollup_three_units_and_atoms(eltq):
+    """Event 1 has three units, one an atom, beside two one-row events: the
+    rolled row by hand, and the one-row events bitwise."""
+    model = build(ROLLUP_THREE, update=False).sevs[0].model
+    cols = model.columns()
+    assert list(model.event_ids) == ['1', '1', '1', '2', '3']
+    for key, expect in (('rate', [.1, .2, .3]), ('mean_loss', [60, 40, 7]),
+                        ('max_loss', [550, 100, 9]), ('sd_indep', [25, 5, 0]),
+                        ('sd_corr', [20, 5, 0])):
+        assert cols[key].tolist() == expect, key
+        assert not cols[key].flags.writeable
+    hand = build('agg LT.RollupHand elt [[1 .1 60 550 25 20] [2 .2 40 100 5 5] '
+                 '[3 .3 7 9 0 0]]', update=False).sevs[0].model
+    assert list(model.moments.raw_moments) == list(hand.moments.raw_moments)
+    np.testing.assert_allclose(model.moments.raw_moments,
+                               _homer(eltq, model).raw_moments, rtol=1e-12)
+    assert model.shared_audit() == (1, 3, 0)
+    assert model.rows == 5 and model.events == 3
+
+
+@pytest.mark.parametrize('program', [BETA, LARGE_1,
+                                     'agg LT.Disjoint elt unit Wind '
+                                     '[[1 .1 50 100 10 10]] elt unit Quake '
+                                     '[[2 .2 30 200 5 20]]'])
+def test_one_row_tables_unchanged(eltq, program):
+    a = build(program, update=False)
+    model = a.sevs[0].model
+    assert model.digest == DIGESTS_1_18_2[a.name]
+    assert model.shared_rule is None and model.rolled_columns is None
+    assert ('table', 'shared events') not in a.loss_table_summary_df.index
+    assert 'rolled up' not in a.info
+
+
+def test_rollup_feasibility(eltq):
+    """Admissible unit rows, two to five per event, always roll into an
+    admissible beta (Cauchy-Schwarz)."""
+    rng = np.random.default_rng(20261028)
+    units = rng.integers(2, 6, size=100)
+    clauses = []
+    for u in range(5):
+        rows = []
+        for e in np.flatnonzero(units > u):
+            m = rng.uniform(10, 1000)
+            mu = rng.uniform(0.05, 0.95) * m
+            sd = rng.uniform(0.01, 0.99) * (mu * (m - mu)) ** 0.5
+            w = rng.uniform()
+            rows.append(f'[{e + 1} .01 {mu:.12g} {m:.12g} {w * sd:.12g} '
+                        f'{(1 - w) * sd:.12g}]')
+        clauses.append(f"elt unit U{u} [{' '.join(rows)}]")
+    a = build(f"agg LT.RollupRandom {' '.join(clauses)}", update=False)
+    model = a.sevs[0].model
+    assert model.shared_audit() == (100, int(units.sum()), 0)
+    cols = model.columns()
+    sd = cols['sd_indep'] + cols['sd_corr']
+    room = cols['mean_loss'] * (cols['max_loss'] - cols['mean_loss'])
+    assert (sd * sd < room).all()
+    secondary = a._loss_table_meta['secondary']
+    assert (secondary['beta_rows'], secondary['two_point_rows']) == (100, 0)
+
+
+def test_rollup_tail_check_runs(eltq):
+    """Two [1 .1 10000 1e9 30000 0] rows roll to M = 2e9; the tail check
+    runs and passes far below it, as LT.Large1 does."""
+    from aggregate._bucket_window import _elt_severity
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', DefectiveDistributionWarning)
+        a = build(ROLLUP_LARGE)
+    assert _elt_severity(a) is a.sevs[0]
+    assert a.sevs[0].model.moments.max_support == 2e9
+    assert a.sevs[0].last_quantization['passed']
+    assert a.bs * 2 ** a.log2 < 2e9 / 5
+
+
+@pytest.mark.parametrize('program, swapped', [
+    (ROLLUP, f'agg LT.RollupSwap {ROLLUP_B} {ROLLUP_A}'),
+    (ROLLUP_THREE, 'agg LT.RollupThreeSwap elt unit C [[1 .1 10 50 0 0]] '
+                   'elt unit B [[1 .1 20 200 15 10] [3 .3 7 9 0 0]] '
+                   'elt unit A [[1 .1 30 300 20 10] [2 .2 40 100 5 5]]'),
+])
+def test_rollup_clause_order(eltq, program, swapped):
+    """Summation order within an event can move the last bit, no more."""
+    a = build(program, update=False).sevs[0].model.moments
+    b = build(swapped, update=False).sevs[0].model.moments
+    np.testing.assert_allclose(a.raw_moments, b.raw_moments, rtol=1e-15)
 
 
 # ----------------------------------------------------------------------

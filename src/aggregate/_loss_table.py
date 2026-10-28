@@ -61,8 +61,18 @@ YLT_FORMS = {2: 'YLT2', 3: 'YLT3'}
 ELTQ_MIN_VERSION = (2, 13, 0)
 
 #: Relative tolerance on the shared-event moment integration, eltq's
-#: ``multiunit_moments`` ``rtol`` on ``C_2`` and ``C_3``.
+#: ``multiunit_moments`` ``rtol`` on ``C_2`` and ``C_3``, under the Burke rule.
 SHARED_MOMENT_RTOL = 1e-6
+
+#: The model of a shared event (one event with rows for two or more units).
+#: ``'rollup'``, the default, rolls the event's rows into one row before the
+#: one-row path ([ELT-Shared-Event-Rollup]). ``'burke'`` keeps the rows and
+#: couples them by Burke's one-factor Gaussian copula, with exact model
+#: moments and no grid ([ELT-Burke-Total], pended). Private: no DecL word,
+#: keyword or setting; :func:`_elt_model` reads it at call time, so a test can
+#: monkeypatch it.
+SHARED_EVENT_RULE = 'rollup'
+SHARED_EVENT_RULES = ('rollup', 'burke')
 
 
 class LossTableError(ValueError):
@@ -136,11 +146,20 @@ class EltModel:
         row of an event carries the event's canonical rate.
     shared : bool
         Whether some event has rows for two or more units.
+    shared_rule : str or None
+        ``None`` for a table without a shared event, else the
+        :data:`SHARED_EVENT_RULE` it was built under, ``'rollup'`` or
+        ``'burke'``.
+    rolled_columns : dict or None
+        Under the roll-up, one row per event as read-only float64 arrays keyed
+        by eltq keyword (as :meth:`columns` returns them); ``None`` otherwise.
     moments : eltq.ModelMoments
-        The model moments: ``moments_arrays`` for one-row events,
-        ``multiunit_moments`` under Burke's coupling for shared events.
+        The model moments: ``moments_arrays`` on one row per event (the
+        rolled rows of a shared table), or ``multiunit_moments`` under Burke's
+        coupling for a shared table under the Burke rule.
     digest : str
-        SHA-256 of the canonical row bytes and identifiers.
+        SHA-256 of the canonical row bytes and identifiers, and of
+        ``shared_rule`` when it is not ``None``.
     eltq_version, eltq_backend : str
         ``eltq.__version__`` and ``eltq.BACKEND`` of the computation.
 
@@ -154,6 +173,10 @@ class EltModel:
     ``raw_moments`` eltq returns. ``repr`` and ``str`` are compact and
     content addressed, because ``Aggregate._spec_hash`` serializes the spec
     with ``default=str`` and a million-row table must not reach a message.
+
+    The input rows stay here unchanged under the roll-up: they identify the
+    table, feed the digest and :meth:`shared_example`, and are what a joint
+    model of the units would need.
     """
     event_ids: np.ndarray
     event_code: np.ndarray
@@ -165,6 +188,8 @@ class EltModel:
     sdi: np.ndarray
     sdc: np.ndarray
     shared: bool
+    shared_rule: object
+    rolled_columns: object
     moments: object
     digest: str
     eltq_version: str
@@ -181,13 +206,50 @@ class EltModel:
         return int(len(np.unique(self.event_code)))
 
     def columns(self):
-        """The five ELT6 columns as eltq keywords, ``rate`` to ``sd_corr``.
+        """The five ELT6 columns of the model as eltq keywords.
 
-        eltq orders its columns differently from function to function, so
-        every call passes them by keyword.
+        The rolled columns under the roll-up, one row per event, else the
+        input rows. Every one-row eltq call (tail measures, quantization)
+        takes these, and eltq orders its columns differently from function to
+        function, so every call passes them by keyword.
+
+        Returns
+        -------
+        dict
+            ``rate``, ``max_loss``, ``mean_loss``, ``sd_indep`` and
+            ``sd_corr``, read-only float64 arrays.
         """
+        if self.rolled_columns is not None:
+            return dict(self.rolled_columns)
         return dict(rate=self.rate, max_loss=self.max, mean_loss=self.mean,
                     sd_indep=self.sdi, sd_corr=self.sdc)
+
+    def shared_audit(self):
+        """Counts of the shared events for the reports.
+
+        Returns
+        -------
+        (int, int, int)
+            Events with two or more rows, the rows they hold, and how many of
+            those rows have positive SD and inadmissible variance
+            :math:`\\sigma^2 \\ge \\mu(M - \\mu)`, :math:`\\sigma =
+            \\sigma_I + \\sigma_C`, each a two-point law in the unit model.
+
+        Notes
+        -----
+        The roll-up uses the stated SDs of every row, inadmissible or not
+        (``[Rollup-Stated-SDs]``), so such rows can roll into an admissible
+        beta; the third count shows how many fed the model. A square that
+        overflows is inadmissible, as eltq classifies it, so the overflow is
+        not warned.
+        """
+        counts = np.bincount(self.event_code)
+        in_shared = counts[self.event_code] > 1
+        sd = self.sdi + self.sdc
+        with np.errstate(over='ignore'):
+            bad = (sd > 0) & (sd * sd >= self.mean * (self.max - self.mean))
+        return (int((counts > 1).sum()), int(in_shared.sum()),
+                int((bad & in_shared).sum()))
 
     def shared_example(self):
         """One shared event and its units, for messages: ``(event, units)``."""
@@ -282,10 +344,10 @@ def resolve(name, spec):
     :math:`\\kappa_r = \\sum_e \\lambda_e m_e^r`.
 
     ELT6 without ``no2u``: event :math:`e` has a random total :math:`X_e`, a
-    beta, two-point or atom law per unit row as eltq classifies it (summed
-    under Burke's coupling for a shared event), and the severity is the
-    :class:`EltModel` with cumulants :math:`\\kappa_r = \\sum_e \\lambda_e
-    \\mathsf P X_e^r`.
+    beta, two-point or atom law per row as eltq classifies it (a shared
+    event's rows rolled up into one row first, see :func:`_elt_model`), and
+    the severity is the :class:`EltModel` with cumulants :math:`\\kappa_r =
+    \\sum_e \\lambda_e \\mathsf P X_e^r`.
 
     YLT: year :math:`j` has probability :math:`p_j` (:math:`1/n` unless a
     probability column is supplied) and total :math:`a_j = \\sum_u y_{ju}`,
@@ -323,8 +385,9 @@ def describe(meta):
     str
         For example ``ELT3, 3 events, 1 unit, no secondary uncertainty``,
         ``ELT6, 3 events, 1 unit, secondary uncertainty`` or ``YLT1, 4 years,
-        1 unit, equally likely years``. An ELT6 with a shared event adds
-        ``shared events (model moments only)``.
+        1 unit, equally likely years``. An ELT6 with shared events adds
+        ``2 shared events rolled up``, or ``shared events (model moments
+        only)`` under the Burke rule.
     """
     units = len(meta['units'])
     unit_text = f"{units} unit{'s' if units != 1 else ''}"
@@ -332,6 +395,9 @@ def describe(meta):
         secondary = meta.get('secondary')
         if secondary is None:
             law = 'no secondary uncertainty'
+        elif secondary['shared_rule'] == 'rollup':
+            law = (f"secondary uncertainty, {secondary['shared_events']:,d} "
+                   'shared events rolled up')
         elif secondary['shared']:
             law = 'secondary uncertainty, shared events (model moments only)'
         else:
@@ -851,6 +917,7 @@ def _lower_elt(name, declared):
         c = [float(x) for x in mom.raw_moments]
         lowered = {'exp_en': float(mom.total_rate), 'freq_name': 'poisson',
                    'sev_name': model}
+        shared_events, shared_rows, shared_inadmissible = model.shared_audit()
         meta.update({
             'rate': float(mom.total_rate), 'aal': c[0],
             'severity_atoms': None,
@@ -858,6 +925,10 @@ def _lower_elt(name, declared):
             'mass_error': None,
             'secondary': {
                 'shared': model.shared,
+                'shared_rule': model.shared_rule,
+                'shared_events': shared_events,
+                'shared_rows': shared_rows,
+                'shared_inadmissible_rows': shared_inadmissible,
                 'beta_rows': int(mom.beta_rows),
                 'two_point_rows': int(mom.two_point_rows),
                 'atom_rows': int(mom.atom_rows),
@@ -917,6 +988,8 @@ def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
     LossTableError
         eltq dropped a row of the validated table, or a model moment leaves
         double precision.
+    ValueError
+        :data:`SHARED_EVENT_RULE` is not one of :data:`SHARED_EVENT_RULES`.
 
     Notes
     -----
@@ -924,10 +997,41 @@ def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
     explicitly anyway so that a later change of default cannot silently
     change the model: ``variance_policy='bernoulli'`` (an inadmissible
     variance becomes the two-point law on :math:`\\{0, M\\}` with the same
-    mean), ``mean_is_loss_rate=False``, and Burke's coupling for a shared
-    event with :data:`SHARED_MOMENT_RTOL`. Rows are stably sorted by event
-    so each event's rows are contiguous, as ``multiunit_moments`` requires.
+    mean) and ``mean_is_loss_rate=False``. Rows are stably sorted by event
+    so each event's rows are contiguous, which both shared rules need.
+
+    **The roll-up** (``[ELT-Shared-Event-Rollup]``, the default
+    :data:`SHARED_EVENT_RULE`) replaces the rows of each shared event by one
+    row, the convention of Homer and Li (2017, section 3.2.2) and
+    Mitchell-Wallace et al. (2017, section 1.10.5.10), eltq's
+    ``coupling='homer'``:
+
+    .. math::
+
+        \\mu_R = \\sum_u \\mu_u, \\quad M_R = \\sum_u M_u, \\quad
+        \\sigma_{C,R} = \\sum_u \\sigma_{C,u}, \\quad
+        \\sigma_{I,R} = \\Bigl(\\sum_u \\sigma_{I,u}^2\\Bigr)^{1/2},
+
+    at the event's rate, and the rolled row is classified and quantized as a
+    one-row event. Under the linear model :math:`X_u = \\mu_u + \\sigma_{C,u}
+    Z_c + \\sigma_{I,u} Z_u` the component rule is exact; against a model with
+    beta marginals it is exact in the mean and the support and approximate in
+    the variance and tail. The stated SDs are used, including those of an
+    inadmissible row (``[Rollup-Stated-SDs]``). If every row of an event is an
+    admissible beta so is the rolled row, since :math:`\\sigma_R \\le \\sum_u
+    \\sigma_u < \\sum_u (\\mu_u(M_u - \\mu_u))^{1/2} \\le (\\mu_R(M_R -
+    \\mu_R))^{1/2}` by Cauchy-Schwarz. The quadrature sum is ``np.hypot``
+    reduced over the event, which cannot overflow where the squares would,
+    and a one-row event passes through every reduction untouched.
+
+    **The Burke rule** (``'burke'``, ``[ELT-Burke-Total]``, pended) keeps the
+    rows and takes eltq's ``multiunit_moments`` under Burke's coupling with
+    :data:`SHARED_MOMENT_RTOL`; it has no grid.
     """
+    rule = SHARED_EVENT_RULE
+    if rule not in SHARED_EVENT_RULES:
+        raise ValueError(f'internal error: SHARED_EVENT_RULE is {rule!r}, '
+                         f'not one of {SHARED_EVENT_RULES}.')
     eltq = import_eltq()
     rows = np.flatnonzero(keep)
     rows = rows[np.argsort(event_code[rows], kind='stable')]
@@ -944,7 +1048,9 @@ def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
     event_code = _frozen(codes, dtype=np.int64)
     unit_code = _frozen(unit_code[rows], dtype=np.int64)
     shared = bool((np.bincount(event_code) > 1).any())
-    if shared:
+    shared_rule = rule if shared else None
+    rolled = None
+    if shared_rule == 'burke':
         moments = eltq.multiunit_moments(
             event_id=event_ids,
             unit_id=np.asarray(units, dtype=object)[unit_code],
@@ -952,10 +1058,23 @@ def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
             coupling='burke', variance_policy='bernoulli',
             rtol=SHARED_MOMENT_RTOL)
     else:
+        model_ids = event_ids
+        if shared_rule == 'rollup':
+            starts = np.flatnonzero(np.diff(event_code, prepend=-1))
+            rolled = dict(
+                rate=_frozen(rate[starts]),
+                max_loss=_frozen(np.add.reduceat(mx, starts)),
+                mean_loss=_frozen(np.add.reduceat(mean, starts)),
+                sd_indep=_frozen(np.hypot.reduceat(sdi, starts)),
+                sd_corr=_frozen(np.add.reduceat(sdc, starts)))
+            model_ids = event_ids[starts]
+            columns = rolled
+        else:
+            columns = dict(rate=rate, max_loss=mx, mean_loss=mean,
+                           sd_indep=sdi, sd_corr=sdc)
         moments = eltq.moments_arrays(
-            rate=rate, max_loss=mx, mean_loss=mean, sd_indep=sdi, sd_corr=sdc,
-            mean_is_loss_rate=False, variance_policy='bernoulli',
-            event_ids=list(event_ids))
+            **columns, mean_is_loss_rate=False, variance_policy='bernoulli',
+            event_ids=list(model_ids))
     if moments.dropped_rows:
         found = '; '.join(f'{k}: {v.count} ({", ".join(map(str, v.examples))})'
                           for k, v in moments.diagnostics.items() if v.count)
@@ -974,10 +1093,14 @@ def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
         digest.update(column.tobytes())
     digest.update('\x1f'.join(map(str, event_ids)).encode('utf-8'))
     digest.update('\x1f'.join(units).encode('utf-8'))
+    if shared_rule is not None:
+        # only a shared table's digest moves with the rule
+        digest.update(f'\x1e{shared_rule}'.encode('utf-8'))
     return EltModel(
         event_ids=event_ids, event_code=event_code, unit_code=unit_code,
         units=tuple(units), rate=rate, mean=mean, max=mx, sdi=sdi, sdc=sdc,
-        shared=shared, moments=moments, digest=digest.hexdigest(),
+        shared=shared, shared_rule=shared_rule, rolled_columns=rolled,
+        moments=moments, digest=digest.hexdigest(),
         eltq_version=str(eltq.__version__), eltq_backend=str(eltq.BACKEND))
 
 
@@ -1238,8 +1361,8 @@ def _grid_rows(agg, add, against, eps):
     targets, the quantized rate mass against :math:`\\Lambda`, and eltq's
     secondary mean error relative to :math:`C_1` against ``eps``. Read from
     ``SeverityElt.last_quantization``, so they describe the grid actually
-    used; ``not computed`` before ``update`` (and for a shared table, which
-    never reaches a grid), never ``pass``.
+    used; ``not computed`` before ``update`` (and for a shared table under
+    the Burke rule, which never reaches a grid), never ``pass``.
     """
     q = _last_quantization(agg) if agg.bs > 0 else None
     checks = [('tail rate above edge', 'rate_above', 'rate_target',
@@ -1302,8 +1425,12 @@ def summary_frame(agg):
         describes the combined table, part ``grid`` the selected grid (``n/a``
         before ``update``), and one part per source and unit its origin, form,
         rows and, for a file, the resolved path, size, modification time,
-        SHA-256 digest and ignored columns. Empty for an aggregate not
-        declared from a loss table.
+        SHA-256 digest and ignored columns. A table with shared events adds
+        the row ``('table', 'shared events')``: the events, the input rows
+        they hold, the rule, and how many of those rows have inadmissible
+        variance. The row classification counts model rows, which are the
+        rolled rows under the roll-up. Empty for an aggregate not declared
+        from a loss table.
     """
     meta = agg._loss_table_meta
     rows = []
@@ -1337,6 +1464,14 @@ def summary_frame(agg):
                     'removed by no2u' if no2u else 'none')
             else:
                 add('table', 'secondary uncertainty', _row_laws(secondary))
+                if secondary['shared']:
+                    how = ('rolled up' if secondary['shared_rule'] == 'rollup'
+                           else "under Burke's coupling")
+                    add('table', 'shared events',
+                        f"{secondary['shared_events']:,d} events from "
+                        f"{secondary['shared_rows']:,d} rows, {how}; "
+                        f"{secondary['shared_inadmissible_rows']:,d} of the "
+                        'rows have inadmissible variance')
                 add('table', 'largest event support', secondary['max_support'])
                 add('table', 'model moments', _moment_method(secondary))
                 add('table', 'eltq', f"{secondary['eltq_version']} "
@@ -1495,7 +1630,7 @@ def validation_frame(agg):
                 add('row classification', secondary['two_point_rows'], np.nan,
                     'pass', f'{_row_laws(secondary)} rows; a two-point row '
                     'replaces an inadmissible beta variance, keeping the mean')
-                if secondary['shared']:
+                if secondary['shared_rule'] == 'burke':
                     error = max(secondary['achieved_error'])
                     add('moment integration', error, secondary['rtol'],
                         'pass' if secondary['converged'] else 'warning',

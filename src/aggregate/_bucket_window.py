@@ -803,9 +803,10 @@ def snap_bs_to_reference(agg, b0, pinned):
 
 
 def _elt_severity(agg):
-    """The one-row ELT severity of ``agg`` with secondary uncertainty, or None."""
+    """The ELT severity of ``agg`` with secondary uncertainty that can reach a
+    grid (one row per event, a shared table's rows rolled up), or None."""
     for s in (agg.sevs if agg.sevs is not None else []):
-        if getattr(s, 'sev_kind', '') == 'elt' and not s.shared:
+        if getattr(s, 'sev_kind', '') == 'elt' and s.grid_supported:
             return s
     return None
 

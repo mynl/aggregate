@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.23.0 - 2026-10-28
+
+**[Stable-Statement] `aggregate.stable.Stable` holds alpha-stable parameters, and a bare `stable` statement returns one.** `Stable(alpha, beta, scale=1, loc=0, parameterization='S1')` stores Nolan's S1 parameters, reports `loc0` in S0 (`s0_to_s1` and `s1_to_s0` convert), adds laws with a common alpha, scales, negates and shifts (`sum()` works), and gives `chf`, `mean`, `prob_above_loc`, `tail_constant` and `left_tail_constant` in closed form, with `pdf`, `cdf`, `sf`, `ppf`, `isf`, `rvs` and `plot` from `scipy.stats.levy_stable` (reliable in the body, not in the far tail). `Stable.from_compound_pareto` is the generalized central limit theorem for a Poisson count and a Pareto tail with `1 < alpha < 2`. The statement is a `'conversion'`: `stable 1.5 1 2 0`, `stable 1.5 1 2 -2 s0` and `stable 1000 claims sev 100 * lomax 1.5` each return a `Stable` whose string lists both parameterizations, the mean, the probability above it and the power tails. Submodule access only, `from aggregate.stable import Stable`; it replaces PMIR's `pmir_legacy.stable.Stable`, which stays for backwards compatibility.
+
+Breaking: `stable` is a reserved word, so a program that used it as a name no longer parses. Downstream: `aggregate-api` shows the answer once `[Status-Bar-Text-Answers]` lands.
+
 ## 1.22.0 - 2026-10-28
 
 **[Tweedie-Statement] a bare `tweedie` statement converts between Tweedie parameterizations, and the `agg` clause gains a `cv` form.** `tweedie 1.5 100 2` (p, mean, dispersion), `tweedie 1.5 100 cv 0.447214` (p, mean, CV) and `tweedie 10 claims sev gamma 10 cv 1` (Poisson count, gamma severity, written as in an `agg`) each return the new top-level `TweedieConversion`, a named tuple with fields `p`, `mean`, `dispersion`, `cv`, `frequency`, `sev_m`, `sev_cv` and `p0` and constructors `from_dispersion`, `from_cv` and `from_compound`, whose string lists every spelling joined by ` = ` and `Pr(X=0)`, to six significant figures. The statement is a new answer kind, `'conversion'`, beside `'expr'` (`underwriter.ANSWER_KINDS`): it has no name or trailer and is never stored in the recipe base. Only a plain gamma is accepted in the compound form, and every refusal is a `ValueError` naming the form. `agg X tweedie 1.5 100 cv 0.447214` builds and renders back as written, including as a `pnl` engine, through the private `_tweedie_cv` key; existing spec hashes are unchanged.

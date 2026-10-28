@@ -101,6 +101,18 @@ parameterizations.
 
 .. automodule:: aggregate.tweedie
 
+Stable
+------
+
+:mod:`aggregate.stable` provides :class:`~aggregate.stable.Stable`, the
+parameters of an alpha-stable law in Nolan's S1 and S0 forms, with the closure
+algebra (sums with a common alpha, scaling, negation, shifting), the closed-form
+characteristic function, mean and tail constants, the stable limit of a Poisson
+Pareto book, and scipy-backed distribution values. It is the answer to the DecL
+``stable`` statement.
+
+.. automodule:: aggregate.stable
+
 Exact NTT compounds
 -------------------
 

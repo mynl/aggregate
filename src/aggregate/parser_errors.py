@@ -97,6 +97,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "COPULA": "'copula'",
     "EXPOSURE": "'exposure'",
     "TWEEDIE": "'tweedie'",
+    "STABLE": "'stable'",
     "PREMIUM": "'premium' (or 'prem')",
     "TOWER": "'tower'",
     "MIXED": "'mixed'",

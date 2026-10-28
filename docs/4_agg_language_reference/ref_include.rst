@@ -44,11 +44,20 @@
     // Poisson count with a gamma severity written exactly as in an ``agg`` body.
     // The forms differ in their third or fourth token (a number, CV, or CLAIMS),
     // so they cannot collide. See dev/done/plan-tweedie-statement.md.
+    //
+    // ``stable`` takes ``alpha beta [scale [loc]]``, an optional ``s0`` or ``s1``
+    // naming the parameterization of the location (an ordinary ID, validated in
+    // the transformer), or a Poisson count and a Pareto severity, whose stable
+    // limit it computes. CLAIMS is a keyword, so the forms cannot collide. See
+    // dev/done/plan-stable-statement.md.
     // ======================================================================
     
     conversion_out: TWEEDIE expr expr expr        -> conversion_tweedie_dispersion
                   | TWEEDIE expr expr CV expr     -> conversion_tweedie_cv
                   | TWEEDIE expr CLAIMS SEV sev   -> conversion_tweedie_compound
+                  | STABLE numberl                -> conversion_stable
+                  | STABLE numberl ID             -> conversion_stable_param
+                  | STABLE expr CLAIMS SEV sev    -> conversion_stable_compound
     
     // ======================================================================
     // Distortion
@@ -933,6 +942,7 @@
     COPULA.2:     /copula(?![a-zA-Z0-9._:~\-])/
     EXPOSURE.2:   /exposure(?![a-zA-Z0-9._:~\-])/
     TWEEDIE.2:    /tweedie(?![a-zA-Z0-9._:~\-])/
+    STABLE.2:     /stable(?![a-zA-Z0-9._:~\-])/
     PREMIUM.2:    /(?:premium|prem)(?![a-zA-Z0-9._:~\-])/
     TOWER.2:      /tower(?![a-zA-Z0-9._:~\-])/
     MIXED.2:      /mixed(?![a-zA-Z0-9._:~\-])/
@@ -1068,7 +1078,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

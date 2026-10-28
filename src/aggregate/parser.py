@@ -922,6 +922,91 @@ class UnderwritingTransformer(Transformer):
                 TweedieConversion.from_compound(float(en), float(sev_m),
                                                 float(sev_cv)))
 
+    # ----- stable ([Stable-Statement]) ---------------------------------
+    _STABLE_FORM = 'stable alpha beta [scale [loc]] [s0|s1]'
+
+    def _stable_from_numbers(self, numbers, parameterization):
+        """``Stable`` from two to four numbers and a parameterization word."""
+        from .stable import Stable
+        numbers = list(np.atleast_1d(numbers))
+        if not 2 <= len(numbers) <= 4:
+            raise ValueError(
+                f"stable: the statement is '{self._STABLE_FORM}', with two to "
+                f"four numbers, got {len(numbers)}")
+        if str(parameterization).upper() not in ('S0', 'S1'):
+            raise ValueError(
+                f"stable: the statement is '{self._STABLE_FORM}'; the last "
+                f"word must be s0 or s1, got {parameterization!r}")
+        return ("conversion", "stable",
+                Stable(*(float(x) for x in numbers),
+                       parameterization=parameterization))
+
+    def conversion_stable(self, c):
+        """``stable alpha beta [scale [loc]]``, the location in S1."""
+        _st, numbers = c
+        return self._stable_from_numbers(numbers, 'S1')
+
+    def conversion_stable_param(self, c):
+        """``stable alpha beta [scale [loc]] s0|s1``."""
+        _st, numbers, param = c
+        return self._stable_from_numbers(numbers, str(param))
+
+    def conversion_stable_compound(self, c):
+        """``stable <count> claims sev <pareto or lomax>``: the stable limit.
+
+        The severity is parsed by the ``agg`` body's own ``sev`` rule and
+        resolved exactly as an ``agg`` resolves it, with ``Severity``; the
+        shape, scale and mean are read from the frozen scipy object, so every
+        spelling an ``agg`` accepts works (``100 * lomax 1.5``,
+        ``100 * pareto 1.5 - 100``). A location shift is allowed, since it
+        changes only the mean; a reflection, mixture, splice, picks or
+        unconditional ``!`` is refused. See
+        :meth:`aggregate.stable.Stable.from_compound_pareto`.
+        """
+        from .distributions import Severity
+        from .stable import Stable
+        _st, en, _claims, _sev, sev = c
+        form = 'stable <count> claims sev <scale> * lomax <alpha>'
+
+        def refuse(found):
+            raise ValueError(
+                f'stable: the limit theorem form needs a plain pareto or lomax '
+                f'severity, `{form}`, but found {found}.')
+
+        name = sev.get("sev_name")
+        if name not in ("pareto", "lomax"):
+            refuse(f'severity {name!r}' if isinstance(name, str)
+                   else f'a mixture of {name}')
+        defaults = {"sev_wt": 1.0, "sev_lb": 0.0, "sev_ub": np.inf,
+                    "sev_reflect": False, "sev_conditional": True}
+        params = ("sev_mean", "sev_cv", "sev_a", "sev_scale", "sev_loc")
+        for k, v in sev.items():
+            if k in ("sev_name", *params) or k in self._SEV_METADATA_KEYS:
+                continue
+            if k in defaults:
+                if not np.isscalar(v) or v != defaults[k]:
+                    refuse(f'{k} = {v}')
+                continue
+            refuse(f'the clause {k}')
+        for k in params:
+            if k in sev and not np.isscalar(sev[k]):
+                refuse(f'the vector {k} = {sev[k]}')
+        if not en > 0:
+            raise ValueError(
+                f'stable: the claim count must be positive, got {en}. The '
+                f'form is `{form}`.')
+        fz = Severity(**{k: v for k, v in sev.items() if k.startswith('sev_')}).fz
+        # the shape is ``c`` for lomax and ``b`` for pareto in scipy
+        alpha = float(fz.args[0] if fz.args else fz.kwds[fz.dist.shapes])
+        theta = float(fz.kwds.get('scale', 1.0))
+        if not 1 < alpha < 2:
+            # checked before the mean, which is infinite for alpha <= 1
+            refuse(f'the tail index {alpha:.6g}, which must be strictly '
+                   f'between 1 and 2')
+        return ("conversion", "stable",
+                Stable.from_compound_pareto(float(en), alpha, theta,
+                                            float(fz.mean())))
+
     def agg_body_rename(self, c):
         bagg, occ_reins, agg_reins = c
         if "name" in bagg:
@@ -3250,7 +3335,8 @@ class UnderwritingParser:
             object. For ``'expr'`` the statement is a bare expression and
             ``spec`` is its numeric value. For ``'conversion'`` the statement
             is a parameter calculator such as ``tweedie 1.5 100 2``, ``name``
-            is the family (``'tweedie'``) and ``spec`` is the computed object.
+            is the family (``'tweedie'`` or ``'stable'``) and ``spec`` is the
+            computed object.
 
         Raises
         ------

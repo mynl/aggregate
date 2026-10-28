@@ -6,10 +6,11 @@ just re-exports those via ``from .module import *``. To change what's
 public at the top level, edit ``__all__`` in the source module -- not
 this file.
 
-``Tweedie``, ``FourierTools``, ``Pentagon``, anything in ``pedagogy``,
-and the ``exhibits`` module are intentionally NOT re-exported here --
-reach them via submodule import (``from aggregate.tweedie import
-Tweedie``, ``from aggregate import exhibits``, etc.). ``plugins`` is the
+``Tweedie``, ``Stable``, ``FourierTools``, ``Pentagon``, anything in
+``pedagogy``, and the ``exhibits`` module are intentionally NOT re-exported
+here; reach them via submodule import (``from aggregate.tweedie import
+Tweedie``, ``from aggregate.stable import Stable``, ``from aggregate import
+exhibits``, etc.). ``plugins`` is the
 one submodule bound here, so a host can write ``aggregate.plugins.load()``;
 nothing is star-exported from it either.
 """
@@ -60,7 +61,7 @@ __status__    = "beta"
 # The one place the version is written. A plain literal on purpose: setuptools
 # reads it statically for the wheel, and running code reports it live, so an
 # editable install never reports a stale number after a bump.
-__version__ = "1.22.0"
+__version__ = "1.23.0"
 
 
 __doc__ = """

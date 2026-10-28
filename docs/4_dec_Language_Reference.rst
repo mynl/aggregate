@@ -109,8 +109,8 @@ Three behaviors are worth knowing.
 
 Expressions evaluate as the program parses, so the specification carries plain numbers and the formula is not retained. The canonical text that :func:`aggregate.decl_writer.spec_to_decl` and :func:`aggregate.decl_writer.format_program` produce therefore shows the evaluated literal: the program above decompiles with ``10 claims 133333.33333333334 premium``. This is the long-standing canonical, not verbatim, contract, the same one that collapses ``exp(.5)`` to its float.
 
-Parameter Conversions (tweedie)
-===============================
+Parameter Conversions (tweedie, stable)
+=======================================
 
 A **conversion** is a statement that computes the equivalent spellings of one distribution and builds nothing. Like a bare expression it is an answer rather than a declaration: it has no name and no trailer, ``build`` returns the computed object directly, and nothing is stored in the recipe base.
 
@@ -129,6 +129,22 @@ Each spelling is legal input, so any part of the answer can be pasted back. The 
 The compound form reads the severity with the ``agg`` body's own ``sev`` clause, so every spelling of a gamma an ``agg`` accepts works (``sev gamma 10 cv 1``, ``sev 10 * gamma 1``). Only a plain gamma is accepted: a shifted, reflected, mixed, spliced or unconditional severity is refused with a message saying what was found, as is :math:`p` outside :math:`(1,2)`.
 
 The ``cv`` form is also legal inside an ``agg``, ``agg X tweedie 1.5 100 cv 0.447214``, and renders back as written. :meth:`aggregate.Aggregate.as_tweedie` reports the reproductive parameters of any compound Poisson gamma aggregate, and ``TweedieConversion.from_dispersion(*a.as_tweedie())`` turns them into the full conversion.
+
+The ``stable`` statement describes an alpha-stable law. It takes the index :math:`\alpha\in(0,2]`, the skewness :math:`\beta\in[-1,1]`, an optional scale (default 1) and an optional location (default 0), read in Nolan's S1 parameterization unless a trailing ``s0`` names S0; or it takes a Poisson count and a Pareto severity and returns their stable limit::
+
+    stable 1.5 1 2 0                          # alpha beta scale loc, S1
+    stable 1.5 1 2 -2 s0                      # the same law in S0
+    stable 1000 claims sev 100 * lomax 1.5    # stable limit of a Pareto book
+
+Each returns an :class:`aggregate.stable.Stable`, whose string gives both parameterizations, the mean, the probability above it and the power tail::
+
+    stable 1.5 1 2 0 = stable 1.5 1 2 -2 s0, mean 0, Pr(X>mean) 0.333333, Pr(X>x) ~ 1.12838 x^-1.5
+
+In S1 the characteristic function is :math:`\exp(-\gamma^\alpha|t|^\alpha(1 - i\beta\,\mathrm{sign}(t)\tan(\pi\alpha/2)) + i\delta_1 t)` for :math:`\alpha\ne1`, and the S0 location is :math:`\delta_0=\delta_1+\beta\gamma\tan(\pi\alpha/2)`. S1 is scipy's default and the form in which sums and scaling are clean; S0 is continuous in :math:`\alpha`. For :math:`1<\alpha<2` and :math:`\beta=1` the mean is the :math:`1-1/\alpha` quantile, 2/3 here, and the right tail is :math:`\Pr(X>x)\sim 2C_\alpha\gamma^\alpha x^{-\alpha}` with :math:`C_\alpha=\Gamma(\alpha)\sin(\pi\alpha/2)/\pi`. ``stable`` is a reserved word.
+
+The third form is the generalized central limit theorem for a compound Poisson with a Pareto tail, :math:`\Pr(X>x)=\theta^\alpha x^{-\alpha}(1+o(1))` with :math:`1<\alpha<2`. For a large expected count :math:`\lambda` the aggregate is approximately :math:`S(\alpha, 1, \gamma, \lambda\mathsf{P}X; 1)` with :math:`\gamma^\alpha=\lambda\theta^\alpha\Gamma(1-\alpha)\cos(\pi\alpha/2)`, which has exactly the compound's mean and right tail constant :math:`\lambda\theta^\alpha`. In the worked example :math:`\lambda=1000`, :math:`\theta=100` and the severity mean is 200, so :math:`\gamma=18452.7`, the S1 location is 200,000 and the right tail constant is :math:`10^6`. ``sev 100 * pareto 1.5 - 100`` is the same severity and gives the same answer. The severity must be a plain ``pareto`` or ``lomax`` with :math:`1<\alpha<2`; a shift is allowed, a reflection, mixture or splice is refused.
+
+The distribution values of a ``Stable`` (``pdf``, ``cdf``, ``ppf`` and the rest) come from ``scipy.stats.levy_stable``, which is reliable in the body and not in the far tail: with scipy 1.17.1 at :math:`\alpha=1.5`, :math:`\beta=1`, unit scale, ``ppf(1 - 1e-6)`` returns 659 rather than about 5,430, and ``sf(5430)`` returns 0 against an asymptotic :math:`9.97\times10^{-7}`. Use the tail constants there.
 
 Exact Compounds (nttagg)
 ========================

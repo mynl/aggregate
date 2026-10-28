@@ -200,13 +200,27 @@ def test_sharpen_does_not_call_the_nice_bucket_too_fine():
 
 # ------------------------------------- [Portfolio-Lattice-Bucket], step 2
 
-def test_portfolio_takes_the_pooled_step_not_the_formula():
-    """Poisson units on steps 3 and 5: pooled step 1 (bs 4 through 1.24.0)."""
+def test_portfolio_takes_the_pooled_step():
+    """Poisson units on steps 3 and 5: pooled step 1 (bs 4 at 1.23.0)."""
     p = build('port FLB.Steps agg FLB.S3 3 claims dsev [3 6 9] poisson '
               'agg FLB.S5 3 claims dsev [5 10 15] poisson')
     assert p.bs == 1
     assert p._bs_lattice == dict(h=1.0, residual=0.0, bs=1.0)
     assert 'lattice of 1' in p.bs_explanation
+
+
+def test_portfolio_units_whose_buckets_do_not_divide():
+    """Steps 2 and 5: the finest unit bucket, 2, misses the 5 lattice.
+
+    At 1.24.0 the resolution formula took ``bs`` 2 and put the atoms at 5 and
+    15 between grid points; the pooled step is 1.
+    """
+    p = build('port FLB.Steps25 agg FLB.S2 3 claims dsev [2 4 6] poisson '
+              'agg FLB.S5b 3 claims dsev [5 10 15] poisson')
+    assert p.bs == 1
+    x0 = float(p.density_df.index[0])
+    k = (np.array([2, 4, 6, 5, 10, 15.0]) - x0) / p.bs
+    assert np.array_equal(k, np.round(k))
 
 
 SIGNED_PORT = ('port FLB.SignedPort '
@@ -218,7 +232,7 @@ SIGNED_PORT = ('port FLB.SignedPort '
 def test_signed_portfolio_lands_every_atom_and_shrinks_log2():
     p = build(SIGNED_PORT)
     assert p.bs == 0.25
-    assert p.log2 < 16                     # stayed at the cap through 1.24.0
+    assert p.log2 < 16                     # 0.25 at the cap 16 at 1.24.0
     x0 = float(p.density_df.index[0])
     atoms = np.array([-1.75, 0.25, 0.5, -0.5, 0.75, 1.5])
     k = (atoms - x0) / p.bs
@@ -265,3 +279,42 @@ def test_a_pinned_portfolio_bs_is_left_alone():
     p = build(SIGNED_PORT, bs=1 / 16)
     assert p.bs == 1 / 16 and p.log2 == 16
     assert p._bs_lattice is None
+
+
+# ------------------------------------- [Bivariate-Dyadic-Lattice], step 3
+
+def _bv(axis):
+    return build(f'bivariate FLB.BV dfreq [1 2] [.5 .5] dbvsev {axis} [0 1 2]')
+
+
+def _margins_match(b):
+    S = b._S.toarray() if hasattr(b._S, 'toarray') else np.asarray(b._S)
+    g0, g1 = b._gs
+    return (np.allclose(S.sum(axis=1), g0, rtol=0, atol=1e-14)
+            and np.allclose(S.sum(axis=0), g1, rtol=0, atol=1e-14))
+
+
+@pytest.mark.parametrize('axis, bs', [('[0 1 2]', 1.0), ('[0 0.25 0.75]', 0.25)])
+def test_lattice_axes_keep_their_bucket(axis, bs):
+    b = _bv(axis)
+    assert b.bs == [bs, 1.0]
+    assert b._on_lattice == [True, True]
+    assert _margins_match(b)
+
+
+@pytest.mark.parametrize('axis', ['[0 0.1 0.2]', '[0.1 0.2 0.3]', '[-0.3 0 0.2]'])
+def test_decimal_axis_is_free_dyadic_and_scattered(axis):
+    """Through 1.25.0 a float gcd gave bs 0.1 or 0.09999999999999998."""
+    b = _bv(axis)
+    num, den = b.bs[0].as_integer_ratio()
+    assert num == 1 and den & (den - 1) == 0          # a power of two
+    assert b._on_lattice == [False, True]
+    assert _margins_match(b)
+    assert float(np.asarray(b.density).sum()) == pytest.approx(1, abs=1e-12)
+
+
+def test_noisy_decimal_axis_builds():
+    """A float gcd of about 1e-7 never finished building through 1.25.0."""
+    b = _bv('[0 0.1 0.3000001]')
+    assert len(b.axis_xs[0]) <= 2 ** 16
+    assert _margins_match(b)

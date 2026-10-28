@@ -20,11 +20,15 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.26.0 - 2026-10-28
+
+**[Bivariate-Dyadic-Lattice] A discrete bivariate axis sizes by the dyadic lattice rule, and an axis with no lattice is sized freely and scattered.** `bivariate._lattice_bs` is the dyadic lattice step and the floating-point `_float_gcd` is gone. An axis with a step takes the first lattice candidate whose grid covers its measured width within the axis cap (`total_log2 - min_axis_log2`, 16 at the defaults). An axis with no lattice, no fitting candidate, or a pinned `bs` that misses it is measured like a copula axis, and the joint matrix is placed on it with the units' `dsev_bucket` scheme, so the margins of the severity still equal `g0` and `g1`. `_netceded_exact_bs` uses the same routine and rule, with its budget test as the fit. Numbers move only for decimal or noisy axes: `[0 0.1 0.2]` gets a power-of-two `bs` (was 0.1), and `[0 0.1 0.3000001]` builds in a fraction of a second (was a `bs` near `1e-7` that did not finish). Every `MV.DBV*` tester and every `bvagg` program in the shipped corpora sizes as before.
+
 ## 1.25.0 - 2026-10-28
 
 **[Portfolio-Lattice-Bucket] A Portfolio whose units are all discrete on one pooled dyadic lattice takes its bucket from the lattice rule, and `log2` shrinks to the need, signed books included.** `port_best_window` takes the step of every unit's atoms together and picks the first lattice candidate whose grid fits the cap, ahead of `round_bucket(max(min_k bs_k, W / N))`, which stays for every other book. A signed book's need is measured from the origin `update` realizes, the sum of the unit origins, not from the window. `Portfolio.bs_explanation` and the `used` row of `bs_window_df` name the lattice.
 
-Numbers move: Poisson units on steps 3 and 5 get `bs` 1 (was 4, on neither lattice), a signed book of quarter-point units gets 0.25 at `log2` 8 (was 2^-10 at 16), and `DiscretePortfolio` keeps `bs` 1 at `log2` 6 (was 16). A signed book of many lattice units now holds its mass: 1000 units on `[-1.75 .25 .5]` held 17.7% of it at 1.24.0 and hold all of it at `bs` 0.25, `log2` 13. That bug remains for signed books without a lattice (`[Signed-Portfolio-Origin]` in `dev/TODO.md`).
+Numbers move: Poisson units on steps 2 and 5 get `bs` 1 (was 2, which put the atoms at 5 and 15 between grid points), a signed book of quarter-point units keeps 0.25 at `log2` 8 (was 16), and `DiscretePortfolio` keeps `bs` 1 at `log2` 6 (was 16). (Corrected at 1.26.0: this entry first credited 1.25.0 with moves that 1.24.0 made through the units' buckets, steps 3 and 5 from `bs` 4 to 1 and the quarter-point book from 2^-10 to 0.25.) A signed book of many lattice units now holds its mass: 1000 units on `[-1.75 .25 .5]` held 17.7% of it at 1.24.0 and hold all of it at `bs` 0.25, `log2` 13. That bug remains for signed books without a lattice (`[Signed-Portfolio-Origin]` in `dev/TODO.md`).
 
 ## 1.24.0 - 2026-10-28
 

@@ -47,6 +47,7 @@ plain ``agg`` components, or build a standalone :class:`aggregate.PnL`.
 
 import json
 import logging
+import math
 import os
 import warnings
 from typing import NamedTuple
@@ -65,7 +66,8 @@ from .config import get_settings
 from ._validation import DEFICIT_MATERIALITY
 from .moments import (MomentAggregator, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
-from .utilities import round_bucket, balanced_window
+from .utilities import (round_bucket, balanced_window, LATTICE_DEPTH,
+                        _dyadic_lattice_step, _lattice_candidates)
 from ._grid_distribution import GridDistribution
 
 logger = logging.getLogger(__name__)
@@ -993,12 +995,13 @@ def _netceded_axis_log2(hi, bs):
 
 
 def _netceded_exact_bs(x0, x1, gross_bs, hi0, hi1, total_log2):
-    """The exact common lattice for a netceded joint, or ``None`` if unaffordable.
+    """The exact common lattice bucket for a netceded joint, or ``None``.
 
-    The largest bucket size placing every sampled view image, and the gross
-    grid itself, on one lattice: the gcd of the atoms, which is what
-    :func:`_lattice_bs` computes for discrete mode and what this reuses rather
-    than reimplements.
+    The bucket placing every sampled view image, and the gross grid itself, on
+    one dyadic lattice, chosen by the lattice rule: the first of
+    :func:`~aggregate.utilities._lattice_candidates` for the step of the pooled
+    atoms (:func:`~aggregate.utilities._dyadic_lattice_step`) that the budget
+    can pay for.
 
     Parameters
     ----------
@@ -1015,8 +1018,8 @@ def _netceded_exact_bs(x0, x1, gross_bs, hi0, hi1, total_log2):
     Returns
     -------
     float or None
-        The exact lattice, or ``None`` when the grid it implies does not fit
-        the budget.
+        The exact bucket, or ``None`` when the images share no dyadic lattice
+        or no candidate fits the budget.
 
     Notes
     -----
@@ -1026,25 +1029,31 @@ def _netceded_exact_bs(x0, x1, gross_bs, hi0, hi1, total_log2):
     could carry. So the rule is prefer the exact lattice when it is affordable,
     report when it is not, never pretend.
 
-    The fold runs over the sorted unique atoms and exits as soon as the running
-    gcd is too fine to fit, which is the common case and makes the test cheap:
-    a gcd only decreases, so once the budget is blown it stays blown, and the
-    exact value of an unaffordable lattice is of no interest.
+    The atoms are the images of the whole gross grid, so ``max|x|`` is the grid
+    top and the gross ``bs`` sits about ``log2`` levels below it, more than the
+    default :data:`~aggregate.utilities.LATTICE_DEPTH` when the gross ``log2``
+    exceeds 16. The search is extended to reach the power-of-two factor of the
+    gross ``bs`` (0.25 for a gross ``bs`` of 0.75), so the gross lattice stays
+    findable however long the gross grid is.
     """
     atoms = np.unique(np.abs(np.concatenate(
         [np.asarray(x0, dtype=float).ravel(),
          np.asarray(x1, dtype=float).ravel(),
          np.array([float(gross_bs)])])))
-    atoms = atoms[atoms > 0]
-    if len(atoms) == 0:
+    M = float(atoms.max()) if len(atoms) else 0.0
+    if not (M > 0 and np.isfinite(M) and gross_bs > 0):
         return None
-    g = float(atoms[0])
-    for v in atoms[1:]:
-        g = _float_gcd(g, float(v))
-        if (_netceded_axis_log2(hi0, g)
-                + _netceded_axis_log2(hi1, g)) > total_log2:
-            return None
-    return g
+    num, den = float(gross_bs).as_integer_ratio()
+    two_part = (num & -num) / den              # largest power of two dividing it
+    depth = max(LATTICE_DEPTH, int(np.ceil(np.log2(M / two_part))))
+    fit = _dyadic_lattice_step(atoms, depth=depth)
+    if fit is None:
+        return None
+    for b in _lattice_candidates(fit[0]):
+        if (_netceded_axis_log2(hi0, b)
+                + _netceded_axis_log2(hi1, b)) <= total_log2:
+            return b
+    return None
 
 
 def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
@@ -1109,7 +1118,11 @@ def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
     exact = False
     if bs:
         bs = float(bs)
-        exact = bs_exact is not None and abs(bs - bs_exact) <= 1e-12 * bs
+        # exact when every image and the gross grid are whole numbers of the
+        # pinned bucket: the nice divisor, the step itself, or a finer divisor
+        pts = np.concatenate([x0, x1, [float(agg.bs)]]) / bs
+        exact = (bs_exact is not None
+                 and bool(np.all(np.abs(pts - np.round(pts)) <= 1e-9)))
     elif bs_exact is not None:
         # Nothing is lost at this bucket size and the budget can pay for it:
         # every per-claim point is a cell center, the bilinear scatter never
@@ -1152,48 +1165,43 @@ def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
                           bs_exact=bs_exact, exact=exact)
 
 
-def _float_gcd(a, b):
-    """Greatest common divisor of two positive floats, by float Euclid.
-
-    Stops when the remainder is rounding noise relative to the larger of the
-    pair and 1, which is what makes it usable on measured lattice values rather
-    than on integers. Shared by :func:`_lattice_bs` (discrete mode) and
-    :func:`_netceded_exact_bs` (the netceded exact lattice), which want the
-    same quantity and should not each carry a copy of the loop.
-    """
-    while b > 1e-9 * max(a, 1.0):
-        a, b = b, a - np.floor(a / b) * b
-    return a
+def _divides(bs, h, rel_tol=1e-9):
+    """Whether ``h / bs`` is a positive integer, to a relative tolerance."""
+    r = float(h) / float(bs)
+    return r >= 1.0 and math.isclose(r, round(r), rel_tol=rel_tol)
 
 
 def _lattice_bs(xs):
-    """Largest bucket size that places every atom of ``xs`` exactly on the grid.
+    """The dyadic lattice step of one axis of a discrete bivariate severity.
 
-    The discrete bivariate severity (``dbvsev``) is exact only if each lattice
-    value is an integer multiple of the per-axis ``bs`` -- then the joint matrix
-    scatters onto the FFT grid with no rebucketing. This returns the greatest
-    such ``bs`` (the gcd of the non-zero atoms): ``1`` for an integer lattice,
-    the natural step for a uniform one, a common divisor otherwise.
+    The discrete bivariate severity (``dbvsev``) is exact on an axis when each
+    value is an integer multiple of the axis ``bs``: the joint matrix then
+    scatters onto the FFT grid with no split. This returns the step ``h`` of
+    :func:`~aggregate.utilities._dyadic_lattice_step`; the axis ``bs`` is the
+    first of :func:`~aggregate.utilities._lattice_candidates` that fits the
+    axis budget (:meth:`BivariateAggregate._size_axes`).
 
     Parameters
     ----------
     xs : array-like
-        The axis outcomes (a 1-D lattice; ``0`` is ignored, negatives by
-        magnitude).
+        The axis outcomes (signed values allowed; 0 is on every lattice).
 
     Returns
     -------
-    float
-        The largest exact bucket size; ``1.0`` for an empty / all-zero lattice.
+    float or None
+        The step: ``1`` for an integer lattice, ``5`` for ``[0 5 10]``,
+        ``0.25`` for ``[0.25 0.75]``, ``1.0`` for an all-zero axis. ``None``
+        when the values sit on no dyadic lattice (``[0 0.1 0.2]``), and that
+        axis is then sized freely and scattered.
+
+    Notes
+    -----
+    Through 1.25.0 this was a floating-point Euclid gcd, which took
+    ``0.09999999999999998`` as the bucket for ``[0.1 0.2 0.3]`` and about
+    ``1e-7`` for ``[0 0.1 0.3000001]``, a grid that never finished building.
     """
-    vals = np.abs(np.asarray(xs, dtype=float))
-    vals = vals[vals > 0]
-    if len(vals) == 0:
-        return 1.0
-    g = vals[0]
-    for v in vals[1:]:
-        g = _float_gcd(g, v)
-    return float(g)
+    fit = _dyadic_lattice_step(xs)
+    return None if fit is None else fit[0]
 
 
 def _dense_1d(v):
@@ -1496,8 +1504,9 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # shared event count (an empirical dfreq carries its own mean; see
         # _resolve_en).
         self.en = self._resolve_en(exp_en, exp_el, exp_premium, exp_lr)
-        # per-axis exact bucket size: the lattice gcd, so S scatters onto the
-        # FFT grid with no rebucketing (the discrete analogue of dsev exactness).
+        # per-axis dyadic lattice step (or None): the axis bs is a lattice
+        # candidate when one fits, so S lands on the grid with no split (the
+        # discrete analogue of dsev exactness); see _size_axes.
         self._lattice_bs = [_lattice_bs(xs), _lattice_bs(ys)]
         self._gs = None
 
@@ -1661,7 +1670,8 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         lo, hi = balanced_window(ser, prob)
         return lo, hi, float(a.bs)
 
-    def _size_axes(self, total_log2, bs_axes, log2_axes, measure_log2=None):
+    def _size_axes(self, total_log2, bs_axes, log2_axes, measure_log2=None,
+                   lattice_axes=None):
         """Measure each axis's grid from its realized standalone marginal (§5).
 
         The bv's privilege is to *measure*, not guess. Each standalone loss
@@ -1694,6 +1704,15 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             the massive path caps it at :data:`_MASSIVE_MEASURE_LOG2` so a
             ``(16, 16)`` budget does not ask a 1-D marginal for ``2**32``
             buckets just to read its window.
+        lattice_axes : list of (float or None), optional
+            Discrete mode: each axis's dyadic lattice step (:func:`_lattice_bs`).
+            An axis with a step and no pinned ``bs`` takes the first of
+            :func:`~aggregate.utilities._lattice_candidates` whose grid covers
+            its measured width within the axis cap, its pinned ``log2`` or
+            else ``total_log2 - min_axis_log2`` (16 at the defaults, the most
+            the free split gives one axis), and is then sized as if pinned.
+            An axis with no step, or no candidate that fits, is left free and
+            measured like a copula axis ([Bivariate-Axis-Cap], 2026-10-28).
 
         Returns
         -------
@@ -1732,6 +1751,21 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         #    the budget.
         def _cover_log2(width, bs):
             return max(int(np.ceil(np.log2(width / bs + 1.0))), _MIN_AXIS_LOG2)
+
+        # Discrete lattice axes: the first candidate that fits the axis cap is
+        # used as a pinned bs, exactly as the lattice gcd was through 1.25.0.
+        # There is no joint budget test once both axes fit, as before.
+        bs_axes = list(bs_axes)
+        for i in range(2):
+            h = None if lattice_axes is None else lattice_axes[i]
+            if h is None or bs_axes[i] is not None:
+                continue
+            cap = (int(log2_axes[i]) if log2_axes[i] is not None
+                   else total_log2 - _MIN_AXIS_LOG2)
+            for b in _lattice_candidates(h):
+                if _cover_log2(widths[i], b) <= cap:
+                    bs_axes[i] = float(b)
+                    break
 
         free = [log2_axes[i] is None and bs_axes[i] is None for i in range(2)]
         if free[0] and free[1]:
@@ -1895,17 +1929,21 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             bs_axes = [float(bs), float(bs)]
         else:
             bs_axes = [None, None]
-        # discrete mode: default each axis's bs to the lattice gcd so the given
-        # joint matrix scatters onto the grid exactly (a pinned bs lets _size_axes
-        # grow log2 to cover the measured aggregate window). An explicit override
-        # still wins.
-        if self.mode == 'discrete':
-            bs_axes = [bs_axes[i] if bs_axes[i] is not None else self._lattice_bs[i]
-                       for i in range(2)]
+        # discrete mode: a lattice axis takes a lattice candidate as its bs when
+        # one fits the axis cap, so the given joint matrix lands on the grid
+        # exactly; an explicit override still wins (_size_axes).
+        lattice_axes = self._lattice_bs if self.mode == 'discrete' else None
         measure_log2 = (min(total_log2, _MASSIVE_MEASURE_LOG2)
                         if store_dir is not None else None)
         bss, log2s, x_mins, his, clipped = self._size_axes(
-            total_log2, bs_axes, log2_axes, measure_log2=measure_log2)
+            total_log2, bs_axes, log2_axes, measure_log2=measure_log2,
+            lattice_axes=lattice_axes)
+        # an axis is placed at exact indices when its bs divides its step;
+        # otherwise (no lattice, no fitting candidate, a pinned bs that misses
+        # it) the joint matrix is scattered on that axis
+        self._on_lattice = [
+            lattice_axes is not None and lattice_axes[i] is not None
+            and _divides(bss[i], lattice_axes[i]) for i in range(2)]
         self._clipped = clipped
         self._gs = []
         self._i0 = []                    # per-event severity negative reach (lay-in wrap)
@@ -2102,7 +2140,9 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         The mode-specific severity *formation*, shared by the in-core
         :meth:`update_work` and the massive :meth:`_update_massive` paths.
         Discrete mode scatters the given lattice matrix onto the output grid
-        at exact bucket indices (the lattice ``bs`` is the gcd); copula mode
+        at exact bucket indices when each axis ``bs`` divides its lattice step,
+        and with the units' ``dsev_bucket`` scheme on an axis that is off its
+        lattice ([Bivariate-Off-Lattice-Scheme]); copula mode
         builds the discrete-Sklar rectangle mass from the per-event marginal
         CDFs (the Bernoulli zero-inflation is automatic as a jump in ``G``).
 
@@ -2128,10 +2168,31 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             The per-claim severity, stored on ``self._S`` (retained for the
             severity panel of ``plot()`` and the ``Sev`` dependence row).
         """
-        if self._S_given is not None:
+        on = getattr(self, '_on_lattice', [True, True])
+        if self._S_given is not None and not all(on):
+            # discrete mode with an axis off its lattice: scatter the given
+            # matrix with the units' dsev_bucket scheme, the one that built
+            # g0 / g1, so the row and column sums of S still equal them (the
+            # bilinear split's margins are the 1-D linear split). A lattice axis
+            # is rounded to its exact index first, so it does not split. The
+            # i0 offset is the signed lay-in convention, as below.
+            scheme = next(self.units[i].dsev_bucket for i in range(2)
+                          if not on[i])
+            pos = []
+            for i, v in enumerate((self._dbv_xs, self._dbv_ys)):
+                k = np.asarray(v, dtype=float) / self.bs[i]
+                pos.append(((np.round(k) if on[i] else k) + self._i0[i])
+                           * self.bs[i])
+            cv = np.repeat(pos[0], len(pos[1]))
+            nv = np.tile(pos[1], len(pos[0]))
+            mass = np.asarray(self._S_given, dtype=float).ravel()
+            scatter = scatter_bivariate_sparse if massive else scatter_bivariate
+            S = scatter(cv, nv, mass, self.bs[0], self.bs[1], N0, N1,
+                        scheme=scheme)
+        elif self._S_given is not None:
             # discrete mode: scatter the given joint per-claim matrix onto the
-            # (N0, N1) output grid at each lattice point's bucket index. The
-            # lattice bs divides every atom (gcd), so the indices are exact and
+            # (N0, N1) output grid at each lattice point's bucket index. Each
+            # axis bs divides its lattice step, so the indices are exact and
             # the per-event-severity row/column sums reproduce g0 / g1 on the grid.
             # The i0 offset puts the scatter in the natural signed convention
             # the lay-in expects (row 0 = x_min = -i0*bs): _lay_signed_2d wraps

@@ -364,7 +364,8 @@ def _dyadic_lattice_step(atoms, rtol=LATTICE_RTOL, depth=LATTICE_DEPTH):
         return 1.0, 0.0
     tol = rtol * M
     e = int(np.floor(np.log2(M)))          # 2**e <= M < 2**(e + 1)
-    r_hi = int(np.floor(depth - np.log2(M)))
+    # and never past 2**53, where x * 2**r stops rounding to integers exactly
+    r_hi = min(int(np.floor(depth - np.log2(M))), 52 - e)
     for r in range(-e, r_hi + 1):
         scaled = np.ldexp(x, r)
         p = np.rint(scaled)

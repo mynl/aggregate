@@ -201,9 +201,13 @@ def test_dbvsev_unnormalised_renormalises(caplog):
     ([10, 20, 35], 5.0),
     ([0.5, 1.5], 0.5),
     ([0], 1.0),
+    # decimals sit on no dyadic lattice: a free axis, scattered
+    ([0, 0.1, 0.2], None),
+    ([0, 0.1, 0.3000001], None),
 ])
 def test_lattice_bs(xs, expected):
-    assert np.isclose(_lattice_bs(xs), expected)
+    """The axis step is the dyadic lattice routine's (1.26.0, was a float gcd)."""
+    assert _lattice_bs(xs) == expected
 
 
 # ----------------------------------------------------------------------

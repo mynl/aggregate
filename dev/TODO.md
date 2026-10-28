@@ -54,9 +54,6 @@
 
 ## Correctness
 
-- **[Fractional-Lattice-Bucket]**: steps 1 and 2 landed in 1.24.0 and
-  1.25.0. Step 3 (`[Bivariate-Dyadic-Lattice]`) remains; see
-  `dev/done/plan-fractional-lattice-bucket.md`.
 - **[Signed-Portfolio-Origin]**: `Portfolio.update` places a signed grid at
   `min(sum x_min_k, min x_min_k)`, not at `best_window`'s origin; 1000 signed
   fixed-count units realize -1750 at width 512 and hold 17.7% of the mass.

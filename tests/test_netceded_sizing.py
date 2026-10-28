@@ -20,7 +20,7 @@ import numpy as np
 import pytest
 
 from aggregate import build
-from aggregate.bivariate import _float_gcd, _netceded_exact_bs
+from aggregate.bivariate import _netceded_exact_bs
 
 # A discrete excess layer: images 0, 10, 10 and gross 10, 20, 30, so the exact
 # common lattice is the severity step and the budget can pay for it.
@@ -81,10 +81,20 @@ def test_exact_bs_early_exit_matches_the_full_gcd():
     assert _netceded_exact_bs(x0, x1, 1e-6, 30.0, 10.0, 20) is None
 
 
-def test_float_gcd_is_the_one_implementation():
-    """``_lattice_bs`` and the netceded lattice fold the same helper."""
-    assert _float_gcd(12.0, 8.0) == pytest.approx(4.0)
-    assert _float_gcd(0.25, 0.1) == pytest.approx(0.05)
+def test_netceded_lattice_is_the_dyadic_rule():
+    """The netceded lattice is the one dyadic routine and the lattice rule.
+
+    The float gcd it replaced (1.26.0) found 0.05 for 0.25 and 0.1, a bucket
+    no binary grid holds exactly.
+    """
+    x0 = np.array([0.0, 0.25, 0.75])
+    x1 = np.array([0.0, 0.0, 0.25])
+    assert _netceded_exact_bs(x0, x1, 0.25, 1.0, 1.0, 20) == 0.25
+    # decimal images sit on no dyadic lattice, whatever the budget
+    assert _netceded_exact_bs(x0 + 0.1, x1, 0.25, 1.0, 1.0, 20) is None
+    # an integer step off the ladder takes its ladder divisor
+    assert _netceded_exact_bs(np.array([0.0, 30.0, 60.0]), np.array([0.0, 30.0]),
+                              30.0, 60.0, 30.0, 20) == 10.0
 
 
 # --- the refusal ------------------------------------------------------------

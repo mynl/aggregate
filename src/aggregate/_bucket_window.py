@@ -2269,7 +2269,7 @@ def _bucket_is_exact(ob, bs):
     """Whether ``bs`` discretizes a discrete severity exactly.
 
     ``(exact, lattice)``. Exact when every atom is a whole number of buckets,
-    i.e. the lattice gcd is an integer multiple of ``bs``. A *finer* bucket is
+    i.e. the lattice step is an integer multiple of ``bs``. A *finer* bucket is
     still exact but wastes grid; a coarser one that does not divide the lattice
     scatters the atoms off their own values.
     """

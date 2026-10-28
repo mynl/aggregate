@@ -1342,7 +1342,11 @@ clash BivariateClash
 
 bivariate BivariateDiscreteJoint
   dfreq [1 5 20] [0.5 0.25 0.25]
-  dbvsev [1 2 3] [1 2 3] [[0.1875 0.125 0] [0.125 0.125 0.125] [0 0.125 0.1875]]
+  dbvsev [1 2 3] [1 2 3] [
+    [0.1875 0.125 0]
+    [0.125 0.125 0.125]
+    [0 0.125 0.1875]
+  ]
   note{Discrete bivariate severity, the two-dimensional analogue of dsev: the joint per-claim probability matrix is given directly on an explicit lattice, row index the X outcome and column index the Y outcome. The marginals reproduce the standalone dsev compounds exactly.}
   tags{topic:bivariate, role:advanced};
 

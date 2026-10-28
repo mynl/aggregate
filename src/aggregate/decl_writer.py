@@ -849,6 +849,30 @@ class _Block:
         self.tab = tab
 
 
+class _Matrix:
+    """A clause ending in a nested array: a head and one bracketed row per line.
+
+    The ``elt`` / ``ylt`` matrices and the ``dbvsev`` probability matrix. Terse
+    puts the whole array on the line as ``head [[r1] [r2]]``, byte-for-byte the
+    historical form. Spread opens the array on the head line, puts each row one
+    level deeper and closes it at the head's level, so rows stack for reading
+    down. A single row stays on the head line in both layouts, since three lines
+    of brackets for one row add nothing.
+
+    Attributes
+    ----------
+    head : str
+        The clause text before the array (``elt unit A``, ``dbvsev [0 1] [0 1]``).
+    rows : list of str
+        The rendered rows, each already bracketed.
+    """
+    __slots__ = ('head', 'rows')
+
+    def __init__(self, head, rows):
+        self.head = head
+        self.rows = rows
+
+
 def _render_terse(node) -> str:
     """Flatten a ``_Block`` / ``str`` tree to a single logical statement.
 
@@ -860,6 +884,8 @@ def _render_terse(node) -> str:
     """
     if isinstance(node, str):
         return node
+    if isinstance(node, _Matrix):
+        return _join([node.head, '[' + ' '.join(node.rows) + ']'])
     if node.tab:
         lines = [node.head] if node.head else []
         for child in node.children:
@@ -878,11 +904,20 @@ def _render_spread(node, depth: int = 0, indent: str = '  ') -> str:
     The head sits at ``indent * depth``; each child renders one level deeper, on
     its own line. For an ``and``-separated block every child except the last gets
     a trailing `` and`` so the cession list reads naturally. ``tab`` is ignored
-    here --- spread indents uniformly with ``indent``.
+    here --- spread indents uniformly with ``indent``. A :class:`_Matrix` with
+    more than one row opens its array on the head line, puts each row one level
+    deeper and closes it at the head's level; the preprocessor folds the lines
+    back into one statement on re-parse.
     """
     pad = indent * depth
     if isinstance(node, str):
         return pad + node
+    if isinstance(node, _Matrix):
+        if len(node.rows) < 2:
+            return pad + _render_terse(node)
+        return '\n'.join([pad + _join([node.head, '[']),
+                          *(pad + indent + r for r in node.rows),
+                          pad + ']'])
     lines = [pad + node.head] if node.head else []
     # drop empty string fragments so they never emit a whitespace-only line
     kids = [c for c in node.children if not (isinstance(c, str) and not c)]
@@ -937,13 +972,15 @@ def _fmt_lt_id(ident: str) -> str:
     return ident if ident.isdigit() and str(int(ident)) == ident else f'"{ident}"'
 
 
-def _render_loss_table(source: dict) -> str:
+def _render_loss_table(source: dict):
     """Render one ``elt`` / ``ylt`` source clause.
 
     Inverts ``elt_source`` / ``ylt_source``: the keyword, ``no2u`` when set,
     ``unit NAME [as LABEL]`` when declared, then the quoted path, the flat
     vector, or the matrix with one bracketed row per event or year. An omitted
-    unit stays omitted rather than rendering as ``unit Total``.
+    unit stays omitted rather than rendering as ``unit Total``. A matrix
+    returns a :class:`_Matrix`, so spread stacks its rows; the other forms
+    return a ``str``.
     """
     parts = [source['table']]
     if source.get('no2u'):
@@ -955,10 +992,9 @@ def _render_loss_table(source: dict) -> str:
     elif 'values' in source:
         parts.append(_fmt_seq(source['values']))
     else:
-        rows = ' '.join(
+        return _Matrix(' '.join(parts), [
             '[' + ' '.join([_fmt_lt_id(r[0]), *(_fmt_num(v) for v in r[1:])]) + ']'
-            for r in source['rows'])
-        parts.append(f'[{rows}]')
+            for r in source['rows']])
     return ' '.join(parts)
 
 
@@ -1188,18 +1224,19 @@ def _render_copula(copula) -> str:
     return f'copula {kind} {_fmt_num(param)}'
 
 
-def _render_dbvsev(spec: dict) -> str:
+def _render_dbvsev(spec: dict) -> _Matrix:
     """Render a discrete bivariate severity as the canonical dense form.
 
     ``dbvsev [xs] [ys] [[row] [row] ...]`` --- ``S[i][j] = P(X=xs[i], Y=ys[j])``.
     The sparse / uniform / range surface forms all normalise to the same dense
     ``dbv_*`` spec, so they canonicalise to this dense rendering (which re-parses
-    to the same matrix).
+    to the same matrix). Returned as a :class:`_Matrix`, so spread puts one
+    row of ``S`` per line.
     """
     xs, ys = spec['dbv_xs'], spec['dbv_ys']
     S = np.atleast_2d(np.asarray(spec['dbv_S'], dtype=float))
-    rows = ' '.join('[' + ' '.join(_fmt_num(v) for v in row) + ']' for row in S)
-    return f'dbvsev {_fmt_seq(xs)} {_fmt_seq(ys)} [{rows}]'
+    return _Matrix(f'dbvsev {_fmt_seq(xs)} {_fmt_seq(ys)}',
+                   ['[' + ' '.join(_fmt_num(v) for v in row) + ']' for row in S])
 
 
 def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.18.1 - 2026-10-28
+
+**[Format-Matrix-Rows] the spread layout puts each row of a nested array on its own line.** `format_program` and `pprogram` now open an `elt` / `ylt` matrix or a `dbvsev` probability matrix on the clause line, indent each row one level deeper and close the bracket at the clause's level. A one-row matrix stays on one line, and the terse layout (`spec_to_decl`, `to_agg`) is unchanged. `BivariateDiscreteJoint` in `library.agg` is rewritten in the new layout.
+
 ## 1.18.0 - 2026-10-27
 
 **[ELT-Eltq-Extra] eltq is the optional `elt` extra, also in `all`.** `pip install aggregate[elt]` installs eltq 2.13 or later from PyPI for secondary uncertainty in an ELT6 source; it is no longer installed by hand. In a dev checkout `uv sync --all-extras` now replaces a local eltq build with the published wheel, so re-install a checkout after syncing to test an unreleased eltq. The ELT6 tests still skip where eltq is absent, like the other extras' tests.

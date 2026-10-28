@@ -2631,7 +2631,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                  value_type='loss',
                  approximate='exact',
                  label=None, label_map=None,
-                 note='', hints='', tags=(), _tweedie=None,
+                 note='', hints='', tags=(), _tweedie=None, _tweedie_cv=None,
                  exp_retention_end=None, _loss_table_meta=None):
         """
         The :class:`Aggregate` distribution class manages creation and calculation of aggregate distributions.
@@ -2792,6 +2792,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             underwriter-applied stamp because a parsed spec is splatted
             straight into this constructor at eleven call sites and there is no
             choke point to pop it at. See dev/done/plan-tweedie.md.
+        :param _tweedie_cv:     private provenance, the coefficient of
+            variation when the clause was written ``tweedie <p> <mean> cv
+            <cv>``, else ``None``. Read only by ``decl_writer``, which renders
+            the declared CV rather than converting the dispersion back. See
+            dev/done/plan-tweedie-statement.md.
         :param _loss_table_meta: private provenance, the audit record
             ``aggregate._loss_table.resolve`` writes when the aggregate is
             declared from an ``elt`` or ``yelt`` table, or ``None``. The
@@ -2822,6 +2827,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self._spec.get('_tweedie') is None:
             self._spec.pop('_tweedie', None)
         self._tweedie = _tweedie
+        # Same rule for the CV form's declared CV ([Tweedie-Clause-CV]).
+        if self._spec.get('_tweedie_cv') is None:
+            self._spec.pop('_tweedie_cv', None)
+        self._tweedie_cv = _tweedie_cv
         # Same rule for the loss table audit ([DecL-Loss-Tables]).
         if self._spec.get('_loss_table_meta') is None:
             self._spec.pop('_loss_table_meta', None)

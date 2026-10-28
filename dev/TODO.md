@@ -90,6 +90,11 @@
 - **[Unparser-Reference-Gaps]**: shrink `UNPARSER_EXEMPT` in
   `tests/test_agg_libraries.py`, the `library.agg` entries `decl_writer`
   cannot render back as written.
+- **[Power-Variance-Family]**: the `tweedie` clause and statement cover only
+  `1 < p < 2` (the `conversion` kind landed in 1.22.0,
+  `dev/done/plan-tweedie-statement.md`); the rest of the family has no
+  frequency and severity form. Absorbed by the parked
+  `dev/plan-characteristic-function-engine.md`.
 
 ## P&L and bivariate
 

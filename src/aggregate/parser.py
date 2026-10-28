@@ -770,19 +770,7 @@ class UnderwritingTransformer(Transformer):
         from .tweedie import TweedieParameters, tweedie_convert
 
         _tw, pp, mu, sig2 = c
-        if not 1 < pp < 2:
-            # The compound Poisson-gamma representation exists only strictly
-            # inside (1, 2): at p = 1 the gamma shape alpha = (2-p)/(p-1) is
-            # infinite and at p = 2 the Poisson rate diverges, so
-            # ``tweedie_convert`` would raise a bare ZeroDivisionError. Outside
-            # the interval the family has no frequency x severity form at all,
-            # which is what [Power-Variance-Family] in dev/TODO.md would need
-            # a different representation for.
-            raise ValueError(
-                f'tweedie: p must be strictly between 1 and 2, got {pp}. The '
-                f'clause is `tweedie <p> <mean> <dispersion>`, shape parameter '
-                f'first. (It read `<mean> <p> <dispersion>` before 1.0.0a231, '
-                f'so an older program needs its first two numbers swapped.)')
+        self._check_tweedie(pp, mu, sig2, None)
         ans = tweedie_convert(p=pp, μ=mu, σ2=sig2)
         return {
             "exp_en": ans["λ"],
@@ -792,6 +780,147 @@ class UnderwritingTransformer(Transformer):
             "sev_scale": ans["β"],
             "_tweedie": TweedieParameters(p=pp, mean=mu, dispersion=sig2),
         }
+
+    def agg_body_tweedie_cv(self, c):
+        """``tweedie <p> <mean> cv <cv>`` inside an ``agg``: the CV form.
+
+        Expands exactly as :meth:`agg_body_tweedie` does, from the dispersion
+        ``cv ** 2 * mean ** (2 - p)``, and records the declared CV under the
+        private ``_tweedie_cv`` beside ``_tweedie``, so the writer renders the
+        clause from the number the author wrote rather than converting the
+        dispersion back. See dev/done/plan-tweedie-statement.md
+        ([Tweedie-Clause-CV]).
+        """
+        _tw, pp, mu, _cv, cv = c
+        self._check_tweedie(pp, mu, None, cv)
+        spec = self.agg_body_tweedie([_tw, pp, mu, cv ** 2 * mu ** (2 - pp)])
+        spec["_tweedie_cv"] = cv
+        return spec
+
+    @staticmethod
+    def _check_tweedie_p(pp):
+        """Refuse a Tweedie power outside the open interval (1, 2).
+
+        The compound Poisson-gamma representation exists only strictly inside
+        (1, 2): at p = 1 the gamma shape alpha = (2-p)/(p-1) is infinite and at
+        p = 2 the Poisson rate diverges, so ``tweedie_convert`` would raise a
+        bare ZeroDivisionError. Outside the interval the family has no
+        frequency x severity form at all, which is what
+        [Power-Variance-Family] in dev/TODO.md would need a different
+        representation for.
+        """
+        if not 1 < pp < 2:
+            raise ValueError(
+                f'tweedie: p must be strictly between 1 and 2, got {pp}. The '
+                f'clause is `tweedie <p> <mean> <dispersion>` or `tweedie <p> '
+                f'<mean> cv <cv>`, shape parameter first. (It read `<mean> <p> '
+                f'<dispersion>` before 1.0.0a231, so an older program needs its '
+                f'first two numbers swapped.)')
+
+    def _check_tweedie(self, pp, mu, sig2, cv):
+        """Validate a reproductive ``tweedie`` clause: p, then positivity.
+
+        ``sig2`` is ``None`` for the CV form and ``cv`` is ``None`` for the
+        dispersion form; the message names the form that was written.
+        """
+        self._check_tweedie_p(pp)
+        form = ('tweedie <p> <mean> <dispersion>' if cv is None
+                else 'tweedie <p> <mean> cv <cv>')
+        for what, x in (('mean', mu), ('dispersion', sig2), ('cv', cv)):
+            if x is not None and not x > 0:
+                raise ValueError(
+                    f'tweedie: the {what} must be positive, got {x}. The form '
+                    f'is `{form}`.')
+
+    # ----- parameter conversions ([Tweedie-Statement]) ----------------
+    # A bare ``tweedie`` statement is an answer: each form returns the computed
+    # object as ``("conversion", family, object)``, which the underwriter
+    # treats like a bare expression (``ANSWER_KINDS``). Nothing is stored. See
+    # dev/done/plan-tweedie-statement.md.
+
+    def answer_conversion(self, c):
+        return c[0]
+
+    def conversion_tweedie_dispersion(self, c):
+        """``tweedie <p> <mean> <dispersion>`` standing alone."""
+        from .tweedie import TweedieConversion
+        _tw, pp, mu, sig2 = c
+        self._check_tweedie(pp, mu, sig2, None)
+        return ("conversion", "tweedie",
+                TweedieConversion.from_dispersion(pp, mu, sig2))
+
+    def conversion_tweedie_cv(self, c):
+        """``tweedie <p> <mean> cv <cv>`` standing alone."""
+        from .tweedie import TweedieConversion
+        _tw, pp, mu, _cv, cv = c
+        self._check_tweedie(pp, mu, None, cv)
+        return ("conversion", "tweedie", TweedieConversion.from_cv(pp, mu, cv))
+
+    #: Keys a parsed severity carries that say nothing about the law: the
+    #: trailer of a stored ``sev.NAME`` the compound form may reference.
+    _SEV_METADATA_KEYS = frozenset({"note", "tags", "hints", "label"})
+
+    def conversion_tweedie_compound(self, c):
+        """``tweedie <count> claims sev <gamma>`` standing alone.
+
+        The severity is parsed by the ``agg`` body's own ``sev`` rule, so every
+        spelling of a gamma an ``agg`` accepts works here (``gamma 10 cv 1``,
+        ``10 * gamma 1``), and only a plain one is accepted: scalar parameters,
+        no shift, reflection, mixture, splice, picks or unconditional ``!``.
+
+        Notes
+        -----
+        With ``sev_mean`` present (the mean and CV spelling, already multiplied
+        by any scale) the mean and CV are read directly. Otherwise the gamma is
+        written by its shape ``alpha`` and scale, its mean is
+        ``alpha * scale`` and its CV is ``alpha ** -0.5``.
+        """
+        from .tweedie import TweedieConversion
+        _tw, en, _claims, _sev, sev = c
+        form = 'tweedie <count> claims sev gamma <mean> cv <cv>'
+
+        def refuse(found):
+            raise ValueError(
+                f'tweedie: the compound form needs a plain gamma severity, '
+                f'`{form}`, but found {found}.')
+
+        name = sev.get("sev_name")
+        if name != "gamma":
+            refuse(f'severity {name!r}' if isinstance(name, str)
+                   else f'a mixture of {name}')
+        defaults = {"sev_loc": 0.0, "sev_wt": 1.0, "sev_lb": 0.0,
+                    "sev_ub": np.inf, "sev_reflect": False,
+                    "sev_conditional": True}
+        params = ("sev_mean", "sev_cv", "sev_a", "sev_scale")
+        for k, v in sev.items():
+            if k in ("sev_name", *params) or k in self._SEV_METADATA_KEYS:
+                continue
+            if k in defaults:
+                if not np.isscalar(v) or v != defaults[k]:
+                    refuse(f'{k} = {v}')
+                continue
+            refuse(f'the clause {k}')
+        for k in params:
+            if k in sev and not np.isscalar(sev[k]):
+                refuse(f'the vector {k} = {sev[k]}')
+        if "sev_mean" in sev:
+            sev_m, sev_cv = sev["sev_mean"], sev.get("sev_cv", np.nan)
+        elif "sev_a" in sev:
+            alpha = sev["sev_a"]
+            if not alpha > 0:
+                refuse(f'the gamma shape {alpha}, which must be positive')
+            sev_m, sev_cv = alpha * sev.get("sev_scale", 1.0), alpha ** -0.5
+        else:
+            refuse('a gamma with no parameters')
+        for what, x in (('claim count', en), ('severity mean', sev_m),
+                        ('severity cv', sev_cv)):
+            if not x > 0:
+                raise ValueError(
+                    f'tweedie: the {what} must be positive, got {x}. The form '
+                    f'is `{form}`.')
+        return ("conversion", "tweedie",
+                TweedieConversion.from_compound(float(en), float(sev_m),
+                                                float(sev_cv)))
 
     def agg_body_rename(self, c):
         bagg, occ_reins, agg_reins = c
@@ -1000,9 +1129,9 @@ class UnderwritingTransformer(Transformer):
         # ``agg NAME <body>`` -- a complete inline aggregate, no trailer (the
         # wrapping pnl/xpnl owns it). Returns the engine spec fragment; the
         # engine's display label is carried through so the inner Aggregate is
-        # faithfully the declared engine, and so is a ``_tweedie`` provenance
-        # key, which is what lets a tweedie engine inside a pnl render its
-        # clause back.
+        # faithfully the declared engine, and so are the ``_tweedie`` and
+        # ``_tweedie_cv`` provenance keys, which are what let a tweedie engine
+        # inside a pnl render its clause back.
         _agg, name, as_label, body = c
         return ("agg", name, {"name": name, **as_label, **body})
 
@@ -1065,8 +1194,9 @@ class UnderwritingTransformer(Transformer):
                 spec[k] = v
             # The engine's own note and label are inner-Aggregate presentation;
             # keep them without shadowing the pnl's trailer/label. (A tweedie
-            # engine's ``_tweedie`` is not metadata and is not skipped above, so
-            # it rides the loop into the pnl spec and the clause round-trips.)
+            # engine's ``_tweedie`` and ``_tweedie_cv`` are not metadata and
+            # are not skipped above, so they ride the loop into the pnl spec
+            # and the clause round-trips.)
             if espec.get("note"):
                 spec["engine_note"] = espec["note"]
             if "label" in espec:
@@ -3095,7 +3225,7 @@ class UnderwritingParser:
     returned by ``UnderwritingLexer.tokenize`` (which carries the original
     text), returning a ``(kind, name, spec)`` tuple where ``kind`` is one of
     ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``,
-    ``'distortion'``, or ``'expr'``."""
+    ``'distortion'``, ``'expr'``, or ``'conversion'``."""
 
     def __init__(self, safe_lookup_function, debug: bool = False) -> None:
         self.safe_lookup = safe_lookup_function
@@ -3114,10 +3244,13 @@ class UnderwritingParser:
         -------
         (kind, name, spec) : tuple
             ``kind`` is one of ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``,
-            ``'pnl'``, ``'xpnl'``, ``'distortion'``, ``'expr'``; ``name`` is
-            the object identifier; ``spec`` is the dictionary specification
-            used downstream to construct the object. For ``'expr'`` the
-            statement is a bare expression and ``spec`` is its numeric value.
+            ``'pnl'``, ``'xpnl'``, ``'distortion'``, ``'expr'``,
+            ``'conversion'``; ``name`` is the object identifier; ``spec`` is
+            the dictionary specification used downstream to construct the
+            object. For ``'expr'`` the statement is a bare expression and
+            ``spec`` is its numeric value. For ``'conversion'`` the statement
+            is a parameter calculator such as ``tweedie 1.5 100 2``, ``name``
+            is the family (``'tweedie'``) and ``spec`` is the computed object.
 
         Raises
         ------

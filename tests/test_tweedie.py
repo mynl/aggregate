@@ -13,6 +13,10 @@ Also covers the ``tweedie`` DecL clause surviving the parse
 renders back instead of its compound-Poisson-gamma expansion, the author's
 ``note{}`` is no longer overwritten, and the argument order is
 ``<p> <mean> <dispersion>``.
+
+And the bare ``tweedie`` statement with its ``TweedieConversion`` answer, plus
+the ``cv`` form of the clause (``[Tweedie-Statement]``,
+``dev/done/plan-tweedie-statement.md``).
 """
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ import numpy as np
 import pytest
 
 from aggregate import build, tweedie_convert, tweedie_density
-from aggregate.tweedie import Tweedie, TweedieParameters
+from aggregate.tweedie import Tweedie, TweedieConversion, TweedieParameters
 
 
 # (p, mean, dispersion) — compound-Poisson-gamma regime.
@@ -222,3 +226,137 @@ def test_recognition_does_not_leak_into_the_unparser():
     assert a.as_tweedie() is not None
     assert 'tweedie' not in a.pprogram
     assert 'poisson' in a.pprogram
+
+
+# ----------------------------------------------------------------------
+# The bare statement: [Tweedie-Statement]
+# ----------------------------------------------------------------------
+
+def _fields(obj):
+    """The eight fields of a ``TweedieConversion`` as a float array."""
+    return np.array(obj, dtype=float)
+
+
+def test_tweedie_statement_worked_example():
+    """``tweedie 1.5 100 2`` is ten claims of a gamma with mean 10 and CV 1."""
+    t = build('tweedie 1.5 100 2')
+    assert isinstance(t, TweedieConversion)
+    assert np.isclose(t.frequency, 10, rtol=1e-12)
+    assert np.isclose(t.sev_m, 10, rtol=1e-12)
+    assert np.isclose(t.sev_cv, 1, rtol=1e-12)
+    assert np.isclose(t.cv, 0.447213595499958, rtol=1e-12)
+    assert np.isclose(t.p0, np.exp(-10), rtol=1e-12)
+    # the compound variance is the Tweedie variance
+    assert np.isclose(t.frequency * t.sev_m ** 2 * (1 + t.sev_cv ** 2),
+                      t.dispersion * t.mean ** t.p, rtol=1e-12)
+
+
+@pytest.mark.parametrize('p', [1.005, 1.5, 1.995])
+def test_tweedie_statement_three_forms_agree(p):
+    """The dispersion, CV and compound forms of one law give the same fields."""
+    t = build(f'tweedie {p} 100 2')
+    by_cv = build(f'tweedie {p} 100 cv {t.cv!r}')
+    by_compound = build(f'tweedie {t.frequency!r} claims sev gamma '
+                        f'{t.sev_m!r} cv {t.sev_cv!r}')
+    assert np.allclose(_fields(by_cv), _fields(t), rtol=1e-12)
+    assert np.allclose(_fields(by_compound), _fields(t), rtol=1e-12)
+
+
+@pytest.mark.parametrize('sev', ['gamma 10 cv 1', '10 * gamma 1',
+                                 '0.5 * gamma 20 cv 1'])
+def test_tweedie_statement_every_gamma_spelling(sev):
+    """Any spelling of the same gamma an ``agg`` accepts gives the same answer."""
+    t = build(f'tweedie 10 claims sev {sev}')
+    assert np.allclose(_fields(t), _fields(build('tweedie 1.5 100 2')),
+                       rtol=1e-12)
+
+
+@pytest.mark.parametrize('program', [
+    'tweedie 10 claims sev lognorm 10 cv 1',
+    'tweedie 10 claims sev gamma 10 cv 1 + 5',
+    'tweedie 10 claims sev gamma [10 20] cv 1 wts [.5 .5]',
+    'tweedie 10 claims sev [gamma lognorm] [10 20] cv 1 wts [.5 .5]',
+    'tweedie 10 claims sev gamma 10 cv 1 !',
+    'tweedie 0 claims sev gamma 10 cv 1',
+    'tweedie 10 claims sev gamma 0',
+    'tweedie 1 100 2',
+    'tweedie 2 100 2',
+    'tweedie 1 100 cv 0.5',
+    'tweedie 2.5 100 cv 0.5',
+    'tweedie 1.5 0 2',
+    'tweedie 1.5 100 0',
+    'tweedie 1.5 100 cv 0',
+])
+def test_tweedie_statement_refusals_name_the_form(program):
+    """Every refusal is a ValueError naming the statement, never a ZeroDivisionError."""
+    with pytest.raises(ValueError, match='tweedie'):
+        build(program)
+
+
+def test_tweedie_statement_string_is_ascii_and_pastes_back():
+    """Each spelling in the answer is legal input for the same law."""
+    t = build('tweedie 1.5 100 2')
+    text = str(t)
+    text.encode('ascii')
+    assert text == ('tweedie 1.5 100 2 = tweedie 1.5 100 cv 0.447214 = '
+                    'tweedie 10 claims sev gamma 10 cv 1, Pr(X=0) 4.53999e-05')
+    spellings = text.split(', Pr(X=0)')[0].split(' = ')
+    assert len(spellings) == 3
+    for s in spellings:
+        assert np.allclose(_fields(build(s)), _fields(t), rtol=1e-5)
+
+
+def test_tweedie_statement_stores_nothing():
+    """A conversion is an answer: the recipe base does not change."""
+    before = set(build._recipes)
+    rv = build.build_many('tweedie 1.5 100 2')
+    assert set(build._recipes) == before
+    assert len(rv) == 1
+    assert rv[0].kind == 'conversion'
+    assert isinstance(rv[0].object, TweedieConversion)
+
+
+def test_bare_expression_unchanged():
+    """The other answer kind still evaluates to its number."""
+    assert build('(2+2)') == 4
+
+
+def test_tweedie_statement_agrees_with_recognition():
+    """The calculator and ``as_tweedie`` agree on a long-hand compound."""
+    a = build('agg TWREC 10 claims sev gamma 10 cv 1 poisson')
+    t = build('tweedie 10 claims sev gamma 10 cv 1')
+    assert np.allclose(a.as_tweedie(), (t.p, t.mean, t.dispersion), rtol=1e-12)
+    assert TweedieConversion.from_dispersion(*a.as_tweedie()) == t
+
+
+# ----------------------------------------------------------------------
+# The CV form inside an agg: [Tweedie-Clause-CV]
+# ----------------------------------------------------------------------
+
+def test_tweedie_clause_cv_form_round_trips():
+    """``tweedie <p> <mean> cv <cv>`` builds and renders as declared."""
+    a = build('agg TWCV tweedie 1.5 100 cv 0.447213595499958')
+    assert 'tweedie 1.5 100 cv 0.447213595499958' in a.pprogram
+    assert np.isclose(a.as_tweedie().dispersion, 2, rtol=1e-12)
+    b = build(a.pprogram)
+    assert b.pprogram == a.pprogram
+    assert b.spec == a.spec
+
+
+def test_tweedie_clause_cv_form_inside_a_pnl():
+    """The clause keeps its CV form as the engine of a P&L."""
+    p = build('pnl TWPNL 1100 premium less agg TWE tweedie 1.5 100 cv 0.5')
+    assert 'tweedie 1.5 100 cv 0.5' in p.pprogram
+
+
+def test_tweedie_cv_provenance_leaves_hashes_alone():
+    """``_tweedie_cv`` is dropped when unset, so no existing hash moved.
+
+    The two hashes were measured at 1.21.0, before the key existed. A
+    deliberate change to the constructor that moves every hash re-pins them.
+    """
+    a = build('agg TWH1 tweedie 1.5 100 2', update=False)
+    b = build('agg TWH2 10 claims sev lognorm 50 cv 1 poisson', update=False)
+    assert '_tweedie_cv' not in a.spec and '_tweedie_cv' not in b.spec
+    assert a._spec_hash() == '618DBE6E'
+    assert b._spec_hash() == 'F0160E2C'

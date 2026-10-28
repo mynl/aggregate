@@ -109,6 +109,27 @@ Three behaviors are worth knowing.
 
 Expressions evaluate as the program parses, so the specification carries plain numbers and the formula is not retained. The canonical text that :func:`aggregate.decl_writer.spec_to_decl` and :func:`aggregate.decl_writer.format_program` produce therefore shows the evaluated literal: the program above decompiles with ``10 claims 133333.33333333334 premium``. This is the long-standing canonical, not verbatim, contract, the same one that collapses ``exp(.5)`` to its float.
 
+Parameter Conversions (tweedie)
+===============================
+
+A **conversion** is a statement that computes the equivalent spellings of one distribution and builds nothing. Like a bare expression it is an answer rather than a declaration: it has no name and no trailer, ``build`` returns the computed object directly, and nothing is stored in the recipe base.
+
+The ``tweedie`` statement is the ``tweedie`` clause from inside an ``agg``, standing alone. It covers the Tweedie distributions with :math:`1<p<2`, which are compound Poisson distributions with gamma severity, and accepts three input forms::
+
+    tweedie 1.5 100 2                        # p, mean, dispersion (a GLM's p and phi)
+    tweedie 1.5 100 cv 0.447214              # p, mean, coefficient of variation
+    tweedie 10 claims sev gamma 10 cv 1      # Poisson count and gamma severity
+
+Each returns the same :class:`aggregate.tweedie.TweedieConversion`, a named tuple with fields ``p``, ``mean``, ``dispersion``, ``cv``, ``frequency``, ``sev_m``, ``sev_cv`` and ``p0``, whose string is every spelling joined by ``=`` and the probability of no loss, to six significant figures::
+
+    tweedie 1.5 100 2 = tweedie 1.5 100 cv 0.447214 = tweedie 10 claims sev gamma 10 cv 1, Pr(X=0) 4.53999e-05
+
+Each spelling is legal input, so any part of the answer can be pasted back. The reproductive Tweedie :math:`\mathrm{Tw}_p(\mu, \sigma^2)` has mean :math:`\mu` and variance :math:`\sigma^2\mu^p`. Its expected claim count is :math:`\lambda = \mu^{2-p}/((2-p)\sigma^2)`, the gamma shape is :math:`\alpha=(2-p)/(p-1)`, so the severity has coefficient of variation :math:`\alpha^{-1/2}` and mean :math:`\mu/\lambda`, and the Tweedie coefficient of variation is :math:`\sigma\mu^{p/2-1}`. In the worked example :math:`\lambda=10`, :math:`\alpha=1` and :math:`\Pr(X=0)=e^{-10}`.
+
+The compound form reads the severity with the ``agg`` body's own ``sev`` clause, so every spelling of a gamma an ``agg`` accepts works (``sev gamma 10 cv 1``, ``sev 10 * gamma 1``). Only a plain gamma is accepted: a shifted, reflected, mixed, spliced or unconditional severity is refused with a message saying what was found, as is :math:`p` outside :math:`(1,2)`.
+
+The ``cv`` form is also legal inside an ``agg``, ``agg X tweedie 1.5 100 cv 0.447214``, and renders back as written. :meth:`aggregate.Aggregate.as_tweedie` reports the reproductive parameters of any compound Poisson gamma aggregate, and ``TweedieConversion.from_dispersion(*a.as_tweedie())`` turns them into the full conversion.
+
 Exact Compounds (nttagg)
 ========================
 

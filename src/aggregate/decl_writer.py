@@ -956,6 +956,11 @@ def _render_tweedie(spec: dict) -> str:
     if not tw:
         return ''
     p, mean, dispersion = tw
+    cv = spec.get('_tweedie_cv')
+    if cv is not None:
+        # The CV form ([Tweedie-Clause-CV]) renders from the declared CV, so
+        # there is no rounding from converting the dispersion back.
+        return f'tweedie {_fmt_num(p)} {_fmt_num(mean)} cv {_fmt_num(cv)}'
     return f'tweedie {_fmt_num(p)} {_fmt_num(mean)} {_fmt_num(dispersion)}'
 
 
@@ -1140,8 +1145,9 @@ def _render_pnl(name: str, spec: dict, kind: str = 'pnl',
         engine_label = _render_label(spec.get('engine_label'))
         engine_name = spec.get('engine_name', f'{name}_e')
         # A tweedie engine short-circuits the body the same way `_render_agg`
-        # does; `_merge_engine_spec` copies `_tweedie` into the pnl spec because
-        # it is structure, not metadata, so it is not on the skip list there.
+        # does; `_merge_engine_spec` copies `_tweedie` and `_tweedie_cv` into
+        # the pnl spec because they are structure, not metadata, so they are
+        # not on the skip list there.
         tweedie = _render_tweedie(spec)
         loss_table = _render_loss_table_body(spec, orientation=False)
         engine = _Block(f'agg {engine_name}{engine_label}', [tweedie] if tweedie

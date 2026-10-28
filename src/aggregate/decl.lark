@@ -25,7 +25,28 @@ answer: sev_out          -> answer_sev
       | bv_out           -> answer_bv
       | nttagg_out       -> answer_nttagg
       | distortion_out   -> answer_distortion
+      | conversion_out   -> answer_conversion
       | expr             -> answer_expr
+
+// ======================================================================
+// Parameter conversions
+// ----------------------------------------------------------------------
+// A conversion is an answer, like a bare expression: it computes the
+// equivalent spellings of one distribution and builds nothing, so it has no
+// name and no trailer and is never stored in the recipe base. Each
+// alternative returns ("conversion", <family>, <object>).
+//
+// ``tweedie`` is the clause from inside an ``agg`` standing alone, in three
+// input forms: the reproductive (p, mean, dispersion), the same with the
+// coefficient of variation in place of the dispersion, and the compound
+// Poisson count with a gamma severity written exactly as in an ``agg`` body.
+// The forms differ in their third or fourth token (a number, CV, or CLAIMS),
+// so they cannot collide. See dev/done/plan-tweedie-statement.md.
+// ======================================================================
+
+conversion_out: TWEEDIE expr expr expr        -> conversion_tweedie_dispersion
+              | TWEEDIE expr expr CV expr     -> conversion_tweedie_cv
+              | TWEEDIE expr CLAIMS SEV sev   -> conversion_tweedie_compound
 
 // ======================================================================
 // Distortion
@@ -83,6 +104,7 @@ agg_body: exposures layers sev_clause occ_reins freq agg_reins approx_clause ori
         | dfreq      layers sev_clause occ_reins       agg_reins approx_clause orientation  -> agg_body_dfreq
         | exposures_years layers sev_clause occ_reins wait_clause agg_reins approx_clause orientation -> agg_body_renewal
         | TWEEDIE expr expr expr                                                             -> agg_body_tweedie
+        | TWEEDIE expr expr CV expr                                                          -> agg_body_tweedie_cv
         | builtin_agg occ_reins agg_reins                                                    -> agg_body_rename
         | elt_sources occ_reins agg_reins approx_clause orientation                          -> agg_body_elt
         | yelt_sources occ_reins agg_reins approx_clause orientation                         -> agg_body_yelt

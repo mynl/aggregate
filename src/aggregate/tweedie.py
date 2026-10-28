@@ -6,7 +6,8 @@ plus the small parameter-translation helpers :func:`tweedie_convert` and
 the series-expansion density :func:`tweedie_density`. ``Tweedie`` itself
 is *not* re-exported at the top-level ``aggregate`` namespace — reach for
 it via ``from aggregate.tweedie import Tweedie``. The helpers and the
-:class:`TweedieParameters` named tuple are top-level public.
+:class:`TweedieParameters` and :class:`TweedieConversion` named tuples are
+top-level public.
 """
 
 from collections import namedtuple
@@ -26,7 +27,8 @@ from .underwriter import build
 # ``Tweedie`` class deliberately NOT in ``__all__`` -- reach it via
 # ``from aggregate.tweedie import Tweedie``. Only the parameter-translation
 # helpers are part of the top-level public surface.
-__all__ = ['TweedieParameters', 'tweedie_convert', 'tweedie_density']
+__all__ = ['TweedieParameters', 'TweedieConversion', 'tweedie_convert',
+           'tweedie_density']
 from .ft import FourierTools
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,150 @@ logger = logging.getLogger(__name__)
 #: clause (rather than its expansion) is what the author wrote. See
 #: ``dev/done/plan-tweedie.md`` ([Tweedie-Round-Trip]).
 TweedieParameters = namedtuple('TweedieParameters', ['p', 'mean', 'dispersion'])
+
+
+class TweedieConversion(namedtuple('TweedieConversion',
+                                   ['p', 'mean', 'dispersion', 'cv', 'frequency',
+                                    'sev_m', 'sev_cv', 'p0'])):
+    """Every spelling of one Tweedie distribution with ``1 < p < 2``.
+
+    The answer to a bare ``tweedie`` DecL statement, which is a calculator
+    rather than a declaration: ``build('tweedie 1.5 100 2')`` returns one of
+    these and stores nothing. The three input forms of the statement map onto
+    the three constructors, and each produces the same object.
+
+    Attributes
+    ----------
+    p : float
+        The power, ``1 < p < 2``.
+    mean : float
+        The mean.
+    dispersion : float
+        The dispersion, so the variance is ``dispersion * mean ** p``.
+    cv : float
+        The coefficient of variation of the Tweedie.
+    frequency : float
+        The expected Poisson claim count.
+    sev_m, sev_cv : float
+        The mean and coefficient of variation of the gamma severity.
+    p0 : float
+        The probability of no loss, ``exp(-frequency)``.
+
+    Notes
+    -----
+    The reproductive Tweedie ``Tw_p(mu, sigma^2)`` has mean ``mu`` and variance
+    ``sigma^2 mu^p``. For ``1 < p < 2`` it is a compound Poisson distribution
+    with gamma severity: the count has mean ``mu^(2-p) / ((2-p) sigma^2)``, the
+    gamma shape is ``alpha = (2-p)/(p-1)``, so the severity CV is
+    ``alpha^(-1/2)``, and the severity mean is the mean divided by the count.
+    The Tweedie CV is ``sigma mu^(p/2-1)``, which is how :meth:`from_cv` sets
+    the dispersion. :func:`tweedie_convert` holds the formulas in both
+    directions.
+
+    The string is the three spellings joined by `` = ``, then the probability
+    of no loss, every number to six significant figures and ASCII only. Each
+    spelling is legal DecL, so any part can be pasted back. The separator is
+    not ``;`` because ``;`` ends a DecL statement.
+
+    An aggregate reports its reproductive parameters through
+    :meth:`aggregate.Aggregate.as_tweedie`, which returns the shorter
+    :class:`TweedieParameters`. Splat it to reach this object::
+
+        TweedieConversion.from_dispersion(*a.as_tweedie())
+
+    Examples
+    --------
+    >>> from aggregate import build
+    >>> print(build('tweedie 1.5 100 2'))
+    tweedie 1.5 100 2 = tweedie 1.5 100 cv 0.447214 = tweedie 10 claims sev gamma 10 cv 1, Pr(X=0) 4.53999e-05
+    """
+
+    __slots__ = ()
+
+    @classmethod
+    def _from_series(cls, s):
+        """Build from the ``pandas.Series`` that :func:`tweedie_convert` returns."""
+        return cls(p=float(s['p']), mean=float(s['μ']), dispersion=float(s['σ^2']),
+                   cv=float(s['tw_cv']), frequency=float(s['λ']),
+                   sev_m=float(s['sev_m']), sev_cv=float(s['sev_cv']),
+                   p0=float(s['p0']))
+
+    @classmethod
+    def from_dispersion(cls, p, mean, dispersion):
+        """From the reproductive parameters, as a GLM reports them.
+
+        Parameters
+        ----------
+        p : float
+            The power, ``1 < p < 2``.
+        mean : float
+            The mean.
+        dispersion : float
+            The dispersion ``phi``; the variance is ``dispersion * mean ** p``.
+
+        Returns
+        -------
+        TweedieConversion
+        """
+        return cls._from_series(tweedie_convert(p=p, μ=mean, σ2=dispersion))
+
+    @classmethod
+    def from_cv(cls, p, mean, cv):
+        """From the power, the mean and the coefficient of variation.
+
+        Parameters
+        ----------
+        p : float
+            The power, ``1 < p < 2``.
+        mean : float
+            The mean.
+        cv : float
+            The coefficient of variation of the Tweedie (not of the severity).
+
+        Returns
+        -------
+        TweedieConversion
+
+        Notes
+        -----
+        Equating ``(cv * mean) ** 2`` with the variance
+        ``dispersion * mean ** p`` gives ``dispersion = cv ** 2 * mean ** (2 - p)``,
+        as in :meth:`Tweedie.from_p_mean_cv`.
+        """
+        return cls.from_dispersion(p, mean, cv ** 2 * mean ** (2 - p))
+
+    @classmethod
+    def from_compound(cls, frequency, sev_m, sev_cv):
+        """From a Poisson claim count and a gamma severity.
+
+        Parameters
+        ----------
+        frequency : float
+            The expected claim count.
+        sev_m : float
+            The gamma severity mean.
+        sev_cv : float
+            The gamma severity coefficient of variation.
+
+        Returns
+        -------
+        TweedieConversion
+
+        Notes
+        -----
+        The gamma shape is ``alpha = sev_cv ** -2``, the power is
+        ``p = (alpha + 2) / (alpha + 1)``, the mean is ``frequency * sev_m`` and
+        the dispersion is ``frequency * sev_m ** 2 * (1 + sev_cv ** 2) / mean ** p``,
+        the compound variance divided by ``mean ** p``.
+        """
+        return cls._from_series(tweedie_convert(λ=frequency, m=sev_m, cv=sev_cv))
+
+    def __str__(self):
+        g = lambda x: f'{x:.6g}'  # noqa: E731
+        return (f'tweedie {g(self.p)} {g(self.mean)} {g(self.dispersion)} = '
+                f'tweedie {g(self.p)} {g(self.mean)} cv {g(self.cv)} = '
+                f'tweedie {g(self.frequency)} claims sev gamma {g(self.sev_m)} '
+                f'cv {g(self.sev_cv)}, Pr(X=0) {g(self.p0)}')
 
 
 def tweedie_convert(*, p=None, μ=None, σ2=None, λ=None, α=None, β=None, m=None, cv=None):

@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.22.0 - 2026-10-28
+
+**[Tweedie-Statement] a bare `tweedie` statement converts between Tweedie parameterizations, and the `agg` clause gains a `cv` form.** `tweedie 1.5 100 2` (p, mean, dispersion), `tweedie 1.5 100 cv 0.447214` (p, mean, CV) and `tweedie 10 claims sev gamma 10 cv 1` (Poisson count, gamma severity, written as in an `agg`) each return the new top-level `TweedieConversion`, a named tuple with fields `p`, `mean`, `dispersion`, `cv`, `frequency`, `sev_m`, `sev_cv` and `p0` and constructors `from_dispersion`, `from_cv` and `from_compound`, whose string lists every spelling joined by ` = ` and `Pr(X=0)`, to six significant figures. The statement is a new answer kind, `'conversion'`, beside `'expr'` (`underwriter.ANSWER_KINDS`): it has no name or trailer and is never stored in the recipe base. Only a plain gamma is accepted in the compound form, and every refusal is a `ValueError` naming the form. `agg X tweedie 1.5 100 cv 0.447214` builds and renders back as written, including as a `pnl` engine, through the private `_tweedie_cv` key; existing spec hashes are unchanged.
+
+Downstream: `aggregate-api` refuses a `conversion` statement as an unsupported kind until `[Status-Bar-Text-Answers]` lands.
+
 ## 1.21.0 - 2026-10-28
 
 **[ELT-Reporting-Punchup] an `elt` or `yelt` aggregate reports through `elt_description`, `elt_explanation` and `elt_df`.** `elt_description` is a few aligned lines: the table, the event rate and mean annual loss (or the annual outcomes), the secondary uncertainty, the grid, and the checks counted by status with each warning named. `elt_explanation` is three paragraphs: the model in words, each source with its provenance, and every check with its value, tolerance and status, warnings first. `elt_df` is the table the model uses, one row per positive-rate event (`rate`, `mean`, then `max`, `sdi` and `sdc` as the form has them, and `units`, the input rows behind a rolled-up shared event) or per year of positive probability (`prob`, `loss`). For any other aggregate the strings are empty and the frame is empty, so the Narrative pane of aLL gains an `elt` section for loss tables only, with no edit there.

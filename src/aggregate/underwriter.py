@@ -53,6 +53,14 @@ class _Unset:
 _UNSET = _Unset()
 
 
+#: Statement kinds that are answers rather than declarations: built by
+#: returning the parsed value, never stored in the recipe base. ``'expr'`` is a
+#: bare expression, whose value is a number; ``'conversion'`` is a parameter
+#: calculator such as ``tweedie 1.5 100 2``, whose value is the computed object
+#: ([Tweedie-Statement], dev/done/plan-tweedie-statement.md).
+ANSWER_KINDS = frozenset({'expr', 'conversion'})
+
+
 #: The non-loss spec keys a pure ``agg`` accepts and **ignores** (with an
 #: :class:`~aggregate.constants.IgnoredDecLClauseWarning`): reinsurance
 #: economics (ceded premium / commission), reinstatement schedules, the
@@ -664,8 +672,8 @@ class ProgramPreview(NamedTuple):
     statements : tuple of Recipe
         One per top-level declaration, in program order, with ``object``
         ``None``. On the ``'name'`` route, the single entry that was found.
-        An ``'expr'`` statement appears here and is never registered, matching
-        ``Underwriter._interpret_program``.
+        An ``'expr'`` or ``'conversion'`` statement appears here and is never
+        registered, matching ``Underwriter._interpret_program``.
     resolved : tuple of ResolvedReference
         Every entry the program leans on, deduplicated, in the order the
         parse met them: the dotted references it inlined, the deferred
@@ -741,14 +749,15 @@ class Underwriter(HelpMixin):
     - Safe lookup of named programs from the recipe base for the parser.
 
     Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``,
-    ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``, ``'distortion'``, or
-    ``'expr'``) and a *name*. Parsing produces a
+    ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``, ``'distortion'``,
+    ``'expr'``, or ``'conversion'``) and a *name*. Parsing produces a
     :class:`~aggregate.recipe.Recipe` holding the kind, name, dict spec, source
     program, provenance, its metadata (``note`` / ``tags`` / ``hints``,
     derived from the spec), and, once :meth:`_factory` runs, the
-    constructed object. ``'expr'`` is the odd one out: a bare expression is an
-    answer rather than a declaration, so it evaluates to its value and is never
-    stored in the recipe base.
+    constructed object. ``'expr'`` and ``'conversion'`` (``ANSWER_KINDS``) are
+    the odd ones out: a bare expression or a parameter conversion such as
+    ``tweedie 1.5 100 2`` is an answer rather than a declaration, so it
+    evaluates to its value and is never stored in the recipe base.
 
     The recipe base is a flat in-memory union, ``(kind, name) -> Recipe``,
     stored in ``self._recipes`` as a plain dict. It is fed by the loaded
@@ -2078,10 +2087,11 @@ class Underwriter(HelpMixin):
             from .ntt import AggregateNTT
             obj = AggregateNTT(**spec)
             obj.program = program
-        elif kind == 'expr':
-            # a bare expression is its own answer: the parser has already
-            # evaluated it, so the spec is the number. There is no object to
-            # construct and nothing is stored in the recipe base.
+        elif kind in ANSWER_KINDS:
+            # an answer is its own object: the parser has already evaluated it,
+            # so the spec is the number (``expr``) or the computed conversion
+            # (``conversion``). There is nothing to construct and nothing is
+            # stored in the recipe base.
             obj = spec
         else:
             raise ValueError(f'Cannot build {kind} objects')
@@ -2317,9 +2327,10 @@ class Underwriter(HelpMixin):
         ----------
         kind : str
             One of ``'sev'``, ``'agg'``, ``'port'``, ``'bvagg'``, ``'pnl'``,
-            ``'xpnl'``, ``'distortion'``. Note that ``'expr'`` is deliberately
-            not stored: a bare expression is an answer, not a declaration, so
-            :meth:`_interpret_program` skips this method for it.
+            ``'xpnl'``, ``'distortion'``. Note that ``'expr'`` and
+            ``'conversion'`` (``ANSWER_KINDS``) are deliberately not stored: a
+            bare expression or a parameter conversion is an answer, not a
+            declaration, so :meth:`_interpret_program` skips this method for it.
         name : str
             The declaration name.
         spec : dict
@@ -2692,11 +2703,12 @@ class Underwriter(HelpMixin):
                     logger.error(e)
                 raise
             else:
-                if kind == 'expr':
-                    # a bare expression evaluates to a number; it is an answer,
-                    # not a declaration, so it is never stored (nothing to look
-                    # up by name, and no spec_to_decl renderer for it).
-                    logger.info('answer out: expression %s evaluated', name)
+                if kind in ANSWER_KINDS:
+                    # a bare expression evaluates to a number and a conversion
+                    # to its computed object; each is an answer, not a
+                    # declaration, so it is never stored (nothing to look up
+                    # by name, and no spec_to_decl renderer for it).
+                    logger.info('answer out: %s %s evaluated', kind, name)
                     rv.append(Recipe(kind=kind, name=name, spec=spec,
                                      program=program_line, source=source))
                     continue
@@ -2869,7 +2881,7 @@ class Underwriter(HelpMixin):
             kind, name, spec = parser.parse(self.lexer.tokenize(line))
             statements.append(Recipe(kind=kind, name=name, spec=spec,
                                      program=line))
-            if kind != 'expr':
+            if kind not in ANSWER_KINDS:
                 # Into the fork only, so a later statement can reference this
                 # one. Provenance still comes from ``self``, so declaring a
                 # name here does not make the program look dependent on it.
@@ -2934,9 +2946,10 @@ class Underwriter(HelpMixin):
         from .bivariate import BivariateAggregate
 
         # The closed set of objects _factory can produce. Severity, Distortion
-        # and a bare numeric expr have no update step; everything in
-        # ``updatable`` is finished by the dispatch at the foot of the loop.
-        # Register a new output type here, in one place, and give it a branch.
+        # and the answers (a bare expression's number, a conversion's object,
+        # tested by kind) have no update step; everything in ``updatable`` is
+        # finished by the dispatch at the foot of the loop. Register a new
+        # output type here, in one place, and give it a branch.
         no_update = (Severity, Distortion, numbers.Number)
         updatable = (Aggregate, Portfolio, BivariateAggregate)
 
@@ -2947,7 +2960,7 @@ class Underwriter(HelpMixin):
                 logger.info('Object %s of kind %s returned as a spec; no further processing.',
                             answer.name, answer.kind)
                 continue
-            if isinstance(obj, no_update):
+            if answer.kind in ANSWER_KINDS or isinstance(obj, no_update):
                 continue
             if not isinstance(obj, updatable):
                 logger.warning('Unexpected: build produced a %s, which build_many '
@@ -3516,7 +3529,7 @@ class Underwriter(HelpMixin):
                     spec = str(e)
                     name = 'other error'
             else:
-                if kind != 'expr':
+                if kind not in ANSWER_KINDS:
                     scratch.add_recipe(kind, name, spec, line)
             rows.append([kind, err, name, spec, line])
 

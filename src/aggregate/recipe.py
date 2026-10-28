@@ -49,12 +49,13 @@ class Recipe:
     ----------
     kind : str
         ``'agg'`` | ``'sev'`` | ``'port'`` | ``'distortion'`` | ``'bvagg'`` |
-        ``'pnl'`` | ``'xpnl'`` | ``'expr'``.
+        ``'pnl'`` | ``'xpnl'`` | ``'expr'`` | ``'conversion'``.
     name : str
         The user-given name (e.g. ``'Dice'``, ``'MyBook'``).
     spec : dict
         Constructor kwargs from the parser, including the DecL trailer keys
-        ``note`` / ``tags`` / ``hints`` when written.
+        ``note`` / ``tags`` / ``hints`` when written. For the answer kinds,
+        ``'expr'`` and ``'conversion'``, the evaluated value itself.
     program : str
         The DecL statement as the parser received it: one line, comments
         stripped. Verbatim relative to what was parsed, not to the ``.agg``
@@ -74,7 +75,8 @@ class Recipe:
         ``.agg`` file continue the count. A session build takes the next number
         at registration, which sorts a user's own programs after the library;
         rebuilding an existing name keeps that name's place. ``-1`` for a
-        recipe that was never registered (the ``expr`` answers handed back by
+        recipe that was never registered (the ``expr`` and ``conversion``
+        answers handed back by
         :meth:`aggregate.Underwriter.build_many`). The ``recipes`` frame stays
         sorted alphabetically; ``recipes.sort_values('seq')`` is reading order.
     as_read : str

@@ -1494,3 +1494,13 @@ pnl LT.PnL6 30 premium less agg LT.PnL6_e elt [[1 .1 50 100 10 10]] occurrence n
 # agg LT.Mixed elt [[1 .1 50 100 10 10]] elt [[2 .1 50]]                     note{refused: active ELT6 with ELT3}
 # agg LT.YOcc yelt [0 100] occurrence net of 50 xs 50                        note{refused: occurrence terms on annual outcomes}
 # agg LT.Missing yelt unit A [[1 0] [2 100]] yelt unit B [[1 100] [3 0]]     note{refused: different year sets}
+
+# TWS. The coefficient of variation form of the tweedie clause ([Tweedie-Statement], 1.22.0)
+# ==========================================================================================
+# ``tweedie <p> <mean> cv <cv>`` beside ``tweedie <p> <mean> <dispersion>``: the
+# same law, rendered back in the form written. The bare ``tweedie`` statement is
+# an answer that declares nothing, so it lives in tests/test_tweedie.py, not
+# here. See dev/done/plan-tweedie-statement.md.
+agg TWS.Dispersion tweedie 1.5 100 2                                         note{ten claims, gamma mean 10 and cv 1};
+agg TWS.CV tweedie 1.5 100 cv 0.447213595499958                              note{the same law in the cv form};
+pnl TWS.PnL 1100 premium less agg TWS.PnL_e tweedie 1.5 100 cv 0.5           note{a cv form engine}

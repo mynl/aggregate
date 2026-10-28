@@ -1521,4 +1521,6 @@ agg FLB.Poi 3 claims dsev [5 10 15] poisson                                    n
 agg FLB.Three 3 claims dsev [3 6 9] [.25 .5 .25] poisson                       note{lattice 3, nice bs 1};
 agg FLB.Noisy 1 claim dsev [0.25000000000000006 0.5000000000000001 1.7499999999999998] [.25 .5 .25] fixed   note{noise lands on the 1/4 lattice};
 agg FLB.Dec 3 claims dsev [0.1 0.2 0.3] [.25 .5 .25] fixed                     note{no dyadic lattice, sized as before};
-port FLB.Port agg FLB.P1 2 claims dsev [-1.75 0.25 0.5] [.25 .5 .25] fixed agg FLB.P2 2 claims dsev [0.75 1.5] fixed   note{pooled lattice 1/4}
+port FLB.Port agg FLB.P1 2 claims dsev [-1.75 0.25 0.5] [.25 .5 .25] fixed agg FLB.P2 2 claims dsev [0.75 1.5] fixed   note{pooled lattice 1/4};
+port FLB.Steps agg FLB.S3 3 claims dsev [3 6 9] poisson agg FLB.S5 3 claims dsev [5 10 15] poisson   note{pooled step 1, bs 1 (was 4)};
+port FLB.SignedPort agg FLB.SP1 3 claims dsev [-1.75 0.25 0.5] [.25 .5 .25] poisson agg FLB.SP2 2 claims dsev [-0.5 0.75] poisson agg FLB.SP3 1 claim dsev [0.25 1.5] fixed   note{signed, bs 1/4, log2 shrinks}

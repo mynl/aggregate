@@ -322,6 +322,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._sharpen_state = None  # last sharpen() decision, for the narrative
         self._bs_clip = None            # portfolio far-tail clip record or None
         self._bs_raw = None             # pre-dyadic-round bs (auto-size only) or None
+        self._bs_lattice = None         # pooled lattice pick (h, residual, bs) or None
         self._combine_x_min = None      # windowed combine origin (Plan B) or None
 
         # for consistency with Aggregates
@@ -983,6 +984,15 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 f'which dyadically rounds to {_bucket_window._fmt_bs(bs)} '
                 f'producing a final window width of '
                 f'{_bucket_window.fmt_amount(W)}.')
+
+        lat = getattr(self, '_bs_lattice', None)
+        if lat is not None:
+            parts.append(
+                f'Every unit is discrete and the pooled atoms sit on a lattice '
+                f'of {_bucket_window._fmt_bs(lat["h"])}, so bs is '
+                f'{_bucket_window._fmt_bs(lat["bs"])}, the first of its lattice '
+                f'buckets whose grid fits log2 {log2}, and every atom lands on a '
+                'grid point.')
 
         lo, hi = _as_float(tot['min']), _as_float(tot['max'])
         if tot['left_tail'] == 'bounded' and np.isfinite(lo):

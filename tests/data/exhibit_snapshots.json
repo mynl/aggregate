@@ -14076,7 +14076,7 @@
        "raw": null,
        "text": "\u2014"
       },
-      "realized portfolio grid (resolution=1, extent=19.4873)"
+      "realized portfolio grid (resolution=1, extent=19.4873); lattice 1 (residual 0), bs 1 on it"
      ]
     }
    ],
@@ -14913,7 +14913,7 @@
        "raw": null,
        "text": "\u2014"
       },
-      "realized portfolio grid (resolution=5, extent=188.803)"
+      "realized portfolio grid (resolution=5, extent=188.803); lattice 5 (residual 0), bs 5 on it"
      ]
     }
    ],
@@ -15928,7 +15928,7 @@
        "raw": null,
        "text": "\u2014"
       },
-      "realized portfolio grid (resolution=1, extent=19.4873)"
+      "realized portfolio grid (resolution=1, extent=19.4873); lattice 1 (residual 0), bs 1 on it"
      ]
     }
    ],
@@ -16765,7 +16765,7 @@
        "raw": null,
        "text": "\u2014"
       },
-      "realized portfolio grid (resolution=5, extent=188.803)"
+      "realized portfolio grid (resolution=5, extent=188.803); lattice 5 (residual 0), bs 5 on it"
      ]
     }
    ],

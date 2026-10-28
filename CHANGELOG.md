@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.25.0 - 2026-10-28
+
+**[Portfolio-Lattice-Bucket] A Portfolio whose units are all discrete on one pooled dyadic lattice takes its bucket from the lattice rule, and `log2` shrinks to the need, signed books included.** `port_best_window` takes the step of every unit's atoms together and picks the first lattice candidate whose grid fits the cap, ahead of `round_bucket(max(min_k bs_k, W / N))`, which stays for every other book. A signed book's need is measured from the origin `update` realizes, the sum of the unit origins, not from the window. `Portfolio.bs_explanation` and the `used` row of `bs_window_df` name the lattice.
+
+Numbers move: Poisson units on steps 3 and 5 get `bs` 1 (was 4, on neither lattice), a signed book of quarter-point units gets 0.25 at `log2` 8 (was 2^-10 at 16), and `DiscretePortfolio` keeps `bs` 1 at `log2` 6 (was 16). A signed book of many lattice units now holds its mass: 1000 units on `[-1.75 .25 .5]` held 17.7% of it at 1.24.0 and hold all of it at `bs` 0.25, `log2` 13. That bug remains for signed books without a lattice (`[Signed-Portfolio-Origin]` in `dev/TODO.md`).
+
 ## 1.24.0 - 2026-10-28
 
 **[Severity-Lattice-Fractional] A discrete severity on a fractional or signed dyadic lattice gets an exact, small grid, by one bucket rule for every lattice.** When every severity atom is a multiple of a common dyadic step `h` (0.25, 0.75, 1.5, 3, 200000), each sizing row takes the largest nice divisor of `h` (a power of two below 1, the `round_bucket` ladder from 1 up) if its window fits `log2`, else `h`, else the standard estimator; the exact discrete window now covers fractional and signed lattices. `dsev [0.25 0.5 1.75]` under 3 fixed claims goes from `bs` 2^-13 at `log2` 16 to 0.25 at 5, and `[0.75 1.5 2.25]` gets 0.25. Decimal atoms and thirds have no dyadic lattice and size as before. New private names in `aggregate.utilities`: `LATTICE_RTOL`, `LATTICE_DEPTH`, `_dyadic_lattice_step`, `_lattice_candidates`. Lattice rows of `bs_window_df` note the step, the residual and whether `bs` is on it (a pinned `bs` off the lattice is noted, not warned), and an atom that noise moved off its lattice point lands whole in one bucket under `dsev_bucket='linear'`.

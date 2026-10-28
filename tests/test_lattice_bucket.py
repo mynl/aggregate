@@ -196,3 +196,72 @@ def test_sharpen_does_not_call_the_nice_bucket_too_fine():
     assert a.bs == 1
     a.sharpen(good_enough=0, execute=False)
     assert 'finer than it needs to be' not in a.sharpen_explanation
+
+
+# ------------------------------------- [Portfolio-Lattice-Bucket], step 2
+
+def test_portfolio_takes_the_pooled_step_not_the_formula():
+    """Poisson units on steps 3 and 5: pooled step 1 (bs 4 through 1.24.0)."""
+    p = build('port FLB.Steps agg FLB.S3 3 claims dsev [3 6 9] poisson '
+              'agg FLB.S5 3 claims dsev [5 10 15] poisson')
+    assert p.bs == 1
+    assert p._bs_lattice == dict(h=1.0, residual=0.0, bs=1.0)
+    assert 'lattice of 1' in p.bs_explanation
+
+
+SIGNED_PORT = ('port FLB.SignedPort '
+               'agg FLB.SP1 3 claims dsev [-1.75 0.25 0.5] [.25 .5 .25] poisson '
+               'agg FLB.SP2 2 claims dsev [-0.5 0.75] poisson '
+               'agg FLB.SP3 1 claim dsev [0.25 1.5] fixed')
+
+
+def test_signed_portfolio_lands_every_atom_and_shrinks_log2():
+    p = build(SIGNED_PORT)
+    assert p.bs == 0.25
+    assert p.log2 < 16                     # stayed at the cap through 1.24.0
+    x0 = float(p.density_df.index[0])
+    atoms = np.array([-1.75, 0.25, 0.5, -0.5, 0.75, 1.5])
+    k = (atoms - x0) / p.bs
+    assert np.array_equal(k, np.round(k))
+    s = p.density_df.p_total
+    assert s.sum() == pytest.approx(1, abs=1e-12)
+    assert float((s * s.index).sum()) == pytest.approx(p.est_m, rel=1e-12)
+    assert 'lattice 1/4' in p.bs_window_df.loc['used', 'note']
+
+
+@pytest.mark.slow                          # about 8 s: 200 units
+def test_many_signed_units_keep_their_mass():
+    """The realized origin is the sum of the unit origins, far below the window.
+
+    200 units on ``[-1.75 .25 .5]`` realize an origin of -350 against a moment
+    window of about ``[-136, 45]``. Sizing ``log2`` from the window (10) gives
+    a grid on ``[-350, -94)``, below most of the mass, so the need is measured
+    from the realized origin (11). It takes many units: with few, skewness
+    widens the moment window past the summed support. At 1.23.0, 1000 such
+    units held 17.7% of their mass ([Signed-Portfolio-Origin]).
+    """
+    from aggregate import Aggregate, Portfolio
+    # constructed, not built: the Portfolio update sizes and runs every unit
+    aggs = [Aggregate(name=f'FLB.M{i}', exp_en=1, freq_name='fixed',
+                      sev_name='dhistogram', sev_xs=[-1.75, 0.25, 0.5],
+                      sev_ps=[.25, .5, .25]) for i in range(200)]
+    p = Portfolio('FLB.Many', aggs)
+    p.update(log2=16, bs=0)
+    assert p.bs == 0.25
+    assert float(p.density_df.index[0]) == -350.0
+    assert p.log2 == 11
+    s = p.density_df.p_total
+    assert s.sum() == pytest.approx(1, abs=1e-12)
+    assert float((s * s.index).sum()) == pytest.approx(-0.1875 * 200, rel=1e-12)
+
+
+def test_a_continuous_unit_means_no_portfolio_lattice():
+    p = build('port FLB.Mixed agg FLB.MD 3 claims dsev [3 6 9] poisson '
+              'agg FLB.MC 3 claims sev gamma 10 cv 1 poisson')
+    assert p._bs_lattice is None
+
+
+def test_a_pinned_portfolio_bs_is_left_alone():
+    p = build(SIGNED_PORT, bs=1 / 16)
+    assert p.bs == 1 / 16 and p.log2 == 16
+    assert p._bs_lattice is None

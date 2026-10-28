@@ -1724,6 +1724,74 @@ def port_single_big_jump_window(port, p_star):
     return float(sbj_lo), float(sbj_hi)
 
 
+def _port_lattice_bucket(port, log2, signed, windowed, x_lo, x_hi,
+                         x_min_ks, x_max_ks):
+    """The Portfolio grid from the units' pooled lattice, or ``None``.
+
+    Parameters
+    ----------
+    port : Portfolio
+        Reads ``agg_list``; sets ``_bs_lattice`` when a bucket is chosen.
+    log2 : int
+        The cap.
+    signed, windowed : bool
+        The origin regime of :func:`port_best_window`: a signed book, a
+        windowed non-signed one (Plan B), or neither (0-based, Plan A).
+    x_lo, x_hi : float
+        The Portfolio window.
+    x_min_ks, x_max_ks : list of float
+        The units' selected windows from the phase 1 pre-pass.
+
+    Returns
+    -------
+    (bs, log2, x_min) or None
+        The first of :func:`~aggregate.utilities._lattice_candidates` for the
+        pooled step whose grid fits the cap, with ``log2`` shrunk to the need;
+        ``None`` when a unit is not discrete, the pool has no dyadic lattice,
+        or no candidate fits, and the resolution formula runs as before.
+
+    Notes
+    -----
+    The need is measured from the origin the grid will actually have. For a
+    0-based or windowed book that is ``0`` or ``floor(x_lo / b) b``. A signed
+    book is placed by :meth:`Portfolio.update` at
+    :math:`\\min(\\sum_k x_k, \\min_k x_k)`, the units' realized origins,
+    not at ``x_lo``, and with many signed units that sum lies far below the
+    window: 1000 units on ``[-1.75 .25 .5]`` realize :math:`-1750` against a
+    window from about :math:`-400` (``[Signed-Portfolio-Origin]``). Measured
+    from ``x_lo`` the grid top would fall below the mass. So the origin is
+    estimated conservatively as :math:`\\sum_k \\min(\\lfloor s_k / b \\rfloor b,
+    0)`, :math:`s_k` the unit's phase 1 window low edge, which is at or below
+    the realized origin (a pinned ``bs`` skips the unit's single-big-jump
+    floor and flooring is monotone), so the realized grid top is at or above
+    the estimate's. Each unit's own grid must also hold its window, the wrap
+    safety the resolution formula floors its span for.
+    """
+    fit = _pooled_lattice(port.agg_list)
+    if fit is None:
+        return None
+    h, residual = fit
+    for b in _lattice_candidates(h):
+        if signed:
+            lows = [float(np.floor(s / b) * b) for s in x_min_ks]
+            origin = float(sum(min(v, 0.0) for v in lows))
+            # never less than the window itself, the plan's wrap-safe span
+            need = max([_need_log2(x_hi - min(origin, x_lo), b)]
+                       + [_need_log2(t - v, b) for v, t in zip(lows, x_max_ks)])
+            x_min = float(np.floor(x_lo / b) * b)
+        elif windowed:
+            x_min = float(np.floor(x_lo / b) * b)
+            need = _need_log2(x_hi - x_min, b)
+        else:
+            x_min = 0.0
+            need = _need_log2(x_hi, b)
+        if need <= log2:
+            port._bs_lattice = dict(h=float(h), residual=float(residual),
+                                    bs=float(b))
+            return float(b), int(min(log2, max(need, 1))), x_min
+    return None
+
+
 def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     """Decide the portfolio combine grid by **Portfolio MM** + SBJ look-through.
 
@@ -1774,6 +1842,13 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
       ``x_min``. ``log2`` stays at the cap and the span is floored at the
       conservative ``max_k W_k / N`` so no per-unit marginal wraps.
 
+    **Lattice books.** When every unit is discrete and the pooled atoms sit on
+    a dyadic lattice, :func:`_port_lattice_bucket` picks ``bs`` by the lattice
+    rule (the largest nice divisor of the step that fits the cap, else the
+    step) ahead of the formula, and ``log2`` shrinks to the need in every
+    regime, signed included, measured from the origin ``update`` will realize.
+    The units' separately chosen buckets are not combined.
+
     Parameters
     ----------
     log2 : int
@@ -1809,7 +1884,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     # a warning swallowed here does not spend the one emission the real
     # combine is entitled to.
     rows = []
-    bs_ks, x_min_ks, W_ks = [], [], []
+    bs_ks, x_min_ks, x_max_ks, W_ks = [], [], [], []
     with warn_once_isolated(), warnings.catch_warnings():
         warnings.simplefilter('ignore', DefectiveDistributionWarning)
         for a in port.agg_list:
@@ -1821,6 +1896,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
             W_k = max(sx_max - sx_min, 0.0)
             bs_ks.append(float(bs_k))
             x_min_ks.append(sx_min)
+            x_max_ks.append(sx_max)
             W_ks.append(W_k)
             rows.append(dict(unit=a.name, x_min=sx_min, x_max=sx_max, W=W_k,
                              bs=float(bs_k), log2=int(l2_k),
@@ -1877,6 +1953,24 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     else:
         x_lo = 0.0                               # 0-based (Plan A)
     W_ext = max(x_hi - x_lo, 0.0)
+    port._bs_lattice = None
+    lattice_pick = (None if bs_in > 0 else
+                    _port_lattice_bucket(port, log2, signed, window_nonsigned,
+                                         x_lo, x_hi, x_min_ks, x_max_ks))
+    if lattice_pick is not None:
+        # Every unit is discrete on one pooled dyadic lattice: the rule picks
+        # the bucket and log2 shrinks to the need, signed books included.
+        bs, log2_out, x_min = lattice_pick
+        port._bs_raw = None                      # chosen, not rounded
+        cand = dict(mm=(mm_lo, mm_hi), rms=(rms_lo, rms_hi),
+                    sbj=(sbj_lo, sbj_hi),
+                    sum=(min(x_lo, 0.0), W_sum + min(x_lo, 0.0)))
+        port._build_bs_window_df(rows, bs, log2_out, x_min, cand,
+                                 resolution, W_ext)
+        lat = port._bs_lattice
+        port._bs_window_df.loc['used', 'note'] += _lattice_note(
+            lat['h'], lat['residual'], bs, False)
+        return bs, log2_out, x_min
     if bs_in > 0:
         bs = float(bs_in)
         port._bs_raw = None                      # pinned: no rounding to report

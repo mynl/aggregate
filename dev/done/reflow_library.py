@@ -18,7 +18,10 @@ added or edited, and whenever an unparser gap closes, since a construct that
 starts inverting can leave the held-back set and be laid out by machine (three
 Tweedie entries did exactly that at 1.0.0a231). ``--check`` is the read-only
 form, and ``tests/test_agg_libraries.py`` fails if the shipped file drifts from
-what this renders.
+what this renders, layout included: ``test_library_reflow_is_a_no_op`` runs
+:func:`reflow` over the file and requires it unchanged. Before 2026-10-28 the
+test compared whitespace-normalized content only, so eight entries lost their
+``;`` and the script, unable to split them, went unrun for two months unnoticed.
 
 How it works
 ------------
@@ -48,6 +51,11 @@ library should not grow ambiguous statements for a cosmetic gain, and the
 compact spelling is what entries named ``PremiumMinusLoss`` exist to show.
 ``tests/test_grammar_ambiguity.py`` is what would otherwise catch this.
 
+A statement is held back, finally, when its name is in ``UNPARSER_EXEMPT`` in
+``tests/test_agg_libraries.py``: an entry whose authored spelling (``[1:6]``,
+``2/3``, arithmetic, digit separators) is the point of the entry and renders to
+a spec-identical but different canonical form. See :func:`unparser_exempt`.
+
 See ``[Unparser-Reference-Gaps]`` in ``dev/TODO.md``. Held-back statements are
 reflowed by hand afterwards, in the same style.
 
@@ -58,6 +66,8 @@ the whole file before anything is written.
 """
 from __future__ import annotations
 
+import ast
+import difflib
 import re
 import sys
 from pathlib import Path
@@ -138,6 +148,12 @@ def split_chunks(text):
     chunks, current, in_doc = [], [], False
     for line in text.split('\n'):
         stripped = line.strip()
+        if current and not in_doc and not stripped:
+            # A statement missing its ``;`` ends at the blank line, as it does
+            # for the library loader. Without this it ran on into the next
+            # statement, and an unterminated entry stopped the script cold.
+            chunks.append(['statement', current])
+            current = []
         if not current and not in_doc and (not stripped or stripped.startswith('#')):
             if chunks and chunks[-1][0] == 'verbatim':
                 chunks[-1][1].append(line)
@@ -200,10 +216,54 @@ def comparable(spec):
             if not (k in DEFAULTS and v == DEFAULTS[k])}
 
 
-def main(check=False):
-    uw = Underwriter(databases='library')
-    uw.load()
-    text = LIBRARY.read_text(encoding='utf-8')
+def unparser_exempt() -> frozenset:
+    """The names whose authored spelling the library keeps.
+
+    ``UNPARSER_EXEMPT`` in ``tests/test_agg_libraries.py`` is the one list, so
+    this reads it from there rather than keeping a copy that would drift. Read
+    with :func:`ast.literal_eval` rather than imported, so loading the set runs
+    none of the test module.
+
+    Notes
+    -----
+    The script's own hold-back rules (``NON_INVERTIBLE`` and the ambiguity
+    count) are not enough without it. An entry like ``dsev [1:6]``,
+    ``ph 2/3`` or ``10000 exposure at 0.125 rate`` renders to a spec-identical
+    canonical form, so it passes the round trip and was rewritten to
+    ``dsev [1 2 3 4 5 6]``, ``ph 0.6666666666666666`` or
+    ``10000 premium at 0.125 lr``, discarding the spelling the entry exists to
+    show.
+    """
+    path = _repo_root() / 'tests' / 'test_agg_libraries.py'
+    for node in ast.parse(path.read_text(encoding='utf-8')).body:
+        if (isinstance(node, ast.Assign) and len(node.targets) == 1
+                and getattr(node.targets[0], 'id', None) == 'UNPARSER_EXEMPT'):
+            return frozenset(ast.literal_eval(node.value))
+    raise RuntimeError(f'reflow_library: no UNPARSER_EXEMPT in {path}')
+
+
+def reflow(text, exempt=frozenset(), uw=None):
+    """The library text in canonical layout, with the names reflowed and held back.
+
+    Parameters
+    ----------
+    text : str
+        The library file's text.
+    exempt : collection of str
+        Statement names kept exactly as written (see :func:`unparser_exempt`).
+    uw : Underwriter, optional
+        A loaded library underwriter; one is built when omitted.
+
+    Returns
+    -------
+    result : str
+        The reflowed text. Equal to ``text`` when the file is already canonical.
+    canonical, held : list of str
+        Names laid out by machine, and names left in their source form.
+    """
+    if uw is None:
+        uw = Underwriter(databases='library')
+        uw.load()
 
     out, canonical, held = [], [], []
     for kind, lines in split_chunks(text):
@@ -217,7 +277,9 @@ def main(check=False):
         parsed = uw.parser.parse(uw.lexer.tokenize(statement))
 
         rendered = None
-        if not NON_INVERTIBLE.search(SEV_REFERENCE.sub('', statement)):
+        if parsed[1] in exempt:
+            pass
+        elif not NON_INVERTIBLE.search(SEV_REFERENCE.sub('', statement)):
             try:
                 candidate = format_program(parsed, fmt='text', layout='spread',
                                            trailer=True)
@@ -231,6 +293,10 @@ def main(check=False):
 
         if rendered is None:
             held.append(parsed[1])
+            # Held back keeps the spelling, not a missing terminator.
+            last = lines[-1].rstrip()
+            if not last.endswith(';') and not last.lstrip().startswith('#'):
+                lines = [*lines[:-1], last + ';']
             out.extend(lines)
         else:
             canonical.append(parsed[1])
@@ -239,9 +305,15 @@ def main(check=False):
 
     # Collapse the blank line appended after a statement into whatever blank
     # lines the source already had, so section dividers keep their spacing.
-    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(out))
-    if not result.endswith('\n'):
-        result += '\n'
+    result = re.sub(r'\n{3,}', '\n\n', '\n'.join(out)).rstrip('\n') + '\n'
+    return result, canonical, held
+
+
+def main(check=False):
+    uw = Underwriter(databases='library')
+    uw.load()
+    text = LIBRARY.read_text(encoding='utf-8')
+    result, canonical, held = reflow(text, unparser_exempt(), uw)
 
     print(f'{len(canonical)} canonical, {len(held)} held back: {", ".join(held)}')
 
@@ -256,8 +328,13 @@ def main(check=False):
         assert comparable(s0) == comparable(s1), f'spec moved: {n0}'
     print(f'verified: {len(after)} statements, specs identical')
 
-    if check:
-        print('--check: nothing written')
+    if result == text:
+        print('already canonical: nothing to write')
+    elif check:
+        moved = sum(1 for line in difflib.unified_diff(
+                        text.split('\n'), result.split('\n'), lineterm='', n=0)
+                    if line[:1] in '+-' and line[:3] not in ('+++', '---'))
+        print(f'--check: not canonical, {moved} diff lines; nothing written')
     else:
         LIBRARY.write_text(result, encoding='utf-8')
         print(f'wrote {LIBRARY}')

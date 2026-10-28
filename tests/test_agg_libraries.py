@@ -21,6 +21,7 @@ not load clean; it is exercised by ``test_decl_unparser`` and the mirrored
 pytest cases.
 """
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
@@ -285,6 +286,31 @@ def test_library_is_written_in_the_canonical_layout():
         f'{offenders} are not in canonical form -- run '
         f'`python dev/done/reflow_library.py`, or add a name to UNPARSER_EXEMPT '
         f'with a reason')
+
+
+def test_library_reflow_is_a_no_op():
+    """The library formatter leaves the shipped file byte-identical.
+
+    The test above compares whitespace-normalized content, so it cannot see a
+    missing ``;``, an indent or a misplaced line break. Eight entries lost
+    their ``;`` that way, which stopped ``dev/done/reflow_library.py`` from
+    splitting the file at all, and nothing noticed for two months. Running the
+    formatter itself checks layout as well as content, with the exempt entries
+    held back exactly as the script holds them.
+    """
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location(
+        'reflow_library', root / 'dev' / 'done' / 'reflow_library.py')
+    reflow_library = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(reflow_library)
+
+    text = reflow_library.LIBRARY.read_text(encoding='utf-8')
+    result, _, _ = reflow_library.reflow(text, UNPARSER_EXEMPT)
+    assert result == text, (
+        'library.agg is not in canonical layout: run '
+        '`python dev/done/reflow_library.py`')
 
 
 def test_no_library_port_binds_its_trailer_to_a_unit(library):

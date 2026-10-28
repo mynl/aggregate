@@ -16,6 +16,8 @@ Use `uv` for all environment and dependency management.
 
 **`uv sync` removes the optional compiled engine.** `aggregate-ntt` is discovered, never declared, so it is extraneous to the lockfile and `uv sync --all-extras` **deletes it** (measured: it also took `gmpy2`, `rich` and `csv-grid`). Use **`uv sync --all-extras --inexact`** in a checkout that has it installed. To run without installing it at all, `uv run --with V:/dev/aggregate-ntt ...` adds it to one invocation and leaves `.venv` untouched. To force either path from Python, pass `ntt_engine='python'` or `'rust'`; see `aggregate.ntt._resolve_engine`.
 
+**eltq** is the optional elt extra since 1.18.0, so uv sync --all-extras installs it from PyPI. To test an unreleased eltq, run UV_PROJECT_ENVIRONMENT=.venv uv pip install V:/dev/eltq after syncing; the next sync puts the PyPI wheel back. The same --inexact sync keeps it.
+
 **Doc scripts put `UV_PROJECT_ENVIRONMENT` back.** `doc-test-uv.ps1` sets it to `.doc-venv` and runs in the caller's scope, so until 2026-10-10 it leaked into the shell and every later `uv run` there silently resolved to `.doc-venv`. It now restores the caller's value on the normal path and before every error exit (`Restore-UvProjectEnvironment`). The two-venv warning below still applies to any shell where it is set by hand.
 
 **Sync environment — use `--all-extras` for a dev checkout:**

@@ -110,9 +110,9 @@ wherever a grid point is looked up by value. Options:
 
 - (a) dyadic lattices only, with decimal atoms as today;
 - (b) `bs` the rational step as a float, with grid labels rounded to the lattice's precision;
-- (c) an integer grid in units of the step, with a scale applied to labels.
+- \(c) an integer grid in units of the step, with a scale applied to labels.
 
-Recommendation: (a) now, since it fixes the large miss within the current policy. (b) or (c)
+Recommendation: (a) now, since it fixes the large miss within the current policy. (b) or \(c)
 follows as a separate plan, after an audit of where aggregate relies on a binary-exact `bs`.
 
 **[Lattice-As-Bucket]** Whether `bs` is the lattice step itself or a divisor of it.

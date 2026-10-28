@@ -195,9 +195,31 @@ file (house rule, 2026-10-20). In the final phase's commit:
   landed as. If scope shifted, edit the entry rather than leaving it stale.
 - Update the `dev-files.md` row to DONE with the version range.
 
-## 8. Report
+## 8. Write a short usage doc
+
+When the plan adds or changes something a user calls (a statement, a class, a
+method, a keyword), finish with a short introduction to it in
+`hacks/using-<feature>.qmd`, named so a reader can find it from the file name
+alone. `hacks` links to `D:/Projects/Hacks/aggregate`, outside the repository,
+so the doc is never committed. The author runs it in JupyterLab or writedown.
+
+- **A little setup, then short examples.** A few paragraphs: what the feature
+  is for, the mathematics in a line or two, the forms it takes. Then short
+  executable `{python}` blocks, one idea each, each introduced by a sentence
+  saying what it shows. Refusals belong in one block at the end.
+- **Front matter:** a descriptive `title`, `format: html` with `toc: true` and
+  `embed-resources: true`, and the jupytext `text_representation` and
+  `kernelspec` block the other `hacks/*.qmd` files carry. No house kit.
+- **It must render to HTML, but do not render it.** Run every block once in
+  order in `.venv` instead, and check every sentence against what the code
+  prints. A claim the output contradicts is rewritten, not left.
+- **One doc per feature.** `hacks/using-tweedie.qmd` and
+  `hacks/using-stable.qmd` (1.22.0 and 1.23.0) are the pattern.
+
+## 9. Report
 
 - The version range, and what landed in each bump.
+- The usage doc, by path, or why the plan needed none.
 - Which test tiers ran, with the actual commands, and their results. A failure
   is reported with its output, never summarized as mostly green.
 - **Every divergence**, with a pointer to where it is recorded.

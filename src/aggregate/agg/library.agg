@@ -995,9 +995,10 @@ agg ReinsuranceExposureRating.Check
 
 agg LayerPicks.Uniform
   dfreq [1]
-  sev 100 * uniform picks [50 75 100] [30 12 5]
+  sev 100 * uniform
+    picks [50 75 100] [30 12 5]
   note{Layer loss picks: the severity curve is adjusted to match the selected picks by layer, which moves the mean with it.}
-  tags{topic:reinsurance, topic:picks, role:advanced}
+  tags{topic:reinsurance, topic:picks, role:advanced};
 
 agg LayerPicks.Lognorm.Exposure
   dfreq [1]
@@ -1005,7 +1006,7 @@ agg LayerPicks.Lognorm.Exposure
   sev (100 / exp(1.5**2/2)) * lognorm 1.5
   occurrence ceded to tower [0 125 250 500 1000]
   note{Exposure rating by layer. Look at Reinsurance, then Summary for the loss picks by layer.}
-  tags{topic:reinsurance, topic:picks, role:advanced}
+  tags{topic:reinsurance, topic:picks, role:advanced};
 
 agg LayerPicks.Lognorm.Experience
   dfreq [1]
@@ -1014,7 +1015,7 @@ agg LayerPicks.Lognorm.Experience
       picks [125 250 500 1000] [30 20 20 18]
   occurrence ceded to tower [0 125 250 500 1000]
   note{Layer loss picks with a fairly extreme adjustment. Run it with ceded to tower [0 100 200 500] to recover the loss picks by layer.}
-  tags{topic:reinsurance, topic:picks, role:advanced}
+  tags{topic:reinsurance, topic:picks, role:advanced};
 
 port LayerPicks.Compare
   note{Compares picked and unpicked severity as two units of one portfolio.}
@@ -1027,7 +1028,7 @@ port LayerPicks.Compare
     dfreq [1]
     1000 xs 0
     sev (100 / exp(1.5**2/2)) * lognorm 1.5
-      picks [125 250 500 1000] [30 20 20 18]
+      picks [125 250 500 1000] [30 20 20 18];
 
 agg CommAuto.Exposure
   1 claim
@@ -1169,7 +1170,6 @@ xpnl LossCorridor
     0.2 premium expenses as Expenses
   note{Loss corridor: the cedant takes back half of the ceded loss in a ratio band running 40 points excess of 50%, so the recovery flattens across the corridor and resumes above it. The band is written with the layer words po and xs. Net quota share with no cede.}
   tags{topic:reinsurance, role:advanced};
-
 
 # ----------------------------------------------------------------------
 # Inner/outer aggregates: one aggregate as the severity of another.
@@ -1527,7 +1527,7 @@ agg SignedPremiumMinusLossNormal
   ssev 100  - lognorm 95 cv 1.2
   poisson
   note{A high frequency premium minus loss payoff carrying both severity and exposure variability, near-Gaussian on a signed window.}
-  tags{topic:aggregate, role:advanced}
+  tags{topic:aggregate, role:advanced};
 
 port SignedGotcha
   note{The sev side of the sev and ssev contrast: a plain sev clamps the normal to a non-negative window, so both units are bounded below where those of SignedPortfolioPair are not.}
@@ -1544,14 +1544,14 @@ port SignedGotcha
 port SignedPortfolioPair
   note{The ssev side of the sev and ssev contrast: two signed normal units, offset either way, on one signed window.}
   tags{topic:portfolio, topic:economics, role:advanced}
-      agg A
-        1 claim
-        ssev 10 * norm + 25
-        fixed
-      agg B
-        1 claim
-        ssev 10 * norm + 5
-        fixed;
+  agg A
+    1 claim
+    ssev 10 * norm + 25
+    fixed
+  agg B
+    1 claim
+    ssev 10 * norm + 5
+    fixed;
 
 port SignedPortfolioMixed
   note{One ordinary loss unit and one signed profit and loss unit in the same portfolio, so the total lives on a signed window.}
@@ -1622,7 +1622,6 @@ agg WindowedContinuous
   note{A very high claim count, which forces a windowed FFT.}
   tags{topic:numerics, role:advanced};
 
-
 # ----------------------------------------------------------------------
 # Portfolios
 # Two units at a time, from the plain pair to the diversification archetypes.
@@ -1671,7 +1670,7 @@ port PropertyCasualty
     mixed gamma 0.15;
 
 port ThinThinPortfolio
-      note{Two thin, concentrated units, giving a nearly Gaussian total. Same as PIR tame case study.}
+  note{Two thin, concentrated units, giving a nearly Gaussian total. Same as PIR tame case study.}
   tags{topic:portfolio, role:intermediate}
   agg A
     1 claim
@@ -1720,6 +1719,7 @@ port DiscretePortfolio
   agg C
     dfreq [2]
     dsev [1 3];
+
 # ----------------------------------------------------------------------
 # Book and paper reproductions
 # ----------------------------------------------------------------------
@@ -1732,7 +1732,7 @@ port BodoffOne
     dsev [0 99] [0.8 0.2]
   agg Quake.1
     dfreq [1]
-    dsev [0 100] [0.95 0.05]
+    dsev [0 100] [0.95 0.05];
 
 port BodoffTwo
   note{Bodoff thought experiment number 2, the same pair with the wind loss cut to 50.}
@@ -1742,7 +1742,7 @@ port BodoffTwo
     dsev [0 50] [0.8 0.2]
   agg Quake.2
     dfreq [1]
-    dsev [0 100] [0.95 0.05]
+    dsev [0 100] [0.95 0.05];
 
 port BodoffThree
   note{Bodoff thought experiment number 3, the same pair with the wind loss cut again, to 5.}
@@ -1752,7 +1752,7 @@ port BodoffThree
     dsev [0 5] [0.8 0.2]
   agg Quake.3
     dfreq [1]
-    dsev [0 100] [0.95 0.05]
+    dsev [0 100] [0.95 0.05];
 
 port BodoffFour
   note{Bodoff thought experiment number 4, whose exponential severity needs sharpen to price.}

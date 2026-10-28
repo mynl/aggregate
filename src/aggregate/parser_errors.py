@@ -121,7 +121,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "FRANCHISE": "'franchise' (franchise deductible)",
     "DISAPPEARING": "'disappearing' (disappearing deductible)",
     "ELT": "'elt' (event loss table)",
-    "YLT": "'ylt' (year loss table)",
+    "YELT": "'yelt' (year loss table)",
     "NO2U": "'no2u' (mean-only event loss table)",
     "UNIT": "'unit' (loss table unit)",
     "BASIC": "'basic' (collar base premium)",

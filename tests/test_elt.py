@@ -224,7 +224,7 @@ def test_algebra_on_a_table_is_refused(program):
 
 
 def test_bivariate_body_is_refused():
-    with pytest.raises(ValueError, match='elt or ylt body is not supported'):
+    with pytest.raises(ValueError, match='elt or yelt body is not supported'):
         build('bivariate LT.BV 1 claim agg LT.B1 elt [[1 .1 100]] '
               'agg LT.B2 1 claim dsev [1] fixed copula normal 0.5', update=False)
 

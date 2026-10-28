@@ -1,7 +1,7 @@
 """Event and year loss tables lowered to ordinary aggregate specs ([DecL-Loss-Tables]).
 
-``agg NAME elt ...`` and ``agg NAME ylt ...`` parse to a spec that records the
-sources symbolically, under ``elt_sources`` or ``ylt_sources`` (see
+``agg NAME elt ...`` and ``agg NAME yelt ...`` parse to a spec that records the
+sources symbolically, under ``elt_sources`` or ``yelt_sources`` (see
 ``parser.UnderwritingTransformer``). :func:`resolve` runs at construction, from
 ``Underwriter._factory``, beside the ``sev agg.NAME`` resolver: it reads each
 source, validates the combined table, and returns the spec of an ordinary
@@ -9,10 +9,10 @@ source, validates the combined table, and returns the spec of an ordinary
 rulings: ``dev/done/plan-elt.md``.
 
 An ELT lowers to compound Poisson with one count per physical event and the
-event's unit losses summed before any occurrence treaty. A YLT lowers to
+event's unit losses summed before any occurrence treaty. A YELT lowers to
 ``dfreq [1] dsev``, each year a whole annual outcome. A deterministic ELT (ELT3,
 ELT4, or ELT6 under ``no2u``) lowers to ``dhistogram`` atoms, and neither it
-nor a YLT imports eltq. An ELT6 with secondary uncertainty lowers to an
+nor a YELT imports eltq. An ELT6 with secondary uncertainty lowers to an
 :class:`EltModel` passed as the severity, whose moments come from eltq;
 ``dev/done/plan-elt-uncertainty.md`` has the design.
 
@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 
 #: Spec keys holding the symbolic sources of a loss table body.
-SOURCE_KEYS = ('elt_sources', 'ylt_sources')
+SOURCE_KEYS = ('elt_sources', 'yelt_sources')
 
 #: The unit of a source declared without a ``unit`` clause.
 DEFAULT_UNIT = 'Total'
@@ -42,7 +42,7 @@ DEFAULT_UNIT = 'Total'
 #: units.
 RATE_RTOL = 1e-12
 
-#: Tolerances for a YLT3 probability column to sum to one, and for two units'
+#: Tolerances for a YELT3 probability column to sum to one, and for two units'
 #: probabilities of the same year to agree: ``|a - b| <= PROB_RTOL * b +
 #: PROB_ATOL``. Only a residual inside them is normalized away, and it is
 #: recorded.
@@ -54,7 +54,7 @@ MAX_EXAMPLES = 5
 
 #: Table form by the number of fields in a row, identifier included.
 ELT_FORMS = {3: 'ELT3', 4: 'ELT4', 6: 'ELT6'}
-YLT_FORMS = {2: 'YLT2', 3: 'YLT3'}
+YELT_FORMS = {2: 'YELT2', 3: 'YELT3'}
 
 #: The oldest eltq with every function the ELT6 path calls; 2.13.0 added
 #: ``multiunit_moments``.
@@ -97,7 +97,7 @@ def import_eltq():
     Notes
     -----
     Called only when an ELT6 source without ``no2u`` is lowered, so parsing,
-    ELT3 and ELT4 tables, all-``no2u`` ELT6 tables and YLTs never import eltq.
+    ELT3 and ELT4 tables, all-``no2u`` ELT6 tables and YELTs never import eltq.
     It is the optional ``elt`` extra, ``pip install aggregate[elt]``, also
     included in ``all``.
     """
@@ -315,7 +315,7 @@ def resolve(name, spec):
     name : str
         Object name, for messages.
     spec : dict
-        A parsed spec carrying ``elt_sources`` or ``ylt_sources``. Not mutated.
+        A parsed spec carrying ``elt_sources`` or ``yelt_sources``. Not mutated.
 
     Returns
     -------
@@ -349,7 +349,7 @@ def resolve(name, spec):
     the severity is the :class:`EltModel` with cumulants :math:`\\kappa_r =
     \\sum_e \\lambda_e \\mathsf P X_e^r`.
 
-    YLT: year :math:`j` has probability :math:`p_j` (:math:`1/n` unless a
+    YELT: year :math:`j` has probability :math:`p_j` (:math:`1/n` unless a
     probability column is supplied) and total :math:`a_j = \\sum_u y_{ju}`,
     the units summed within the year before equal totals coalesce. The annual
     law is :math:`\\sum_j p_j \\delta_{a_j}` with population moments; a
@@ -357,16 +357,16 @@ def resolve(name, spec):
     """
     spec = dict(spec)
     elt = spec.pop('elt_sources', None)
-    ylt = spec.pop('ylt_sources', None)
-    if elt is not None and ylt is not None:
+    yelt = spec.pop('yelt_sources', None)
+    if elt is not None and yelt is not None:
         raise LossTableError(
-            f'{name}: an aggregate is declared from elt or from ylt sources, '
+            f'{name}: an aggregate is declared from elt or from yelt sources, '
             'not both.')
     if elt is not None:
         lowered, meta = _lower_elt(name, elt)
     else:
         _refuse_occurrence(name, spec)
-        lowered, meta = _lower_ylt(name, ylt)
+        lowered, meta = _lower_yelt(name, yelt)
     spec.update(lowered)
     spec['_loss_table_meta'] = meta
     return spec
@@ -384,7 +384,7 @@ def describe(meta):
     -------
     str
         For example ``ELT3, 3 events, 1 unit, no secondary uncertainty``,
-        ``ELT6, 3 events, 1 unit, secondary uncertainty`` or ``YLT1, 4 years,
+        ``ELT6, 3 events, 1 unit, secondary uncertainty`` or ``YELT1, 4 years,
         1 unit, equally likely years``. An ELT6 with shared events adds
         ``2 shared events rolled up``, or ``shared events (model moments
         only)`` under the Burke rule.
@@ -439,7 +439,7 @@ def _sources(table, index, raw):
 
     Parameters
     ----------
-    table : {'elt', 'ylt'}
+    table : {'elt', 'yelt'}
     index : int
         Zero-based position among the body's sources.
     raw : dict
@@ -459,11 +459,11 @@ def _sources(table, index, raw):
     if 'values' in raw:
         values = np.asarray(raw['values'], dtype=float)
         ids = np.array([str(i + 1) for i in range(len(values))], dtype=object)
-        return [_Source(origin='inline', form='YLT1', ids=ids, unit=unit,
+        return [_Source(origin='inline', form='YELT1', ids=ids, unit=unit,
                         fields=values.reshape(-1, 1), implicit_ids=True,
                         **common)]
     rows = raw['rows']
-    forms = ELT_FORMS if table == 'elt' else YLT_FORMS
+    forms = ELT_FORMS if table == 'elt' else YELT_FORMS
     ids = np.array([r[0] for r in rows], dtype=object)
     fields = np.array([r[1:] for r in rows], dtype=float).reshape(len(rows), -1)
     return [_Source(origin='inline', form=forms[len(rows[0])], ids=ids,
@@ -489,8 +489,8 @@ _READERS = {
 
 #: Header aliases. A header is matched after lowercasing and removing spaces
 #: and underscores, so ``Event ID``, ``event_id`` and ``EVENTID`` agree. ``id``
-#: is an event in an ELT and a year in a YLT, and ``loss`` is the conditional
-#: mean in an ELT (not rate times mean) and the annual loss in a YLT.
+#: is an event in an ELT and a year in a YELT, and ``loss`` is the conditional
+#: mean in an ELT (not rate times mean) and the annual loss in a YELT.
 _ALIASES = {
     'elt': {
         'event_id': ('id', 'event_id', 'event', 'eventid'),
@@ -501,7 +501,7 @@ _ALIASES = {
         'sdc': ('sdc', 'sd_corr', 'sdcor', 'stddevc'),
         'unit': ('unit', 'unit_id'),
     },
-    'ylt': {
+    'yelt': {
         'year_id': ('year_id', 'year', 'trial_id', 'trial', 'simulation_id',
                     'sample_id', 'id'),
         'loss': ('loss', 'annual_loss', 'annual_loss_amount'),
@@ -627,7 +627,7 @@ def _file_sources(table, raw, common):
 
     The form is set by which loss columns are present, never by the unit or by
     ignored columns: ELT3 ``event_id rate mean``, ELT4 adds ``max``, ELT6 adds
-    ``max sdi sdc``; YLT1 ``loss``, YLT2 adds ``year_id``, YLT3 adds ``prob``.
+    ``max sdi sdc``; YELT1 ``loss``, YELT2 adds ``year_id``, YELT3 adds ``prob``.
     """
     df, record = _read_table(table, raw)
     where = f"{table} file \"{raw['path']}\""
@@ -655,7 +655,7 @@ def _file_sources(table, raw, common):
                 f'{where}: a probability column needs a year identifier column.')
         value_cols = ['loss'] + (['prob'] if 'prob' in cols else [])
         id_col = 'year_id' if 'year_id' in cols else None
-        form = 'YLT3' if 'prob' in cols else 'YLT2' if id_col else 'YLT1'
+        form = 'YELT3' if 'prob' in cols else 'YELT2' if id_col else 'YELT1'
 
     if len(df) == 0:
         raise LossTableError(f'{where} has no rows.')
@@ -696,7 +696,7 @@ def _file_sources(table, raw, common):
 def _walk_sources(node, visit):
     """Call ``visit`` on every file source dict inside a parsed spec."""
     if isinstance(node, dict):
-        if node.get('table') in ('elt', 'ylt') and 'path' in node:
+        if node.get('table') in ('elt', 'yelt') and 'path' in node:
             visit(node)
         for v in node.values():
             _walk_sources(v, visit)
@@ -1105,18 +1105,18 @@ def _elt_model(name, ids, event_code, unit_code, units, canon, keep, fields):
 
 
 # ----------------------------------------------------------------------
-# YLT
+# YELT
 # ----------------------------------------------------------------------
 
 def _refuse_occurrence(name, spec):
-    """Refuse occurrence terms on a YLT, including those added by reference."""
+    """Refuse occurrence terms on a YELT, including those added by reference."""
     def _stated(v):
         return v is not None and not (isinstance(v, (str, list, tuple))
                                       and len(v) == 0)
 
     if any(k.startswith('occ_') and _stated(v) for k, v in spec.items()):
         raise LossTableError(
-            f'{name}: a ylt holds annual outcomes, so occurrence reinsurance '
+            f'{name}: a yelt holds annual outcomes, so occurrence reinsurance '
             'cannot apply: an annual total does not identify its occurrences. '
             "Write annual terms as 'aggregate net of ...', or declare the "
             'events with elt for occurrence terms.')
@@ -1127,8 +1127,8 @@ def _close(a, b):
     return np.abs(a - b) <= PROB_RTOL * np.abs(b) + PROB_ATOL
 
 
-def _lower_ylt(name, declared):
-    """Validate YLT sources, align their years and lower to ``dfreq [1] dsev``.
+def _lower_yelt(name, declared):
+    """Validate YELT sources, align their years and lower to ``dfreq [1] dsev``.
 
     Returns
     -------
@@ -1136,13 +1136,13 @@ def _lower_ylt(name, declared):
         Frequency and severity spec keys, and the audit record.
     """
     sources = [s for k, raw in enumerate(declared)
-               for s in _sources('ylt', k, raw)]
+               for s in _sources('yelt', k, raw)]
     seen = {}
     for src in sources:
         if src.unit in seen:
             raise LossTableError(
-                f'{name}: unit {src.unit} has two ylt sources; each source is '
-                'a complete YLT, so give each unit one.')
+                f'{name}: unit {src.unit} has two yelt sources; each source is '
+                'a complete YELT, so give each unit one.')
         seen[src.unit] = src
         if len(src.ids) == 0:
             raise LossTableError(f'{name}: {src.where} has no years.')
@@ -1183,7 +1183,7 @@ def _lower_ylt(name, declared):
     residual = 0.0
     canon = canon_src = None
     for src, order in zip(sources, aligned):
-        if src.form != 'YLT3':
+        if src.form != 'YELT3':
             continue
         _check_nonnegative(name, src, src.fields[:, 1], 'probabilities')
         p = src.fields[order, 1]
@@ -1208,9 +1208,9 @@ def _lower_ylt(name, declared):
         p = uniform
     else:
         p = canon
-        if any(src.form != 'YLT3' for src in sources) and not _close(p, uniform).all():
+        if any(src.form != 'YELT3' for src in sources) and not _close(p, uniform).all():
             raise LossTableError(
-                f'{name}: a ylt without probabilities makes its years equally '
+                f'{name}: a yelt without probabilities makes its years equally '
                 'likely, which the supplied probabilities are not. Give every '
                 'unit the same probabilities, or none.')
 
@@ -1222,11 +1222,11 @@ def _lower_ylt(name, declared):
     ps = np.bincount(inv, weights=p[support])
 
     if canon is not None:
-        form = 'YLT3'
+        form = 'YELT3'
     elif any(not src.implicit_ids for src in sources):
-        form = 'YLT2'
+        form = 'YELT2'
     else:
-        form = 'YLT1'
+        form = 'YELT1'
     if len(sources) == 1:
         alignment = 'single unit'
     elif all(src.implicit_ids for src in sources):
@@ -1240,7 +1240,7 @@ def _lower_ylt(name, declared):
                'freq_b': np.array([1.0]), 'exp_en': -1,
                'sev_name': 'dhistogram', 'sev_xs': xs, 'sev_ps': ps}
     meta = {
-        'table': 'ylt', 'form': form,
+        'table': 'yelt', 'form': form,
         'probabilities': 'uniform' if canon is None else 'supplied',
         'alignment': alignment, 'units': [src.unit for src in sources],
         'unit_labels': unit_labels,
@@ -1250,7 +1250,7 @@ def _lower_ylt(name, declared):
         'zero_probability': float(p[zero].sum()),
         'outcomes': int(len(xs)), 'probability_residual': float(residual),
         'mean': float(p @ totals),
-        'moments': _ylt_moments(p, totals),
+        'moments': _yelt_moments(p, totals),
         'mass_error': abs(float(ps.sum()) - 1),
     }
     return lowered, meta
@@ -1316,8 +1316,8 @@ def _cumulant_moments(c, total):
     return {'severity': sev, 'annual': annual}
 
 
-def _ylt_moments(prob, totals):
-    """Annual moments of a YLT, from its years, before equal totals coalesce.
+def _yelt_moments(prob, totals):
+    """Annual moments of a YELT, from its years, before equal totals coalesce.
 
     The one synthetic claim is the whole year, so the severity is the annual
     outcome and the two agree. Population moments: the weights are the year
@@ -1339,7 +1339,7 @@ STATS_COLUMNS = ['table', 'model', 'estimate', 'error']
 VALIDATION_COLUMNS = ['check', 'value', 'tolerance', 'status', 'detail']
 
 #: Tolerance on the lowered severity's total weight against the event rate
-#: (ELT) or one (YLT): pure rounding, so a few ulps of a sum.
+#: (ELT) or one (YELT): pure rounding, so a few ulps of a sum.
 MASS_TOLERANCE = 1e-12
 
 #: A table CV or skewness (dimensionless) at most this in magnitude is zero up

@@ -1690,7 +1690,7 @@ class Underwriter(HelpMixin):
                 "its own agg and reference that agg by name from an ordinary "
                 "aggregate.")
 
-        # ---- event and year loss tables (``agg NAME elt ...`` / ``ylt``)
+        # ---- event and year loss tables (``agg NAME elt ...`` / ``yelt``)
         # Recorded symbolically by the parser and lowered here, beside the
         # severity reference and for the same reason: ``Aggregate.__init__``
         # needs the frequency and severity arrays. A pnl / xpnl carries the
@@ -1700,7 +1700,7 @@ class Underwriter(HelpMixin):
         elif (kind not in ('agg', 'pnl', 'xpnl', 'port')
               and _loss_table.carries_loss_table(spec)):
             raise ValueError(
-                f"{name}: an elt or ylt body is not supported in a '{kind}' "
+                f"{name}: an elt or yelt body is not supported in a '{kind}' "
                 "body. Declare the table as its own agg.")
 
         if kind == 'agg':

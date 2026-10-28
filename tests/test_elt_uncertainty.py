@@ -587,4 +587,4 @@ def test_without_eltq(monkeypatch):
     build('agg LT.NoEltq3 elt [[1 .1 50]]', update=False)
     build('agg LT.NoEltq4 elt [[1 .1 50 100]]', update=False)
     build('agg LT.NoEltqNo2u elt no2u [[1 .1 50 100 10 10]]', update=False)
-    build('agg LT.NoEltqY ylt [0 100]', update=False)
+    build('agg LT.NoEltqY yelt [0 100]', update=False)

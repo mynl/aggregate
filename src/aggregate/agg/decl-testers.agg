@@ -1453,10 +1453,10 @@ xpnl OAT.Unpriced 2000 premium less agg OAT.Unpriced_e 2000 premium at 70% lr 10
 # ============================================================
 # ``elt`` lowers an ELT3 ``[id rate mean]``, an ELT4 ``[id rate mean max]`` or,
 # under ``no2u``, an ELT6 ``[id rate mean max sdi sdc]`` to compound Poisson: one
-# count per physical event, unit losses summed within the event. ``ylt`` lowers
+# count per physical event, unit losses summed within the event. ``yelt`` lowers
 # losses, ``[year loss]`` or ``[year loss prob]`` to ``dfreq [1] dsev``, units
 # summed within each year. The refusals are commented, like section X. See
-# tests/test_elt.py, tests/test_ylt.py and dev/done/plan-elt.md.
+# tests/test_elt.py, tests/test_yelt.py and dev/done/plan-elt.md.
 agg LT.Basic as "My easy example" elt [[1 .1 100] [2 .1 40] [3 .1 80]]       note{rate 0.3, mean 22, variance 1800};
 agg LT.Max elt [[1 .1 100 1000] [2 .1 40 600] [3 .1 80 2000]]                note{ELT4: the same law, maximums for reporting};
 agg LT.Shared elt unit A [[1 .1 100]] elt unit B [[1 .1 40]]                 note{one event: rate 0.1, mean 14, variance 1960};
@@ -1465,10 +1465,10 @@ agg LT.MeanOnly elt no2u [[1 .1 50 100 10 10]]                               not
 agg LT.Treaty elt unit A [[1 .1 60] [2 .2 30]] elt unit B [[1 .1 60]] occurrence net of 100 xs 50 aggregate net of 200 xs 100   note{the occurrence layer sees the event total};
 agg LT.Ids elt unit A [[7 .1 100] ["007" .1 5]] elt unit B [["7" .1 40]]     note{7 and "7" one event, "007" another};
 pnl LT.PnL 30 premium less agg LT.PnL_e elt [[1 .1 100] [2 .1 40]] occurrence net of 50 xs 50   note{an elt engine};
-agg LT.Y1 ylt [0 0 100 300]                                                  note{mean 100, variance 15000};
-agg LT.Y3 ylt [[1 0 .5] [2 100 .3] [3 300 .2]] aggregate net of 150 xs 50     note{net mean 45, variance 3225};
-agg LT.Aligned ylt unit A [[1 0] [2 100]] ylt unit B [[1 100] [2 0]]          note{every year totals 100: variance zero};
-pnl LT.YPnL 120 premium less agg LT.YPnL_e ylt [0 0 100 300] aggregate net of 150 xs 50   note{a ylt engine with annual terms};
+agg LT.Y1 yelt [0 0 100 300]                                                 note{mean 100, variance 15000};
+agg LT.Y3 yelt [[1 0 .5] [2 100 .3] [3 300 .2]] aggregate net of 150 xs 50    note{net mean 45, variance 3225};
+agg LT.Aligned yelt unit A [[1 0] [2 100]] yelt unit B [[1 100] [2 0]]        note{every year totals 100: variance zero};
+pnl LT.YPnL 120 premium less agg LT.YPnL_e yelt [0 0 100 300] aggregate net of 150 xs 50   note{a yelt engine with annual terms};
 # ELT6 with secondary uncertainty ([ELT-Uncertainty], 1.15.0 and 1.16.0):
 # eltq's model moments with no grid, then eltq's quantization on the grid
 # with the [ELT-Grid] tail check. A shared event's rows are rolled up into one
@@ -1490,5 +1490,5 @@ agg LT.Remote elt [[1 .1 50 100 10 10] [2 5e-7 10 1e7 0 20000]]              not
 agg LT.BetaNet elt [[1 .1 50 100 10 10]] occurrence net of 30 xs 20 aggregate net of 50 xs 10   note{treaties on the quantized severity};
 pnl LT.PnL6 30 premium less agg LT.PnL6_e elt [[1 .1 50 100 10 10]] occurrence net of 50 xs 20   note{an ELT6 engine}
 # agg LT.Mixed elt [[1 .1 50 100 10 10]] elt [[2 .1 50]]                     note{refused: active ELT6 with ELT3}
-# agg LT.YOcc ylt [0 100] occurrence net of 50 xs 50                         note{refused: occurrence terms on annual outcomes}
-# agg LT.Missing ylt unit A [[1 0] [2 100]] ylt unit B [[1 100] [3 0]]       note{refused: different year sets}
+# agg LT.YOcc yelt [0 100] occurrence net of 50 xs 50                        note{refused: occurrence terms on annual outcomes}
+# agg LT.Missing yelt unit A [[1 0] [2 100]] yelt unit B [[1 100] [3 0]]     note{refused: different year sets}

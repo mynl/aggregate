@@ -2794,7 +2794,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             choke point to pop it at. See dev/done/plan-tweedie.md.
         :param _loss_table_meta: private provenance, the audit record
             ``aggregate._loss_table.resolve`` writes when the aggregate is
-            declared from an ``elt`` or ``ylt`` table, or ``None``. The
+            declared from an ``elt`` or ``yelt`` table, or ``None``. The
             frequency and severity arguments carry the lowered law; this
             carries what the table was (sources, forms, units, counts) for
             :attr:`info` and ``decl_writer``. An argument, like ``_tweedie``,
@@ -3967,7 +3967,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
     @property
     def loss_table_summary_df(self):
-        """What an ``elt`` or ``ylt`` declaration read, one fact per row.
+        """What an ``elt`` or ``yelt`` declaration read, one fact per row.
 
         Indexed by ``(part, item)``: the combined table (kind, form, units,
         events or years, rate or probabilities, mean annual loss), the grid,

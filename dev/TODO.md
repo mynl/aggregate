@@ -33,7 +33,8 @@
   trial of the automatic `bs` choice (the moment window can land 10 times
   coarser than the tail needs; measurements in the uncertainty plan's
   execution log), and `[ELT-Reporting-Punchup]`
-  (`dev/plan-elt-reporting-punchup.md`). Pended: `[ELT-Burke-Total]`, its
+  (`dev/done/plan-elt-reporting-punchup.md`; its first half,
+  `[YELT-Keyword]`, renamed the annual table clause `ylt` to `yelt` in 1.20.0). Pended: `[ELT-Burke-Total]`, its
   branch kept behind `_loss_table.SHARED_EVENT_RULE`, and `[ELT-Joint-Units]`
   (`dev/note-joint-elt.md`).
 
@@ -173,5 +174,5 @@
 `[Range-Sugar-Round-Trip]`, `[Rate-Based-Reins-Clauses]`,
 `[Reinstatement-Event-Date-Terms]`, `[Paper-Reproductions]`,
 `[Joint-Padding-Window-Tradeoff]`, `[Multi-Window-Splice-Conditional]`,
-`[Data-To-Dsev-Preprocessors]` (its ELT and YLT limb is `[DecL-Loss-Tables]`), `[Parameter-Risk-Predictive]`,
+`[Data-To-Dsev-Preprocessors]` (its ELT and YELT limb is `[DecL-Loss-Tables]`), `[Parameter-Risk-Predictive]`,
 `[Individual-Risk-Model-Census]`.

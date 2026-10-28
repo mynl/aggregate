@@ -1,10 +1,10 @@
 """Loss table file sources ([DecL-Loss-Tables], ``[Loss-Table-Files]``).
 
-``elt "path"`` and ``ylt "path"`` read CSV, TSV, Parquet or Feather through one
+``elt "path"`` and ``yelt "path"`` read CSV, TSV, Parquet or Feather through one
 alias table. Identifiers stay exact, a ``unit`` column splits a long file, and a
 relative path is fixed when the statement is registered: against the ``.agg``
 file's directory, or the session's working directory. Fixtures are synthetic,
-under ``tests/data/elt`` and ``tests/data/ylt``.
+under ``tests/data/elt`` and ``tests/data/yelt``.
 """
 
 import hashlib
@@ -86,19 +86,19 @@ def test_elt6_file_with_secondary_uncertainty():
 
 
 @pytest.mark.parametrize('name, form, mean, var', [
-    ('years.csv', 'YLT2', 100, 15000),
-    ('losses-only.csv', 'YLT1', 100, 15000),
-    ('weighted.tsv', 'YLT3', 90, 12900),
+    ('years.csv', 'YELT2', 100, 15000),
+    ('losses-only.csv', 'YELT1', 100, 15000),
+    ('weighted.tsv', 'YELT3', 90, 12900),
 ])
-def test_ylt_files(name, form, mean, var):
-    a = build(f'agg LT.YF ylt {_q(DATA / "ylt" / name)}', update=False)
+def test_yelt_files(name, form, mean, var):
+    a = build(f'agg LT.YF yelt {_q(DATA / "yelt" / name)}', update=False)
     assert a._loss_table_meta['form'] == form
     assert a.actual_m == pytest.approx(mean)
     assert a.actual_var == pytest.approx(var)
 
 
-def test_long_ylt_aligns_units_by_year():
-    x, p, *_ = _law(f'agg LT.YL ylt {_q(DATA / "ylt/units-long.csv")}')
+def test_long_yelt_aligns_units_by_year():
+    x, p, *_ = _law(f'agg LT.YL yelt {_q(DATA / "yelt/units-long.csv")}')
     np.testing.assert_allclose(x, [100])
 
 
@@ -205,11 +205,11 @@ def test_malformed_elt_files(tmp_path, text, match):
     ('loss,prob\n0,.5\n1,.5\n', 'needs a year identifier'),
     ('unit,loss\nA,0\nB,1\n', 'several units needs a year'),
 ])
-def test_malformed_ylt_files(tmp_path, text, match):
+def test_malformed_yelt_files(tmp_path, text, match):
     f = tmp_path / 'bad.csv'
     f.write_text(text, encoding='utf-8')
     with pytest.raises(LossTableError, match=match):
-        build(f'agg LT.BadYear ylt {_q(f)}', update=False)
+        build(f'agg LT.BadYear yelt {_q(f)}', update=False)
 
 
 def test_unsupported_and_missing_files(tmp_path):

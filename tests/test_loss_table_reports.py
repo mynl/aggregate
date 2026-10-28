@@ -54,10 +54,10 @@ def test_elt3_combination_reports_no_exposure():
                                        'value'] == 'n/a'
 
 
-def test_ylt_summary_and_file_record():
-    a = build(f'agg LT.Y ylt "{(DATA / "ylt/weighted.tsv").as_posix()}"')
+def test_yelt_summary_and_file_record():
+    a = build(f'agg LT.Y yelt "{(DATA / "yelt/weighted.tsv").as_posix()}"')
     s = a.loss_table_summary_df['value']
-    assert s[('table', 'kind')] == 'ylt'
+    assert s[('table', 'kind')] == 'yelt'
     assert s[('table', 'years')] == 3
     assert s[('table', 'zero-loss years')] == 1
     assert s[('table', 'probability of zero')] == pytest.approx(0.5)
@@ -97,8 +97,8 @@ def test_validation_statuses():
     assert (v['status'] == 'pass').all(), v
 
 
-def test_degenerate_ylt_marks_undefined_measures():
-    v = build('agg LT.One ylt [75]').loss_table_validation_df.set_index('check')
+def test_degenerate_yelt_marks_undefined_measures():
+    v = build('agg LT.One yelt [75]').loss_table_validation_df.set_index('check')
     assert v.loc['annual mean estimate', 'status'] == 'pass'
     assert v.loc['annual skew estimate', 'status'] == 'not computed'
     assert 'undefined' in v.loc['annual skew estimate', 'detail']

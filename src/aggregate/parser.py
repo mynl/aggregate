@@ -801,15 +801,15 @@ class UnderwritingTransformer(Transformer):
 
     # ----- event and year loss tables ([DecL-Loss-Tables]) -------------
     # Each source becomes a small dict recorded symbolically under
-    # ``elt_sources`` / ``ylt_sources``; the underwriter reads, validates and
+    # ``elt_sources`` / ``yelt_sources``; the underwriter reads, validates and
     # lowers the whole list at construction (``aggregate._loss_table``). Only
     # shape is checked here: row widths, and what the grammar cannot express.
     def _loss_table_body(self, table, c):
-        """Assemble an ``agg_body_elt`` / ``agg_body_ylt`` spec fragment.
+        """Assemble an ``agg_body_elt`` / ``agg_body_yelt`` spec fragment.
 
         Parameters
         ----------
-        table : {'elt', 'ylt'}
+        table : {'elt', 'yelt'}
             The body kind.
         c : list
             Children: sources, occurrence reinsurance, aggregate reinsurance,
@@ -822,29 +822,30 @@ class UnderwritingTransformer(Transformer):
 
         Notes
         -----
-        A YLT row is a whole year's loss, so an occurrence treaty applied to it
+        A YELT row is a whole year's loss, so an occurrence treaty applied to it
         would transform the annual total while appearing to price an event
-        layer; it is refused here and, for a referenced YLT, again in
+        layer; it is refused here and, for a referenced YELT, again in
         ``_loss_table.resolve``. ``approximate`` on a loss table is deferred.
         """
         sources, occ_reins, agg_reins, approx, orientation = c
-        if table == 'ylt' and occ_reins:
+        if table == 'yelt' and occ_reins:
             raise ValueError(
-                "DecL: a ylt holds annual outcomes, so occurrence reinsurance "
+                "DecL: a yelt holds annual outcomes, so occurrence reinsurance "
                 "cannot apply: an annual total does not identify its "
                 "occurrences. Write annual terms as 'aggregate net of ...', or "
                 "declare the events with elt for occurrence terms.")
         if approx.get("approximate", "exact") != "exact":
             raise ValueError(
-                f"DecL: approximate is not supported on an {table} body yet.")
+                f"DecL: approximate is not supported on "
+                f"{'an' if table == 'elt' else 'a'} {table} body yet.")
         return {f"{table}_sources": sources, **occ_reins, **agg_reins,
                 **orientation}
 
     def agg_body_elt(self, c):
         return self._loss_table_body('elt', c)
 
-    def agg_body_ylt(self, c):
-        return self._loss_table_body('ylt', c)
+    def agg_body_yelt(self, c):
+        return self._loss_table_body('yelt', c)
 
     def lt_sources_one(self, c):
         return [c[0]]
@@ -856,7 +857,7 @@ class UnderwritingTransformer(Transformer):
 
     #: Inline row widths, identifier included, mapped to the table form.
     _ELT_ROW_FORMS = {3: 'ELT3', 4: 'ELT4', 6: 'ELT6'}
-    _YLT_ROW_FORMS = {2: 'YLT2', 3: 'YLT3'}
+    _YELT_ROW_FORMS = {2: 'YELT2', 3: 'YELT3'}
 
     @staticmethod
     def _check_rows(table, rows, forms):
@@ -869,7 +870,8 @@ class UnderwritingTransformer(Transformer):
         if widths[0] not in forms:
             allowed = ', '.join(f'{w} ({f})' for w, f in forms.items())
             raise ValueError(
-                f"DecL: an {table} row has {widths[0]} fields, identifier "
+                f"DecL: {'an' if table == 'elt' else 'a'} {table} row has "
+                f"{widths[0]} fields, identifier "
                 f"included; allowed: {allowed}.")
 
     def elt_source(self, c):
@@ -878,11 +880,11 @@ class UnderwritingTransformer(Transformer):
             self._check_rows('elt', data['rows'], self._ELT_ROW_FORMS)
         return {"table": "elt", "no2u": no2u, **unit, **data}
 
-    def ylt_source(self, c):
-        _ylt, unit, data = c
+    def yelt_source(self, c):
+        _yelt, unit, data = c
         if 'rows' in data:
-            self._check_rows('ylt', data['rows'], self._YLT_ROW_FORMS)
-        return {"table": "ylt", **unit, **data}
+            self._check_rows('yelt', data['rows'], self._YELT_ROW_FORMS)
+        return {"table": "yelt", **unit, **data}
 
     def no2u_set(self, c):
         return True
@@ -2930,11 +2932,11 @@ class UnderwritingTransformer(Transformer):
         and scaling only some of them would build a different table from the
         one the program names. Edit the table instead.
         """
-        for key in ("elt_sources", "ylt_sources"):
+        for key in ("elt_sources", "yelt_sources"):
             if key in bid:
                 raise ValueError(
                     f"DecL: {bid.get('name', 'the aggregate')} is declared from "
-                    f"{'an elt' if key == 'elt_sources' else 'a ylt'}, which "
+                    f"{'an elt' if key == 'elt_sources' else 'a yelt'}, which "
                     f"cannot be {operation}: the table's "
                     "rates and losses are data. Edit the table itself.")
 

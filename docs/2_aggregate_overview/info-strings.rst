@@ -24,7 +24,7 @@ claim count                  ``self.n``, format ``,.3f``
 frequency distribution       ``self.frequency.freq_name``
 severity distribution        single component: ``Severity.tail_description``;
                              else ``{k} components``
-loss table                   ``elt`` / ``ylt`` source: form, event or year            not a loss table
+loss table                   ``elt`` / ``yelt`` source: form, event or year            not a loss table
                              count, units, and the uncertainty or probability
                              convention; an ELT shows ``no secondary
                              uncertainty``, ``secondary uncertainty`` (ELT6),

@@ -852,7 +852,7 @@ class _Block:
 class _Matrix:
     """A clause ending in a nested array: a head and one bracketed row per line.
 
-    The ``elt`` / ``ylt`` matrices and the ``dbvsev`` probability matrix. Terse
+    The ``elt`` / ``yelt`` matrices and the ``dbvsev`` probability matrix. Terse
     puts the whole array on the line as ``head [[r1] [r2]]``, byte-for-byte the
     historical form. Spread opens the array on the head line, puts each row one
     level deeper and closes it at the head's level, so rows stack for reading
@@ -960,8 +960,8 @@ def _render_tweedie(spec: dict) -> str:
 
 
 def _loss_table_sources(spec: dict):
-    """The declared ``elt`` / ``ylt`` sources of a parsed spec, or ``None``."""
-    for key in ('elt_sources', 'ylt_sources'):
+    """The declared ``elt`` / ``yelt`` sources of a parsed spec, or ``None``."""
+    for key in ('elt_sources', 'yelt_sources'):
         if key in spec:
             return spec[key]
     return None
@@ -973,9 +973,9 @@ def _fmt_lt_id(ident: str) -> str:
 
 
 def _render_loss_table(source: dict):
-    """Render one ``elt`` / ``ylt`` source clause.
+    """Render one ``elt`` / ``yelt`` source clause.
 
-    Inverts ``elt_source`` / ``ylt_source``: the keyword, ``no2u`` when set,
+    Inverts ``elt_source`` / ``yelt_source``: the keyword, ``no2u`` when set,
     ``unit NAME [as LABEL]`` when declared, then the quoted path, the flat
     vector, or the matrix with one bracketed row per event or year. An omitted
     unit stays omitted rather than rendering as ``unit Total``. A matrix

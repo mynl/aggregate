@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.20.0 - 2026-10-28
+
+**[YELT-Keyword] the DecL clause for an annual loss table is `yelt`, and `ylt` is gone.** `yelt [0 0 100 300]` (or a file with only a loss column), `yelt [[year loss]]` and `yelt [[year loss prob]]` declare the forms `YELT1`, `YELT2` and `YELT3`, with the semantics of the old `ylt` unchanged. `yelt` is a reserved word and `ylt` an ordinary identifier, with no alias. The spec key is `yelt_sources`, the audit records the table as `yelt`, `info` shows `YELT2, 4 years, ...`, and the error messages, the grammar reference, the Sublime colorer and the corpus follow. `ylt` was never published (the last PyPI release is 1.11.0), so there is no deprecation.
+
+Downstream: `aggregate-api` replaces `ylt` with `yelt` in `web/src/decl-words.json`, `src/aggregate_api/loss_table_files.py` and `tests/test_loss_table_files.py`.
+
 ## 1.19.0 - 2026-10-28
 
 **[ELT-Shared-Event-Rollup] a shared ELT6 event is rolled up into one row, and the table updates.** When an event has rows for two or more units, the rows become one row before the model is built: means, maximums and correlated SDs add, independent SDs add in quadrature, at the event's rate (the convention of Homer and Li and of Mitchell-Wallace et al., eltq's `coupling='homer'`). The rolled row is classified, quantized and tail checked as a one-row event, so `update` and a `Portfolio` unit work where 1.15.0 to 1.18.2 raised `NotImplementedError`. The model moments of a shared table move from Burke's coupling to the roll-up (the `LT.Comonotone` severity second moment from 11,000 to 14,000, `LT.Independent` from 9,000 to 12,100), and the row classification counts rolled rows. `info` shows `{k} shared events rolled up`, `loss_table_summary_df` gains the row `('table', 'shared events')` with the input rows and how many have inadmissible variance, the `moment integration` validation row goes, and `SeverityElt` gains `grid_supported`. Tables without a shared event are unchanged, digest included. The Burke route stays in the code behind the private `_loss_table.SHARED_EVENT_RULE` (`[ELT-Burke-Total]`, pended).

@@ -1504,3 +1504,21 @@ pnl LT.PnL6 30 premium less agg LT.PnL6_e elt [[1 .1 50 100 10 10]] occurrence n
 agg TWS.Dispersion tweedie 1.5 100 2                                         note{ten claims, gamma mean 10 and cv 1};
 agg TWS.CV tweedie 1.5 100 cv 0.447213595499958                              note{the same law in the cv form};
 pnl TWS.PnL 1100 premium less agg TWS.PnL_e tweedie 1.5 100 cv 0.5           note{a cv form engine}
+
+# FLB. Dyadic lattice buckets ([Fractional-Lattice-Bucket], 1.24.0)
+# =================================================================
+# Atoms on a common dyadic step get the largest nice divisor of the step as the
+# bucket when the window fits log2, else the step itself. A fixed and a random
+# count on the same atoms agree. Decimals and thirds have no dyadic lattice and
+# size as before. See tests/test_lattice_bucket.py and
+# dev/done/plan-fractional-lattice-bucket.md.
+agg FLB.Quarter 3 claims dsev [0.25 0.5 1.75] [.25 .5 .25] fixed               note{bs 1/4, log2 5};
+agg FLB.Signed 3 claims dsev [-1.75 0.25 0.5] [.25 .5 .25] fixed               note{signed, bs 1/4, log2 5};
+agg FLB.Nice 3 claims dsev [0.75 1.5 2.25] [.25 .5 .25] fixed                  note{lattice 0.75, nice bs 1/4};
+agg FLB.Half 3 claims dsev [1.5 3 4.5] [.25 .5 .25] fixed                      note{lattice 1.5, bs 1/2};
+agg FLB.Fixed 3 claims dsev [5 10 15] fixed                                    note{bs 5, was 1};
+agg FLB.Poi 3 claims dsev [5 10 15] poisson                                    note{bs 5, as the fixed count};
+agg FLB.Three 3 claims dsev [3 6 9] [.25 .5 .25] poisson                       note{lattice 3, nice bs 1};
+agg FLB.Noisy 1 claim dsev [0.25000000000000006 0.5000000000000001 1.7499999999999998] [.25 .5 .25] fixed   note{noise lands on the 1/4 lattice};
+agg FLB.Dec 3 claims dsev [0.1 0.2 0.3] [.25 .5 .25] fixed                     note{no dyadic lattice, sized as before};
+port FLB.Port agg FLB.P1 2 claims dsev [-1.75 0.25 0.5] [.25 .5 .25] fixed agg FLB.P2 2 claims dsev [0.75 1.5] fixed   note{pooled lattice 1/4}

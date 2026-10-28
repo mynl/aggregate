@@ -15,7 +15,7 @@ import logging
 import numpy as np
 import scipy.fft as sfft
 
-from .utilities import ft, ift
+from .utilities import ft, ift, LATTICE_RTOL
 
 logger = logging.getLogger(__name__)
 
@@ -406,7 +406,10 @@ def discretize_severities(sevs, xs, bs, *, i0=0, sev_calc='discrete',
             # output-window origin ``x_min`` -- the two differ when the
             # output window is forced wider than the atom support (e.g. an
             # explicit ``x_min`` below the smallest atom).
-            appx = rebucket(sev.fz.xk, sev.fz.pk, scheme='linear', origin=xs[0])
+            # ``snap_rtol``: an atom noise moved off its lattice point lands
+            # whole in one bucket rather than leaving a 1e-16 sliver.
+            appx = rebucket(sev.fz.xk, sev.fz.pk, scheme='linear', origin=xs[0],
+                            snap_rtol=LATTICE_RTOL)
         elif discretization_calc == 'both':
             # see comments: we rescale each severity...
             appx = np.maximum(np.diff(sev.cdf(adj_xs)), -np.diff(sev.sf(adj_xs)))

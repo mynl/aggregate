@@ -35,7 +35,7 @@ from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_meancv, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import (ft, ift, below_grid_fill,
-                        round_bucket,
+                        round_bucket, _dyadic_lattice_step,
                         balanced_window,
                         agg_help, remove_fuzz, noise_floor, value_type_role)
 from ._grid_distribution import GridDistribution, return_period_map, period_to_p
@@ -5203,7 +5203,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
     # Reinsurance application: occ pre-FFT, agg post-FFT
     # ================================================================
 
-    def _rebucket_to_grid(self, values, mass, scheme=None, origin=None):
+    def _rebucket_to_grid(self, values, mass, scheme=None, origin=None,
+                          snap_rtol=None):
         """Scatter off-grid ``mass`` at target ``values`` onto the model grid.
 
         The model grid is ``self.xs == bs * arange`` with ``xs[0] == 0``, so
@@ -5231,6 +5232,14 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             from ``x_min`` when the output window is forced wider than the
             severity support (e.g. an explicit ``x_min`` below the smallest
             atom).
+        snap_rtol : float, optional
+            When given, a value within ``snap_rtol * max|values|`` of a grid
+            point is treated as on it before the split. The discrete-severity
+            call site passes :data:`~aggregate.utilities.LATTICE_RTOL`, so an
+            atom that floating-point noise moved a few units in the last place
+            off its lattice point puts all its mass in one bucket instead of
+            leaving a sliver in the next. ``None`` (the reinsurance call
+            sites) leaves the values as they are.
 
         Returns
         -------
@@ -5260,7 +5269,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             origin = self.x_min
         # Grid index of a value v is (v - origin) / bs; origin == 0 on the
         # default grid recovers the original v / bs.
-        scaled = (np.asarray(values, dtype=float) - origin) / bs
+        values = np.asarray(values, dtype=float)
+        scaled = (values - origin) / bs
+        if snap_rtol and len(values):
+            near = np.rint(scaled)
+            tol = snap_rtol * float(np.max(np.abs(values))) / bs
+            scaled = np.where(np.abs(scaled - near) <= tol, near, scaled)
         out = np.zeros(n)
         if scheme is None:
             scheme = self.reins_bucket
@@ -6988,23 +7002,14 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _reinsurance.reins_after_label(self)
 
-    def _severity_lattice(self):
-        """Integer-lattice step of the severity, or ``None`` if not on a lattice.
-
-        Returns the gcd of the (integer) severity atoms -- the natural bucket
-        size, since an aggregate of lattice-valued severities is itself on that
-        lattice **regardless of the frequency** (e.g. Poisson x ``dsev [1:10]``
-        is integer-valued, so ``bs=1``). ``None`` for any continuous component.
-        This is what lets the window estimator pick a coarse, exact ``bs`` and
-        shrink ``log2`` to fit, instead of defaulting to a fine ``bs`` over the
-        full ``2**log2`` buckets.
+    def _severity_atoms(self):
+        """Every atom of every severity component, pooled, or ``None``.
 
         Returns
         -------
-        float or None
-            ``gcd`` of the integer atoms (1 for ``dsev [1:n]``; 5 for atoms
-            ``[0 5 10]``), or ``None`` if any severity component is continuous /
-            non-integer.
+        ndarray or None
+            The concatenated ``support_atoms`` of the components, or ``None``
+            when there is no component or any component is not discrete.
         """
         atoms = []
         for s in (self.sevs if self.sevs is not None else []):
@@ -7014,15 +7019,31 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             atoms.append(np.asarray(a, dtype=float))
         if not atoms:
             return None
-        allx = np.concatenate(atoms)
-        if not np.allclose(allx, np.round(allx), atol=1e-9):
-            return None
-        ints = np.abs(np.round(allx).astype(np.int64))
-        ints = ints[ints != 0]
-        if len(ints) == 0:
-            return 1.0
-        g = int(np.gcd.reduce(ints))
-        return float(g) if g > 0 else 1.0
+        return np.concatenate(atoms)
+
+    def _severity_lattice(self):
+        """Dyadic lattice step of the severity, or ``None`` if not on a lattice.
+
+        The step ``h`` of :func:`~aggregate.utilities._dyadic_lattice_step` over
+        the pooled atoms. An aggregate of lattice-valued severities is itself on
+        that lattice **regardless of the frequency** (Poisson x ``dsev [1:10]``
+        is integer-valued, Poisson x ``dsev [0.25 1.75]`` lives on quarters), so
+        the window estimator can pick a coarse, exact ``bs`` from
+        :func:`~aggregate.utilities._lattice_candidates` and shrink ``log2`` to
+        fit, instead of defaulting to a fine ``bs`` over the full ``2**log2``
+        buckets.
+
+        Returns
+        -------
+        float or None
+            The step (1 for ``dsev [1:n]``, 5 for atoms ``[0 5 10]``, 0.75 for
+            ``[0.75 1.5 2.25]``), or ``None`` if any component is continuous
+            or the atoms sit on no dyadic lattice (decimals such as 0.1, and
+            thirds).
+        """
+        atoms = self._severity_atoms()
+        fit = None if atoms is None else _dyadic_lattice_step(atoms)
+        return None if fit is None else fit[0]
 
     def _severity_high_estimate(self, p):
         """Upper extent (~``p`` quantile) of the per-occurrence severity mixture.
@@ -7271,9 +7292,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         Returns ``(A_min, A_max, bs_lattice, logp_lo, logp_hi)`` when the
         frequency is discrete-finite (``dfreq`` -> ``empirical``, or ``fixed``)
-        **and** every severity component is a discrete histogram on an integer
-        lattice; otherwise ``None``. The aggregate then takes values exactly on
-        the integer lattice and its support is finite and exactly computable.
+        **and** the severity atoms, pooled across components, sit on a dyadic
+        lattice (:func:`~aggregate.utilities._dyadic_lattice_step`); otherwise
+        ``None``. The aggregate then takes values exactly on the lattice and
+        its support is finite and exactly computable.
 
         Notes
         -----
@@ -7286,7 +7308,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         - ``A_min = min(N_max·s_min, N_min·s_min)`` symmetrically; include ``0``
           if ``0`` is a count atom.
 
-        ``bs_lattice`` is 1 for integer atoms (the common case).
+        ``bs_lattice`` is the lattice step ``h`` (3 for atoms ``[3 6 9]``, 0.25
+        for ``[0.25 0.5 1.75]``). The sizer picks the bucket from it by
+        :func:`~aggregate.utilities._lattice_candidates`, so a fixed and a
+        random count on the same atoms get the same bucket. It was a hard-coded
+        1 before 1.24.0, which gave ``[3 6 9]`` ``bs = 1`` under a fixed count
+        and 3 under Poisson.
 
         **Corner reachability (``logp_lo`` / ``logp_hi``).** The exact support is
         only a trustworthy grid extent if the aggregate can *attain* its
@@ -7339,8 +7366,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         def _allint(x):
             return bool(np.allclose(x, np.round(x), atol=1e-9))
 
-        if not (_allint(n_atoms) and _allint(s_all)):
+        fit = _dyadic_lattice_step(s_all)
+        if not (_allint(n_atoms) and fit is not None):
             return None
+        h = fit[0]
         s_min, s_max = float(s_all.min()), float(s_all.max())
         n_min, n_max = float(n_atoms.min()), float(n_atoms.max())
         hi = max(n_max * s_max, n_min * s_max)
@@ -7380,7 +7409,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         n_lo = n_max if s_min <= 0 else n_min   # count realizing A_min
         logp_hi = _corner_logp(hi, s_max, n_hi)
         logp_lo = _corner_logp(lo, s_min, n_lo)
-        return float(lo), float(hi), 1.0, float(logp_lo), float(logp_hi)
+        return float(lo), float(hi), float(h), float(logp_lo), float(logp_hi)
 
     def _bounded_severity_window(self, p):
         """Window for a bounded severity with a (possibly small) claim count.

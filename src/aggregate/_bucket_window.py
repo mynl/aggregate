@@ -20,7 +20,8 @@ from . import _validation
 # from aggregate at module scope, and _program reaches back here for _fmt_bs
 # through a deferred import inside the function.
 from . import _program
-from .utilities import round_bucket, value_type_role
+from .utilities import (round_bucket, value_type_role, _dyadic_lattice_step,
+                        _lattice_candidates)
 from . import tail as _tail
 from ._fits import gamma_fit, lognorm_fit, sgamma_fit, sln_fit
 
@@ -273,7 +274,7 @@ def estimate_agg_window(m, sd, skew, p=BUCKET_SIZING_P, p_lo=None, p_hi=None):
 
 _METHOD_BLURB = {
     'moment': 'the 3-moment method-of-moments window',
-    'exact_discrete': 'the exact discrete (integer-lattice) support',
+    'exact_discrete': 'the exact discrete (lattice) support',
     'bounded_small': 'the bounded-severity support window',
     'windowed': 'a two-sided window far from 0 (benign FFT wrap)',
     'sbj': 'the single-big-jump extent',
@@ -578,6 +579,37 @@ def _integer_ratio(a, b, rel_tol=1e-9):
         return False
     r = a / b
     return r >= 1.0 and math.isclose(r, round(r), rel_tol=rel_tol)
+
+
+def _lattice_note(h, residual, bs, pinned):
+    """Bucket table note fragment for a row sized against the lattice step ``h``.
+
+    Parameters
+    ----------
+    h : float
+        The lattice step.
+    residual : float
+        Largest distance of an atom from its lattice point
+        (:func:`~aggregate.utilities._dyadic_lattice_step`).
+    bs : float
+        The row's chosen bucket.
+    pinned : bool
+        Whether ``bs`` was pinned by the caller.
+
+    Returns
+    -------
+    str
+        The step, the residual and whether ``bs`` is on the lattice. A pinned
+        ``bs`` that misses the lattice is noted here, not warned: the pin is
+        the user's opt-out.
+    """
+    res = f' (residual {residual:.2g})' if np.isfinite(residual) else ''
+    if _integer_ratio(h, bs):
+        return f'; lattice {_fmt_bs(h)}{res}, bs {_fmt_bs(bs)} on it'
+    if pinned:
+        return f'; pinned bs {_fmt_bs(bs)} misses the lattice {_fmt_bs(h)}'
+    return (f'; lattice {_fmt_bs(h)} too fine for the log2 cap, '
+            f'bs {_fmt_bs(bs)} off it')
 
 
 def _need_log2(span, bs):
@@ -909,8 +941,15 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     - ``moment`` -- always; the legacy 3-moment sizing for non-negative
       aggregates (the former ``recommend_bucket`` algorithm), two-sided
       ``estimate_agg_window`` for signed ones.
-    - ``exact_discrete`` -- ``dfreq``/``fixed`` x ``dsev`` on an integer
-      lattice: exact finite support, ``bs=1``, minimal ``log2`` (<= cap).
+    - ``exact_discrete`` -- ``dfreq``/``fixed`` x ``dsev`` on a dyadic
+      lattice: exact finite support, ``bs`` the first lattice candidate that
+      fits, minimal ``log2`` (<= cap).
+
+    Every method row sizes against the severity's lattice step when it has
+    one (:meth:`Aggregate._severity_lattice`): ``bs`` is the largest nice
+    divisor of the step if the row's window fits the cap there, else the step,
+    else (no lattice) the resolution estimate. See ``_size`` and
+    ``dev/done/plan-fractional-lattice-bucket.md``.
     - ``bounded_small`` -- bounded severity: ``[0, N_hi·s_max]`` from a high
       frequency quantile; selected only when tighter than ``moment``.
     - ``windowed`` -- non-signed high-mean / thin-spread aggregate
@@ -957,9 +996,15 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     p_protect = 1.0 - 10.0 ** -WINDOW_NINES
     p_trim = 1.0 - 10.0 ** -WINDOW_NINES_TRIM
     p_lo_w, p_hi_w = (p_trim, p_protect) if is_loss else (p_protect, p_trim)
-    lattice = agg._severity_lattice()
+    # The lattice step and its residual, once: every lattice row uses the step,
+    # and the residual goes in their notes.
+    _atoms = agg._severity_atoms()
+    lattice_fit = None if _atoms is None else _dyadic_lattice_step(_atoms)
+    lattice, lattice_residual = (lattice_fit if lattice_fit is not None
+                                 else (None, np.nan))
 
-    def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None):
+    def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None,
+              nice=True):
         """Origin ``x0`` and grid ``(bs, log2)`` for a window ``[x_lo, x_hi]``.
 
         Returns ``(x0, bs, log2)`` only -- the *window* edges stay the
@@ -967,13 +1012,21 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         (``x0 + 2**log2 * bs``, which power-of-2 padding makes wider than the
         window) is reported separately in the ``used`` row.
 
-        bs: forced ``bs_in`` if given; else the integer lattice step (so an
-        integer-valued aggregate uses ``bs=1`` not a fine fraction); else a
-        resolution ``round_bucket(W / 2**cap)``. ``log2`` is shrunk to just
-        cover the window (<= cap) when bs is free, keeping the realized grid
-        sensible; if the user pinned bs they control the grid so the cap
-        ``log2`` is honored; if the window needs more than the cap, bs is
-        coarsened to fit.
+        bs: forced ``bs_in`` if given; else, for a lattice step ``h``, the
+        first of :func:`~aggregate.utilities._lattice_candidates` (the largest
+        nice divisor of ``h``, then ``h``) whose window fits the cap ``log2``;
+        else a resolution ``round_bucket(W / 2**cap)``. A lattice with no
+        fitting candidate is no lattice: the resolution estimate runs as it
+        does for a continuous severity. ``log2`` is shrunk to just cover the
+        window (<= cap) when bs is free, keeping the realized grid sensible;
+        if the user pinned bs they control the grid so the cap ``log2`` is
+        honored; if the window needs more than the cap, bs is coarsened to
+        fit.
+
+        ``nice=False`` forces ``lattice_bs`` itself with no candidate search,
+        and coarsens off it when it does not fit. The reference snap uses it:
+        its ``d * 2**m`` is the commensurable bucket and must not be replaced
+        by a nice divisor.
 
         The realized extent must *strictly exceed* the window, because the
         window top is a closed endpoint: a support that reaches ``x_hi``
@@ -996,20 +1049,39 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         method.
 
         ``grow_cap`` (windowed only) is an *absolute* log2 ceiling above the
-        requested cap: when an integer lattice is present and the band needs
-        more than the cap to hold ``bs = lattice_bs``, grow ``log2`` up to
-        ``grow_cap`` rather than coarsening below the lattice (which would
-        mis-place the atoms). Only coarsen if even ``grow_cap`` is too small.
+        requested cap: when a lattice is present and the band needs more than
+        the cap to hold ``bs = lattice_bs``, grow ``log2`` up to ``grow_cap``
+        rather than coarsening below the lattice (which would mis-place the
+        atoms). Only the exact step may grow: the nice divisor is held to the
+        cap, so ``log2`` never grows just to make ``bs`` nicer. Only coarsen
+        if even ``grow_cap`` is too small.
         """
         use_origin = signed or force_origin
         W = max(x_hi - x_lo, 0.0)
+
+        def _origin(b):
+            return float(np.floor(x_lo / b) * b) if use_origin else 0.0
+
+        if bs_in <= 0 and lattice_bs is not None and nice:
+            for b in _lattice_candidates(lattice_bs):
+                x0 = _origin(b)
+                need = _need_log2(x_hi - x0, b)
+                if need <= log2:
+                    return x0, float(b), int(min(log2, max(need, 1)))
+            h = float(lattice_bs)
+            x0 = _origin(h)
+            need = _need_log2(x_hi - x0, h)
+            if grow_cap is not None and need <= grow_cap:
+                return x0, h, int(need)
+            # no candidate fits: no lattice, the resolution estimate below
+            lattice_bs = None
         if bs_in > 0:
             bs = float(bs_in)
         elif lattice_bs is not None:
             bs = float(lattice_bs)
         else:
             bs = round_bucket(W / N0) if W > 0 else 1.0
-        x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
+        x0 = _origin(bs)
         span = x_hi - x0
         if bs_in > 0:
             # The user pinned bs, so the grid is theirs and the cap ``log2``
@@ -1028,9 +1100,9 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                 l2 = min(log2, max(need, 1))
             elif (grow_cap is not None and lattice_bs is not None
                   and need <= grow_cap):
-                # windowed lattice case: keep the exact lattice bs and grow log2
-                # past the cap (the band is narrow, so a small bounded bump) so
-                # an integer-atom severity is not coarsened off its lattice.
+                # windowed lattice case with a forced bucket: keep it and grow
+                # log2 past the cap (the band is narrow, so a small bounded
+                # bump) so the atoms are not coarsened off their lattice.
                 l2 = need
             elif np.isfinite(span):
                 # Inclusive count, matching ``_need_log2``: a closed window
@@ -1068,6 +1140,8 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                         coverage=coverage,
                         note=f'{note}; non-finite window (rejected)')
         x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs, force_origin, grow_cap)
+        if lattice_bs is not None:
+            note += _lattice_note(lattice_bs, lattice_residual, bs_, bs_in > 0)
         return dict(applies=True, x_min=float(x0), x_max=float(x_hi),
                     W=float(x_hi - x0), bs=bs_, log2=l2_,
                     coverage=coverage, note=note)
@@ -1108,8 +1182,10 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     ed = agg._exact_discrete_window()
     if ed is not None:
         a_lo, a_hi, bs_lat, logp_lo, logp_hi = ed
-        r = _row(a_lo, a_hi, bs_lat, 'exact', 'dfreq/fixed x dsev integer lattice')
-        if not np.isclose(r['bs'], bs_lat):
+        r = _row(a_lo, a_hi, bs_lat, 'exact', 'dfreq/fixed x dsev on a lattice')
+        # coarsened only when no candidate fit: a nice divisor of the step is
+        # as exact as the step itself
+        if not _integer_ratio(bs_lat, r['bs']):
             r['coverage'] = 'support exact, bs coarsened'
         # Reachability guard: the exact support is only trustworthy as a grid
         # extent when the aggregate can actually attain an extreme. Each corner
@@ -1409,7 +1485,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         _forig = (selected == 'windowed')
         _gcap = (log2 + WINDOW_LOG2_GROWTH) if _forig else None
         _x0, _bs, _l2 = _size(float(_sel['x_min']), float(_sel['x_max']),
-                              snapped, _forig, _gcap)
+                              snapped, _forig, _gcap, nice=False)
         rows[selected] = {**_sel, 'x_min': float(_x0), 'bs': float(_bs),
                           'log2': int(_l2),
                           'W': float(float(_sel['x_max']) - _x0),
@@ -2054,18 +2130,43 @@ def _bs_steps(bs_limit):
     return k
 
 
-def _sharpen_lattice(ob):
-    """The integer lattice step of a wholly discrete severity, else ``None``.
+def _pooled_lattice(aggs):
+    """Dyadic lattice fit of every severity atom of every unit, pooled.
 
-    Delegates to :meth:`Aggregate._severity_lattice`, the gcd of the integer
-    severity atoms, taking the gcd across units for a Portfolio. ``None`` as soon
-    as any component is continuous or off the integer lattice.
+    Parameters
+    ----------
+    aggs : list of Aggregate
+        The units.
+
+    Returns
+    -------
+    (float, float) or None
+        ``(h, residual)`` from :func:`~aggregate.utilities._dyadic_lattice_step`
+        over all units' atoms together, or ``None`` when there is no unit, any
+        unit has a continuous component, or the pool has no dyadic lattice.
+
+    Notes
+    -----
+    Pooling the atoms, rather than combining the units' own steps, keeps one
+    depth and one tolerance relative to the largest atom anywhere in the book,
+    and the step of the pool is the dyadic gcd of the units' steps.
+    """
+    pools = [a._severity_atoms() for a in aggs]
+    if not pools or any(v is None for v in pools):
+        return None
+    return _dyadic_lattice_step(np.concatenate(pools))
+
+
+def _sharpen_lattice(ob):
+    """The dyadic lattice step of a wholly discrete severity, else ``None``.
+
+    Delegates to :meth:`Aggregate._severity_lattice`, taking the step of all
+    units' pooled atoms for a Portfolio (:func:`_pooled_lattice`). ``None`` as
+    soon as any component is continuous or the atoms sit on no dyadic lattice.
     """
     if _sharpen_is_port(ob):
-        lats = [a._severity_lattice() for a in getattr(ob, 'agg_list', [])]
-        if not lats or any(v is None for v in lats):
-            return None
-        return float(np.gcd.reduce([int(round(v)) for v in lats]))
+        fit = _pooled_lattice(getattr(ob, 'agg_list', []))
+        return None if fit is None else fit[0]
     fn = getattr(ob, '_severity_lattice', None)
     return None if fn is None else fn()
 
@@ -2610,12 +2711,17 @@ def sharpen_explain(ob) -> str:
             'change can help: a coarser one scatters the atoms off their own '
             'values, a finer one only wastes grid. What a discrete object fails '
             'on is extent, which is what log2 controls.')
-        if st['lattice'] and st['lattice'] > st['bs0']:
+        # Measured against the sizer's preferred bucket, the nice divisor of
+        # the step, not the step: the sizer picks 1 over a lattice of 3 on
+        # purpose, and that choice is not "finer than it needs to be".
+        nice = (_lattice_candidates(st['lattice'])[0] if st['lattice']
+                else None)
+        if nice and nice > st['bs0'] and not np.isclose(nice, st['bs0']):
             out.append(
                 f'Note that bs {_fmt_bs(st["bs0"])} is finer than it needs to '
-                f'be: the atoms sit on a lattice of {st["lattice"]:g}, which is '
-                'the coarsest exact bucket and would hold the same book on a '
-                'shorter grid.')
+                f'be: the atoms sit on a lattice of {st["lattice"]:g}, so bs '
+                f'{_fmt_bs(nice)} is exact too and would hold the same book on '
+                'a shorter grid.')
     else:
         out.append(
             f'{len(df)} cells were scored, a row per log2 and within each a line '

@@ -318,6 +318,9 @@ def _entry_to_decl(r, layout='terse'):
 _HINT_KEYS = {
     'log2', 'bs', 'padding', 'normalize', 'bucket_sizing_p',
     'sev_calc', 'discretization_calc', 'force_severity', 'x_min', 'x_max',
+    # the chfagg tilt (aggregate.characteristic_function); inert on any
+    # other kind, as padding is on a chfagg
+    'tilt',
 }
 
 # A parenthesized per-axis pair ``(a, b)`` in a hint value: exactly two

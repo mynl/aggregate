@@ -297,6 +297,40 @@ def round_bucket(bs):
     return 1.0 / (1 << (n.bit_length() - 1))
 
 
+def _round_bucket_down(bs):
+    """The largest rung of :func:`round_bucket`'s ladder at or below ``bs``.
+
+    The bucket cap of a tilted characteristic function grid
+    (``aggregate.characteristic_function``): a bucket above the cap lets
+    frequency truncation through, so the cap rounds **down**, where
+    :func:`round_bucket` rounds up to cover a support.
+
+    Parameters
+    ----------
+    bs : float
+        A positive finite cap.
+
+    Returns
+    -------
+    float
+        ``{1, 2, 4, 5, 8} * 10**k`` at or below ``bs`` when ``bs >= 1``, else
+        the largest power of two at or below it.
+    """
+    if bs <= 0 or np.isinf(bs):
+        raise ValueError(f'Inadmissible value passed to _round_bucket_down, {bs}')
+    if bs >= 1:
+        exp = int(np.floor(np.log10(bs)))
+        base = 10.0 ** exp
+        m = bs / base
+        best = 1.0
+        for rung in _BUCKET_LADDER[:-1]:
+            if rung <= m * (1 + 1e-9):
+                best = float(rung)
+        return best * base
+    # the largest power of two at or below bs: 2 ** floor(log2(bs))
+    return 2.0 ** np.floor(np.log2(bs))
+
+
 #: Relative tolerance for an atom to count as on a dyadic lattice, as a share of
 #: the largest atom. It absorbs floating-point noise from arithmetic that should
 #: have landed on the lattice (a conditional mean, a scaled atom) and never moves

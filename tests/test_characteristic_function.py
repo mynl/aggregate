@@ -203,7 +203,8 @@ def test_untilted_stable_reproduces_the_measured_table(log2, bs, errors):
 
 def test_rule_a_sizes_an_untilted_stable_window_from_the_power_tail():
     c = AggregateCHF('S', 'stable', alpha=1.5, beta=1)
-    c.update()
+    c.update(tilt=False)
+    assert c.tilt == (0.0, 0.0) and c.outside_mass == 0.0
     fam = c.family
     assert c.x_max >= (fam.stable.tail_constant / 5e-6) ** (1 / 1.5)
     assert c.x_min < 0 and c.x_min % c.bs == 0
@@ -318,8 +319,8 @@ def test_rule_c_uses_the_given_grid_and_keeps_zero_on_it():
     c.update(log2=12, bs=1 / 8)
     assert c.bs == 1 / 8 and c.log2 == 12 and len(c.xs) == 4096
     assert c.x_min % c.bs == 0
-    bs, log2, x0 = c.grid_window(12, bs=1 / 8)
-    assert (bs, log2, x0) == (1 / 8, 12, c.x_min)
+    bs, log2, x0, tilt = c.grid_window(12, bs=1 / 8)
+    assert (bs, log2, x0, tilt) == (1 / 8, 12, c.x_min, (0.0, 0.0))
 
 
 def test_recommended_grid_resolves_the_body():
@@ -359,3 +360,190 @@ def test_fcc_contract_lists_the_class():
     from aggregate.constants import FIRST_CLASS_CLASSES, FCC_CONTRACT_EXCEPTIONS
     assert 'AggregateCHF' in FIRST_CLASS_CLASSES
     assert FCC_CONTRACT_EXCEPTIONS == {}
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Tilting]: the shifted contour, one-sided
+# ----------------------------------------------------------------------
+
+def test_round_bucket_down_is_the_ladder_rung_at_or_below():
+    from aggregate.utilities import _round_bucket_down
+    for bs, rung in [(0.1, 1 / 16), (0.288, 0.25), (0.0024, 1 / 512), (1, 1),
+                     (3.4, 2), (5, 5), (57, 50), (99, 80), (0.5, 0.5)]:
+        assert _round_bucket_down(bs) == rung, bs
+
+
+@pytest.mark.parametrize('alpha', [0.7, 1.0, 1.5])
+def test_analytic_stable_chf_on_the_real_line_and_at_i_theta(alpha):
+    """The continuation equals ``Stable.chf`` on the real line and ``exp(Lambda(theta))`` at ``s = i theta``."""
+    fam = FamilyStable(dict(alpha=alpha, beta=1, scale=2, loc=1))
+    t = np.linspace(-6, 6, 25)
+    assert np.max(np.abs(fam.chf(t + 0j) - fam.stable.chf(t))) < 1e-12
+    # a strictly complex array takes the analytic branch
+    s = t + 1e-300j
+    assert np.max(np.abs(fam.chf(s) - fam.stable.chf(t))) < 1e-12
+    for theta in (0.05, 0.3, 2.0):
+        got = fam.chf(np.array([1j * theta]))[0]
+        want = np.exp(fam.cgf(np.array([-theta]))[0])
+        assert abs(got - want) < 1e-12 * abs(want)
+    with pytest.raises(ValueError, match='beta = 1'):
+        FamilyStable(dict(alpha=alpha, beta=0.5)).chf(np.array([1j]))
+
+
+def _one_sided_check(alpha, log2, reference_log2_extra=6):
+    """Tilted masses against the plan's reference: the untilted kernel on a window 64 times longer for alpha >= 1 (its own closed-form wrap allowed for), the exact series below."""
+    c = AggregateCHF('S', 'stable', alpha=alpha, beta=1)
+    c.update(log2=log2)
+    n, h, x0 = 2 ** log2, c.bs, c.x_min
+    fam = c.family
+    assert c.tilt[0] == 0 and c.tilt[1] > 0
+    assert c.tilt_theta[1] == pytest.approx(c.tilt[1] / (n * h))
+    if alpha >= 1:
+        ref = invert_characteristic_function(fam.chf, x0, h, 2 ** (log2 + reference_log2_extra))[:n]
+        mid, edge = n // 2, n - 1
+        p = c.agg_density
+        # the reference wraps too, by its own closed-form rho at each point:
+        # the power tail at x + m * (64 W) relative to the mass at x
+        from scipy.special import zeta
+        W_ref = 2 ** reference_log2_extra * n * h
+        ref_wrap = [q ** (alpha + 1) * zeta(alpha + 1, 1 + q)
+                    for q in ((c.xs[mid] - fam.location) / W_ref,
+                              (c.xs[edge] - fam.location) / W_ref)]
+    else:
+        xs = c.xs
+        c_scale = fam.stable.scale * np.cos(np.pi * alpha / 2) ** (-1 / alpha)
+        sel = np.flatnonzero(xs - h / 2 > 2 * c_scale)
+        hi = np.array([fam.tail_mass_above(x + h / 2) for x in xs[sel]])
+        lo = np.array([fam.tail_mass_above(x - h / 2) for x in xs[sel]])
+        ref = lo - hi
+        p = c.agg_density[sel]
+        mid, edge = int(np.searchsorted(xs[sel], x0 + n * h / 2)), len(sel) - 1
+        ref_wrap = [0.0, 0.0]                     # the series is exact
+    rel_mid = abs(p[mid] - ref[mid]) / ref[mid]
+    rel_edge = abs(p[edge] - ref[edge]) / ref[edge]
+    assert rel_mid < 1e-4 + ref_wrap[0] and rel_mid < c.edge_error + ref_wrap[0]
+    assert rel_edge < 1e-4 + ref_wrap[1] and rel_edge < c.edge_error + ref_wrap[1]
+    assert abs(c.total_mass - (1 - c.outside_above)) < 2e-7
+    assert np.all(c.agg_density > 0)
+    assert c.outside_below == 0.0
+    return c
+
+
+@pytest.mark.parametrize('alpha', [1.5, 1.1, 1.0, 0.7])
+def test_one_sided_tilting_at_log2_14(alpha):
+    _one_sided_check(alpha, 14)
+
+
+@pytest.mark.xdist_group('chf_reference')
+@pytest.mark.parametrize('alpha, log2', [(1.5, 16), (1.1, 16), (1.0, 16),
+                                         (0.7, 16), (0.7, 20), (0.5, 20)])
+def test_one_sided_tilting_reproduces_the_measured_table(alpha, log2):
+    """The 2026-10-29 one-sided table; the alpha >= 1 references are 2 ** 22 buckets, one worker."""
+    c = _one_sided_check(alpha, log2)
+    cap = c._bucket_cap()
+    assert c.bs <= cap
+    if alpha < 1.2:
+        assert c.bs == cap                                    # the cap binds
+        assert c.validation_df.loc['outside mass', 'status'] == 'flag'
+
+
+def test_levy_law_is_exact_at_alpha_one_half():
+    """``stable 0.5 1`` is ``scipy.stats.levy``, so its masses are known exactly."""
+    c = AggregateCHF('L', 'stable', alpha=0.5, beta=1, scale=3, loc=1)
+    c.update(log2=16)
+    lv = ss.levy(loc=1, scale=3)
+    exact = lv.cdf(c.xs + c.bs / 2) - lv.cdf(c.xs - c.bs / 2)
+    body = exact > 1e-6
+    assert np.max(np.abs(c.agg_density[body] - exact[body]) / exact[body]) < 1e-4
+    assert c.outside_above == pytest.approx(lv.sf(c.x_max + c.bs / 2), rel=1e-6)
+    assert c.x_min == 1
+
+
+def test_beta_minus_one_is_the_reflection():
+    a = AggregateCHF('A', 'stable', alpha=1.5, beta=1, scale=2, loc=1)
+    b = AggregateCHF('B', 'stable', alpha=1.5, beta=-1, scale=2, loc=-1)
+    a.update(log2=14)
+    b.update(log2=14)
+    n, h = 2 ** 14, a.bs
+    assert b.bs == h and b.tilt == (a.tilt[1], 0.0)
+    assert b.x_max == pytest.approx(-a.x_min) and b.x_min == pytest.approx(-a.x_max)
+    assert b.x_min % h == pytest.approx(0, abs=1e-9) or (b.x_min / h) == pytest.approx(round(b.x_min / h))
+    # every bucket but the first mirrors; the first also holds outside_below
+    assert np.max(np.abs(b.agg_density[1:] - a.agg_density[::-1][1:])) < 1e-12
+    assert b.outside_below == a.outside_above and b.outside_above == 0
+    assert b.agg_density[0] == pytest.approx(a.agg_density[-1] + b.outside_below)
+    assert abs(b.total_mass - 1) < 2e-7
+    # the cdf is right across the window: cdf_b(x_k) = sf_a(-x_k - h), up to
+    # the residual between a's grid total and 1 - outside_above
+    k = np.arange(10, n - 2, 997)
+    x = b.xs[k]
+    assert np.max(np.abs(b.cdf(x) - a.sf(-x - h))) < 1e-8
+    assert b.agg_m == -1 and b.support == (-np.inf, np.inf)
+
+
+def test_closure_under_addition_untilted():
+    """``Stable(1.5, 1, 1) + Stable(1.5, 1, 2)`` equals the product of the two characteristic functions."""
+    one, two = Stable(1.5, 1, 1), Stable(1.5, 1, 2)
+    s = AggregateCHF.from_family('S', one + two)
+    s.update(log2=12, bs=1 / 8, tilt=False)
+    prod = AggregateCHF.from_chf('P', lambda t: one.chf(t) * two.chf(t),
+                                 x_min=s.x_min, bs=1 / 8, log2=12)
+    prod.update()
+    assert np.max(np.abs(s.agg_density - prod.agg_density)) < 1e-12
+
+
+def test_tilt_keyword_forms():
+    c = AggregateCHF('S', 'stable', alpha=1.5, beta=1)
+    c.update(log2=12, tilt=8)
+    assert c.tilt == (0.0, 8.0) and c.tilt_setting == 8
+    c.update(log2=12, tilt=1)
+    assert c.tilt == (0.0, 1.0)
+    c.update(log2=12, tilt=True)
+    assert c.tilt[1] not in (0.0, 1.0) and c.tilt[1] > 5
+    c.update(log2=12, tilt=False)
+    assert c.tilt == (0.0, 0.0) and c.outside_mass == 0 and abs(c.total_mass - 1) < 1e-9
+    assert c.edge_error > 0.1                       # the untilted wrap at the edge
+    for bad in (-1, 'x', np.inf):
+        with pytest.raises(ValueError, match='tilt must be'):
+            c.update(log2=12, tilt=bad)
+    g = AggregateCHF('G', 'gamma', shape=4, scale=25)
+    g.update(log2=12, tilt=True)
+    assert g.tilt == (0.0, 0.0) and np.isnan(g.edge_error)
+    with pytest.raises(ValueError, match='no power tail'):
+        g.update(log2=12, tilt=8)
+
+
+def test_tilt_is_a_hint_key():
+    from aggregate.underwriter import _HINT_KEYS, _parse_hints
+    assert 'tilt' in _HINT_KEYS
+    assert _parse_hints('tilt=False')['tilt'] is False
+    assert _parse_hints('tilt=8')['tilt'] == 8
+    assert _parse_hints('tilt=True')['tilt'] is True
+
+
+def test_split_law_is_untilted_with_a_warning_until_two_sided_lands(caplog):
+    c = AggregateCHF('S', 'stable', alpha=1.5, beta=0.5)
+    with caplog.at_level(logging.WARNING, logger='aggregate.characteristic_function'):
+        c.update(log2=12)
+    assert 'Two-Sided' in caplog.text
+    assert c.tilt == (0.0, 0.0) and abs(c.total_mass - 1) < 1e-9
+
+
+def test_tilted_validation_rows_and_info():
+    c = AggregateCHF('S', 'stable', alpha=1.0, beta=1)
+    c.update(log2=14)
+    v = c.validation_df
+    assert v.loc['total mass', 'target'] == pytest.approx(1 - c.outside_above)
+    assert v.loc['total mass', 'status'] == 'ok'
+    assert v.loc['outside mass', 'status'] == 'flag'
+    assert 'hints{log2=' in v.loc['outside mass', 'note']
+    assert v.loc['tilt', 'value'] == c.tilt[1]
+    assert v.loc['edge error', 'status'] == 'ok'
+    assert 'outside mass' in c.validation_description
+    info = c.info
+    assert 'tilt' in info and 'theta' in info and 'outside mass' in info
+    log2, bs = c.recommended_grid()
+    assert log2 > 14 and bs == c.bs
+    assert sum(c._outside_at(log2, bs, c.grid_window(log2)[2])) <= 1e-5
+    # the window's cdf is right up to the outside mass, and sf includes it
+    assert c.sf(c.x_max) == pytest.approx(c.outside_above, rel=1e-4)

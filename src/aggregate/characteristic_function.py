@@ -43,6 +43,7 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.optimize import minimize_scalar
 from scipy.special import gamma as gamma_function
+from scipy.special import zeta as hurwitz_zeta
 
 from ._aggregate import (SUMMARY_PERCENTILES, _summary_pct_label,
                          return_period_frame)
@@ -55,7 +56,7 @@ from .config import get_settings
 from .constants import INFO_NA, info_row
 from .moments import _noise_aware_rel_error, _snap_noise
 from .stable import Stable
-from .utilities import round_bucket
+from .utilities import _round_bucket_down, round_bucket
 
 __all__ = ['AggregateCHF', 'Family', 'FamilyNormal', 'FamilyGamma',
            'FamilyInverseGaussian', 'FamilyStable', 'FamilyUser',
@@ -92,6 +93,21 @@ RECOMMENDED_LOG2_MAX = 24
 #: A finite support bound replaces a Chernoff edge within this share of the
 #: window of it (:func:`window_edges`).
 SUPPORT_EDGE_SHARE = 0.05
+
+#: The mass allowed below the window of a tilted law: the tilt amplifies
+#: whatever wraps from below by ``exp(tau)``, and the light side's
+#: super-exponential tail makes this edge cost a few scales.
+TILT_LEFT_EPS = 1e-40
+
+#: Buckets per scale a tilted grid keeps in the body: the bucket cap is
+#: ``min(scale / TILT_BODY_BUCKETS, h_trunc)``.
+TILT_BODY_BUCKETS = 10
+
+#: ``log(2 ** 52)``: a tilted bucket needs ``|phi(pi / h)|`` at roundoff.
+_ROUNDOFF_LOG = 52 * math.log(2)
+
+#: Modeled worst relative bucket error above which the edge error row is flagged.
+EDGE_ERROR_FLAG = 1e-3
 
 
 # ======================================================================
@@ -546,12 +562,134 @@ class FamilyStable(Family):
                     'scale': stable.scale, 'loc': stable.loc})
 
     def chf(self, s):
+        r"""The characteristic function, continued onto the closed upper half plane for ``beta = 1``.
+
+        For :math:`\beta = 1`, S1,
+        :math:`\log\varphi(s) = -\gamma^\alpha\sec(\pi\alpha/2)(-is)^\alpha + i\delta_1 s`
+        for :math:`\alpha \ne 1` and
+        :math:`(2\gamma/\pi)(-is)\log(-is) + i\delta_1 s` at :math:`\alpha = 1`,
+        principal branches, which reduce to the S1 form on the real line and
+        to :math:`\Lambda(\theta)` at :math:`s = i\theta`. Off the real line
+        with :math:`\beta < 1` there is no continuation: :math:`\beta = -1` is
+        computed by reflection and :math:`|\beta| < 1` by the split, so a
+        complex argument there is a programming error.
+        """
         s = np.asarray(s, dtype=complex)
-        if np.any(s.imag != 0):
-            raise NotImplementedError(
-                'the stable characteristic function off the real line is '
-                '[Characteristic-Function-Tilting]')
-        return self.stable.chf(s.real)
+        st = self.stable
+        if not np.any(s.imag):
+            return st.chf(s.real)
+        if st.beta != 1 or st.alpha == 2:
+            raise ValueError(
+                'the stable characteristic function is continued off the real '
+                'line only for beta = 1; beta = -1 is computed by reflection '
+                'and |beta| < 1 by the split')
+        a, g, d = st.alpha, st.scale, st.loc
+        w = -1j * s
+        if a == 1:
+            # w log w is 0 at w = 0
+            body = np.zeros_like(w)
+            nz = w != 0
+            body[nz] = (2 * g / np.pi) * w[nz] * np.log(w[nz])
+        else:
+            body = -g ** a / np.cos(np.pi * a / 2) * w ** a
+        return np.exp(body + 1j * d * s)
+
+    @property
+    def density_bound(self):
+        r"""``sup f = Gamma(1 + 1/alpha) / (pi gamma)``, from ``(1/2pi) int |phi|``."""
+        st = self.stable
+        return gamma_function(1 + 1 / st.alpha) / (np.pi * st.scale)
+
+    def tail_mass_above(self, x):
+        r"""``Pr(X > x)`` for ``beta = 1``: the exact series for ``alpha < 1``, the leading term otherwise.
+
+        Parameters
+        ----------
+        x : float
+            A point above the location, well into the tail.
+
+        Returns
+        -------
+        float
+
+        Notes
+        -----
+        For :math:`\alpha \ne 1` the series
+        :math:`\Pr(X > x) = -(1/\pi)\sum_{k\ge1}(-1)^k\Gamma(k\alpha)\sin(k\pi\alpha)\,s^k x^{-k\alpha}/k!`,
+        :math:`s = \gamma^\alpha\sec(\pi\alpha/2)`, :math:`x` measured from
+        :math:`\delta_1`, whose first term is :math:`A x^{-\alpha}`. Below
+        :math:`\alpha = 1` it converges [Nolan 2020, Thm. 3.10] and is summed
+        to roundoff; above, :math:`s < 0` and the series is asymptotic, summed
+        to its smallest term, which takes the leading term's relative error of
+        :math:`1.6\times10^{-3}` at :math:`\alpha = 1.1`, :math:`x = 2000`
+        to :math:`2\times10^{-5}` (measured against a log2 20 tilted grid);
+        at :math:`\alpha = 1.5` the second term vanishes. The leading term
+        alone is off by :math:`3\times10^{-5}` at :math:`\alpha = 0.7` on a
+        log2 16 window.
+
+        At :math:`\alpha = 1` the expansion carries a logarithm. With
+        :math:`v = (x - \delta_1 - (2\gamma/\pi)\log\gamma)/\gamma` (S1 puts
+        the standard law :math:`(2\gamma/\pi)\log\gamma` above the location)
+        and :math:`a = 2/\pi`,
+        :math:`\Pr(X > x) = a/v + a^2(\log v + \gamma_E - 1)/v^2 + O(\log^2 v/v^3)`:
+        expanding the Laplace transform :math:`\exp(a\,v\log v)` to second
+        order and matching the singular terms of
+        :math:`-s\int e^{-sx}\Pr(X>x)\,dx` (a tail :math:`x^{-2}\log x`
+        transforms to :math:`-\tfrac12 s\log^2 s - (\gamma_E - 1)s\log s`)
+        fixes both coefficients; the constant was checked against scipy's
+        ``levy_stable.sf``, which gives :math:`-0.35` to :math:`-0.38` for
+        :math:`x` between 30 and 240 scales, approaching
+        :math:`\gamma_E - 1 = -0.4228` as the third term fades.
+        """
+        st = self.stable
+        a, g = st.alpha, st.scale
+        u = float(x) - st.loc
+        if u <= 0:
+            return 1.0
+        if a == 2:
+            return float(ss.norm(scale=np.sqrt(2) * g).sf(u))
+        if a == 1:
+            # the leading term and the logarithmic second term in units of the
+            # scale, see Notes; S1 at alpha = 1 puts the standard law at
+            # (2 gamma / pi) log gamma above the location
+            v = (u - (2 * g / np.pi) * math.log(g)) / g
+            if v <= 0:
+                return 1.0
+            return (2 / np.pi) / v + (2 / np.pi) ** 2 * (math.log(v) + np.euler_gamma - 1) / v ** 2
+        # term_k = -(1/pi) (-1)^k sin(k pi alpha) Gamma(k alpha) / k! * s^k u^(-k alpha)
+        # with s = gamma^alpha sec(pi alpha / 2), signed: positive below
+        # alpha = 1, negative above. Logs keep Gamma(k alpha) / k! in range.
+        s_signed = g ** a / math.cos(math.pi * a / 2)
+        log_s = math.log(abs(s_signed))
+        sign_s = 1.0 if s_signed > 0 else -1.0
+        total = 0.0
+        last = np.inf
+        for k in range(1, 400):
+            log_mag = math.lgamma(k * a) - math.lgamma(k + 1) + k * (log_s - a * math.log(u))
+            if log_mag > 700:
+                raise ValueError(
+                    f'tail_mass_above: x = {x:g} is too close to the location '
+                    f'{st.loc:g} for the series (scale {g:g})')
+            mag = math.exp(log_mag)
+            if a > 1 and mag > last:
+                # asymptotic above alpha = 1: stop at the smallest term
+                break
+            last = mag
+            term = -((-1) ** k) * math.sin(k * math.pi * a) * mag * sign_s ** k / math.pi
+            total += term
+            # the magnitude, not the term: sin(k pi alpha) vanishes at even k
+            # when alpha = 1/2, which is not the end of the series
+            if mag < 1e-18 * max(abs(total), 1e-300):
+                break
+        return float(total)
+
+    def reflected(self):
+        """The family of ``-X``: ``beta`` negated, location negated, as written."""
+        p = dict(self.parameters)
+        st = self.stable
+        p.update(alpha=st.alpha, beta=-st.beta, scale=st.scale, loc=-st.loc)
+        p.pop('parameterization', None)
+        return FamilyStable(p)
 
     def _laplace(self, s):
         r"""``log P exp(-sY)`` for ``Y ~ S(alpha, 1, gamma, loc; 1)`` on ``s >= 0``, as a function of ``(s, loc)``."""
@@ -798,8 +936,26 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
     Aliasing wraps the mass outside the window onto it. For a stable law with
     :math:`\alpha < 2` the wrapped mass lands where it does the most relative
     damage, near the right edge, so an untilted heavy-tailed grid has a
-    relative error of order one there whatever its total; the shifted
-    contour that cures it is ``[Characteristic-Function-Tilting]``.
+    relative error of order one there whatever its total.
+
+    **Tilting.** A totally skewed stable law (:math:`|\beta| = 1`) is inverted
+    along the contour :math:`\mathrm{Im}\,s = \theta`, where the integrand
+    decays like the tilted law :math:`e^{-\theta x}f(x)`, exponentially on
+    the heavy side; the discretized integral wraps that damped sequence and
+    :math:`e^{\theta x}` recovers the masses
+    (:func:`invert_characteristic_function`). Written as :math:`\tau = \theta W`
+    e-folds across the window, the two errors at the right edge are the
+    damped wrap :math:`\rho e^{-\tau}` and the amplified roundoff
+    :math:`\varepsilon_{\mathrm{eff}}\kappa e^{\tau}`, least at
+    :math:`\tau^* = \tfrac12\log(\rho/\varepsilon_{\mathrm{eff}}\kappa)` with
+    value :math:`E^* = 2\sqrt{\rho\varepsilon_{\mathrm{eff}}\kappa}`, all in
+    closed form (:meth:`_edge_terms`); tilting halves the number of digits
+    the window's dynamic range costs. Because truncation is amplified too,
+    the bucket is capped (:meth:`_bucket_cap`) and the window ends short,
+    with the mass beyond reported in :attr:`outside_above` rather than
+    wrapped; the left edge is the support bound or the
+    :data:`TILT_LEFT_EPS` Chernoff edge. :math:`\beta = -1` is the reflection
+    of :math:`\beta = 1`. The ``tilt`` keyword of :meth:`update` chooses.
 
     Examples
     --------
@@ -834,6 +990,20 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.xs = None
         self.agg_density = None
         self.truncation_error = np.nan
+        #: the ``tilt`` keyword as given to :meth:`update`
+        self.tilt_setting = True
+        #: the realized tilts ``(left, right)`` in e-folds across the window
+        self.tilt = (0.0, 0.0)
+        #: ``tau / W``, the tilts per unit of loss
+        self.tilt_theta = (0.0, 0.0)
+        #: the law's mass below and above the window, left out by a tilted
+        #: grid; the mass below sits in the first bucket
+        self.outside_below = 0.0
+        self.outside_above = 0.0
+        #: sigma of the normal moved between the halves of a two-sided law
+        self.transfer_sigma = 0.0
+        #: the modeled worst relative bucket error at the realized tilt
+        self.edge_error = np.nan
         self._gd = None
         self._density_df = None
         self.figure = None
@@ -893,30 +1063,112 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return obj
 
     # ---- the grid ---------------------------------------------------------
-    def grid_window(self, log2=16, bucket_sizing_p=BUCKET_SIZING_P, bs=0):
-        """The grid the window rule would choose, without computing.
+    @staticmethod
+    def _tilt_mode(tilt):
+        """``'auto'``, ``'off'`` or a float ``tau >= 0`` from the ``tilt`` keyword.
 
-        Parameters
-        ----------
-        log2 : int
-        bucket_sizing_p : float
-            The mass the window must cover (rule A).
-        bs : float, default 0
-            A given bucket (rule C); 0 means rule A.
-
-        Returns
-        -------
-        tuple
-            ``(bs, log2, x_min)``.
+        ``bool`` is tested before ``float``, so ``tilt=1`` is one e-fold and
+        ``tilt=True`` is automatic.
         """
-        n = 2 ** int(log2)
-        if self._x_min_fixed is not None:
-            h = bs or self._fixed_grid[0]
-            x0 = self._x_min_fixed
-            return float(h), int(log2), float(x0)
+        if isinstance(tilt, (bool, np.bool_)):
+            return 'auto' if tilt else 'off'
+        try:
+            tau = float(tilt)
+        except (TypeError, ValueError):
+            raise ValueError(f'tilt must be True, False or a number >= 0, got {tilt!r}') from None
+        if not np.isfinite(tau) or tau < 0:
+            raise ValueError(f'tilt must be True, False or a number >= 0, got {tilt!r}')
+        return tau
+
+    def _tilt_family(self):
+        """The one-sided family the tilted computation runs on: this one for a right heavy tail, its reflection for a left one, ``None`` otherwise."""
+        fam = self.family
+        if fam.tilt_side == 'right':
+            return fam
+        if fam.tilt_side == 'left':
+            return fam.reflected()
+        return None
+
+    def _bucket_cap(self, family=None):
+        r"""The largest bucket a tilted grid may use, a rung of the ladder.
+
+        :math:`h_{\max} = \min(\gamma/10,\ \pi\gamma/(52\log 2)^{1/\alpha})`
+        rounded down (:func:`~aggregate.utilities._round_bucket_down`): the
+        truncation :math:`|\varphi(\pi/h)|` must sit at roundoff because the
+        tilt amplifies it by :math:`e^\tau`, and the body keeps ten buckets
+        per scale because a tilted grid no longer has to reach far into the
+        tail. ``inf`` for a law with no power tail.
+        """
+        fam = family or self.family
+        if not fam.power_tails:
+            return np.inf
+        _, _, alpha = fam.power_tails
+        gamma = fam.scale
+        h_trunc = np.pi * gamma / _ROUNDOFF_LOG ** (1 / alpha)
+        return _round_bucket_down(min(gamma / TILT_BODY_BUCKETS, h_trunc))
+
+    @staticmethod
+    def _edge_terms(fam, x0, h, n):
+        r"""``(rho, eps_eff, kappa)`` of the one-sided tilt model on the window ``[x0, x0 + n h]``.
+
+        The wrap damped by the tilt is :math:`\rho e^{-\tau}` with
+        :math:`\rho = q^{\alpha+1}\zeta(\alpha+1, 1+q)`, :math:`q = (x_R-\delta_1)/W`
+        (the Hurwitz zeta sums the power tail at :math:`x_R + mW`); the
+        amplified absolute error is :math:`\varepsilon_{\mathrm{eff}}\kappa e^{\tau}`
+        with :math:`\varepsilon_{\mathrm{eff}} = 2^{-52} + |\varphi(\pi/h)|`
+        and :math:`\kappa = \bar f (x_R-\delta_1)^{\alpha+1}/(A\alpha)` the
+        dynamic range of the masses across the window. Both are relative to
+        the bucket mass at the right edge, where they are worst.
+        """
+        A, _, alpha = fam.power_tails
+        W = n * h
+        x_r = x0 + W
+        q = max((x_r - fam.location) / W, 1e-12)
+        rho = q ** (alpha + 1) * float(hurwitz_zeta(alpha + 1, 1 + q))
+        eps_eff = 2.0 ** -52 + float(abs(fam.chf(np.array([np.pi / h]))[0]))
+        kappa = fam.density_bound * (x_r - fam.location) ** (alpha + 1) / (A * alpha)
+        return rho, eps_eff, kappa
+
+    @staticmethod
+    def _tau_star(rho, eps_eff, kappa):
+        r""":math:`\tau^* = \max(0, \tfrac12\log(\rho/(\varepsilon_{\mathrm{eff}}\kappa)))`, the tilt that balances wrap against amplification."""
+        return max(0.0, 0.5 * math.log(rho / (eps_eff * kappa)))
+
+    @staticmethod
+    def _edge_error_at(tau, rho, eps_eff, kappa):
+        r"""The modeled worst relative bucket error :math:`\rho e^{-\tau} + \varepsilon_{\mathrm{eff}}\kappa e^{\tau}`."""
+        return rho * math.exp(-tau) + eps_eff * kappa * math.exp(tau)
+
+    def _one_sided_window(self, fam, log2, bucket_sizing_p, bs, mode):
+        """Rule A or C for a right-heavy law to be tilted: ``(h, x0, tau)``."""
+        n = 2 ** log2
         eps = 1.0 - bucket_sizing_p
-        if not 0 < eps < 1:
-            raise ValueError(f'bucket_sizing_p must be in (0, 1), got {bucket_sizing_p}')
+        A, _, alpha = fam.power_tails
+        lo, _ = fam.support
+        if np.isfinite(lo):
+            x_l = lo
+        else:
+            s_minus, _ = fam.cgf_domain
+            x_l = -chernoff_edge(lambda u: fam.cgf(-u), -s_minus,
+                                 math.log(TILT_LEFT_EPS), fam.scale)
+        x_r = fam.location + (A / eps) ** (1 / alpha)
+        if bs:
+            h = float(bs)
+        else:
+            h = min(round_bucket((x_r - x_l) / n), self._bucket_cap(fam))
+        x0 = h * math.floor(x_l / h + 1e-12)
+        if mode == 'auto':
+            tau = self._tau_star(*self._edge_terms(fam, x0, h, n))
+        else:
+            tau = float(mode)
+        return h, x0, tau
+
+    def _plain_window(self, log2, bucket_sizing_p, bs):
+        """Rule A or C with no tilt: both edges at half the budget, the slack split."""
+        n = 2 ** log2
+        if self._x_min_fixed is not None:
+            return float(bs or self._fixed_grid[0]), self._x_min_fixed
+        eps = 1.0 - bucket_sizing_p
         x_l, x_r = window_edges(self.family, eps / 2)
         if not (np.isfinite(x_l) and np.isfinite(x_r)) or x_r <= x_l:
             raise ValueError(
@@ -930,10 +1182,62 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         slack = max(n * h - (x_r - x_l), 0.0)
         x_left = max(self.family.support[0], x_l - slack / 2)
         x0 = h * math.floor(x_left / h + 1e-12)
-        return float(h), int(log2), float(x0)
+        return h, x0
+
+    def grid_window(self, log2=16, bucket_sizing_p=BUCKET_SIZING_P, tilt=True, bs=0):
+        """The grid the rules would choose, without computing.
+
+        Parameters
+        ----------
+        log2 : int
+        bucket_sizing_p : float
+            The mass the window must cover (rule A).
+        tilt : bool or float, default True
+            As on :meth:`update`.
+        bs : float, default 0
+            A given bucket (rule C); 0 means rule A.
+
+        Returns
+        -------
+        tuple
+            ``(bs, log2, x_min, tilt)`` with ``tilt`` the pair
+            ``(left, right)`` of e-folds across the window the rules choose:
+            ``(0, tau)`` for a right heavy tail, ``(tau, 0)`` for a left one,
+            ``(0, 0)`` untilted.
+        """
+        log2 = int(log2)
+        n = 2 ** log2
+        if not 0 < 1.0 - bucket_sizing_p < 1:
+            raise ValueError(f'bucket_sizing_p must be in (0, 1), got {bucket_sizing_p}')
+        mode = self._tilt_mode(tilt)
+        fam = self._tilt_family() if (mode != 'off' and self._x_min_fixed is None) else None
+        if mode not in ('auto', 'off') and not self.family.power_tails:
+            raise ValueError(
+                f'{self.name}: tilt={tilt!r} on a {self.family.name} law, which '
+                'has no power tail; such a law barely wraps, so there is '
+                'nothing for a tilt to damp. Use tilt=True or tilt=False.')
+        if fam is None or self.family.tilt_side == 'split':
+            h, x0 = self._plain_window(log2, bucket_sizing_p, bs)
+            return float(h), log2, float(x0), (0.0, 0.0)
+        h, y0, tau = self._one_sided_window(fam, log2, bucket_sizing_p, bs, mode)
+        if self.family.tilt_side == 'left':
+            # the reflection: x = -y, so the grid runs from -(y0 + (n - 1) h)
+            return float(h), log2, float(-(y0 + (n - 1) * h)), (tau, 0.0)
+        return float(h), log2, float(y0), (0.0, tau)
+
+    def _outside_at(self, log2, h, x0):
+        """``(below, above)``: the closed-form mass the law leaves outside the tilted window ``[x0, x0 + n h)``."""
+        n = 2 ** log2
+        fam = self._tilt_family()
+        if fam is None:
+            return 0.0, 0.0
+        if self.family.tilt_side == 'left':
+            y_top = -(x0 - h / 2)
+            return fam.tail_mass_above(y_top), 0.0
+        return 0.0, fam.tail_mass_above(x0 + (n - 1) * h + h / 2)
 
     def recommended_grid(self, epsilon=None):
-        """The smallest ``(log2, bs)`` whose window covers mass ``epsilon`` beyond it at full resolution.
+        """The smallest ``(log2, bs)`` whose window reaches mass ``epsilon`` beyond it at the capped bucket and full resolution.
 
         Parameters
         ----------
@@ -949,23 +1253,28 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
 
         Notes
         -----
-        Rule A always covers, so what grows ``log2`` is resolution: the
-        bucket must give at least :data:`MIN_BUCKETS_PER_SCALE` buckets per
-        body scale (:attr:`Family.scale`). The bucket cap of a tilted law is
-        ``[Characteristic-Function-Tilting]``.
+        For a tilted law the bucket is capped (:meth:`_bucket_cap`), so the
+        window is ``2 ** log2`` capped buckets long and coverage grows only
+        with ``log2``; for every other law rule A always covers, and what
+        grows ``log2`` is resolution, at least :data:`MIN_BUCKETS_PER_SCALE`
+        buckets per body scale (:attr:`Family.scale`).
         """
         if self._x_min_fixed is not None:
             return self._fixed_grid[1], self._fixed_grid[0]
-        p = 1.0 - (epsilon if epsilon is not None else 1.0 - self.bucket_sizing_p)
+        eps = epsilon if epsilon is not None else 1.0 - self.bucket_sizing_p
+        p = 1.0 - eps
         scale = self.family.scale
         for log2 in range(8, RECOMMENDED_LOG2_MAX + 1):
-            h, _, _ = self.grid_window(log2, p)
-            if not np.isfinite(scale) or scale / h >= MIN_BUCKETS_PER_SCALE:
+            h, _, x0, _ = self.grid_window(log2, p)
+            resolved = not np.isfinite(scale) or scale / h >= MIN_BUCKETS_PER_SCALE
+            covered = sum(self._outside_at(log2, h, x0)) <= eps
+            if resolved and covered:
                 return log2, h
         return RECOMMENDED_LOG2_MAX, h
 
-    def update(self, log2=None, bs=0, bucket_sizing_p=BUCKET_SIZING_P, **kwargs):
-        """Compute the bucket masses on the grid the window rule chooses.
+    def update(self, log2=None, bs=0, bucket_sizing_p=BUCKET_SIZING_P, tilt=True,
+               **kwargs):
+        r"""Compute the bucket masses on the grid the rules choose.
 
         Parameters
         ----------
@@ -977,9 +1286,38 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             or the bucket given to :meth:`from_chf`.
         bucket_sizing_p : float
             The mass the window covers under rule A.
+        tilt : bool or float, default True
+            ``True``: automatic. A stable law with ``beta = 1`` is inverted
+            along the shifted contour at the tilt :math:`\tau^*` that balances
+            the damped wrap against the amplified roundoff; ``beta = -1`` is
+            the reflection, so the tilt is always toward the heavy tail; the
+            bucket is capped (:meth:`_bucket_cap`); every other law is
+            inverted on the real line, since a light tail barely wraps.
+            ``False``: never tilt and never cap; the law wraps, which is the
+            teaching comparison. A number :math:`\tau \ge 0`: tilt by exactly
+            :math:`\tau` e-folds across the window, cap applied. ``tilt=8``
+            damps the wrapped tail by :math:`e^{-8} \approx 3\times10^{-4}`
+            and amplifies roundoff at the edge by :math:`e^{8} \approx 3\,000`.
+            A number on a law with no power tail is a ``ValueError``. ``bool``
+            is tested before ``float``, so ``tilt=1`` is one e-fold.
         **kwargs
             Other ``hints{}`` keys reach here and are ignored with a logged
             warning, as ``Aggregate.update`` ignores keys it does not use.
+
+        Notes
+        -----
+        A tilted grid leaves the mass beyond its window out and reports it:
+        :attr:`outside_above` is the closed-form tail mass above the window
+        and :attr:`outside_below` the mass below it, which is **added to the
+        first bucket**, so the cumulative masses, and with them ``cdf``, ``q``
+        and ``sf = 1 - cdf``, are right throughout the window for every tilt.
+        The first bucket then means "the left edge and everything below it".
+        ``tvar``, ``lev`` and the grid moments are window statistics. An
+        untilted grid wraps the outside mass in and both are 0.
+
+        Two-sided tilting, a stable law with :math:`|\beta| < 1`, is
+        ``[Characteristic-Function-Two-Sided]``; until it lands such a law is
+        inverted untilted with a logged warning.
         """
         if kwargs:
             logger.warning('%s.update ignores %s', type(self).__name__,
@@ -988,19 +1326,55 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             bs = bs or self._fixed_grid[0]
             log2 = log2 or self._fixed_grid[1]
         log2 = 16 if log2 is None else int(log2)
-        h, log2, x0 = self.grid_window(log2, bucket_sizing_p, bs)
         n = 2 ** log2
-        p = invert_characteristic_function(self.family.chf, x0, h, n, 0.0,
-                                           self.family.atom)
+        mode = self._tilt_mode(tilt)
+        if mode != 'off' and self.family.tilt_side == 'split':
+            logger.warning('%s: two-sided tilting is [Characteristic-Function-Two-Sided]; '
+                           'inverted untilted', self.name)
+        h, log2, x0, tau_pair = self.grid_window(log2, bucket_sizing_p, tilt, bs)
+        fam = self._tilt_family() if mode != 'off' else None
+        below = above = 0.0
+        if fam is None or self.family.tilt_side == 'split':
+            p = invert_characteristic_function(self.family.chf, x0, h, n, 0.0,
+                                               self.family.atom)
+            edge_fam = self._tilt_family()
+            if edge_fam is not None and self.family.tilt_side != 'split':
+                # the wrap of an untilted heavy tail, for the record
+                y0 = x0 if self.family.tilt_side == 'right' else -(x0 + (n - 1) * h)
+                edge_error = self._edge_error_at(0.0, *self._edge_terms(edge_fam, y0, h, n))
+            else:
+                edge_error = np.nan
+        else:
+            tau = max(tau_pair)
+            W = n * h
+            y0 = x0 if self.family.tilt_side == 'right' else -(x0 + (n - 1) * h)
+            p = invert_characteristic_function(fam.chf, y0, h, n, tau / W, fam.atom)
+            edge_error = self._edge_error_at(tau, *self._edge_terms(fam, y0, h, n))
+            if self.family.tilt_side == 'left':
+                p = p[::-1].copy()
+            below, above = self._outside_at(log2, h, x0)
+            p[0] += below
         self.log2 = log2
         self.bs = h
         self.x_min = x0
         self.bucket_sizing_p = bucket_sizing_p
+        self.tilt_setting = tilt
+        self.tilt = tau_pair
+        self.tilt_theta = tuple(t / (n * h) for t in tau_pair)
+        self.outside_below = below
+        self.outside_above = above
+        self.transfer_sigma = 0.0
+        self.edge_error = edge_error
         self.xs = x0 + h * np.arange(n)
         self.agg_density = p
         self.truncation_error = float(abs(self.family.chf(np.array([np.pi / h]))[0]))
         self._gd = None
         self._density_df = None
+
+    @property
+    def outside_mass(self):
+        """``outside_below + outside_above``: the law's mass the window leaves out."""
+        return self.outside_below + self.outside_above
 
     @property
     def x_max(self):
@@ -1230,11 +1604,38 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         eps = get_settings().validation.eps
         rows = []
         total = self.total_mass
-        rows.append(('total mass', total, 1.0, abs(total - 1.0) > 1e-6,
-                     'sum of the masses on the grid against the mass the window should hold'))
+        tilted = max(self.tilt) > 0
+        target = 1.0 - self.outside_above if tilted else 1.0
+        rows.append(('total mass', total, target, abs(total - target) > 1e-6,
+                     'sum of the masses on the grid against 1 less the mass above the '
+                     'window' if tilted else
+                     'sum of the masses on the grid; an untilted grid wraps everything in'))
         neg = float(np.min(self.agg_density))
         rows.append(('most negative bucket', neg, 0.0, neg < -1e-12,
                      'a negative mass is frequency truncation ringing'))
+        if self.family.power_tails:
+            budget = 1.0 - self.bucket_sizing_p
+            om = self.outside_mass
+            if om > budget:
+                log2, bs = self.recommended_grid()
+                covered = sum(self._outside_at(log2, bs, self.grid_window(log2, self.bucket_sizing_p)[2])) <= budget
+                advice = (f'use hints{{log2={log2}; bs={bs:g}}}' if covered else
+                          f'coverage needs log2 above {RECOMMENDED_LOG2_MAX}; '
+                          f'log2={log2} with bs={bs:g} is the most this engine offers')
+            else:
+                advice = 'the mass the window leaves out, below and above'
+            rows.append(('outside mass', om, budget, om > budget, advice))
+            rows.append(('edge error', self.edge_error, EDGE_ERROR_FLAG,
+                         self.edge_error > EDGE_ERROR_FLAG,
+                         'modeled worst relative bucket error: damped wrap plus amplified roundoff'
+                         if tilted else 'the relative wrap at the right edge of an untilted grid'))
+            rows.append(('tilt', max(self.tilt), np.nan, False,
+                         f'e-folds across the window, (left, right) = '
+                         f'({self.tilt[0]:.3g}, {self.tilt[1]:.3g}); theta = '
+                         f'({self.tilt_theta[0]:.3g}, {self.tilt_theta[1]:.3g})'))
+            if self.transfer_sigma:
+                rows.append(('transfer sigma', self.transfer_sigma, np.nan, False,
+                             'sigma of the normal moved between the halves'))
         rows.append(('truncation error', self.truncation_error, TRUNCATION_FLAG,
                      self.truncation_error > TRUNCATION_FLAG,
                      '|phi(pi / bs)|, the characteristic function at the highest frequency kept'))
@@ -1315,6 +1716,12 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             ('total mass', f'{self.total_mass:.6g}' if updated else INFO_NA),
             ('expected loss', f'{self.est_m:,.6g}' if updated else INFO_NA),
             ('truncation error', f'{self.truncation_error:.3g}' if updated else INFO_NA),
+            ('tilt', f'({self.tilt[0]:.3g}, {self.tilt[1]:.3g})' if updated else INFO_NA),
+            ('theta', f'({self.tilt_theta[0]:.3g}, {self.tilt_theta[1]:.3g})'
+             if updated else INFO_NA),
+            ('outside mass', f'{self.outside_mass:.3g}' if updated else INFO_NA),
+            ('edge error', f'{self.edge_error:.3g}'
+             if updated and np.isfinite(self.edge_error) else INFO_NA),
             ('validation', self.validation_description),
             ('bounded', self.bounded),
         ]

@@ -71,11 +71,11 @@ CSV_PATH = Path(__file__).with_name('FEATURES.csv')
 
 # CSV class columns, in order. Keys are the CSV header labels; values the short
 # tags used in the grouped ``--inventory`` dump.
-CLASS_COLS = ['Aggregate', 'Portfolio', 'BivariateAggregate', 'PnL',
+CLASS_COLS = ['Aggregate', 'Portfolio', 'BivariateAggregate', 'PnL', 'AggregateCHF',
               'Severity', 'Frequency', 'GridDistribution', 'Distortion',
               'Bounds', 'AllocationBounds', 'PricingBounds']
 SHORT = {'Aggregate': 'Agg', 'Portfolio': 'Port', 'BivariateAggregate': 'Biv',
-         'PnL': 'PnL', 'Severity': 'Sev',
+         'PnL': 'PnL', 'AggregateCHF': 'CHF', 'Severity': 'Sev',
          'Frequency': 'Freq', 'GridDistribution': 'GD', 'Distortion': 'Dist',
          'Bounds': 'Bnd',
          'AllocationBounds': 'AllB', 'PricingBounds': 'PrcB'}

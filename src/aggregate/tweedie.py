@@ -15,6 +15,8 @@ from enum import Enum
 import logging
 from typing import Optional, Tuple
 
+import warnings
+
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
@@ -29,7 +31,6 @@ from .underwriter import build
 # helpers are part of the top-level public surface.
 __all__ = ['TweedieParameters', 'TweedieConversion', 'tweedie_convert',
            'tweedie_density']
-from .ft import FourierTools
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,7 @@ class Tweedie:
       Gaussian, or gamma distribution, or as an ``Aggregate`` object otherwise.
     * For Tweedie distributions it translates parameters into Poisson frequency and
       gamma severity, the latter as mean and CV or shape and rate.
-    * Create a ``aggregate.ft.FourierTools`` object for Fourier analysis
+    * Compute the law from its characteristic function (``chf_law``, an ``AggregateCHF``)
       that provides an approximation to the distribution for those without a
       closed form expression (extreme and positive extreme stable, titled Cauchy,
       Tweedie).
@@ -448,6 +449,7 @@ class Tweedie:
         self.tw_cv = self.tw_sd / mean
         self._fz = None  # for the frozen distribution object
         self._ft = None
+        self._chf_law = None  # the AggregateCHF, built by chf_law or test
 
     def dual(self):
         """Create the dual object."""
@@ -807,20 +809,53 @@ class Tweedie:
 
     @property
     def ft(self):
-        """Create and return FourierTools object."""
+        """The legacy ``FourierTools`` over this law, built on first use.
+
+        Superseded by :attr:`chf_law`, an ``AggregateCHF``; kept so that old
+        notebooks run, with a ``DeprecationWarning`` from the shim
+        ([FourierTools-Shim-Removal]).
+        """
         if self._ft is None:
-            # scale_mode false because chf already incorporates scale
-            self._ft = FourierTools(self.chf, self.fz, scale_mode=False)
+            from .ft import FourierTools
+            warnings.warn('Tweedie.ft is superseded by Tweedie.chf_law, an AggregateCHF',
+                          DeprecationWarning, stacklevel=2)
+            # scale_mode false because chf already incorporates scale; the
+            # legacy object knows scipy laws, Aggregates and 'continuous'
+            fz = self.fz
+            if hasattr(fz, 'agg_density'):
+                fz = 'continuous'
+            self._ft = FourierTools(self.chf, fz, scale_mode=False)
         return self._ft
 
+    @property
+    def chf_law(self):
+        """This law computed from its characteristic function, an ``AggregateCHF``.
+
+        Built on first use at the default grid, or by :meth:`test` at the
+        grid it is given. For the stable members it is also :attr:`fz`.
+        """
+        if self._chf_law is None:
+            from .characteristic_function import AggregateCHF, FamilyTweedie
+            fam = FamilyTweedie({'p': self.p, 'mean': self.mean,
+                                 'dispersion': self.dispersion})
+            self._chf_law = AggregateCHF.from_family(f'TW{id(self)}', fam)
+            self._chf_law.update()
+        return self._chf_law
+
     def stats(self):
-        """Empirical moments of the distribution."""
-        if isinstance(self.fz, Aggregate):
-            return self.fz.actual_m, self.fz.actual_var, self.fz.actual_skew
-        elif self.fz:
-            return self.fz.stats('mvs')
-        else:
-            return np.array([np.nan]*3)
+        """Empirical moments ``(mean, variance, skewness)`` of the distribution.
+
+        From the compound engine's ``Aggregate`` for ``1 < p < 2``, the
+        ``AggregateCHF`` grid for the stable members, and scipy otherwise.
+        """
+        fz = self.fz
+        if isinstance(fz, Aggregate):
+            return fz.actual_m, fz.actual_var, fz.actual_skew
+        if hasattr(fz, 'agg_density'):
+            return fz.est_m, fz.est_sd ** 2, fz.est_skew
+        if fz:
+            return fz.stats('mvs')
+        return np.array([np.nan] * 3)
 
     def audit(self):
         """
@@ -828,10 +863,15 @@ class Tweedie:
 
         Moment code from aggregate xsden_to_meancvskew.
         """
-        if self.ft._df is None:  # noqa
-            raise ValueError('Must compute before estimating stats!')
-        xs = np.array(self.ft.df.index)
-        den = self.ft.df.p.values
+        law = self._chf_law
+        if law is None and self._ft is not None and self._ft._df is not None:
+            # the legacy FourierTools grid, when test() ran before 1.34.0
+            xs = np.array(self._ft.df.index)
+            den = self._ft.df.p.values
+        else:
+            law = self.chf_law
+            xs = np.asarray(law.xs)
+            den = law.agg_density
         pg = 1 - den.sum()
         xd = xs * den
         if isinstance(xs, np.ndarray):
@@ -1029,32 +1069,40 @@ class Tweedie:
         }
 
     def test(self, bs=None, x_min=0, log2=16, s=1e-8, plot=True, simpson=False):
-            """Test the Tweedie class object."""
-            n = 1 << log2
-            if bs is None:
-                bs = (self.ft.fz.ppf(1-s) - x_min) / n
-                bs = 2 ** np.round(np.log2(bs), 0)
-                print(f'{bs=}, {1/bs=}')
-            self.ft.invert(log2, x_min=x_min, bs=bs)
-            if self.ft.fz is not None:
-                self.ft.compute_exact()
-            if plot:
-                self.ft.plot(suptitle=self.name, verbose=False)
-                # for ax in self.ft.last_fig.axes[:2]:
-                #     l, u = ax.get_xlim()
-                #     ax.set(xlim=[-u/20, u])
-            else:
-                if plot:
-                    from .plots._style import _fit_to_page
-                    self.ft.df.plot(figsize=_fit_to_page((3, 2.25)))
+        """Compute the law from its characteristic function, plot it, and audit it.
+
+        Parameters
+        ----------
+        bs : float, optional
+            The bucket; by default the window rule's.
+        x_min : float
+            Unused since 1.34.0: the window's left edge comes from the law's
+            tails. Kept so old calls run.
+        log2 : int
+            The grid has ``2 ** log2`` buckets.
+        s : float
+            Unused since 1.34.0, kept so old calls run.
+        plot : bool
+            Draw :func:`aggregate.pedagogy.chf_inversion_figure`.
+        simpson : bool
+            Also draw :func:`aggregate.pedagogy.chf_simpson_figure`.
+
+        Returns
+        -------
+        pandas.DataFrame
+            :meth:`audit`.
+        """
+        from .characteristic_function import AggregateCHF, FamilyTweedie
+        fam = FamilyTweedie({'p': self.p, 'mean': self.mean,
+                             'dispersion': self.dispersion})
+        self._chf_law = AggregateCHF.from_family(f'TW{id(self)}', fam)
+        self._chf_law.update(log2=log2, bs=bs or 0)
+        if plot:
+            from .pedagogy import chf_inversion_figure, chf_simpson_figure
+            chf_inversion_figure(self._chf_law, suptitle=self.name, verbose=False)
             if simpson:
-                self.ft.invert_simpson(log2=log2, x_min=x_min, bs=bs)
-                from .plots._style import _fit_to_page
-                ax = self.ft.df.plot(figsize=_fit_to_page((3, 2.25)), logy=True,
-                                     title='2 methods')
-                if self.ft.fz is not None:
-                    self.ft.df_exact.plot(ax=ax)
-            return self.audit()
+                chf_simpson_figure(self._chf_law)
+        return self.audit()
 
 
 def tweedie_illustration():

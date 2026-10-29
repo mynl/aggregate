@@ -1065,6 +1065,18 @@ Landed at every touchpoint the plan lists: `BUILTIN_CHFAGG` and the `sev_ref_lea
 - **`output_support_max` reads `support` before anything else** for an object carrying a `family`; the generic path would have answered `inf` anyway (no `sevs`), but the plan says the class answers from its support, and it does.
 - The tilted reference test uses `ssev`: a `sev` reference of a stable law clamps its negative mass onto the zero atom, which moves the mean for a reason that has nothing to do with the deficit under test.
 
+### [Characteristic-Function-Pedagogy], 1.34.0
+
+Landed as the plan's table says: the five compound engine helpers moved unchanged to `pedagogy.py`; `chf_simpson_inversion`, `chf_exact_comparison` and the four figure functions in `pedagogy.py` with `plot_chf_inversion`, `plot_chf_wraps` and `plot_chf_simpson` in `plots/_fourier.py` beside the old compositors; `aggregate.ft` rewritten as the shim (docstring, `DeprecationWarning` in the constructor, PEP 562 forwarding, `make_levy_chf` over `Stable`); `Tweedie.ft`, `stats`, `audit` and `test` over the new object, with `Tweedie.chf_law` holding it; the auxiliary docs page and the `cantor.py` docstring; the three TODO entries; the `AggregateCHF` column of `dev/FEATURES.csv` (the deferral from step 1); and six tests, including the import-graph check (module-level imports only, since `Tweedie.ft` imports the shim locally on purpose) and one smoke run per figure. Divergences:
+
+- **`Tweedie.chf_law` is a new property**, not in the plan, so that `audit` and `stats` have the grid `test` built without the legacy object in between; `Tweedie.fz` keeps its own `AggregateCHF` for the stable members (1.31.0).
+- **`Tweedie.test` keeps `x_min` and `s` as inert parameters**, so old calls run; the window and the bucket come from the engine's rules, with `bs` honored when given.
+- **`Tweedie.ft` hands `FourierTools` the word `'continuous'`** when `fz` is an `AggregateCHF`, since the legacy object knows scipy laws, Aggregates and that word only.
+- **`chf_wrapping_figure` needs a scipy reference** and refuses a Tweedie with `1 < p < 2` (whose reference is an `Aggregate`) and the tempered stable and variance gamma laws (none); the plan's table says "against `obj.family.reference`" and these are the references there are.
+- `chf_fourier3d_figure` is the plotly figure (`plot_fourier3da`); the mayavi one (`plot_fourier3d`) is not carried over, mayavi being installed nowhere.
+
+The plan is complete: eight steps, 1.27.0 to 1.34.0, each its own commit.
+
 The 2026-10-29 one-sided and two-sided measurements came from
 scratch prototypes of the kernels in Mathematics (nine scripts, the last six on
 the two-sided method: plain split, resolution transfer, full halves and crop,

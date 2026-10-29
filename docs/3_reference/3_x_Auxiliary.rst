@@ -82,14 +82,23 @@ ratios).
 
 .. automodule:: aggregate.pentagon
 
-Fourier transform support
--------------------------
+Characteristic function laws
+----------------------------
 
-:mod:`aggregate.ft` (:class:`~aggregate.ft.FourierTools`) performs direct
-numerical inversion of characteristic functions, an independent cross-check on
-the FFT convolution path.
+:mod:`aggregate.characteristic_function` computes a distribution by sampling
+its closed-form characteristic function on the FFT frequency grid and
+inverting to bucket masses: the stable laws, tilted along a shifted contour so
+that a heavy tail does not wrap, the whole Tweedie family, and the normal,
+gamma, inverse Gaussian, normal inverse Gaussian, variance gamma and tempered
+stable laws. :class:`~aggregate.characteristic_function.AggregateCHF` is a
+first-class peer of :class:`~aggregate.Aggregate`, declared in DecL as
+``chfagg``.
 
-.. automodule:: aggregate.ft
+.. automodule:: aggregate.characteristic_function
+
+:mod:`aggregate.ft` is the forwarding shim that preceded it; its
+``FourierTools`` still runs, with a ``DeprecationWarning`` naming the successor
+of each member.
 
 Tweedie
 -------

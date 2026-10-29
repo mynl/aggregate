@@ -151,6 +151,19 @@
 
 ## Polish
 
+- **[FourierTools-Shim-Removal]**: delete `aggregate.ft`, the forwarding
+  shim `[Characteristic-Function-Pedagogy]` (1.34.0) left behind, when the
+  three outside documents that use it (`monograph/posts/3_user_guides/3_x_10mins.qmd`,
+  `monograph/posts/2_technical_guides/_2_x_nm_ft_conv_algo.qmd`,
+  `notes/math/resources/pedagogy.py` under `D:/projects/aggregate`) have moved
+  to `AggregateCHF`, or at the next major release, whichever is first. No date.
+- **[CHF-Tail-Completion]**: `tvar` and `lev` of a tilted `chfagg` beyond the
+  window from the power tail, `A alpha x_R ** (1 - alpha) / (alpha - 1)`, and
+  for a two-sided law the closed-form correction for each half's left-out mass
+  re-entering through the other's tail, which sets the interior error below
+  `alpha = 1`. The validation mean row of every stable law flags until then.
+- **[CHF-Sharpen]**: `sharpen` on `AggregateCHF` through `recommended_grid`,
+  so the Loss Lab's sharpening leaf lights for a `chfagg`.
 - **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`;
   `pedagogy.similar_risks_example` raises `TypeError`, passing arguments that
   `Portfolio.plot` and `Bounds.plot_envelope` do not take.

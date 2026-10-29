@@ -8,6 +8,7 @@ law against the 2026-10-28 measurements.
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -988,3 +989,108 @@ def test_sev_chfagg_round_trips_through_the_writer(underwriter):
         assert spec['sev_ref'] == 'chfagg.SR.R'
         rendered = spec_to_decl(spec, kind, name)
         assert _parse(underwriter, rendered)[2] == spec
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Pedagogy]: the shim, the moves and the figures
+# ----------------------------------------------------------------------
+
+def test_nothing_in_the_library_imports_the_ft_shim():
+    import aggregate
+    root = Path(aggregate.__file__).parent
+    offenders = []
+    for path in root.rglob('*.py'):
+        if path.name == 'ft.py':
+            continue
+        text = path.read_text(encoding='utf-8')
+        for line in text.splitlines():
+            # module-level imports only: Tweedie.ft imports the shim locally, on
+            # purpose, to hand back the legacy object
+            if line.startswith(('from .ft import', 'from aggregate.ft import',
+                                'import aggregate.ft', 'from . import ft')):
+                offenders.append(f'{path.relative_to(root)}: {line.strip()}')
+    assert offenders == []
+
+
+def test_the_ft_shim_forwards_and_warns():
+    import importlib
+    import aggregate.ft as ft
+    import aggregate.pedagogy as pedagogy
+    ft._warned.clear()
+    with pytest.warns(DeprecationWarning, match='moved to aggregate.pedagogy'):
+        fn = ft.poisson_example
+    assert fn is pedagogy.poisson_example
+    with pytest.warns(DeprecationWarning, match='Stable'):
+        chf = ft.make_levy_chf(1.5, 1)
+    assert np.allclose(chf(np.array([0.5, 2.0])), Stable(1.5, 1).chf(np.array([0.5, 2.0])))
+    with pytest.warns(DeprecationWarning, match='from_chf'):
+        ft.FourierTools(lambda t: np.exp(-t ** 2 / 2), ss.norm())
+    with pytest.raises(AttributeError):
+        ft.no_such_name
+    assert importlib.import_module('aggregate.ft') is ft
+
+
+def test_simpson_inversion_and_exact_comparison_agree_on_a_normal():
+    from aggregate.pedagogy import chf_exact_comparison, chf_simpson_inversion
+    n = build('chfagg P.N norm 100 30', log2=12)
+    df = chf_simpson_inversion(n)
+    body = df['grid'] > 1e-8
+    assert np.max(np.abs(df['simpson'] - df['grid'])[body]) < 1e-6
+    ex = chf_exact_comparison(n)
+    assert len(ex) <= 257 and np.max(np.abs(ex['grid'] - ex['exact'])) < 1e-6
+    tw = build('chfagg P.T tweedie 1.5 100 2', log2=12)
+    ex2 = chf_exact_comparison(tw)              # an Aggregate reference
+    assert np.max(np.abs(ex2['grid'] - ex2['exact'])[ex2.index > 0]) < 1e-3
+    with pytest.raises(ValueError, match='no reference'):
+        chf_exact_comparison(build('chfagg P.C temperedstable 1 5 10 0.5', log2=10))
+
+
+def test_each_pedagogy_figure_runs_on_its_example():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from aggregate.pedagogy import (chf_inversion_figure, chf_simpson_figure,
+                                    chf_wrapping_figure)
+    n = build('chfagg P.F norm 100 30', log2=10)
+    for verbose in (True, False):
+        plt.close(chf_inversion_figure(n, suptitle='normal', verbose=verbose))
+    fig, table = chf_wrapping_figure(n, wraps=(-1, 1))
+    plt.close(fig)
+    assert list(table.index) == [-1, 1] and (table['probability'] >= 0).all()
+    plt.close(chf_simpson_figure(n))
+    s = build('chfagg P.S stable 1.5 1', log2=10)
+    plt.close(chf_inversion_figure(s))           # levy_stable: no companion, no error
+    with pytest.raises(ValueError, match='reference'):
+        chf_wrapping_figure(build('chfagg P.V variancegamma 0.2 0.5 -0.1 0', log2=10))
+    plotly = pytest.importorskip('plotly')
+    from aggregate.pedagogy import chf_fourier3d_figure
+    assert chf_fourier3d_figure(n) is not None
+
+
+def test_moved_helpers_run_from_pedagogy():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from aggregate.pedagogy import fft_wrapping_illustration, poisson_example, stats
+    poisson_example(2, 3)
+    fft_wrapping_illustration(ez=10, en=20)
+    plt.close('all')
+    assert callable(stats)
+
+
+def test_tweedie_test_and_audit_over_the_characteristic_function():
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from aggregate.characteristic_function import AggregateCHF
+    from aggregate.tweedie import Tweedie
+    tw = Tweedie(2.5, 100, 0.02)
+    audit = tw.test(log2=12, plot=True, simpson=True)
+    plt.close('all')
+    assert isinstance(tw.chf_law, AggregateCHF) and tw.chf_law.log2 == 12
+    assert list(audit.index) == ['EX', 'var', 'CV', 'Skew']
+    assert abs(audit.iloc[0, 0] - 100) < 1e-4 * 100
+    m, v, k = Tweedie(-1, 1, 1).stats()
+    assert abs(m - 1) < 1e-6 and abs(v - 1) < 1e-4
+    with pytest.warns(DeprecationWarning, match='chf_law'):
+        tw.ft

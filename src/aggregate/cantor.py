@@ -617,7 +617,8 @@ def cantor_chf(t, c=1.0 / 3.0, tol=1e-17):
     geometrically, so the truncation is cheap and the error is of the order of
     the first omitted argument squared.
 
-    Provided for :class:`aggregate.ft.FourierTools` experiments: the Cantor law
+    Provided for :meth:`aggregate.characteristic_function.AggregateCHF.from_chf`
+    experiments: the Cantor law
     is the standard example of a distribution whose characteristic function
     does not vanish at infinity, which makes it an honest stress test of direct
     inversion.

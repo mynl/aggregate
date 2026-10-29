@@ -291,3 +291,156 @@ def plot_fourier_simpson(ftools, ylim=1e-16):
     ax.plot(xs, ftools.df.simpson / ftools.bs, label='simpson', c='C3', ls=':')
     ax.set(yscale='log', ylim=ylim)
     ax.legend()
+
+
+# ======================================================================
+# The same pictures over an AggregateCHF ([Characteristic-Function-Pedagogy]).
+# The engine holds bucket masses on ``xs`` with bucket ``bs``; the exact law
+# comes from the family's reference where there is one.
+# ======================================================================
+
+def _chf_reference_density(obj, max_points=257):
+    """``(x, density)`` of the family's reference law at a few hundred grid points, or ``None``."""
+    from ..pedagogy import chf_exact_comparison
+    if obj.family.reference is None:
+        return None
+    df = chf_exact_comparison(obj, max_points=max_points)
+    return df.index.to_numpy(), df['exact'].to_numpy()
+
+
+def plot_chf_inversion(obj, suptitle='', xlim=None, verbose=True):
+    """Density, log density, cdf and sf, and the sampled transform of an ``AggregateCHF``.
+
+    Parameters
+    ----------
+    obj : AggregateCHF
+        Updated.
+    suptitle : str
+    xlim : tuple, optional
+        Inferred from the grid if omitted.
+    verbose : bool
+        Six panels if True, else the two density panels only.
+
+    Returns
+    -------
+    matplotlib.figure.Figure
+    """
+    x, p, h = obj.xs, obj.agg_density, obj.bs
+    exact = _chf_reference_density(obj)
+    if verbose:
+        fig, axs = plt.subplots(2, 3, figsize=_fit_to_page((3 * 2.5, 2 * 2)),
+                                constrained_layout=True)
+        ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
+    else:
+        fig, axs = plt.subplots(1, 2, figsize=_fit_to_page((2 * 2.5, 2.5)),
+                                constrained_layout=True)
+        ax0, ax1 = axs.flat
+    if xlim is None:
+        xlim = (x[0] if x[0] < 0 else -x[-1] / 25, x[-1])
+    for ax in (ax0, ax1):
+        ax.plot(x, p / h, label='grid', lw=1)
+        if exact is not None:
+            ax.plot(*exact, ls='--', c='C3', label='exact', lw=1)
+        ax.legend()
+    ax0.set(xlim=xlim, title='Density', xlabel='Outcome, x', ylabel='Density')
+    pos = p > 0
+    ax1.set(xlim=xlim, yscale='log', title='Log density', xlabel='Outcome, x',
+            ylim=(max(float(p[pos].min()) / h, 1e-17), float(p.max()) / h * 2))
+    if not verbose:
+        if suptitle:
+            fig.suptitle(suptitle)
+        return fig
+    F = np.cumsum(p)
+    for ax in (ax2, ax5):
+        ax.plot(x, F, label='cdf', lw=1, c='C0')
+        ax.plot(x, 1 - F, label='sf', lw=1, c='C2')
+        ax.legend()
+    ax2.set(xlim=xlim, title='Distribution', xlabel='Outcome, x')
+    ax5.set(xlim=xlim, yscale='log', title='Distribution, log scale', xlabel='Outcome, x')
+    n = len(x)
+    t = 2 * np.pi * np.arange(n // 2 + 1) / (n * h)
+    phi = obj.family.chf(t)
+    kw = {'ls': '-', 'marker': '.', 'ms': 3, 'lw': 1} if n <= 256 else {'lw': 1}
+    ax3.plot(t / (2 * np.pi), np.abs(phi), **kw)
+    ax3.set(yscale='log', title='Amplitude of the transform', xlabel='frequency / 2π',
+            ylabel='|φ(t)|', ylim=(1e-20, 2))
+    ax4.plot(t / (2 * np.pi), np.angle(phi) / (2 * np.pi), **kw)
+    ax4.set(title='Phase of the transform', xlabel='frequency / 2π', ylabel='Phase / 2π')
+    if suptitle:
+        fig.suptitle(suptitle)
+    return fig
+
+
+def plot_chf_wraps(obj, wraps=(-1, 1), add_tail=False, max_points=257):
+    """Illustrate aliasing: the exact law shifted by whole windows and summed onto the grid.
+
+    Parameters
+    ----------
+    obj : AggregateCHF
+        Updated, with a scipy reference law.
+    wraps : iterable of int
+        Window shifts, ``[-1, 1]`` for one window below and one above.
+    add_tail : bool
+        Also draw each shifted density where it sits.
+    max_points : int
+        Reference evaluations per wrap.
+
+    Returns
+    -------
+    tuple
+        ``(figure, table)``; the table has one row per wrap with its
+        interval and the exact probability in it.
+    """
+    ref = obj.family.reference
+    if ref is None or hasattr(ref, 'agg_density'):
+        raise ValueError(f'{obj.name}: the wrapping figure needs a scipy reference law')
+    x, p, h = obj.xs, obj.agg_density, obj.bs
+    W = len(x) * h
+    xe, pe = _chf_reference_density(obj, max_points)
+    be = xe[1] - xe[0]
+    fig, axs = plt.subplots(2, 2, figsize=_fit_to_page((2 * 2.5, 2 * 2)),
+                            constrained_layout=True)
+    ax0, ax1, ax2, ax3 = axs.flat
+    for ax in axs.flat:
+        ax.plot(x, p / h, label='grid', lw=2)
+    running = pe.copy()
+    rows = []
+    for i, w in enumerate(list(wraps)):
+        xs2 = w * W + xe
+        edges = np.append(xs2 - be / 2, xs2[-1] + be / 2)
+        adj = -np.diff(ref.sf(edges)) / be
+        running = running + adj
+        c = f'C{i + 1}'
+        ax0.plot(xe, running, label=f'{w:d}', lw=1, c=c)
+        ax1.plot(xe, adj, label=f'{w:d}', lw=1, c=c)
+        ax2.plot(xe, running, lw=1, c=c)
+        ax3.plot(xe, adj, lw=1, c=c)
+        if add_tail:
+            ax1.plot(xs2, adj, lw=1, c=c, ls=':')
+            ax3.plot(xs2, adj, lw=1, c=c, ls=':')
+        rows.append([w, xs2[0], xs2[-1], float(ref.cdf(xs2[-1]) - ref.cdf(xs2[0]))])
+    for ax in axs.flat:
+        ax.plot(xe, pe, label='exact', ls='--', lw=1, c='C3')
+    ax0.set(title='Cumulative aliasing', xlabel='Outcome, x', ylabel='Density')
+    ax1.set(title='Incremental aliasing', xlabel='Outcome, x', ylabel='Density')
+    ax2.set(title='Cumulative, log scale', xlabel='Outcome, x', yscale='log')
+    ax3.set(title='Incremental, log scale', xlabel='Outcome, x', yscale='log')
+    ax0.legend(ncol=2)
+    table = pd.DataFrame(rows, columns=['wrap', 'from', 'to', 'probability']).set_index('wrap')
+    return fig, table
+
+
+def plot_chf_simpson(obj, ylim=1e-16):
+    """The grid's density against Simpson's rule on the Fourier integral, on a log axis."""
+    from ..pedagogy import chf_simpson_inversion
+    df = chf_simpson_inversion(obj)
+    fig, ax = plt.subplots(figsize=_fit_to_page((3, 2.25)), constrained_layout=True)
+    ax.plot(df.index, df['grid'], label='grid mass / bs', c='C0', lw=1)
+    ax.plot(df.index, df['simpson'], label='Simpson', c='C1', lw=1, ls='--')
+    exact = _chf_reference_density(obj)
+    if exact is not None:
+        ax.plot(*exact, label='exact', c='C3', lw=1, ls=':')
+    ax.set(yscale='log', ylim=(ylim, None), xlabel='Outcome, x', ylabel='Density',
+           title=f'{obj.label}: two inversions')
+    ax.legend()
+    return fig

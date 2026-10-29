@@ -38,7 +38,8 @@ from ._bivariate import plot_bivariate, plot_bivariate_distribution
 from ._bivariate_massive import (plot_bivariate_massive,
                                  plot_bivariate_massive_slice)
 from ._fourier import (plot_fourier, plot_fourier_wraps, plot_fourier_simpson,
-                       plot_fourier1d)
+                       plot_fourier1d, plot_chf_inversion, plot_chf_wraps,
+                       plot_chf_simpson)
 
 # The generic ChartDoc renderer (chart IR realization; dev/plan-chart-ir.md).
 # plots may import charts, never the reverse.
@@ -57,6 +58,7 @@ __all__ = [
     'plot_bivariate_massive', 'plot_bivariate_massive_slice',
     'plot_fourier', 'plot_fourier_wraps', 'plot_fourier_simpson',
     'plot_fourier1d',
+    'plot_chf_inversion', 'plot_chf_wraps', 'plot_chf_simpson',
     # ChartDoc renderer
     'plot_chartdoc',
 ]

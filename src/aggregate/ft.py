@@ -1,16 +1,38 @@
-"""Direct numerical inversion of characteristic functions.
+"""Direct inversion of characteristic functions: a forwarding shim.
 
-Provides :class:`FourierTools`, an object-oriented FFT-based inverter for
-characteristic functions (used internally by :class:`aggregate.tweedie.Tweedie`
-for distributions without closed-form pdfs), plus :func:`make_levy_chf` and
-several paper-figure helpers (``poisson_example``, ``fft_wrapping_illustration``,
-``recentering_convolution[_example]``).
+This module is superseded by :mod:`aggregate.characteristic_function`, whose
+:class:`~aggregate.characteristic_function.AggregateCHF` returns bucket masses
+rather than density samples, sizes its own window from the law's tails, tilts
+a heavy-tailed law along a shifted contour so that it does not wrap, and is a
+first-class object with the DecL statement ``chfagg``
+(``dev/done/plan-characteristic-function-engine.md``). Where each name went:
 
-``FourierTools`` is reached as ``from aggregate.ft import FourierTools``;
-nothing here is re-exported at the top-level package namespace.
+* ``FourierTools(chf, fz)`` with a known law: ``build('chfagg ...')`` or
+  ``AggregateCHF.from_family``;
+* ``FourierTools(chf, 'continuous')``, an arbitrary ``chf``:
+  ``AggregateCHF.from_chf``;
+* ``invert`` (density samples): ``update`` (bucket masses; ``pdf`` is the mass
+  over ``bs``);
+* ``invert_simpson``: ``pedagogy.chf_simpson_inversion``;
+* ``compute_exact``: ``pedagogy.chf_exact_comparison``;
+* ``plot``, ``plot_wraps``, ``plot_simpson``, ``plot_fourier3da``:
+  ``pedagogy.chf_inversion_figure``, ``chf_wrapping_figure``,
+  ``chf_simpson_figure``, ``chf_fourier3d_figure``;
+* ``make_levy_chf``: ``Stable(alpha, beta).chf``;
+* ``poisson_example``, ``fft_wrapping_illustration``,
+  ``recentering_convolution_example``, ``recentering_convolution``, ``stats``:
+  moved unchanged to :mod:`aggregate.pedagogy`.
+
+``FourierTools`` keeps its body unchanged, so old notebooks reproduce their
+numbers, and its constructor raises a ``DeprecationWarning``; the moved names
+are forwarded through a module ``__getattr__`` that warns once per name.
+Nothing inside the library imports this module. Removal is
+``[FourierTools-Shim-Removal]`` in ``dev/TODO.md``: when the outside
+documents that use it have moved, or at the next major release.
 """
 
 import logging
+import warnings
 
 import numpy as np
 import pandas as pd
@@ -23,318 +45,6 @@ from .underwriter import build
 from .utilities import qd, remove_fuzz as remove_fuzz_util
 
 logger = logging.getLogger(__name__)
-
-
-def poisson_example(en, small2):
-    """
-    Example to show how to compute Po(en) using 1 << small2 buckets.
-    For AAS paper. Sample call::
-
-        poisson_example(10**8, 17)
-
-    :param en: mean of Poisson, e.g., 10**8
-    :param small2: log2 number of buckets to use in FFT routine, 2**small2 should be
-      about 10 * en ** 0.5 to get +/-5 standard deviations around the mean
-
-    """
-    from scipy.stats import poisson
-    from .plots import plt, ticker
-    from .plots._style import _fit_to_page
-
-    B = 1 << small2
-    z = np.zeros(B); z[1] = 1
-    wrap = irfft(np.exp(en * (rfft(z) - 1)))
-    k = en // B + 1
-    xs = k * B - (B >> 1) +  np.arange(B)
-    pmf = roll(wrap, B >> 1)
-    df = pd.DataFrame({'x': xs, 'FFT pmf': pmf})
-    po = poisson(en)
-    df['Exact pmf'] = po.pmf(df.x)
-    df = df.set_index('x', drop=True)
-    fig, [ax0, ax1] = plt.subplots(1, 2, figsize=_fit_to_page((FIG_W * 2, FIG_H + 0.3)), constrained_layout=True)
-    ax0.plot(wrap);
-    ax0.set(title=f'Raw FFT-based output, wrapped to [0, {B}]',
-            xlabel=f'Wrapped outcome, n mod {B}',
-            ylabel='Probability mass, Pr(N=n)');
-    df[['FFT pmf', 'Exact pmf']].plot(style=['-', ':'], ax=ax1, logy=True,
-        title='Shifted FFT vs exact Poisson probabilities\n(log scale)',
-        xlabel='Outcome, n', ylabel='Probability mass, Pr(N=n)');
-    ax1.set(ylim=[1e-17, 2 * df['FFT pmf'].max()])
-    ax1.yaxis.set_minor_locator(ticker.LogLocator(subs='all'))
-
-
-def fft_wrapping_illustration(ez=10, en=20, sev_clause='', small2=0, cmap='plasma'):
-    """
-    Illustrate wrapping by convolving a uniform distribution with mean ez
-    en times (if ``ez>0`` or ``sev_clause!=''``) or using the input ``sev_clause``.
-    ``sev_clause`` should be a ``dsev`` tailored to ``bs==1`` or just a Poisson
-    if ez==1.
-
-    Show in a space just big enough for the severity first and then
-    big enough for the full aggregate. Center and right hand plot illustrate how the
-    full components are sliced up and combined to the wrapped total.
-
-    If small2 is zero it is taken to be the smallest value to "fit" the severity.
-
-    In Poisson ez==1 mode, small2 equals the size of the small window to use for
-    convolution. big2 is estimated to fit the whole distribution.
-
-    (moved from figures.py)
-
-    """
-    from .plots import plt, mpl
-    from .plots._style import _fit_to_page
-
-    fig, axs = plt.subplots(1, 3, figsize=_fit_to_page((3 * FIG_W, FIG_H + 0.3)), constrained_layout=True)
-    ax0, ax1, ax2 = axs.flat
-
-    if ez == 0 or sev_clause != '':
-        if sev_clause == '':
-            raise ValueError('Must input one of ez>0 or a valid DecL sev_clause')
-        sev = build(f'agg Junk 1 claim {sev_clause} fixed')
-        ez = sev.sev_m
-        q1 = sev.q(1)
-        if small2 == 0:
-            small2 = int(np.ceil(np.log2(q1)))
-        xs = np.hstack((-np.inf, np.arange(1 << small2) + 0.5))
-        z = np.diff(sev.sev.cdf(xs))
-        # enough space for aggregate
-        big2 = int(np.ceil(np.log2(q1 * en)))
-    elif ez == 1:
-        assert small2, 'Need to input small2 in Poisson mode'
-        z = np.zeros(1 << small2)
-        z[1] = 1
-        # full space
-        sigma = np.sqrt(en)
-        big2 = int(np.ceil(np.log2(en + 5 * sigma)))
-    else:
-        # enough space for severity and make sev
-        if small2 == 0:
-            small2 = int(np.ceil(np.log2(2 * ez)))
-        z = np.zeros(1 << small2)
-        z[:ez*2] = 1 / ez / 2
-        # enough space for aggregate
-        big2 = int(np.ceil(np.log2(2 * ez * en)))
-
-    if big2 <= 8:
-        ds = 'steps-post'
-    else:
-        ds = 'default'
-    if ez == 1:
-        wrapped = irfft( np.exp(en * (rfft(z) - 1)))
-        full = irfft( np.exp(en * (rfft(z, 1 << big2) - 1)))
-    else:
-        wrapped = irfft( rfft(z) ** en )
-        full = irfft( rfft(z, 1 << big2) ** en )
-
-    ax0.plot(wrapped, c='C0', drawstyle=ds)
-    ax0.xaxis.set_major_locator(mpl.ticker.MultipleLocator(4))
-    ax0.set(title=f'Wrapped distribution\nlog2={small2}')
-    lm = ax0.get_ylim()
-    lm = (-lm[1] / 20, lm[1]* 1.1)
-    ax0.set(ylim=lm)
-
-    norm = mpl.colors.Normalize(0, 1, clip=True)
-    cmappable = mpl.cm.ScalarMappable(norm=norm, cmap=cmap)
-    mapper = cmappable.to_rgba
-    cc = list(map(mapper, np.linspace(0, 1, 1 << big2-small2)))
-    ax1.plot(full, label='Full computation', c='w', alpha=1, lw=3, drawstyle=ds)
-    ax1.xaxis.set_major_locator(mpl.ticker.MultipleLocator(32))
-    for n, (s, c) in enumerate(zip(full.reshape((1<<big2-small2, 1<<small2)), cc)):
-        ax1.plot(s, c=c, label=f'Part {n}', drawstyle=ds)
-        ax1.plot(np.arange((1<<small2) * n, (1<<small2) * (n+1)), s, c=c, lw=2,
-                 drawstyle=ds, label=None)
-    for n in range(1 << big2-small2):
-        ax1.axvline(n * (1 << small2), lw=.25, c='C7')
-    for n in range(1 << big2-small2):
-        ax1.axvline(n * (1 << small2), lw=.25, c='C7')
-    if big2 - small2 <= 3:
-        ax1.legend(loc='center right')
-    ax1.set(title=f'Full distribution\nlog2={big2}, {1<<big2-small2} components')
-
-    wrapped_from_full = full.reshape((1<<big2-small2, 1<<small2))
-    ax2.plot(wrapped_from_full.T, label=None, c='C7', lw=.5, drawstyle=ds)
-    ax2.plot(wrapped_from_full.sum(0), lw=3
-             , drawstyle=ds, label='Wrapped from full', c='C1')
-    ax2.plot(wrapped, lw=1, label='Wrapped', c='C0', drawstyle=ds)
-    ax2.xaxis.set_major_locator(mpl.ticker.MultipleLocator(4))
-    ax2.set(title='Wrapping components (grey)\nSums (blue, organge as left)')
-    # ax2.legend(loc)
-    ax2.set(ylim=lm)
-
-    assert np.allclose(wrapped_from_full.sum(0), wrapped)
-
-
-def recentering_convolution_example(sev_clause, en, log2, agg_log2=0, bs=1,
-                                    freq_clause='poisson', remove_fuzz=False):
-    """
-    Illustrate how to find the "correct" part of an aggregate and
-    recenter it appropriately. Aggregate is::
-
-        agg RecenteringExample en claims dsev xs ps poisson
-
-    **Method**
-
-    #. Compute aggregate with enough space for the supported part of the
-       distribution (say, where density > 1e-15 or so)
-    #. Subtract the mean by rolling left (negative shift) by mean / bs buckets (mod n)
-    #. fft shift = roll (in either direction) by n / 2 buckets, because
-       the distribution is centered at zero and has positive and negative parts.
-    #. Set appropriate x values to align with the density. Density is from
-       mean - n/2 to mean + n/2 - 1 (times bs).
-
-    Reasonable defaults::
-
-        en = 5000
-        log2 = 15
-
-        xs = [3, 4, 7, 34]
-        ps = [1/8, 1/8, 1/8, 5/8]
-
-    (from hifreq.py)
-
-    :param xs: array of x values for dsev
-    :param ps: array of x values for dsev
-
-    """
-    from .plots import plt
-    from .plots._style import _fit_to_page
-
-    df, ag = recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz)
-
-    # update the ag object if agg_log2
-    if agg_log2 == 0:
-        # just plot
-        fig, ax0 = plt.subplots(1, 1, figsize=_fit_to_page(
-            (3.5, 2.45)), constrained_layout=True)
-
-        df.plot(ax=ax0, c='C0')
-        ax0.set(
-            title=f'Shifted, centered, re-indexed aggregate\nlog2={log2} buckets')
-        bit = None
-
-    elif agg_log2 > 0:
-        ag.update(log2=agg_log2, bs=bs, padding=0)
-        qd(ag)
-        print('-'*80)
-        # percentiles - help determining log2 needed for hi freq calculation
-        qd(pd.Series([ag.actual_sd, ag.q(0.001), ag.q(0.999),
-                      ag.q(0.999999) - ag.q(0.000001)],
-                     index=['std dev', 'p001', 'p999', 'range']))
-        print('-'*80)
-
-        # merge and compare
-        fig, axs = plt.subplots(2, 3, figsize=_fit_to_page(
-            (3 * 3.5, 2 * 2.45)), constrained_layout=True)
-        ax0, ax1, ax2, ax3, ax4, ax5 = axs.flat
-
-        df.plot(ax=ax0, c='C0')
-        ax0.set(
-            title=f'Shifted, centered, re-indexed aggregate\nlog2={log2} buckets')
-        bit = pd.concat((ag.density_df.p_total, df), axis=1, join='inner')
-        bit.plot(ax=ax1)
-        ax1.lines[1].set(ls='--')
-        ax1.legend(loc='upper right')
-        ax1.set(
-            title=f'Shifted vs. agg object\n'
-                  f'Linear scale; agg object log2 = {ag.log2}')
-        bit.plot(ax=ax2, logy=True)
-        ax2.lines[1].set(ls='--')
-        ax2.legend(loc='upper right')
-        ax2.set(title='Shifted vs. agg object\nLog scale')
-
-        abs_error = (bit.p_total - bit.a).abs()
-        abs_error.plot(ax=ax4, c='C2', logy=True,
-                       title=f'Abs error\n'
-                       f'Max {abs_error.max():.5g}; '
-                       f'Avg {abs_error.mean():.5g}')
-        rel_error = abs_error / bit.p_total
-        rel_error = rel_error.loc[bit.p_total > 1e-15]
-        rel_error.plot(ax=ax5, c='C2', logy=True,
-                       title=f'Rel error p_total > 1e-15\n'
-                       f'Max {rel_error.max():.5g}; '
-                       f'Avg {rel_error.mean():.5g}')
-        ax3.remove()
-
-    else:
-        raise ValueError('log2 >= 0!')
-
-    return df, ag, bit
-
-
-def recentering_convolution(sev_clause, freq_clause, en, log2, bs, remove_fuzz):
-    """
-    Compute hifreq convol for sev_clause, a DecL severity statement.
-    Must have only one component for now.
-    Illustrates how to find the "correct" part of an aggregate and
-    recenter it appropriately. Aggregate is::
-
-        agg RecenteringExample en claims dsev xs ps poisson
-
-    **Method**
-
-    #. Compute aggregate with enough space for the supported part of the
-       distribution (say, where density > 1e-15 or so)
-    #. Subtract the mean by rolling left (negative shift) by mean / bs buckets (mod n)
-    #. fft shift = roll (in either direction) by n / 2 buckets, because
-       the distribution is centered at zero and has positive and negative parts.
-    #. Set appropriate x values to align with the density. Density is from
-       mean - n/2 to mean + n/2 - 1 (times bs).
-
-    """
-
-    ag = build(f'agg SevEg {en} claims {sev_clause} {freq_clause}', update=False)
-    ez = ag.sev_m
-    mean_bucket = int(round(ez * en / bs))
-
-    ft_len = 1 << log2
-    ag.xs = np.linspace(0, ft_len * bs, ft_len, endpoint=False)
-    ag.log2 = log2
-    ag.bs = bs
-    ag.padding = 0
-    z = ag.discretize('round', 'survival', True)
-    assert len(z) == 1
-    z = z[0]
-    fz = rfft(z, ft_len)
-    # aggregate by hand
-    # fa = np.exp(en*(fz - 1))
-    fa = ag.frequency.freq_pgf(en, fz)
-    a = irfft(fa)
-
-    # center roll left by ez and 1 << log2-1, former
-    # is the mean offset, the latter is fftshift
-    a = roll(a, -(mean_bucket % ft_len) + (1 << log2 - 1))
-
-    # set up aligned to the appropriate xs values
-    df = pd.DataFrame(
-        {'n': np.arange(mean_bucket - (1 << log2 - 1),
-                        mean_bucket + (1 << log2 - 1)) * bs,
-         'a': a}
-    ).set_index('n')
-    if remove_fuzz:
-        # remove fuzz; this site keeps a looser 2*eps tolerance (preserved via
-        # the explicit eps= argument to the shared utility).
-        df = remove_fuzz_util(df, eps=2 * np.finfo(float).eps)
-    qd(stats(df).T)
-    print('-'*80)
-    return df, ag
-
-
-def stats(df):
-    ans = {}
-    ns = {}
-    ns[1] = np.array(df.index)
-    ns[2] = ns[1] * ns[1]
-    ns[3] = ns[2] * ns[1]
-    for c in df:
-        ans[c] = [np.sum(ns[i] * df[c]) for i in [1, 2, 3]]
-    df = pd.DataFrame(ans, index=[1, 2, 3])
-    df.loc['var'] = df.loc[2] - df.loc[1] ** 2
-    df.loc['sd'] = df.loc['var'] ** .5
-    df.loc['cv'] = df.loc['sd'] / df.loc[1]
-    df.loc['skew'] = (df.loc[3] - 3 * df.loc[2] * df.loc[1] +
-                      2 * df.loc[1]**3) / df.loc['sd'] ** 3
-    return df
 
 
 class FourierTools:
@@ -370,6 +80,11 @@ class FourierTools:
         :param scale_mode: if True, the scale parameter from fz is used in the Fourier
           Transform, otherwise it is unadjusted.
         """
+        warnings.warn(
+            'FourierTools is superseded by AggregateCHF.from_chf and '
+            'AggregateCHF.from_family (aggregate.characteristic_function); '
+            'aggregate.ft is a forwarding shim ([FourierTools-Shim-Removal])',
+            DeprecationWarning, stacklevel=2)
         self.chf = chf
         self.fz = fz
         self.scale_mode = scale_mode
@@ -758,21 +473,32 @@ class FourierTools:
         return fig
 
 
+#: The names forwarded to ``aggregate.pedagogy`` (PEP 562), each warning once.
+_MOVED = ('poisson_example', 'fft_wrapping_illustration',
+          'recentering_convolution_example', 'recentering_convolution', 'stats')
+_warned = set()
+
+
+def __getattr__(name):
+    if name in _MOVED:
+        if name not in _warned:
+            _warned.add(name)
+            warnings.warn(
+                f'aggregate.ft.{name} has moved to aggregate.pedagogy.{name}; '
+                'aggregate.ft is a forwarding shim ([FourierTools-Shim-Removal])',
+                DeprecationWarning, stacklevel=2)
+        from . import pedagogy
+        return getattr(pedagogy, name)
+    raise AttributeError(f'module {__name__!r} has no attribute {name!r}')
+
+
 def make_levy_chf(alpha, beta):
-    """Make the ch of stable(alpha, beta) per Nolan book page 5 Def 1.3."""
-    assert 0 < alpha < 2, 'alpha must be in (0, 2]'
-    if alpha == 1:
-        def chf(t):
-            return np.where(t==0, 1.,
-                            np.exp(- np.abs(t) * (1 + 1j * beta * 2 / np.pi *
-                                         np.sign(t) * np.log(np.abs(t)))))
-    elif alpha < 2:
-        # alpha not = 1
-        tan = np.tan(np.pi / 2 * alpha)
-        def chf(t):
-            return np.exp(- np.abs(t) ** alpha * (1 - 1j * beta * np.sign(t) * tan))
-    else:
-        # actually normal
-        def chf(t):
-            return np.exp(-t**2 / 2)
-    return chf
+    """The S1 stable characteristic function; superseded by ``Stable(alpha, beta).chf``.
+
+    Returns the ``chf`` method of :class:`aggregate.stable.Stable` at unit
+    scale and zero location, which is the function this used to build.
+    """
+    warnings.warn('make_levy_chf is superseded by Stable(alpha, beta).chf',
+                  DeprecationWarning, stacklevel=2)
+    from .stable import Stable
+    return Stable(alpha, beta).chf

@@ -521,12 +521,12 @@ def test_tilt_is_a_hint_key():
     assert _parse_hints('tilt=True')['tilt'] is True
 
 
-def test_split_law_is_untilted_with_a_warning_until_two_sided_lands(caplog):
+def test_split_law_grid_window_places_the_window_by_the_crop():
     c = AggregateCHF('S', 'stable', alpha=1.5, beta=0.5)
-    with caplog.at_level(logging.WARNING, logger='aggregate.characteristic_function'):
-        c.update(log2=12)
-    assert 'Two-Sided' in caplog.text
-    assert c.tilt == (0.0, 0.0) and abs(c.total_mass - 1) < 1e-9
+    bs, log2, x_min, tilt = c.grid_window(12)
+    assert x_min is None and tilt[0] > 0 and tilt[1] > 0
+    c.update(log2=12)
+    assert c.bs == bs and c.tilt == tilt and c.x_min % bs == 0
 
 
 def test_tilted_validation_rows_and_info():
@@ -547,3 +547,104 @@ def test_tilted_validation_rows_and_info():
     assert sum(c._outside_at(log2, bs, c.grid_window(log2)[2])) <= 1e-5
     # the window's cdf is right up to the outside mass, and sf includes it
     assert c.sf(c.x_max) == pytest.approx(c.outside_above, rel=1e-4)
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Two-Sided]: the split for |beta| < 1
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize('alpha', [0.7, 1.0, 1.5])
+@pytest.mark.parametrize('beta', [0, 0.5, 0.99])
+def test_the_split_is_exact(alpha, beta):
+    """``phi = phi_plus phi_minus`` on the real line to roundoff, for every alpha including 1."""
+    fam = FamilyStable(dict(alpha=alpha, beta=beta, scale=2, loc=1))
+    plus, minus = fam.halves()
+    t = np.linspace(-6, 6, 41)
+    assert np.max(np.abs(fam.chf(t) / (plus.chf(t) * minus.chf(t)) - 1)) < 1e-12
+    assert plus.tilt_side == 'right' and minus.tilt_side == 'left'
+    assert plus.location == 1 and minus.location == 0
+    assert (plus.scale ** alpha + minus.scale ** alpha) == pytest.approx(2 ** alpha)
+    with pytest.raises(ValueError, match='one-sided'):
+        plus.halves()
+
+
+TWO_SIDED_ROWS = [(1.5, 0), (1.5, 0.5), (1.5, 0.9), (1.5, 0.99), (1.5, -0.99),
+                  (1.1, 0), (1.1, 0.5), (1.1, 0.99),
+                  (1.0, 0), (1.0, 0.5), (1.0, 0.99),
+                  (0.7, 0), (0.7, 0.5), (0.7, 0.99)]
+
+
+def _two_sided_check(alpha, beta, log2, reference_log2_extra):
+    """The plan's reference: the untilted kernel on a window ``2 ** extra`` times longer, centered on the kept one, allowed its own closed-form wrap at the edges."""
+    from scipy.special import zeta
+    c = AggregateCHF('S', 'stable', alpha=alpha, beta=beta)
+    c.update(log2=log2)
+    n, h, x0 = 2 ** log2, c.bs, c.x_min
+    fam = c.family
+    big = 2 ** (log2 + reference_log2_extra)
+    off = (big - n) // 2
+    ref = invert_characteristic_function(fam.chf, x0 - off * h, h, big)[off:off + n]
+    p = c.agg_density.copy()
+    p[0] -= c.outside_below
+    rel = np.abs(p - ref) / ref
+    worst = float(np.max(rel))
+    # the reference's own wrap: each tail at a distance of m times its window,
+    # relative to the mass at the kept window's edges
+    A, B, _ = fam.power_tails
+    W_ref = big * h
+    wraps = []
+    for const, dist in ((A, c.x_max - fam.location), (B, fam.location - x0)):
+        q = dist / W_ref
+        wraps.append(q ** (alpha + 1) * zeta(alpha + 1, 1 + q) if const > 0 else 0.0)
+    ref_wrap = max(wraps)
+    assert worst < c.edge_error + ref_wrap, (worst, c.edge_error, ref_wrap)
+    if alpha >= 1:
+        assert worst < 1e-4 + ref_wrap + 4 * c.edge_error
+    assert np.all(c.agg_density > 0)
+    assert c.outside_below > 0 and c.outside_above > 0
+    assert 0.5 < c.outside_below / c.outside_above < 2
+    assert abs(c.total_mass + c.outside_above - 1) < c.edge_error
+    assert c.tilt[0] > 0 and c.tilt[1] > 0 and c.tilt_theta[1] == pytest.approx(c.tilt[1] / (n * h))
+    return c
+
+
+@pytest.mark.parametrize('alpha, beta', TWO_SIDED_ROWS)
+def test_two_sided_tilting_at_log2_14(alpha, beta):
+    c = _two_sided_check(alpha, beta, 14, 8)
+    if (alpha, beta) == (1.5, 0.5):
+        assert c.transfer_sigma == 0
+    if (alpha, beta) == (1.0, 0.99):
+        assert c.transfer_sigma / c.bs > 2
+
+
+@pytest.mark.xdist_group('chf_reference')
+@pytest.mark.parametrize('alpha, beta', TWO_SIDED_ROWS)
+def test_two_sided_tilting_reproduces_the_measured_table(alpha, beta):
+    """The 2026-10-29 two-sided table at log2 16, against a 64x reference."""
+    c = _two_sided_check(alpha, beta, 16, 6)
+    assert c.bs <= c._bucket_cap(two_sided=True)
+    if alpha < 1.2:
+        assert c.validation_df.loc['outside mass', 'status'] == 'flag'
+
+
+def test_two_sided_untilted_wraps():
+    c = AggregateCHF('S', 'stable', alpha=1.5, beta=0.5)
+    c.update(log2=14, tilt=False)
+    t = AggregateCHF('T', 'stable', alpha=1.5, beta=0.5)
+    t.update(log2=14, bs=c.bs)
+    both = pd.concat([c.density_df['p_total'].rename('wrap'),
+                      t.density_df['p_total'].rename('tilt')], axis=1, join='inner')
+    body = both['tilt'] > 1e-12
+    rel = (both['wrap'] - both['tilt']).abs() / both['tilt']
+    assert rel[body].max() > 0.1
+    assert c.tilt == (0.0, 0.0) and c.outside_mass == 0
+
+
+def test_two_sided_number_tilts_both_halves_and_info_shows_the_transfer():
+    c = AggregateCHF('S', 'stable', alpha=1.0, beta=0.99)
+    c.update(log2=12, tilt=6)
+    assert c.tilt == (6.0, 6.0)
+    assert c.transfer_sigma > 0
+    assert 'transfer sigma' in c.info
+    assert c.validation_df.loc['transfer sigma', 'value'] == c.transfer_sigma
+    assert c.validation_df.loc['tilt', 'note'].startswith('e-folds')

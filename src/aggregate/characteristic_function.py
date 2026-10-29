@@ -683,6 +683,31 @@ class FamilyStable(Family):
                 break
         return float(total)
 
+    def halves(self):
+        r"""The two totally skewed laws whose sum is this one: ``(plus, minus)``.
+
+        With :math:`w_\pm = (1 \pm \beta)/2` and :math:`\gamma_\pm = \gamma w_\pm^{1/\alpha}`,
+        :math:`X = X_+ + X_-` with :math:`X_+ \sim S(\alpha, 1, \gamma_+, \delta_1; 1)`
+        and :math:`X_- \sim S(\alpha, -1, \gamma_-, 0; 1)`, independent, for
+        every :math:`\alpha` including 1: :math:`\log\varphi` is linear in
+        :math:`\beta` with coefficient proportional to :math:`\gamma^\alpha`,
+        and the S1 form at :math:`\alpha = 1` has no :math:`\gamma\log\gamma`
+        term. The split is exact on the real line to roundoff.
+
+        Returns
+        -------
+        tuple of FamilyStable
+        """
+        st = self.stable
+        if abs(st.beta) == 1 or st.alpha == 2:
+            raise ValueError('halves: the law is already one-sided')
+        a, g = st.alpha, st.scale
+        g_plus = g * ((1 + st.beta) / 2) ** (1 / a)
+        g_minus = g * ((1 - st.beta) / 2) ** (1 / a)
+        plus = FamilyStable(dict(alpha=a, beta=1, scale=g_plus, loc=st.loc))
+        minus = FamilyStable(dict(alpha=a, beta=-1, scale=g_minus, loc=0.0))
+        return plus, minus
+
     def reflected(self):
         """The family of ``-X``: ``beta`` negated, location negated, as written."""
         p = dict(self.parameters)
@@ -1089,7 +1114,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             return fam.reflected()
         return None
 
-    def _bucket_cap(self, family=None):
+    def _bucket_cap(self, family=None, two_sided=False):
         r"""The largest bucket a tilted grid may use, a rung of the ladder.
 
         :math:`h_{\max} = \min(\gamma/10,\ \pi\gamma/(52\log 2)^{1/\alpha})`
@@ -1097,14 +1122,17 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         truncation :math:`|\varphi(\pi/h)|` must sit at roundoff because the
         tilt amplifies it by :math:`e^\tau`, and the body keeps ten buckets
         per scale because a tilted grid no longer has to reach far into the
-        tail. ``inf`` for a law with no power tail.
+        tail. A two-sided law needs both halves at roundoff, and since
+        :math:`|\varphi| = |\varphi_+||\varphi_-|` that is the whole law at
+        :math:`2^{-104}`: the cap is :math:`\pi\gamma/(104\log 2)^{1/\alpha}`,
+        smaller by :math:`2^{1/\alpha}`. ``inf`` for a law with no power tail.
         """
         fam = family or self.family
         if not fam.power_tails:
             return np.inf
         _, _, alpha = fam.power_tails
         gamma = fam.scale
-        h_trunc = np.pi * gamma / _ROUNDOFF_LOG ** (1 / alpha)
+        h_trunc = np.pi * gamma / ((2 if two_sided else 1) * _ROUNDOFF_LOG) ** (1 / alpha)
         return _round_bucket_down(min(gamma / TILT_BODY_BUCKETS, h_trunc))
 
     @staticmethod
@@ -1184,6 +1212,188 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         x0 = h * math.floor(x_left / h + 1e-12)
         return h, x0
 
+    def _light_edge(self, fam, h, sigma2=0.0):
+        """The left edge of a right-heavy half: its support bound or the 1e-40 Chernoff edge, a multiple of ``h``.
+
+        ``sigma2`` is the variance of a normal law added to the half by the
+        resolution transfer, which widens its light tail: the edge is then
+        taken from ``K(s) + sigma2 s ** 2 / 2``, and a finite support bound no
+        longer applies. Mass below this edge wraps onto the top of the window
+        and is amplified by the tilt, which is why the edge is so far out.
+        """
+        lo, _ = fam.support
+        if np.isfinite(lo) and sigma2 == 0:
+            x_l = lo
+        else:
+            s_minus, _ = fam.cgf_domain
+            x_l = -chernoff_edge(lambda u: fam.cgf(-u) + 0.5 * sigma2 * u ** 2, -s_minus,
+                                 math.log(TILT_LEFT_EPS), max(fam.scale, math.sqrt(sigma2)))
+        return h * math.floor(x_l / h + 1e-12)
+
+    def _two_sided_setup(self, log2, bucket_sizing_p, bs, mode):
+        r"""Everything the split needs short of inverting: the bucket, the halves, their grids, the transfer and the tilts.
+
+        Returns a dict with ``h``, ``plus`` and ``minus_reflected`` (the
+        families inverted, both right-heavy), ``y0_plus`` and ``z0_minus``
+        (their left edges), ``sigma`` and ``narrow`` (the resolution
+        transfer), ``chf_plus`` and ``chf_minus`` (the transferred
+        characteristic functions), and ``tau_plus`` and ``tau_minus``.
+
+        Notes
+        -----
+        **Resolution transfer.** Near :math:`|\beta| = 1` the light half is
+        narrow, under a bucket at :math:`\alpha = 1.5`, :math:`\beta = 0.99`,
+        and its truncation :math:`|\varphi_-(\pi/h)|` is of order one, which
+        the tilt amplifies. A normal law is moved from the wide half to the
+        narrow one, :math:`\varphi = (\varphi_+ e^{\sigma^2 s^2/2})(\varphi_- e^{-\sigma^2 s^2/2})`,
+        with :math:`\sigma^2\pi^2/(2h^2) = \max(0, 52\log 2 - (\pi\gamma_-/h)^\alpha)`,
+        the least :math:`\sigma` that brings the narrow half's truncation to
+        roundoff; the product is unchanged, and the wide half becomes a
+        deconvolved, signed intermediate, which is harmless. The two-sided
+        bucket cap keeps the wide half at roundoff too.
+        """
+        n = 2 ** log2
+        fam = self.family
+        A, B, alpha = fam.power_tails
+        eps = 1.0 - bucket_sizing_p
+        x_r = fam.location + (A / (eps / 2)) ** (1 / alpha)
+        x_l = fam.location - (B / (eps / 2)) ** (1 / alpha)
+        if bs:
+            h = float(bs)
+        else:
+            h = min(round_bucket((x_r - x_l) / n), self._bucket_cap(two_sided=True))
+        plus, minus = fam.halves()
+        minus_r = minus.reflected()
+        # the truncation exponents (pi gamma / h) ** alpha of the two halves
+        e_plus = (np.pi * plus.scale / h) ** alpha
+        e_minus = (np.pi * minus_r.scale / h) ** alpha
+        narrow = 'minus' if e_minus <= e_plus else 'plus'
+        e_narrow = min(e_plus, e_minus)
+        sigma2 = max(0.0, _ROUNDOFF_LOG - e_narrow) * 2 * h ** 2 / np.pi ** 2
+        sigma = math.sqrt(sigma2)
+
+        def transferred(base, sign):
+            def chf(s):
+                s = np.asarray(s, dtype=complex)
+                return base.chf(s) * np.exp(sign * 0.5 * sigma2 * s ** 2)
+            return chf
+        # the narrow half gains the normal (exp(-sigma^2 s^2 / 2)), the wide
+        # half loses it; the reflected minus half sees s -> -s, under which
+        # s ** 2 is unchanged
+        chf_plus = transferred(plus, -1.0 if narrow == 'plus' else +1.0)
+        chf_minus = transferred(minus_r, -1.0 if narrow == 'minus' else +1.0)
+        y0_plus = self._light_edge(plus, h, sigma2 if narrow == 'plus' else 0.0)
+        z0_minus = self._light_edge(minus_r, h, sigma2 if narrow == 'minus' else 0.0)
+        bound = {'plus': plus.density_bound, 'minus': minus_r.density_bound}
+        if sigma > 0:
+            bound[narrow] = min(bound[narrow], 1 / (sigma * math.sqrt(2 * np.pi)))
+        taus = {}
+        for key, half, chf, y0 in (('plus', plus, chf_plus, y0_plus),
+                                   ('minus', minus_r, chf_minus, z0_minus)):
+            if mode == 'auto':
+                A_h, _, _ = half.power_tails
+                # each half is inverted on 2n buckets (see _two_sided_masses)
+                W = 2 * n * h
+                x_end = y0 + W
+                q = max((x_end - half.location) / W, 1e-12)
+                rho = q ** (alpha + 1) * float(hurwitz_zeta(alpha + 1, 1 + q))
+                eps_eff = 2.0 ** -52 + float(abs(chf(np.array([np.pi / h]))[0]))
+                kappa = bound[key] * (x_end - half.location) ** (alpha + 1) / (A_h * alpha)
+                taus[key] = self._tau_star(rho, eps_eff, kappa)
+            else:
+                taus[key] = float(mode)
+        return dict(h=h, n=n, plus=plus, minus_reflected=minus_r, y0_plus=y0_plus,
+                    z0_minus=z0_minus, sigma=sigma, narrow=narrow,
+                    chf_plus=chf_plus, chf_minus=chf_minus,
+                    tau_plus=taus['plus'], tau_minus=taus['minus'])
+
+    def _two_sided_masses(self, setup):
+        r"""Invert both halves, convolve, crop: ``(p, x0, below, above, edge_error)``.
+
+        Notes
+        -----
+        **The bucket factor is applied once.** Convolving two sets of bucket
+        masses gives the masses of :math:`X + U_1 + U_2`, a second rounding
+        with relative error of order :math:`(h/\gamma)^2/24`; so the plus half
+        is inverted with the sinc factor and the minus half without, and the
+        product of the transforms is :math:`\varphi\,\mathrm{sinc}` on the
+        band.
+
+        **Each half on twice the grid, then crop.** Mass of one half beyond
+        its own window re-enters the kept window through the other half's
+        heavy tail, so a half on :math:`n/2` buckets loses accuracy near both
+        edges, and a half on :math:`n` still does at the edge a skewed law
+        pushes the crop to, where the last kept entries pair the plus half's
+        masses beyond its window with the lower half of the minus body
+        (measured: 40% to 55% at :math:`\beta = 0.99`). Each half is
+        therefore inverted on :math:`2n` buckets, so its window reaches a
+        full :math:`W` beyond the kept one on its side, the linear
+        convolution has :math:`4n`, and the :math:`n` kept are placed, within
+        the range where every entry is complete, so that the mass left out
+        below equals the mass left out above. The left-out masses are then
+        the convolution's mass outside the kept window plus each half's
+        closed-form tail beyond its own window. The cost is four inversions
+        of :math:`n` and a convolution of :math:`4n`, about 40 ms at log2 16.
+
+        **The reported edge error** is :math:`\max(E_L, E_R, \text{outside})`
+        with :math:`E_L` and :math:`E_R` the one-sided formula applied to the
+        whole law, with that side's tail constant and the distance from
+        :math:`\delta_1` to that edge: the halves' own :math:`E^*` overstate
+        the assembled law's error by up to 300 times near :math:`|\beta| = 1`.
+        """
+        h, n = setup['h'], setup['n']
+        m = 2 * n                                     # each half's buckets
+        W_half = m * h
+        W = n * h
+        plus, minus_r = setup['plus'], setup['minus_reflected']
+        p_plus = invert_characteristic_function(
+            setup['chf_plus'], setup['y0_plus'], h, m, setup['tau_plus'] / W_half, bucket=True)
+        p_minus = invert_characteristic_function(
+            setup['chf_minus'], setup['z0_minus'], h, m, setup['tau_minus'] / W_half, bucket=False)[::-1]
+        m0 = -(setup['z0_minus'] + (m - 1) * h)       # the minus half's grid starts here
+        full = np.fft.irfft(np.fft.rfft(p_plus, 2 * m) * np.fft.rfft(p_minus, 2 * m), 2 * m)
+        start = setup['y0_plus'] + m0
+        # the balanced crop: n consecutive buckets with equal mass left out
+        # below and above, counting each half's closed-form tail beyond its
+        # own window on its side
+        tail_plus = plus.tail_mass_above(setup['y0_plus'] + (m - 1) * h + h / 2)
+        tail_minus = minus_r.tail_mass_above(setup['z0_minus'] + (m - 1) * h + h / 2)
+        cum = np.concatenate([[0.0], np.cumsum(full)])
+        total = cum[-1]
+        # entry j of the linear convolution is complete only where both
+        # halves' windows cover the pairs it needs: not below the plus half's
+        # body (its light edge sits b_plus buckets under its location) and not
+        # above 2m - 2 - b_minus, so the crop is placed inside that range
+        b_plus = int(math.ceil((plus.location - setup['y0_plus']) / h - 1e-9))
+        b_minus = int(math.ceil((minus_r.location - setup['z0_minus']) / h - 1e-9))
+        k_lo = max(0, min(b_plus, m - 1))
+        k_hi = max(k_lo, 2 * m - 1 - n - max(b_minus, 0))
+        j = np.arange(k_lo, k_hi + 1)
+        below = cum[j] + tail_minus
+        above = total - cum[j + n] + tail_plus
+        k = int(j[np.argmin(np.abs(below - above))])
+        p = full[k:k + n].copy()
+        x0 = start + k * h
+        out_below = float(cum[k] + tail_minus)
+        out_above = float(total - cum[k + n] + tail_plus)
+        p[0] += out_below
+        # the two-sided edge error: the one-sided formula on the whole law,
+        # each side with its own tail constant and distance
+        fam = self.family
+        A, B, alpha = fam.power_tails
+        eps_eff = 2.0 ** -52 + float(abs(fam.chf(np.array([np.pi / h]))[0]))
+        errors = []
+        for const, dist, tau in ((A, x0 + W - fam.location, setup['tau_plus']),
+                                 (B, fam.location - x0, setup['tau_minus'])):
+            if const <= 0 or dist <= 0:
+                continue
+            q = dist / W
+            rho = q ** (alpha + 1) * float(hurwitz_zeta(alpha + 1, 1 + q))
+            kappa = fam.density_bound * dist ** (alpha + 1) / (const * alpha)
+            errors.append(self._edge_error_at(tau, rho, eps_eff, kappa))
+        edge_error = max([*errors, out_below + out_above])
+        return p, float(x0), out_below, out_above, float(edge_error)
+
     def grid_window(self, log2=16, bucket_sizing_p=BUCKET_SIZING_P, tilt=True, bs=0):
         """The grid the rules would choose, without computing.
 
@@ -1203,20 +1413,25 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             ``(bs, log2, x_min, tilt)`` with ``tilt`` the pair
             ``(left, right)`` of e-folds across the window the rules choose:
             ``(0, tau)`` for a right heavy tail, ``(tau, 0)`` for a left one,
-            ``(0, 0)`` untilted.
+            ``(tau_minus, tau_plus)`` for a two-sided law, ``(0, 0)``
+            untilted. ``x_min`` is ``None`` for a tilted two-sided law, whose
+            window is placed by the crop during the computation.
         """
         log2 = int(log2)
         n = 2 ** log2
         if not 0 < 1.0 - bucket_sizing_p < 1:
             raise ValueError(f'bucket_sizing_p must be in (0, 1), got {bucket_sizing_p}')
         mode = self._tilt_mode(tilt)
-        fam = self._tilt_family() if (mode != 'off' and self._x_min_fixed is None) else None
         if mode not in ('auto', 'off') and not self.family.power_tails:
             raise ValueError(
                 f'{self.name}: tilt={tilt!r} on a {self.family.name} law, which '
                 'has no power tail; such a law barely wraps, so there is '
                 'nothing for a tilt to damp. Use tilt=True or tilt=False.')
-        if fam is None or self.family.tilt_side == 'split':
+        if mode != 'off' and self._x_min_fixed is None and self.family.tilt_side == 'split':
+            setup = self._two_sided_setup(log2, bucket_sizing_p, bs, mode)
+            return float(setup['h']), log2, None, (setup['tau_minus'], setup['tau_plus'])
+        fam = self._tilt_family() if (mode != 'off' and self._x_min_fixed is None) else None
+        if fam is None:
             h, x0 = self._plain_window(log2, bucket_sizing_p, bs)
             return float(h), log2, float(x0), (0.0, 0.0)
         h, y0, tau = self._one_sided_window(fam, log2, bucket_sizing_p, bs, mode)
@@ -1228,6 +1443,14 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
     def _outside_at(self, log2, h, x0):
         """``(below, above)``: the closed-form mass the law leaves outside the tilted window ``[x0, x0 + n h)``."""
         n = 2 ** log2
+        if self.family.tilt_side == 'split':
+            # an estimate for coverage advice: a window n h long placed so
+            # that the two leading-term tails balance, A d+ ** -alpha = B d- ** -alpha
+            A, B, alpha = self.family.power_tails
+            W = n * h
+            d_plus = W / (1 + (B / A) ** (1 / alpha))
+            d_minus = W - d_plus
+            return B * d_minus ** -alpha, A * d_plus ** -alpha
         fam = self._tilt_family()
         if fam is None:
             return 0.0, 0.0
@@ -1315,9 +1538,13 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         ``tvar``, ``lev`` and the grid moments are window statistics. An
         untilted grid wraps the outside mass in and both are 0.
 
-        Two-sided tilting, a stable law with :math:`|\beta| < 1`, is
-        ``[Characteristic-Function-Two-Sided]``; until it lands such a law is
-        inverted untilted with a logged warning.
+        A stable law with :math:`|\beta| < 1` has two heavy tails and no
+        contour serves it: it is split into its two totally skewed halves
+        (:meth:`FamilyStable.halves`), each tilted toward its own light side
+        on all ``2 ** log2`` buckets, combined by a linear convolution so that
+        nothing wraps, and cropped to the ``2 ** log2`` buckets that leave
+        equal mass below and above (:meth:`_two_sided_masses`); the window's
+        left edge is then an output. A number tilts both halves alike.
         """
         if kwargs:
             logger.warning('%s.update ignores %s', type(self).__name__,
@@ -1328,13 +1555,15 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         log2 = 16 if log2 is None else int(log2)
         n = 2 ** log2
         mode = self._tilt_mode(tilt)
-        if mode != 'off' and self.family.tilt_side == 'split':
-            logger.warning('%s: two-sided tilting is [Characteristic-Function-Two-Sided]; '
-                           'inverted untilted', self.name)
+        sigma = 0.0
         h, log2, x0, tau_pair = self.grid_window(log2, bucket_sizing_p, tilt, bs)
         fam = self._tilt_family() if mode != 'off' else None
         below = above = 0.0
-        if fam is None or self.family.tilt_side == 'split':
+        if mode != 'off' and self._x_min_fixed is None and self.family.tilt_side == 'split':
+            setup = self._two_sided_setup(log2, bucket_sizing_p, bs, mode)
+            p, x0, below, above, edge_error = self._two_sided_masses(setup)
+            sigma = setup['sigma']
+        elif fam is None:
             p = invert_characteristic_function(self.family.chf, x0, h, n, 0.0,
                                                self.family.atom)
             edge_fam = self._tilt_family()
@@ -1363,7 +1592,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.tilt_theta = tuple(t / (n * h) for t in tau_pair)
         self.outside_below = below
         self.outside_above = above
-        self.transfer_sigma = 0.0
+        self.transfer_sigma = sigma
         self.edge_error = edge_error
         self.xs = x0 + h * np.arange(n)
         self.agg_density = p
@@ -1722,6 +1951,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             ('outside mass', f'{self.outside_mass:.3g}' if updated else INFO_NA),
             ('edge error', f'{self.edge_error:.3g}'
              if updated and np.isfinite(self.edge_error) else INFO_NA),
+            ('transfer sigma', f'{self.transfer_sigma:.3g}'
+             if updated and self.transfer_sigma else INFO_NA),
             ('validation', self.validation_description),
             ('bounded', self.bounded),
         ]

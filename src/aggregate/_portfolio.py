@@ -2383,6 +2383,16 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         return self._grid_distribution().q(p, kind)
 
+    def _output_xs_ps(self):
+        """``(xs, ps)`` of the total this portfolio outputs, for a severity reference.
+
+        See :meth:`aggregate.Aggregate._output_xs_ps`; the one hook
+        :func:`aggregate._severity._dhistogram_from_object` reads.
+        ``(None, None)`` before ``update``.
+        """
+        df = self.density_df
+        return (None, None) if df is None else (df.loss.values, df.p_total.values)
+
     def _grid_distribution(self):
         """The :class:`GridDistribution` view over the portfolio ``p_total`` grid.
 

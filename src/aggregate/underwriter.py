@@ -2205,6 +2205,11 @@ class Underwriter(HelpMixin):
                              bucket_sizing_p=bucket_sizing_p,
                              remove_fuzz=True, force_severity=True,
                              debug=self.debug, **kw)
+            elif isinstance(inner, AggregateCHF):
+                # a chfagg sizes its own window; tilt and the rest of its
+                # hints pass through ([Characteristic-Function-Severity])
+                inner.update(log2=int(log2), bs=bs,
+                             bucket_sizing_p=bucket_sizing_p, **kw)
             else:
                 inner.update(log2=int(log2), bs=bs,
                              bucket_sizing_p=bucket_sizing_p,
@@ -2305,8 +2310,13 @@ class Underwriter(HelpMixin):
         bs = hints.get('bs')
         try:
             from ._bucket_window import bs_window, _fmt_bs
-            obj = rec.object if rec.object is not None else Aggregate(**rec.spec)
-            got_bs, got_log2, _x0 = bs_window(obj, 16, 0, None, BUCKET_SIZING_P)
+            if rec.kind == 'chfagg':
+                # a chfagg's grid comes from its own window rule
+                obj = rec.object if rec.object is not None else AggregateCHF(**rec.spec)
+                got_bs, got_log2, _x0, _tilt = obj.grid_window(16)
+            else:
+                obj = rec.object if rec.object is not None else Aggregate(**rec.spec)
+                got_bs, got_log2, _x0 = bs_window(obj, 16, 0, None, BUCKET_SIZING_P)
             suggestion = (f'hints{{log2={int(got_log2)}; '
                           f'bs={_fmt_bs(got_bs)}}}')
         except Exception:                       # noqa: BLE001 error path only

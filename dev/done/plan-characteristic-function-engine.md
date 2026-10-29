@@ -1057,6 +1057,14 @@ Landed as `AggregateCHF.price_pentagon` and `calibrate_distortions`, `exhibits/_
 - **The regenerated exhibit snapshot moved one unrelated entry by last-digit noise** (`economic_tail/raw/Tower`, 1e-16 relative); the committed values were put back so the diff is the eight new entries, which a load-and-compare confirms (git's text diff pairs the new sorted-in blocks with look-alike neighbors and reports deletions that are not there).
 - The pricing wrappers import `_pricing` lazily, since `_pricing` imports the module tree that imports this one.
 
+### [Characteristic-Function-Severity], 1.33.0
+
+Landed at every touchpoint the plan lists: `BUILTIN_CHFAGG` and the `sev_ref_leaf` alternative in `decl.lark` with `chfagg.` in the `ID` prefix lookahead, `parser.sev_ref_chfagg`, the token label, the `agg.sublime-syntax` mirror (a builtin match and the prefix), the `AggregateCHF` branch in `Underwriter._resolve_sev_ref` and the `grid_window` suggestion in `_sev_ref_hygiene_message`, `_output_xs_ps` on the three output classes in place of the `isinstance` switch in `_dhistogram_from_object`, the `support` branch in `tail.output_support_max`, and `AggregateCHF.with_hints`. Tests: the severity oracle (1e-13 against the plan's 1e-10), `ssev` against `sev` on a signed law, the hygiene error naming `with_hints()` with paste-ready text, `with_hints` carrying `tilt` and re-building, the output hook on all three classes, the tilted reference's deficit warning, and the writer round trip of `sev chfagg.NAME` and `ssev chfagg.NAME!`. Divergences:
+
+- **`with_hints` pins `normalize` only on an object that has the setting.** The worker wrote `normalize=True` for every object; on a `chfagg` the key reaches `update` and only warns. `Aggregate` and `Portfolio` are unchanged.
+- **`output_support_max` reads `support` before anything else** for an object carrying a `family`; the generic path would have answered `inf` anyway (no `sevs`), but the plan says the class answers from its support, and it does.
+- The tilted reference test uses `ssev`: a `sev` reference of a stable law clamps its negative mass onto the zero atom, which moves the mean for a reason that has nothing to do with the deficit under test.
+
 The 2026-10-29 one-sided and two-sided measurements came from
 scratch prototypes of the kernels in Mathematics (nine scripts, the last six on
 the two-sided method: plain split, resolution transfer, full halves and crop,

@@ -912,3 +912,79 @@ def test_exhibits_and_charts_are_the_generic_four_and_the_one_chart():
     assert not hasattr(c, 'pnl_program') and not hasattr(c, 'reins_program')
     before = build('chfagg G gamma 4 25', update=False)
     assert available_charts(before) == []
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Severity]: sev chfagg.NAME and ssev chfagg.NAME
+# ----------------------------------------------------------------------
+
+def test_chfagg_as_a_severity_matches_the_direct_severity():
+    """``agg X dfreq [2] sev chfagg.G`` and ``agg X dfreq [2] sev 25 * gamma 4`` agree on one grid."""
+    g = build('chfagg SR.G gamma 4 25 hints{log2=12; bs=1/4}')
+    a = build('agg SR.X dfreq [2] sev chfagg.SR.G', log2=12, bs=1 / 4)
+    b = build('agg SR.Y dfreq [2] sev 25 * gamma 4', log2=12, bs=1 / 4)
+    assert np.max(np.abs(a.density_df['p_total'] - b.density_df['p_total'])) < 1e-10
+    assert a.sevs[0].sev_name == 'dhistogram'
+    assert a.program.split() == 'agg SR.X dfreq [2] sev chfagg.SR.G'.split()
+    assert a.pprogram.split()[-1] == 'chfagg.SR.G'
+
+
+def test_ssev_chfagg_keeps_the_negative_atoms_and_sev_clamps_them():
+    build('chfagg SR.N norm 100 30 hints{log2=12; bs=1/4}')
+    signed = build('agg SR.S dfreq [1] ssev chfagg.SR.N', log2=12, bs=1 / 4)
+    assert signed.density_df.index.min() < 0
+    assert abs(signed.est_m - 100) < 1e-9
+    with pytest.warns(UserWarning, match='clamped'):
+        clamped = build('agg SR.C dfreq [1] sev chfagg.SR.N', log2=12, bs=1 / 4)
+    assert clamped.density_df.index.min() >= 0
+
+
+def test_hygiene_error_names_with_hints_and_gives_the_chfagg_grid():
+    build('chfagg SR.H gamma 4 25')
+    with pytest.raises(ValueError, match=r'with_hints\(\)') as err:
+        build('agg SR.UsesH dfreq [2] sev chfagg.SR.H')
+    assert 'hints{log2=16; bs=1/64}' in str(err.value)
+    assert 'chfagg.SR.H' in str(err.value)
+
+
+def test_with_hints_pins_the_grid_and_carries_tilt():
+    from aggregate.characteristic_function import AggregateCHF
+    s = build('chfagg SR.W stable 1.5 1')
+    program = s.with_hints(tilt=8)
+    assert program == 'chfagg SR.W stable 1.5 1 hints{log2=16; bs=1/32; tilt=8}'
+    pinned = build(program)
+    assert isinstance(pinned, AggregateCHF) and pinned.tilt == (0.0, 8.0) and pinned.bs == 1 / 32
+    with pytest.raises(ValueError, match='not been updated'):
+        AggregateCHF('X', 'gamma', shape=4, scale=25).with_hints()
+
+
+def test_output_hook_and_support_for_the_reference():
+    from aggregate.tail import output_support_max
+    g = build('chfagg SR.O gamma 4 25', log2=12)
+    xs, ps = g._output_xs_ps()
+    assert xs is g.xs and ps is g.agg_density
+    assert output_support_max(g) == np.inf
+    for program in ('agg SR.A dfreq [1] dsev [1]', 'port SR.P agg SR.PA dfreq [1] dsev [1]'):
+        xs, ps = build(program, log2=8)._output_xs_ps()
+        assert len(xs) == len(ps) > 0
+    assert build('chfagg SR.U gamma 4 25', update=False)._output_xs_ps() == (None, None)
+
+
+def test_tilted_reference_reports_its_deficit():
+    from aggregate.constants import DefectiveDistributionWarning
+    s = build('chfagg SR.T stable 1.5 1 2 0 hints{log2=12; bs=1/8}')
+    with pytest.warns(DefectiveDistributionWarning, match='missing'):
+        t = build('agg SR.UsesT dfreq [1] ssev chfagg.SR.T', log2=14, bs=1 / 8)
+    # ssev keeps the signed atoms; the reference renormalizes over the deficit
+    assert abs(t.est_m - s.est_m / (1 - s.outside_above)) < 1e-6 * abs(s.est_m) + 1e-9
+
+
+def test_sev_chfagg_round_trips_through_the_writer(underwriter):
+    from aggregate.decl_writer import spec_to_decl
+    underwriter.build('chfagg SR.R gamma 4 25 hints{log2=12; bs=1/4}')
+    for program in ('agg SR.RT dfreq [2] sev chfagg.SR.R',
+                    'agg SR.RS dfreq [1] ssev chfagg.SR.R!'):
+        kind, name, spec = _parse(underwriter, program)
+        assert spec['sev_ref'] == 'chfagg.SR.R'
+        rendered = spec_to_decl(spec, kind, name)
+        assert _parse(underwriter, rendered)[2] == spec

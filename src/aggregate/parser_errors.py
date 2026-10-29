@@ -175,6 +175,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     # Builtin-dotted forms.
     "BUILTIN_AGG": "a builtin aggregate (agg.X)",
     "BUILTIN_PORT": "a builtin portfolio (port.X)",
+    "BUILTIN_CHFAGG": "a builtin characteristic function law (chfagg.X)",
     "BUILTIN_SEV": "a builtin severity (sev.X)",
     "BUILTIN_DIST": "a builtin distortion (dist.X)",
     "NOTE": "a note clause (note{...})",

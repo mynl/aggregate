@@ -406,8 +406,11 @@ def with_hints(ob, **extra):
             'is the whole point of the method.')
     kind, name, spec = _require_program(ob, 'with_hints')
     spec = dict(spec)
-    updates = {'log2': str(int(log2)), 'bs': _fmt_bs(bs),
-               'normalize': str(bool(getattr(ob, 'normalize', True)))}
+    updates = {'log2': str(int(log2)), 'bs': _fmt_bs(bs)}
+    if hasattr(ob, 'normalize'):
+        # an Aggregate or Portfolio pins its normalization too; a chfagg has
+        # no such setting and would only warn on the key
+        updates['normalize'] = str(bool(ob.normalize))
     for k, v in extra.items():
         updates[k] = _fmt_bs(v) if k == 'bs' else str(v)
     spec['hints'] = _merge_hints(spec.get('hints', ''), updates)

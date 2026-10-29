@@ -395,3 +395,7 @@ chfagg CHF.NIG          norminvgauss 2 0.5 3 1 note{normal inverse Gaussian: alp
 chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 0 note{variance gamma: sigma nu theta mu}
 
 chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, and an optional mu}
+
+chfagg CHF.RefGamma     gamma 4 25 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below}
+
+agg CHF.UsesRef         dfreq [2] sev chfagg.CHF.RefGamma note{a chfagg serving as a severity: two claims of the gamma law}

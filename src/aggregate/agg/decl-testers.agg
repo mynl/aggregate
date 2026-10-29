@@ -1547,4 +1547,7 @@ chfagg CFE.Tweedie    tweedie 1.5 100 2                      note{atom exp(-lamb
 chfagg CFE.TweedieP   tweedie -1 1 1                         note{extreme stable member on the whole line};
 chfagg CFE.NIG        norminvgauss 2 0.5 3 1                 note{against scipy.stats.norminvgauss};
 chfagg CFE.Laplace    variancegamma 0.2 1 0 0                note{the Laplace special case};
-chfagg CFE.CGMY       temperedstable 1 5 10 1.5 2            note{Y above 1, with mu}
+chfagg CFE.CGMY       temperedstable 1 5 10 1.5 2            note{Y above 1, with mu};
+chfagg CFE.RefNorm    norm 100 30 hints{log2=12; bs=1/4}      note{a signed law pinned to its grid, for the signed reference};
+agg CFE.UsesRef       dfreq [2] sev chfagg.CFE.Gamma          note{sev chfagg.NAME: the hygiene rule needs the hints CFE.Gamma carries};
+agg CFE.UsesSigned    dfreq [1] ssev chfagg.CFE.RefNorm       note{ssev chfagg.NAME keeps the negative atoms}

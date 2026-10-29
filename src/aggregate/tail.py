@@ -1082,6 +1082,9 @@ def output_support_max(obj) -> float:
     A ``Portfolio`` is the independent sum of its units, so its upper end is
     the sum of theirs and is infinite as soon as one of them is.
     """
+    if hasattr(obj, 'family') and hasattr(obj, 'support'):
+        # a chfagg: the law's own support, infinite for every family
+        return float(obj.support[1])
     agg_list = getattr(obj, 'agg_list', None)
     if agg_list is not None:
         total = 0.0

@@ -662,7 +662,7 @@ REFERENCE_DEFICIT_MATERIALITY = 1e-6
 
 
 def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
-    """Materialize an ``Aggregate`` / ``Portfolio`` output law as ``(xs, ps)`` atoms.
+    """Materialize an ``Aggregate`` / ``Portfolio`` / ``AggregateCHF`` output law as ``(xs, ps)`` atoms.
 
     The single implementation behind both routes into a reference severity:
     :class:`SeverityMeta` (the programmatic ``Severity(agg)`` /
@@ -674,7 +674,7 @@ def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
 
     Parameters
     ----------
-    obj : Aggregate or Portfolio
+    obj : Aggregate, Portfolio or AggregateCHF
         A source that has been updated. Its **output view** is taken: for an
         ``Aggregate`` under reinsurance that is the ceded or net law, already
         the right array (see :func:`aggregate._reinsurance.apply_agg_reins`).
@@ -701,7 +701,7 @@ def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
     Raises
     ------
     ValueError
-        If ``obj`` is not an ``Aggregate`` or ``Portfolio``, or has never
+        If ``obj`` carries no ``_output_xs_ps`` hook, or has never
         computed itself. A nullary query cannot be answered by an object with
         no density.
 
@@ -725,20 +725,18 @@ def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
        source's window is too small, not that the reference is wrong.
     """
     # Local imports to avoid _severity <-> portfolio / _aggregate cycles.
-    from .portfolio import Portfolio
-    from ._aggregate import Aggregate
     from .constants import DefectiveDistributionWarning
 
     label = source or getattr(obj, 'name', '') or repr(obj)
-    if isinstance(obj, Aggregate):
-        xs, ps = obj.xs, obj.agg_density
-    elif isinstance(obj, Portfolio):
-        df = obj.density_df
-        xs, ps = (None, None) if df is None else (df.loss.values, df.p_total.values)
-    else:
+    # Each class that outputs a distribution carries ``_output_xs_ps``
+    # (Aggregate, Portfolio, AggregateCHF), so there is no switch here to
+    # extend; an object without it does not output one.
+    output = getattr(obj, '_output_xs_ps', None)
+    if output is None:
         raise ValueError(
             f'{type(obj).__name__} passed as a reference severity; only '
-            'Aggregate and Portfolio objects output a distribution.')
+            'Aggregate, Portfolio and AggregateCHF objects output a distribution.')
+    xs, ps = output()
     if xs is None or ps is None:
         raise ValueError(
             f'{label}: cannot be used as a severity before it has computed '

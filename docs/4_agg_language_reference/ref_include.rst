@@ -608,8 +608,9 @@
     // It is a terminal LEAF: no picks, weights, scaling, shifting or splicing. What
     // those would mean on a compound output is undecided, and the keyword is
     // required so the alternatives stay token-disjoint from ``SEV sev`` (``sev``
-    // can never derive BUILTIN_AGG / BUILTIN_PORT, since the ID lookahead excludes
-    // both prefixes) and cannot interact with the bare ``builtin_agg`` rename form
+    // can never derive BUILTIN_AGG / BUILTIN_PORT / BUILTIN_CHFAGG, since the ID
+    // lookahead excludes all three prefixes; ``chfagg.NAME`` joined at 1.33.0,
+    // [Characteristic-Function-Severity]) and cannot interact with the bare ``builtin_agg`` rename form
     // of ``agg_body``.
     //
     // The trailing ``!`` is the SEVERITY-side one: an unconditional layer, as on
@@ -619,6 +620,7 @@
     // statements.
     sev_ref_leaf: BUILTIN_AGG      -> sev_ref_agg
                 | BUILTIN_PORT     -> sev_ref_port
+                | BUILTIN_CHFAGG   -> sev_ref_chfagg
                 | sev_ref_leaf "!" -> sev_ref_uncond
     
     sev: sev "!"                 -> sev_unconditional
@@ -1049,6 +1051,7 @@
     // AGG / SEV / DISTORTION / ID alternatives that share their prefix.
     BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     BUILTIN_PORT.3: /port\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+    BUILTIN_CHFAGG.3: /chfagg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
     NOTE.3:         /note\{[^}]*\}/
@@ -1103,7 +1106,7 @@
     // both the keyword and ID interpretations for inputs like `dsev` or
     // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
     // heuristics to land on the intended parse.
-    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+    ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.|chfagg\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
     EXPONENT:         "**" | "^"
     PLUS:             "+"

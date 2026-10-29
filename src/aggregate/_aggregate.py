@@ -7647,6 +7647,16 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         return self._grid_distribution().q(p, kind)
 
+    def _output_xs_ps(self):
+        """``(xs, ps)`` of the law this object outputs, for a severity reference.
+
+        The one hook :func:`aggregate._severity._dhistogram_from_object` reads
+        on every class that outputs a distribution (``Aggregate``,
+        ``Portfolio``, ``AggregateCHF``), so a new output kind adds a method
+        rather than a branch. ``(None, None)`` before ``update``.
+        """
+        return self.xs, self.agg_density
+
     def _grid_distribution(self):
         """The :class:`GridDistribution` view over the aggregate ``p_total`` grid.
 

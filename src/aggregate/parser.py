@@ -2435,6 +2435,11 @@ class UnderwritingTransformer(Transformer):
     def sev_ref_port(self, c):
         return self._sev_ref_spec(c[0])
 
+    def sev_ref_chfagg(self, c):
+        # ``sev chfagg.NAME``: a law computed from its characteristic function
+        # as a severity ([Characteristic-Function-Severity])
+        return self._sev_ref_spec(c[0])
+
     def sev_ref_uncond(self, c):
         # the SEVERITY-side ``!``: keep the layer unconditional, so a zero atom
         # in the referenced law survives an outer layers clause. Nothing to do

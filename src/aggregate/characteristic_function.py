@@ -2008,6 +2008,31 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         if self.agg_density is None:
             raise ValueError(f'{self.name}: update() first')
 
+    def _output_xs_ps(self):
+        """``(xs, ps)`` of the law this object outputs, for a ``sev chfagg.NAME`` reference.
+
+        The one hook :func:`aggregate._severity._dhistogram_from_object` reads;
+        see :meth:`aggregate.Aggregate._output_xs_ps`. On a tilted grid the
+        first bucket holds the mass below the window and the masses above it
+        are left out, so the reference carries a deficit of
+        :attr:`outside_above`, which the deficit warning reports with the
+        advice to raise the inner's ``log2``. ``(None, None)`` before
+        ``update``.
+        """
+        return self.xs, self.agg_density
+
+    def with_hints(self, **extra):
+        """This law's program with its realized grid pinned into ``hints{}``.
+
+        The certification helper for the ``sev chfagg.NAME`` reference, the
+        same contract as :meth:`aggregate.Aggregate.with_hints`: the
+        referenced declaration must carry explicit ``log2`` and ``bs``, so
+        that the severity it stands for is pinned by the recipe base. ``tilt``
+        is a hint too, and travels through ``extra``.
+        """
+        from ._program import with_hints
+        return with_hints(self, **extra)
+
     def _grid_distribution(self):
         """The held :class:`~aggregate._grid_distribution.GridDistribution`, built on first use."""
         self._require_update()

@@ -648,3 +648,102 @@ def test_two_sided_number_tilts_both_halves_and_info_shows_the_transfer():
     assert 'transfer sigma' in c.info
     assert c.validation_df.loc['transfer sigma', 'value'] == c.transfer_sigma
     assert c.validation_df.loc['tilt', 'note'].startswith('e-folds')
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Statement]: the chfagg declaration
+# ----------------------------------------------------------------------
+
+CHF_PROGRAMS = [
+    'chfagg S stable 1.5 1 2 0',
+    'chfagg S0 stable 1.5 1 2 -2 s0',
+    'chfagg W stable 0.7 1 hints{tilt=False}',
+    'chfagg T stable 1.5 0.5 hints{tilt=8}',
+    'chfagg G gamma 4 25',
+    'chfagg GC gamma 100 cv 0.5 hints{log2=14}',
+    'chfagg N as "Signed" norm 100 30 note{a note}',
+    'chfagg I invgauss 100 400 tags{topic:numerics}',
+    'chfagg IC invgauss 100 cv 0.5',
+    'chfagg TW tweedie 1.5 100 2',
+    'chfagg TWC tweedie 2.5 100 cv 0.5',
+]
+
+
+@pytest.fixture(scope='module')
+def underwriter():
+    from aggregate import Underwriter
+    return Underwriter(update=False)
+
+
+def _parse(uw, program):
+    return uw.parser.parse(uw.lexer.tokenize(program))
+
+
+@pytest.mark.parametrize('program', CHF_PROGRAMS)
+def test_chfagg_parses_and_the_writer_round_trips(program, underwriter):
+    """parse -> write -> parse reproduces the spec, and the writer is idempotent."""
+    from aggregate.decl_writer import spec_to_decl
+    kind, name, spec = _parse(underwriter, program)
+    assert kind == 'chfagg' and spec['name'] == name
+    assert 'family' in spec and 'form' in spec
+    rendered = spec_to_decl(spec, kind, name)
+    kind2, name2, spec2 = _parse(underwriter, rendered)
+    assert (kind2, name2, spec2) == (kind, name, spec)
+    assert spec_to_decl(spec2, kind2, name2) == rendered
+
+
+def test_chfagg_spec_carries_the_parameters_as_written(underwriter):
+    _, _, spec = _parse(underwriter, 'chfagg S0 stable 1.5 1 2 -2 s0')
+    assert spec['parameterization'] == 's0' and spec['loc'] == -2
+    _, _, spec = _parse(underwriter, 'chfagg GC gamma 100 cv 0.5')
+    assert spec['form'] == 'cv' and spec['mean'] == 100 and spec['cv'] == 0.5
+    _, _, spec = _parse(underwriter, 'chfagg N as "Signed" norm 100 30')
+    assert spec['label'] == 'Signed' and spec['sd'] == 30
+
+
+@pytest.mark.parametrize('program, match', [
+    ('chfagg X lognorm 1 2', 'unknown family'),
+    ('chfagg X stable 1.5', 'two to four numbers'),
+    ('chfagg X stable 1.5 1 2 0 5', 'two to four numbers'),
+    ('chfagg X stable 1.5 1 s2', 'must be s0 or s1'),
+    ('chfagg X gamma 1 2 3', 'takes 2 numbers'),
+    ('chfagg X stable 1.5 cv 1', ''),
+])
+def test_chfagg_refusals_name_the_form(program, match, underwriter):
+    with pytest.raises(ValueError, match=match):
+        _parse(underwriter, program)
+
+
+def test_build_chfagg_returns_an_updated_tilted_object():
+    from aggregate.characteristic_function import AggregateCHF
+    s = build('chfagg S stable 1.5 1 2 0')
+    assert isinstance(s, AggregateCHF)
+    assert s.agg_density is not None and s.tilt[1] > 5 and s.tilt[0] == 0
+    assert s.program == 'chfagg S stable 1.5 1 2 0'
+    assert s.pprogram.split() == s.program.split()
+    assert not hasattr(s, 'pnl_program') and not hasattr(s, 'reins_program')
+    assert not hasattr(s, 'sharpen')
+    t = build('chfagg T stable 1.5 0.5 2 0')
+    assert t.tilt[0] > 0 and t.tilt[1] > 0
+
+
+def test_build_chfagg_hints_reach_update():
+    w = build('chfagg W stable 1.5 1 hints{tilt=False}')
+    assert w.tilt == (0.0, 0.0) and w.outside_mass == 0
+    e = build('chfagg E stable 1.5 1 hints{tilt=8; log2=12; bs=1/32}')
+    assert e.tilt == (0.0, 8.0) and e.log2 == 12 and e.bs == 1 / 32
+    g = build('chfagg G gamma 4 25', log2=12, bs=1 / 4)
+    assert (g.log2, g.bs) == (12, 0.25)
+    n = build('chfagg N as "Signed" norm 100 cv 0.3 note{a note}')
+    assert n.label == 'Signed' and n.note == 'a note' and n.x_min < 0
+    assert build('chfagg G gamma 4 25', update=False).agg_density is None
+
+
+def test_tilt_is_inert_on_an_agg():
+    a = build('agg Inert 10 claims sev lognorm 10 cv 1 poisson hints{tilt=8}')
+    assert a.est_m > 0
+
+
+def test_chfagg_is_a_declaration_word():
+    from aggregate.decl_words import decl_words
+    assert 'chfagg' in decl_words()['declarations']

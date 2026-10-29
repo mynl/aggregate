@@ -6288,5 +6288,118 @@
       "note": "exact arithmetic inside parentheses",
       "hints": ""
     }
+  },
+  "chfagg CHF.Stable       stable 1.5 1 2 0 note{a totally skewed stable law, tilted}": {
+    "kind": "chfagg",
+    "name": "CHF.Stable",
+    "spec": {
+      "name": "CHF.Stable",
+      "family": "stable",
+      "form": null,
+      "alpha": 1.5,
+      "beta": 1.0,
+      "scale": 2.0,
+      "loc": 0.0,
+      "note": "a totally skewed stable law, tilted",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.StableS0     stable 1.5 1 2 -2 s0 note{the same law written in S0}": {
+    "kind": "chfagg",
+    "name": "CHF.StableS0",
+    "spec": {
+      "name": "CHF.StableS0",
+      "family": "stable",
+      "form": null,
+      "alpha": 1.5,
+      "beta": 1.0,
+      "scale": 2.0,
+      "loc": -2.0,
+      "parameterization": "s0",
+      "note": "the same law written in S0",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.Wrap         stable 0.7 1 hints{tilt=False} note{the same law untilted, wrapping, for teaching}": {
+    "kind": "chfagg",
+    "name": "CHF.Wrap",
+    "spec": {
+      "name": "CHF.Wrap",
+      "family": "stable",
+      "form": null,
+      "alpha": 0.7,
+      "beta": 1.0,
+      "note": "the same law untilted, wrapping, for teaching",
+      "hints": "tilt=False"
+    }
+  },
+  "chfagg CHF.TwoSided     stable 1.5 0.5 hints{tilt=8} note{two heavy tails, split, both halves tilted by 8 e-folds}": {
+    "kind": "chfagg",
+    "name": "CHF.TwoSided",
+    "spec": {
+      "name": "CHF.TwoSided",
+      "family": "stable",
+      "form": null,
+      "alpha": 1.5,
+      "beta": 0.5,
+      "note": "two heavy tails, split, both halves tilted by 8 e-folds",
+      "hints": "tilt=8"
+    }
+  },
+  "chfagg CHF.Gamma        gamma 4 25 note{the compound engine's gamma 4 25 severity, computed directly}": {
+    "kind": "chfagg",
+    "name": "CHF.Gamma",
+    "spec": {
+      "name": "CHF.Gamma",
+      "family": "gamma",
+      "form": null,
+      "shape": 4.0,
+      "scale": 25.0,
+      "note": "the compound engine's gamma 4 25 severity, computed directly",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.GammaCV      gamma 100 cv 0.5 hints{log2=14} note{the mean and cv form, with a grid hint}": {
+    "kind": "chfagg",
+    "name": "CHF.GammaCV",
+    "spec": {
+      "name": "CHF.GammaCV",
+      "family": "gamma",
+      "form": "cv",
+      "mean": 100.0,
+      "cv": 0.5,
+      "note": "the mean and cv form, with a grid hint",
+      "hints": "log2=14"
+    }
+  },
+  "chfagg CHF.Normal as \"Signed\" norm 100 30 note{a signed window, with a display label}": {
+    "kind": "chfagg",
+    "name": "CHF.Normal",
+    "spec": {
+      "name": "CHF.Normal",
+      "label": "Signed",
+      "family": "norm",
+      "form": null,
+      "mean": 100.0,
+      "sd": 30.0,
+      "note": "a signed window, with a display label",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.InvGauss     invgauss 100 400 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400}": {
+    "kind": "chfagg",
+    "name": "CHF.InvGauss",
+    "spec": {
+      "name": "CHF.InvGauss",
+      "family": "invgauss",
+      "form": null,
+      "mean": 100.0,
+      "shape": 400.0,
+      "note": "inverse Gaussian with mean 100 and shape 400",
+      "hints": "",
+      "tags": [
+        "topic:numerics"
+      ]
+    }
   }
 }

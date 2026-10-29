@@ -118,12 +118,7 @@ def build_objects() -> dict:
         'agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
         'copula gumbel 0.4 poisson')
     objs['PnL'] = build('pnl Deal 1000 premium less agg Deal_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson')
-    # built directly until the chfagg declaration lands
-    # ([Characteristic-Function-Statement])
-    from aggregate.characteristic_function import AggregateCHF
-    chf = AggregateCHF('CHF', 'gamma', shape=4, scale=25)
-    chf.update(log2=12)
-    objs['AggregateCHF'] = chf
+    objs['AggregateCHF'] = build('chfagg CHF gamma 4 25', log2=12)
     objs['Severity'] = a.sevs[0]
     objs['Frequency'] = a.frequency
     # The canonical quantile engine every q / tvar / cdf / sf routes through, and

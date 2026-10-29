@@ -136,6 +136,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "DFREQ": "'dfreq'",
     "DSEV": "'dsev'",
     "NTTAGG": "'nttagg' (exact discrete compound)",
+    "CHFAGG": "'chfagg' (law from a characteristic function)",
     "NTT_NUMBER": "a number (nttagg: nonnegative, no percent, no inf)",
     "LT_INT": "an integer identifier (loss table event or year)",
     "DWAIT": "'dwait' (discrete renewal waiting time)",

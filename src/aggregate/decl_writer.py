@@ -1365,7 +1365,43 @@ def _render_nttagg(name: str, spec: dict, trailer: bool = True) -> _Block:
          *_render_trailer(spec, trailer)])
 
 
+def _render_chf_body(spec: dict) -> str:
+    """Render a ``chfagg`` body from its spec: the family word and the parameters as written.
+
+    ``stable`` renders its two to four numbers and the parameterization word
+    when one was written; ``tweedie`` its ``p mean dispersion`` or ``p mean
+    cv c``; every other family its positional parameters in the order of
+    ``FAMILY_PARAMETERS`` or, with ``form == 'cv'``, ``mean cv c``.
+    """
+    from .characteristic_function import FAMILY_CV_PARAMETERS, FAMILY_PARAMETERS
+    family = spec['family']
+    if family == 'stable':
+        parts = [family] + [_fmt_num(spec[k]) for k in ('alpha', 'beta', 'scale', 'loc')
+                            if k in spec]
+        if spec.get('parameterization'):
+            parts.append(str(spec['parameterization']))
+        return ' '.join(parts)
+    if family == 'tweedie':
+        if spec.get('form') == 'cv':
+            return f"tweedie {_fmt_num(spec['p'])} {_fmt_num(spec['mean'])} cv {_fmt_num(spec['cv'])}"
+        return (f"tweedie {_fmt_num(spec['p'])} {_fmt_num(spec['mean'])} "
+                f"{_fmt_num(spec['dispersion'])}")
+    if spec.get('form') == 'cv':
+        a, b = FAMILY_CV_PARAMETERS[family]
+        return f'{family} {_fmt_num(spec[a])} cv {_fmt_num(spec[b])}'
+    return ' '.join([family, *(_fmt_num(spec[k]) for k in FAMILY_PARAMETERS[family]
+                               if k in spec)])
+
+
+def _render_chfagg(name: str, spec: dict, trailer: bool = True) -> _Block:
+    """Render a ``chfagg`` declaration (dev/done/plan-characteristic-function-engine.md)."""
+    return _Block(
+        f'chfagg {name}{_render_label(spec.get("label"))}',
+        [_render_chf_body(spec), *_render_trailer(spec, trailer)])
+
+
 _KIND_RENDERERS = {
+    'chfagg': _render_chfagg,
     'agg': lambda name, spec, trailer: _render_agg_or_pnl('agg', name, spec, trailer),
     'pnl': lambda name, spec, trailer: _render_agg_or_pnl('pnl', name, spec, trailer),
     'xpnl': lambda name, spec, trailer: _render_agg_or_pnl('xpnl', name, spec, trailer),

@@ -124,7 +124,7 @@ contexts:
   # with the frequency DISTRIBUTION names above: it declares an outcome and
   # probability pair, it is not a named distribution.
   discrete:
-    - match: '\b(?:dfreq|dsev|dbvsev|dwait|nttagg|elt|yelt){{keyword_boundary}}'
+    - match: '\b(?:dfreq|dsev|dbvsev|dwait|nttagg|chfagg|elt|yelt){{keyword_boundary}}'
       scope: storage.type.discrete.decl
 
   operators:
@@ -155,7 +155,7 @@ contexts:
   identifiers:
     # Mirrors the Lark ID token. Placing this before numbers prevents
     # names such as mydist.1 from splitting and coloring .1 as a number.
-    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
+    - match: '\b(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][._:~a-zA-Z0-9\-]*'
       scope: variable.other.identifier.decl
 
   numbers:

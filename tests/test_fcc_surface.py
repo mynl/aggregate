@@ -73,11 +73,7 @@ def biv():
 
 @pytest.fixture(scope='module')
 def chf():
-    """A ``chfagg`` built directly: the DecL form is [Characteristic-Function-Statement]."""
-    from aggregate.characteristic_function import AggregateCHF
-    obj = AggregateCHF('FCC.CHF', 'gamma', shape=4, scale=25)
-    obj.update(log2=12)
-    return obj
+    return build('chfagg FCC.CHF gamma 4 25', log2=12)
 
 
 @pytest.fixture(scope='module')
@@ -205,7 +201,7 @@ def test_severity_and_frequency_info_are_stable_across_instances():
 # pprogram -- every DecL-creatable class round-trips its declaration
 # ---------------------------------------------------------------------------
 
-@pytest.mark.parametrize('fixture', ['agg', 'port', 'pnl', 'biv'])
+@pytest.mark.parametrize('fixture', ['agg', 'port', 'pnl', 'biv', 'chf'])
 def test_pprogram_and_html_on_decl_creatable(fixture, request):
     obj = request.getfixturevalue(fixture)
     pp = obj.pprogram

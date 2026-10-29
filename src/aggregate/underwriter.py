@@ -22,6 +22,7 @@ from .config import (get_settings, reload_settings as _reload_settings,
                      LIBRARY_FILENAME)
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
+from .characteristic_function import AggregateCHF
 from .spectral import Distortion
 from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
 from .contract_terms import _annual_terms_label
@@ -254,7 +255,7 @@ def _ceded_annual_terms_as_aggregate(name, spec):
 # by the 99 fallback, which was the right answer for the wrong reason and
 # gave anything reimplementing this order nothing to copy.
 _KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3,
-                     'nttagg': 3, 'port': 4, 'pnl': 5, 'xpnl': 5}
+                     'nttagg': 3, 'chfagg': 3, 'port': 4, 'pnl': 5, 'xpnl': 5}
 
 
 def _entry_to_decl(r, layout='terse'):
@@ -2090,6 +2091,11 @@ class Underwriter(HelpMixin):
             from .ntt import AggregateNTT
             obj = AggregateNTT(**spec)
             obj.program = program
+        elif kind == 'chfagg':
+            # the spec is the parameters as written plus the trailer; the
+            # class converts them (dev/done/plan-characteristic-function-engine.md)
+            obj = AggregateCHF(**spec)
+            obj.program = program
         elif kind in ANSWER_KINDS:
             # an answer is its own object: the parser has already evaluated it,
             # so the spec is the number (``expr``) or the computed conversion
@@ -2954,7 +2960,7 @@ class Underwriter(HelpMixin):
         # finished by the dispatch at the foot of the loop. Register a new
         # output type here, in one place, and give it a branch.
         no_update = (Severity, Distortion, numbers.Number)
-        updatable = (Aggregate, Portfolio, BivariateAggregate)
+        updatable = (Aggregate, Portfolio, BivariateAggregate, AggregateCHF)
 
         for answer in rv:
             obj = answer.object
@@ -2983,10 +2989,26 @@ class Underwriter(HelpMixin):
                 # BivariateAggregate has no sharpen (the probe is quadratic in
                 # the joint grid), so drop the kwarg rather than raise on it.
                 kw.pop('sharpen', None)
+                kw.pop('tilt', None)       # a chfagg hint; inert on every other kind
                 log2_ = 0 if log2 == 0 else log2
                 logger.info('(%s, %s): bivariate update(log2=%s, bs=%s)',
                             answer.kind, answer.name, log2_, bs)
                 obj.update(log2=log2_, bs=bs, **kw)
+            elif isinstance(obj, AggregateCHF):
+                # a chfagg sizes its own window from the law's tails; log2,
+                # bs, bucket_sizing_p and tilt pass through, and any other
+                # hint key is ignored by its update with a logged warning
+                d = answer.spec
+                log2, bs, bucket_sizing_p, kw = _resolve_hints(
+                    d, log2_in, bs_in, bsp_in, dict(kwargs))
+                if isinstance(log2, tuple) or isinstance(bs, tuple):
+                    raise ValueError(
+                        f'per-axis (x, y) log2/bs sizing applies to bivariate '
+                        f'objects only; {answer.name} is a {answer.kind}')
+                log2_ = self.log2 if log2 == 0 else log2
+                logger.info('(%s, %s): chfagg update(log2=%s, bs=%s)',
+                            answer.kind, answer.name, log2_, bs)
+                obj.update(log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p, **kw)
             elif isinstance(obj, Aggregate):
                 # pnl / xpnl ride here: their deferred engine is an Aggregate
                 # until _snapshot_pnl runs below.
@@ -3006,6 +3028,7 @@ class Underwriter(HelpMixin):
                 log2_ = self.log2 if log2 == 0 else log2
                 logger.info('(%s, %s): update(log2=%s, bs=%s) -> _bs_window',
                             answer.kind, answer.name, log2_, bs)
+                kw.pop('tilt', None)       # a chfagg hint; inert on every other kind
                 try:
                     obj.update(
                         log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
@@ -3032,6 +3055,7 @@ class Underwriter(HelpMixin):
                 # (signed coarsen-to-fit) itself, so do NOT pre-compute the
                 # bucket here -- mirrors the Aggregate branch above (plan 3.4).
                 logger.info('(%s, %s): bs=%s and log2=%s', answer.kind, answer.name, bs, log2_)
+                kw.pop('tilt', None)       # a chfagg hint; inert on every other kind
                 obj.update(log2=log2_, bs=bs, bucket_sizing_p=bucket_sizing_p,
                            remove_fuzz=True, force_severity=True,
                            debug=self.debug, **kw)

@@ -24,6 +24,7 @@ answer: sev_out          -> answer_sev
       | port_out         -> answer_port
       | bv_out           -> answer_bv
       | nttagg_out       -> answer_nttagg
+      | chfagg_out       -> answer_chfagg
       | distortion_out   -> answer_distortion
       | conversion_out   -> answer_conversion
       | expr             -> answer_expr
@@ -56,6 +57,29 @@ conversion_out: TWEEDIE expr expr expr        -> conversion_tweedie_dispersion
               | STABLE numberl                -> conversion_stable
               | STABLE numberl ID             -> conversion_stable_param
               | STABLE expr CLAIMS SEV sev    -> conversion_stable_compound
+
+// ======================================================================
+// Characteristic function law (chfagg)
+// ----------------------------------------------------------------------
+// A law computed by sampling its closed-form characteristic function on the
+// FFT frequency grid and inverting, with no severity or count to speak of:
+// the stable laws, the whole Tweedie family, and the normal, gamma and
+// inverse Gaussian laws, by name. ``stable`` and ``tweedie`` are keywords
+// with the shapes of the conversion statements; every other family word is
+// an ordinary ID validated by the transformer, so ``chfagg`` is the only new
+// reserved word. Not a port_item: a ``chfagg`` cannot appear inside a
+// portfolio, pnl or bivariate, as ``nttagg`` cannot. See
+// dev/done/plan-characteristic-function-engine.md.
+// ======================================================================
+
+chfagg_out: CHFAGG name as_label chf_body trailer
+
+chf_body: STABLE numberl                -> chf_stable
+        | STABLE numberl ID             -> chf_stable_param
+        | TWEEDIE expr expr expr        -> chf_tweedie_dispersion
+        | TWEEDIE expr expr CV expr     -> chf_tweedie_cv
+        | ID numberl                    -> chf_family
+        | ID expr CV expr               -> chf_family_cv
 
 // ======================================================================
 // Distortion
@@ -979,6 +1003,7 @@ DBVSEV.2:     /dbvsev(?![a-zA-Z0-9._:~\-])/
 DFREQ.2:      /dfreq(?![a-zA-Z0-9._:~\-])/
 DSEV.2:       /dsev(?![a-zA-Z0-9._:~\-])/
 NTTAGG.2:     /nttagg(?![a-zA-Z0-9._:~\-])/
+CHFAGG.2:     /chfagg(?![a-zA-Z0-9._:~\-])/
 WAIT.2:       /wait(?![a-zA-Z0-9._:~\-])/
 DWAIT.2:      /dwait(?![a-zA-Z0-9._:~\-])/
 YEARS.2:      /(?:years|year)(?![a-zA-Z0-9._:~\-])/
@@ -1076,7 +1101,7 @@ LT_INT: /\d+(?![0-9.eE_%a-zA-Z])/
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

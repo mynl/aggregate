@@ -594,6 +594,97 @@ class UnderwritingTransformer(Transformer):
     def answer_nttagg(self, c):
         return c[0]
 
+    def answer_chfagg(self, c):
+        return c[0]
+
+    # ----- chfagg ([Characteristic-Function-Statement]) --------------
+    _CHFAGG_FORM = ('chfagg NAME stable alpha beta [scale [loc]] [s0|s1] | '
+                    'tweedie p mean dispersion | tweedie p mean cv c | '
+                    'FAMILY p1 p2 | FAMILY mean cv c')
+
+    def chfagg_out(self, c):
+        """``chfagg NAME <body> <trailer>`` -> ``('chfagg', name, spec)``.
+
+        The spec carries the parameters as written, keyed by name, with
+        ``family`` and, for a two-form family, ``form`` (``'cv'`` or
+        ``None``), so the writer renders back exactly what was written and
+        :class:`aggregate.characteristic_function.AggregateCHF` converts.
+        """
+        _, name, as_label, body, trailer = c
+        return ("chfagg", name, {"name": name, **as_label, **body, **trailer})
+
+    def chf_stable(self, c):
+        """``stable alpha beta [scale [loc]]``."""
+        _st, numbers = c
+        return self._chf_stable_spec(numbers, None)
+
+    def chf_stable_param(self, c):
+        """``stable alpha beta [scale [loc]] s0|s1``."""
+        _st, numbers, param = c
+        return self._chf_stable_spec(numbers, str(param))
+
+    def _chf_stable_spec(self, numbers, parameterization):
+        numbers = list(np.atleast_1d(numbers))
+        if not 2 <= len(numbers) <= 4:
+            raise ValueError(
+                f"chfagg: the stable body is '{self._STABLE_FORM}', with two to "
+                f"four numbers, got {len(numbers)}")
+        if parameterization is not None and parameterization.upper() not in ('S0', 'S1'):
+            raise ValueError(
+                f"chfagg: the stable body is '{self._STABLE_FORM}'; the last "
+                f"word must be s0 or s1, got {parameterization!r}")
+        spec = {"family": "stable", "form": None}
+        for key, value in zip(('alpha', 'beta', 'scale', 'loc'), numbers):
+            spec[key] = float(value)
+        if parameterization is not None:
+            spec["parameterization"] = parameterization
+        return spec
+
+    def chf_tweedie_dispersion(self, c):
+        """``tweedie p mean dispersion``."""
+        _tw, pp, mu, sig2 = c
+        return {"family": "tweedie", "form": None, "p": float(pp),
+                "mean": float(mu), "dispersion": float(sig2)}
+
+    def chf_tweedie_cv(self, c):
+        """``tweedie p mean cv c``."""
+        _tw, pp, mu, _cv, cv = c
+        return {"family": "tweedie", "form": "cv", "p": float(pp),
+                "mean": float(mu), "cv": float(cv)}
+
+    def _chf_family_word(self, word):
+        from .characteristic_function import FAMILIES
+        word = str(word)
+        if word not in FAMILIES:
+            raise ValueError(
+                f"chfagg: unknown family {word!r}; the families are "
+                f"{', '.join(FAMILIES)}. The statement is '{self._CHFAGG_FORM}'.")
+        return word
+
+    def chf_family(self, c):
+        """``FAMILY p1 p2 ...``: the family's positional parameters, by name."""
+        from .characteristic_function import FAMILY_PARAMETERS
+        word, numbers = c
+        family = self._chf_family_word(word)
+        numbers = list(np.atleast_1d(numbers))
+        names = FAMILY_PARAMETERS[family]
+        if len(numbers) != len(names):
+            raise ValueError(
+                f"chfagg: {family} takes {len(names)} numbers, "
+                f"{' '.join(names)}, got {len(numbers)}")
+        spec = {"family": family, "form": None}
+        spec.update({k: float(v) for k, v in zip(names, numbers)})
+        return spec
+
+    def chf_family_cv(self, c):
+        """``FAMILY mean cv c``: the mean and coefficient of variation form."""
+        from .characteristic_function import FAMILY_CV_PARAMETERS
+        word, mean, _cv, cv = c
+        family = self._chf_family_word(word)
+        if family not in FAMILY_CV_PARAMETERS:
+            raise ValueError(f"chfagg: {family} has no mean cv form")
+        return {"family": family, "form": "cv", "mean": float(mean), "cv": float(cv)}
+
     def answer_expr(self, c):
         e = c[0]
         return ("expr", f"{e}", e)

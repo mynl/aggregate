@@ -103,8 +103,9 @@
 - **[Power-Variance-Family]**: the `tweedie` clause and statement cover only
   `1 < p < 2` (the `conversion` kind landed in 1.22.0,
   `dev/done/plan-tweedie-statement.md`); the rest of the family has no
-  frequency and severity form. Absorbed by the parked
-  `dev/plan-characteristic-function-engine.md`.
+  frequency and severity form. Absorbed by
+  `dev/done/plan-characteristic-function-engine.md`, executing from 1.27.0;
+  closes at its `[Characteristic-Function-Families]` step.
 
 ## P&L and bivariate
 

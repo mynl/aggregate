@@ -557,6 +557,12 @@ def qd(*argv, accuracy=3, align=True, trim=True, ff=None, **kwargs):
             qd(x.calibration_df, accuracy=accuracy, **kwargs)
         elif isinstance(x, EvaluationResult):
             qd(x.evaluation_df, accuracy=accuracy, **kwargs)
+        elif hasattr(x, '_text_info_blob') and hasattr(x, 'summary_df'):
+            # any other first-class peer that carries the Aggregate headline
+            # pair, duck typed so this module never imports it: AggregateCHF
+            # (aggregate.characteristic_function)
+            wrap_print(x._text_info_blob())
+            qd(x.summary_df.fillna(''), accuracy=accuracy, **kwargs)
         elif isinstance(x, pd.DataFrame):
             # 100 line width matches rtd html format
             args = {'line_width': 100,

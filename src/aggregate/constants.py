@@ -143,7 +143,7 @@ def info_row(label, value):
 # Names only, no class imports: this module is the import-graph leaf, and both
 # the dev audit script and the test suite read the contract from here.
 FIRST_CLASS_CLASSES = ('Aggregate', 'Portfolio', 'BivariateAggregate',
-                       'PnL', 'Distortion')
+                       'PnL', 'Distortion', 'AggregateCHF')
 
 #: DecL-creatable, exempt from the DataFrame quartet. See the note above.
 NEAR_FIRST_CLASS = ('Severity',)

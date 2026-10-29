@@ -72,11 +72,20 @@ def biv():
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope='module')
-def fcc_objects(agg, port, pnl, biv):
+def chf():
+    """A ``chfagg`` built directly: the DecL form is [Characteristic-Function-Statement]."""
+    from aggregate.characteristic_function import AggregateCHF
+    obj = AggregateCHF('FCC.CHF', 'gamma', shape=4, scale=25)
+    obj.update(log2=12)
+    return obj
+
+
+@pytest.fixture(scope='module')
+def fcc_objects(agg, port, pnl, biv, chf):
     """One live object per class in ``FIRST_CLASS_CLASSES``, in that order."""
     from aggregate.spectral import Distortion
     return {'Aggregate': agg, 'Portfolio': port, 'BivariateAggregate': biv,
-            'PnL': pnl, 'Distortion': Distortion('ph', 0.5)}
+            'PnL': pnl, 'Distortion': Distortion('ph', 0.5), 'AggregateCHF': chf}
 
 
 def _surface(obj):
@@ -159,12 +168,13 @@ def _labels(info):
     return [line[:INFO_LABEL_WIDTH].rstrip() for line in info.split('\n')]
 
 
-def test_info_on_every_first_class_class(agg, port, pnl, biv):
+def test_info_on_every_first_class_class(agg, port, pnl, biv, chf):
     objs = {
         'Aggregate': agg,
         'Portfolio': port,
         'BivariateAggregate': biv,
         'PnL': pnl,
+        'AggregateCHF': chf,
         'Severity': agg.sevs[0],
         'Frequency': agg.frequency,
         'Bounds': Bounds(agg, premium=agg.actual_m * 1.1),

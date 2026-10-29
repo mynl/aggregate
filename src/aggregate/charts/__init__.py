@@ -261,6 +261,7 @@ from ._emit_approximation import (chart_approximation,  # noqa: E402
                                   chart_approximation_tails)
 from ._emit_bivariate import chart_joint_surface, chart_kappa  # noqa: E402
 from ._emit_bounds import chart_envelope  # noqa: E402
+from ._emit_characteristic_function import chart_chfagg  # noqa: E402
 from ._emit_distortion import chart_distortion  # noqa: E402
 from ._emit_ntt import chart_exact_tail  # noqa: E402
 from ._emit_pnl import chart_pnl  # noqa: E402

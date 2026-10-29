@@ -66080,6 +66080,166 @@
    "n_stub_levels": 2
   }
  ],
+ "stats/insurer/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "mean",
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.628587e-11"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sd",
+      {
+       "raw": 50.0,
+       "text": "50"
+      },
+      {
+       "raw": 50.0000521378921,
+       "text": "50.00005"
+      },
+      {
+       "raw": 1.0427578418514827e-06,
+       "text": "1.042758e-06"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.5,
+       "text": "0.5"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "0.5000005"
+      },
+      {
+       "raw": 1.0426915559857974e-06,
+       "text": "1.042692e-06"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew",
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 0.9999969122062708,
+       "text": "0.9999969"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -3.0877937291506896e-06,
+       "text": "-3.087794e-06"
+      }
+     ]
+    }
+   ],
+   "caption": "The theoretical mean, standard deviation, coefficient of variation and skewness from the cumulants of the law against the grid's, with the relative error between them. A theoretical moment the law does not have is infinite or undefined, and its grid value is then a statistic of the window.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "name": [
+      "theoretical"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "grid"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "rel error"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "measure"
+     },
+     {
+      "text": "theoretical"
+     },
+     {
+      "text": "grid"
+     },
+     {
+      "text": "rel error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "stats/insurer/BivariateAggregate": [
   {
    "body": [
@@ -74990,6 +75150,166 @@
    "ir_version": 1,
    "n_head_levels": 1,
    "n_stub_levels": 2
+  }
+ ],
+ "stats/raw/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "mean",
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.628587e-11"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "sd",
+      {
+       "raw": 50.0,
+       "text": "50"
+      },
+      {
+       "raw": 50.0000521378921,
+       "text": "50.00005"
+      },
+      {
+       "raw": 1.0427578418514827e-06,
+       "text": "1.042758e-06"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv",
+      {
+       "raw": 0.5,
+       "text": "0.5"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "0.5000005"
+      },
+      {
+       "raw": 1.0426915559857974e-06,
+       "text": "1.042692e-06"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew",
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 0.9999969122062708,
+       "text": "0.9999969"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -3.0877937291506896e-06,
+       "text": "-3.087794e-06"
+      }
+     ]
+    }
+   ],
+   "caption": "The theoretical mean, standard deviation, coefficient of variation and skewness from the cumulants of the law against the grid's, with the relative error between them. A theoretical moment the law does not have is infinite or undefined, and its grid value is then a statistic of the window.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "measure"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "name": [
+      "theoretical"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "grid"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "rel error"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "measure"
+     },
+     {
+      "text": "theoretical"
+     },
+     {
+      "text": "grid"
+     },
+     {
+      "text": "rel error"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
   }
  ],
  "stats/raw/BivariateAggregate": [
@@ -85543,6 +85863,187 @@
    "n_stub_levels": 1
   }
  ],
+ "summary/insurer/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Agg",
+      {
+       "raw": 100.00000000662858,
+       "text": "100.00"
+      },
+      {
+       "raw": 50.0000521378921,
+       "text": "50.00"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "50.0%"
+      },
+      {
+       "raw": 0.9999969122062708,
+       "text": "1.000"
+      },
+      {
+       "raw": 20.5,
+       "text": "20.50"
+      },
+      {
+       "raw": 91.75,
+       "text": "91.75"
+      },
+      {
+       "raw": 251.25,
+       "text": "251.25"
+      }
+     ]
+    }
+   ],
+   "caption": "Headline moments and key percentiles of the law, read off the grid the characteristic function was inverted onto. One row: a law computed this way has no count and no severity. Percentiles are exact grid values; a moment the law does not have reads as a statistic of the window.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "Mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "Skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "P01"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "Median"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "P99"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "X"
+     },
+     {
+      "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "summary/insurer/BivariateAggregate": [
   {
    "body": [
@@ -88307,6 +88808,187 @@
     }
    ],
    "caption": "Headline moments and key percentiles by component: count risk (Freq), single claim severity (Sev) and total loss (Agg), one block per unit on a portfolio. Percentiles are exact grid values. Frequency percentiles are blank by design, because frequency enters through its PGF and no count distribution is ever materialized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "X"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "name": [
+      "Mean"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "SD"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c3",
+     "name": [
+      "CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "Skew"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "P01"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c6",
+     "name": [
+      "Median"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c7",
+     "name": [
+      "P99"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "X"
+     },
+     {
+      "text": "Mean"
+     },
+     {
+      "text": "SD"
+     },
+     {
+      "text": "CV"
+     },
+     {
+      "text": "Skew"
+     },
+     {
+      "text": "P01"
+     },
+     {
+      "text": "Median"
+     },
+     {
+      "text": "P99"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "summary/raw/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "Agg",
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": 50.0000521378921,
+       "text": "50.00005"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "50.0%"
+      },
+      {
+       "raw": 0.9999969122062708,
+       "text": "1"
+      },
+      {
+       "raw": 20.5,
+       "text": "20.5"
+      },
+      {
+       "raw": 91.75,
+       "text": "91.75"
+      },
+      {
+       "raw": 251.25,
+       "text": "251.25"
+      }
+     ]
+    }
+   ],
+   "caption": "Headline moments and key percentiles of the law, read off the grid the characteristic function was inverted onto. One row: a law computed this way has no count and no severity. Percentiles are exact grid values; a moment the law does not have reads as a statistic of the window.",
    "columns": [
     {
      "align": "l",
@@ -91615,6 +92297,646 @@
     }
    ],
    "caption": "Return period ladder: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (capital), and VaR to mean leverage, exact from the FFT grid. The 1 in 200 (99.5%, Solvency II) and 1 in 250 (99.6%, US capital adequacy) anchors are emphasized.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "P"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "T"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "VaR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "TVaR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "xsVaR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "VaR/Mean"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "P"
+     },
+     {
+      "text": "T"
+     },
+     {
+      "text": "VaR"
+     },
+     {
+      "text": "TVaR"
+     },
+     {
+      "text": "xsVaR"
+     },
+     {
+      "text": "VaR/Mean"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail/insurer/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "0.00100",
+      {
+       "raw": 1000,
+       "text": "1,000.0"
+      },
+      {
+       "raw": 10.75,
+       "text": "10.75"
+      },
+      {
+       "raw": 100.09164694440432,
+       "text": "100.09"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -89.25000000662858,
+       "text": "-89.25"
+      },
+      {
+       "raw": 0.10749999999287427,
+       "text": "0.107"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.00200",
+      {
+       "raw": 500,
+       "text": "500.0"
+      },
+      {
+       "raw": 13.0,
+       "text": "13.00"
+      },
+      {
+       "raw": 100.17998337633617,
+       "text": "100.18"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -87.00000000662858,
+       "text": "-87.00"
+      },
+      {
+       "raw": 0.12999999999138284,
+       "text": "0.130"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.00400",
+      {
+       "raw": 250,
+       "text": "250.0"
+      },
+      {
+       "raw": 15.75,
+       "text": "15.75"
+      },
+      {
+       "raw": 100.35207828716266,
+       "text": "100.35"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -84.25000000662858,
+       "text": "-84.25"
+      },
+      {
+       "raw": 0.15749999998956,
+       "text": "0.157"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.00500",
+      {
+       "raw": 200,
+       "text": "200.0"
+      },
+      {
+       "raw": 16.75,
+       "text": "16.75"
+      },
+      {
+       "raw": 100.43655598070359,
+       "text": "100.44"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -83.25000000662858,
+       "text": "-83.25"
+      },
+      {
+       "raw": 0.1674999999888971,
+       "text": "0.167"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.01000",
+      {
+       "raw": 100,
+       "text": "100.0"
+      },
+      {
+       "raw": 20.5,
+       "text": "20.50"
+      },
+      {
+       "raw": 100.84868395754496,
+       "text": "100.85"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -79.50000000662858,
+       "text": "-79.50"
+      },
+      {
+       "raw": 0.2049999999864114,
+       "text": "0.205"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.02000",
+      {
+       "raw": 50,
+       "text": "50.0"
+      },
+      {
+       "raw": 25.5,
+       "text": "25.50"
+      },
+      {
+       "raw": 101.64134423961607,
+       "text": "101.64"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -74.50000000662858,
+       "text": "-74.50"
+      },
+      {
+       "raw": 0.25499999998309714,
+       "text": "0.255"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.04000",
+      {
+       "raw": 25,
+       "text": "25.0"
+      },
+      {
+       "raw": 31.75,
+       "text": "31.75"
+      },
+      {
+       "raw": 103.15945338635201,
+       "text": "103.16"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -68.25000000662858,
+       "text": "-68.25"
+      },
+      {
+       "raw": 0.31749999997895423,
+       "text": "0.317"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.10000",
+      {
+       "raw": 10,
+       "text": "10.0"
+      },
+      {
+       "raw": 43.5,
+       "text": "43.50"
+      },
+      {
+       "raw": 107.49473974932306,
+       "text": "107.49"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -56.50000000662858,
+       "text": "-56.50"
+      },
+      {
+       "raw": 0.4349999999711657,
+       "text": "0.435"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.20000",
+      {
+       "raw": 5,
+       "text": "5.0"
+      },
+      {
+       "raw": 57.5,
+       "text": "57.50"
+      },
+      {
+       "raw": 114.57806433387036,
+       "text": "114.58"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -42.50000000662858,
+       "text": "-42.50"
+      },
+      {
+       "raw": 0.5749999999618857,
+       "text": "0.575"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.50000",
+      {
+       "raw": 2,
+       "text": "2.0"
+      },
+      {
+       "raw": 91.75,
+       "text": "91.75"
+      },
+      {
+       "raw": 138.5214141017788,
+       "text": "138.52"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.250000006628582,
+       "text": "-8.25"
+      },
+      {
+       "raw": 0.9174999999391827,
+       "text": "0.917"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.80000",
+      {
+       "raw": 5,
+       "text": "5.0"
+      },
+      {
+       "raw": 138.0,
+       "text": "138.00"
+      },
+      {
+       "raw": 177.58932019740897,
+       "text": "177.59"
+      },
+      {
+       "raw": 37.99999999337142,
+       "text": "38.00"
+      },
+      {
+       "raw": 1.3799999999085255,
+       "text": "1.380"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.90000",
+      {
+       "raw": 10,
+       "text": "10.0"
+      },
+      {
+       "raw": 167.0,
+       "text": "167.00"
+      },
+      {
+       "raw": 204.15275605554731,
+       "text": "204.15"
+      },
+      {
+       "raw": 66.99999999337142,
+       "text": "67.00"
+      },
+      {
+       "raw": 1.6699999998893027,
+       "text": "1.670"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.96000",
+      {
+       "raw": 25,
+       "text": "25.0"
+      },
+      {
+       "raw": 202.25,
+       "text": "202.25"
+      },
+      {
+       "raw": 237.11760788721028,
+       "text": "237.12"
+      },
+      {
+       "raw": 102.24999999337142,
+       "text": "102.25"
+      },
+      {
+       "raw": 2.022499999865937,
+       "text": "2.022"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.98000",
+      {
+       "raw": 50,
+       "text": "50.0"
+      },
+      {
+       "raw": 227.0,
+       "text": "227.00"
+      },
+      {
+       "raw": 260.9564385141619,
+       "text": "260.96"
+      },
+      {
+       "raw": 126.99999999337142,
+       "text": "127.00"
+      },
+      {
+       "raw": 2.269999999849531,
+       "text": "2.270"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99000",
+      {
+       "raw": 100,
+       "text": "100.0"
+      },
+      {
+       "raw": 251.25,
+       "text": "251.25"
+      },
+      {
+       "raw": 284.10690515756176,
+       "text": "284.11"
+      },
+      {
+       "raw": 151.24999999337143,
+       "text": "151.25"
+      },
+      {
+       "raw": 2.512499999833457,
+       "text": "2.512"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99500",
+      {
+       "raw": 200,
+       "text": "200.0"
+      },
+      {
+       "raw": 274.5,
+       "text": "274.50"
+      },
+      {
+       "raw": 306.71454790470733,
+       "text": "306.71"
+      },
+      {
+       "raw": 174.49999999337143,
+       "text": "174.50"
+      },
+      {
+       "raw": 2.744999999818045,
+       "text": "2.745"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99600",
+      {
+       "raw": 250,
+       "text": "250.0"
+      },
+      {
+       "raw": 281.75,
+       "text": "281.75"
+      },
+      {
+       "raw": 313.89483477876877,
+       "text": "313.89"
+      },
+      {
+       "raw": 181.74999999337143,
+       "text": "181.75"
+      },
+      {
+       "raw": 2.8174999998132395,
+       "text": "2.817"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99800",
+      {
+       "raw": 500,
+       "text": "500.0"
+      },
+      {
+       "raw": 304.5,
+       "text": "304.50"
+      },
+      {
+       "raw": 335.9369666735694,
+       "text": "335.94"
+      },
+      {
+       "raw": 204.49999999337143,
+       "text": "204.50"
+      },
+      {
+       "raw": 3.0449999997981596,
+       "text": "3.045"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99900",
+      {
+       "raw": 1000,
+       "text": "1,000.0"
+      },
+      {
+       "raw": 326.5,
+       "text": "326.50"
+      },
+      {
+       "raw": 357.6323389487057,
+       "text": "357.63"
+      },
+      {
+       "raw": 226.49999999337143,
+       "text": "226.50"
+      },
+      {
+       "raw": 3.264999999783577,
+       "text": "3.265"
+      }
+     ]
+    }
+   ],
+   "caption": "Return period ladder read off the grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage. On a tilted heavy-tailed grid the TVaR is the window's and omits the mass reported above it.",
    "columns": [
     {
      "align": "l",
@@ -99101,6 +100423,646 @@
     }
    ],
    "caption": "Return period ladder read off the realized grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "P"
+     ],
+     "role": "stub"
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c1",
+     "name": [
+      "T"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "VaR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c3",
+     "name": [
+      "TVaR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "xsVaR"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "VaR/Mean"
+     ],
+     "raw": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "P"
+     },
+     {
+      "text": "T"
+     },
+     {
+      "text": "VaR"
+     },
+     {
+      "text": "TVaR"
+     },
+     {
+      "text": "xsVaR"
+     },
+     {
+      "text": "VaR/Mean"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail/raw/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "0.00100",
+      {
+       "raw": 1000,
+       "text": "1,000.0"
+      },
+      {
+       "raw": 10.75,
+       "text": "10.75"
+      },
+      {
+       "raw": 100.09164694440432,
+       "text": "100.0916"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -89.25000000662858,
+       "text": "-89.25"
+      },
+      {
+       "raw": 0.10749999999287427,
+       "text": "0.107"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.00200",
+      {
+       "raw": 500,
+       "text": "500.0"
+      },
+      {
+       "raw": 13.0,
+       "text": "13"
+      },
+      {
+       "raw": 100.17998337633617,
+       "text": "100.18"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -87.00000000662858,
+       "text": "-87"
+      },
+      {
+       "raw": 0.12999999999138284,
+       "text": "0.130"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.00400",
+      {
+       "raw": 250,
+       "text": "250.0"
+      },
+      {
+       "raw": 15.75,
+       "text": "15.75"
+      },
+      {
+       "raw": 100.35207828716266,
+       "text": "100.3521"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -84.25000000662858,
+       "text": "-84.25"
+      },
+      {
+       "raw": 0.15749999998956,
+       "text": "0.157"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.00500",
+      {
+       "raw": 200,
+       "text": "200.0"
+      },
+      {
+       "raw": 16.75,
+       "text": "16.75"
+      },
+      {
+       "raw": 100.43655598070359,
+       "text": "100.4366"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -83.25000000662858,
+       "text": "-83.25"
+      },
+      {
+       "raw": 0.1674999999888971,
+       "text": "0.167"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.01000",
+      {
+       "raw": 100,
+       "text": "100.0"
+      },
+      {
+       "raw": 20.5,
+       "text": "20.5"
+      },
+      {
+       "raw": 100.84868395754496,
+       "text": "100.8487"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -79.50000000662858,
+       "text": "-79.5"
+      },
+      {
+       "raw": 0.2049999999864114,
+       "text": "0.205"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.02000",
+      {
+       "raw": 50,
+       "text": "50.0"
+      },
+      {
+       "raw": 25.5,
+       "text": "25.5"
+      },
+      {
+       "raw": 101.64134423961607,
+       "text": "101.6413"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -74.50000000662858,
+       "text": "-74.5"
+      },
+      {
+       "raw": 0.25499999998309714,
+       "text": "0.255"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.04000",
+      {
+       "raw": 25,
+       "text": "25.0"
+      },
+      {
+       "raw": 31.75,
+       "text": "31.75"
+      },
+      {
+       "raw": 103.15945338635201,
+       "text": "103.1595"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -68.25000000662858,
+       "text": "-68.25"
+      },
+      {
+       "raw": 0.31749999997895423,
+       "text": "0.317"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.10000",
+      {
+       "raw": 10,
+       "text": "10.0"
+      },
+      {
+       "raw": 43.5,
+       "text": "43.5"
+      },
+      {
+       "raw": 107.49473974932306,
+       "text": "107.4947"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -56.50000000662858,
+       "text": "-56.5"
+      },
+      {
+       "raw": 0.4349999999711657,
+       "text": "0.435"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.20000",
+      {
+       "raw": 5,
+       "text": "5.0"
+      },
+      {
+       "raw": 57.5,
+       "text": "57.5"
+      },
+      {
+       "raw": 114.57806433387036,
+       "text": "114.5781"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -42.50000000662858,
+       "text": "-42.5"
+      },
+      {
+       "raw": 0.5749999999618857,
+       "text": "0.575"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.50000",
+      {
+       "raw": 2,
+       "text": "2.0"
+      },
+      {
+       "raw": 91.75,
+       "text": "91.75"
+      },
+      {
+       "raw": 138.5214141017788,
+       "text": "138.5214"
+      },
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -8.250000006628582,
+       "text": "-8.25"
+      },
+      {
+       "raw": 0.9174999999391827,
+       "text": "0.917"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.80000",
+      {
+       "raw": 5,
+       "text": "5.0"
+      },
+      {
+       "raw": 138.0,
+       "text": "138"
+      },
+      {
+       "raw": 177.58932019740897,
+       "text": "177.5893"
+      },
+      {
+       "raw": 37.99999999337142,
+       "text": "38"
+      },
+      {
+       "raw": 1.3799999999085255,
+       "text": "1.380"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.90000",
+      {
+       "raw": 10,
+       "text": "10.0"
+      },
+      {
+       "raw": 167.0,
+       "text": "167"
+      },
+      {
+       "raw": 204.15275605554731,
+       "text": "204.1528"
+      },
+      {
+       "raw": 66.99999999337142,
+       "text": "67"
+      },
+      {
+       "raw": 1.6699999998893027,
+       "text": "1.670"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.96000",
+      {
+       "raw": 25,
+       "text": "25.0"
+      },
+      {
+       "raw": 202.25,
+       "text": "202.25"
+      },
+      {
+       "raw": 237.11760788721028,
+       "text": "237.1176"
+      },
+      {
+       "raw": 102.24999999337142,
+       "text": "102.25"
+      },
+      {
+       "raw": 2.022499999865937,
+       "text": "2.022"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.98000",
+      {
+       "raw": 50,
+       "text": "50.0"
+      },
+      {
+       "raw": 227.0,
+       "text": "227"
+      },
+      {
+       "raw": 260.9564385141619,
+       "text": "260.9564"
+      },
+      {
+       "raw": 126.99999999337142,
+       "text": "127"
+      },
+      {
+       "raw": 2.269999999849531,
+       "text": "2.270"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99000",
+      {
+       "raw": 100,
+       "text": "100.0"
+      },
+      {
+       "raw": 251.25,
+       "text": "251.25"
+      },
+      {
+       "raw": 284.10690515756176,
+       "text": "284.1069"
+      },
+      {
+       "raw": 151.24999999337143,
+       "text": "151.25"
+      },
+      {
+       "raw": 2.512499999833457,
+       "text": "2.512"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99500",
+      {
+       "raw": 200,
+       "text": "200.0"
+      },
+      {
+       "raw": 274.5,
+       "text": "274.5"
+      },
+      {
+       "raw": 306.71454790470733,
+       "text": "306.7145"
+      },
+      {
+       "raw": 174.49999999337143,
+       "text": "174.5"
+      },
+      {
+       "raw": 2.744999999818045,
+       "text": "2.745"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99600",
+      {
+       "raw": 250,
+       "text": "250.0"
+      },
+      {
+       "raw": 281.75,
+       "text": "281.75"
+      },
+      {
+       "raw": 313.89483477876877,
+       "text": "313.8948"
+      },
+      {
+       "raw": 181.74999999337143,
+       "text": "181.75"
+      },
+      {
+       "raw": 2.8174999998132395,
+       "text": "2.817"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99800",
+      {
+       "raw": 500,
+       "text": "500.0"
+      },
+      {
+       "raw": 304.5,
+       "text": "304.5"
+      },
+      {
+       "raw": 335.9369666735694,
+       "text": "335.937"
+      },
+      {
+       "raw": 204.49999999337143,
+       "text": "204.5"
+      },
+      {
+       "raw": 3.0449999997981596,
+       "text": "3.045"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "0.99900",
+      {
+       "raw": 1000,
+       "text": "1,000.0"
+      },
+      {
+       "raw": 326.5,
+       "text": "326.5"
+      },
+      {
+       "raw": 357.6323389487057,
+       "text": "357.6323"
+      },
+      {
+       "raw": 226.49999999337143,
+       "text": "226.5"
+      },
+      {
+       "raw": 3.264999999783577,
+       "text": "3.265"
+      }
+     ]
+    }
+   ],
+   "caption": "Return period ladder read off the grid: VaR (the quoted number), TVaR (the priced number), excess VaR over the mean (the capital), and VaR to mean leverage. On a tilted heavy-tailed grid the TVaR is the window's and omits the mass reported above it.",
    "columns": [
     {
      "align": "l",
@@ -107824,6 +109786,225 @@
    "n_stub_levels": 1
   }
  ],
+ "validation/insurer/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "total mass",
+      {
+       "raw": 0.9999999999999999,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      "ok",
+      "sum of the masses on the grid; an untilted grid wraps everything in"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "most negative bucket",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.94911030153632e-12,
+       "text": "-4.94911e-12"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      "flag",
+      "a negative mass is frequency truncation ringing"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "outside mass",
+      {
+       "raw": 1.009844839661362e-12,
+       "text": "1.00984e-12"
+      },
+      {
+       "raw": 9.99999999995449e-06,
+       "text": "1e-05"
+      },
+      "ok",
+      "the mass outside the window, which wraps in (a Chernoff bound on a light tail)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "truncation error",
+      {
+       "raw": 1.0265774225551347e-10,
+       "text": "1.02658e-10"
+      },
+      {
+       "raw": 1e-06,
+       "text": "1e-06"
+      },
+      "ok",
+      "|phi(pi / bs)|, the characteristic function at the highest frequency kept"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "buckets per scale",
+      {
+       "raw": 200.0,
+       "text": "200"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      "ok",
+      "body scale over bs; a coarse grid loses the body"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mean rel error",
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.62859e-11"
+      },
+      {
+       "raw": 0.0001,
+       "text": "0.0001"
+      },
+      "ok",
+      "grid mean against the theoretical"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv rel error",
+      {
+       "raw": 1.0426915559857974e-06,
+       "text": "1.04269e-06"
+      },
+      {
+       "raw": 0.0001,
+       "text": "0.0001"
+      },
+      "ok",
+      "grid cv against the theoretical"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew rel error",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -3.0877937291506896e-06,
+       "text": "-3.08779e-06"
+      },
+      {
+       "raw": 0.0001,
+       "text": "0.0001"
+      },
+      "ok",
+      "grid skew against the theoretical"
+     ]
+    }
+   ],
+   "caption": "Checks on the grid: the total mass against what the window should hold, the most negative bucket, the mass outside the window against the budget, the modeled edge error and the tilt of a heavy-tailed law, the frequency truncation, the buckets per body scale, and each finite moment's relative error. A flagged coverage row carries the grid hint that would cover.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "check"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 6,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "name": [
+      "value"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 6,
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "target"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "status"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "check"
+     },
+     {
+      "text": "value"
+     },
+     {
+      "text": "target"
+     },
+     {
+      "text": "status"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "validation/insurer/BivariateAggregate": [
   {
    "body": [
@@ -111473,6 +113654,225 @@
      },
      {
       "text": "Est Sk"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "validation/raw/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "total mass",
+      {
+       "raw": 0.9999999999999999,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      "ok",
+      "sum of the masses on the grid; an untilted grid wraps everything in"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "most negative bucket",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -4.94911030153632e-12,
+       "text": "-4.94911e-12"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      "flag",
+      "a negative mass is frequency truncation ringing"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "outside mass",
+      {
+       "raw": 1.009844839661362e-12,
+       "text": "1.00984e-12"
+      },
+      {
+       "raw": 9.99999999995449e-06,
+       "text": "1e-05"
+      },
+      "ok",
+      "the mass outside the window, which wraps in (a Chernoff bound on a light tail)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "truncation error",
+      {
+       "raw": 1.0265774225551347e-10,
+       "text": "1.02658e-10"
+      },
+      {
+       "raw": 1e-06,
+       "text": "1e-06"
+      },
+      "ok",
+      "|phi(pi / bs)|, the characteristic function at the highest frequency kept"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "buckets per scale",
+      {
+       "raw": 200.0,
+       "text": "200"
+      },
+      {
+       "raw": 10.0,
+       "text": "10"
+      },
+      "ok",
+      "body scale over bs; a coarse grid loses the body"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "mean rel error",
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.62859e-11"
+      },
+      {
+       "raw": 0.0001,
+       "text": "0.0001"
+      },
+      "ok",
+      "grid mean against the theoretical"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "cv rel error",
+      {
+       "raw": 1.0426915559857974e-06,
+       "text": "1.04269e-06"
+      },
+      {
+       "raw": 0.0001,
+       "text": "0.0001"
+      },
+      "ok",
+      "grid cv against the theoretical"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "skew rel error",
+      {
+       "flags": [
+        "neg"
+       ],
+       "raw": -3.0877937291506896e-06,
+       "text": "-3.08779e-06"
+      },
+      {
+       "raw": 0.0001,
+       "text": "0.0001"
+      },
+      "ok",
+      "grid skew against the theoretical"
+     ]
+    }
+   ],
+   "caption": "Checks on the grid: the total mass against what the window should hold, the most negative bucket, the mass outside the window against the budget, the modeled edge error and the tilt of a heavy-tailed law, the frequency truncation, the buckets per body scale, and each finite moment's relative error. A flagged coverage row carries the grid hint that would cover.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "check"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 6,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "name": [
+      "value"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 6,
+      "kind": "gen"
+     },
+     "key": "c2",
+     "name": [
+      "target"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c3",
+     "name": [
+      "status"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "check"
+     },
+     {
+      "text": "value"
+     },
+     {
+      "text": "target"
+     },
+     {
+      "text": "status"
+     },
+     {
+      "text": "note"
      }
     ]
    ],

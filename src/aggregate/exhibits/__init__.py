@@ -112,7 +112,7 @@ from ._formats import (
 # ``_pricing`` is the same idea over the result objects rather than over a
 # first class class: what a calibration dispatches on is its result.
 from . import (_aggregate, _portfolio, _pnl, _bivariate,  # noqa: F401
-               _distortion, _pricing)
+               _distortion, _pricing, _characteristic_function)
 from ._pricing import (  # noqa: F401
     STAT_SLICES, STAT_SLICE_FORMATS, STAT_SLICE_TITLES,
 )

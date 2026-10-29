@@ -1040,6 +1040,7 @@ port EX.UnbPort note{unbounded pricing.allocate fixture: the mass family reaches
 bv EX.BV dfreq [1 2] [.7 .3] dbvsev [[10 1 .4] [10 2 .1] [20 1 .2] [20 2 .1] [20 3 .2]]                           note{bivariate exhibit fixture: dependency + axis support blocks};
 pnl EX.B 1000 premium less agg EX.Be 850 loss sev lognorm 100 cv 1 poisson                                        note{pnl exhibit fixture: stats/validation via the generic path};
 dist EX.PH ph 0.5                                                                                                 note{distortion exhibit fixture: check-table emphasis path};
+chfagg EX.CHF gamma 4 25 hints{log2=12; bs=1/4}                                                                   note{a law from its characteristic function, for the four generic exhibits};
 agg EX.Re dfreq [1 2] dsev [10 20 30] occurrence net of 10 xs 10                                                  note{reins exhibit fixture: layering block + per-stage summary};
 port EX.RePort agg EX.ReA dfreq [1 2] dsev [10 20 30] occurrence net of 10 xs 10 agg EX.ReB 1 claim dsev [5 10] fixed;
 xpnl EX.Tower 1000 prem less agg EX.TowerE 1000 prem at 70% lr sev lognorm 100 cv 2 occurrence ceded to 500 xs 500 deposit 100 poisson                                        note{economic exhibit fixture: a two-step walk, so the ledger carries group/running-net/grand rows and a kappa ladder};

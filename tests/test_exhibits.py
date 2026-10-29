@@ -50,6 +50,7 @@ PROGRAMS = {
     'PnL': ('pnl EX.B 1000 premium less agg EX.Be 850 loss '
             'sev lognorm 100 cv 1 poisson'),
     'Distortion': 'dist EX.PH ph 0.5',
+    'AggregateCHF': 'chfagg EX.CHF gamma 4 25 hints{log2=12; bs=1/4}',
     # ceding fixtures for the reins exhibit ([Exhibits-Reins-Insurer])
     'ReinsAggregate': ('agg EX.Re dfreq [1 2] dsev [10 20 30] '
                        'occurrence net of 10 xs 10'),
@@ -93,6 +94,7 @@ EXPECTED_EXHIBITS = {
     'PnL': ['summary', 'tail', 'stats', 'validation', 'economic',
             'economic_ratios', 'economic_tail'],
     'Distortion': ['summary', 'stats', 'validation'],
+    'AggregateCHF': ['summary', 'tail', 'stats', 'validation'],
     'ReinsAggregate': ['summary', 'tail', 'stats', 'validation', 'reins',
                        *_DIAG],
     'ReinsPortfolio': ['summary', 'tail', 'stats', 'validation', 'reins',

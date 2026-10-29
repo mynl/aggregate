@@ -192,6 +192,15 @@ patterns:
 # `columns:` and `patterns:` with the same meaning they have above, and both
 # win over their global counterparts for that exhibit only.
 exhibits:
+  # A chfagg's validation frame is a check list: `value` is the quantity
+  # checked and `target` the level it is checked against, each a different
+  # kind of number row by row (a mass, a count, an error), so significant
+  # figures are the only uniform reading. Scoped, because `value` would be
+  # too general a word to give one global reading.
+  validation:
+    columns:
+      value: '.6g'
+      target: '.6g'
   # The tail ladder is indexed by `P`, the symmetric probability ladder,
   # which is not the premium the global entry means. Without this the
   # capital anchors would read as amounts, and under INSURER's money format

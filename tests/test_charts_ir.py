@@ -385,6 +385,8 @@ def test_tex_is_total_over_every_emitted_document():
                   views=('gross', 'ceded')),
         # an exact aggregate, for the exact_tail chart
         build('nttagg IR.TexN dfreq [1:3] dsev [1:3]'),
+        # a law from its characteristic function, for the chfagg chart
+        build('chfagg IR.TexC gamma 4 25', log2=10),
     ]
     swept = set()
     for obj in objs:

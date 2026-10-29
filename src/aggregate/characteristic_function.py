@@ -2074,6 +2074,47 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             x = self.snap(x)
         return {self.name: x}
 
+    # ---- pricing ----------------------------------------------------------
+    def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
+                       LR=None, PQ=None, ROE=None):
+        """Complete the pricing pentagon at a capital level given one target.
+
+        The ``Aggregate`` method over this grid: fix the capital level with
+        exactly one of ``p`` (a VaR probability) or ``a`` (an asset level,
+        snapped to the grid), supply exactly one pricing target (``P``,
+        ``ROE``, or a loss ratio via ``LR``, ``M``, ``Q`` or ``PQ``), and
+        read the canonical one-row pentagon. See
+        :meth:`aggregate.Aggregate.price_pentagon`.
+
+        Notes
+        -----
+        Every price is at a finite asset level ``a``, so it is finite even
+        for a stable law with ``alpha <= 1``. ``a`` must sit inside the
+        window: on an untilted heavy-tailed grid the survival there should be
+        large against :attr:`outside_mass`, the wrapped tail, and a tilted
+        grid's ``S(a)`` is right to the edge. ``p = 1`` is refused, since
+        :attr:`bounded` is ``False`` for every family.
+        """
+        from . import _pricing
+        return _pricing.price_pentagon(self, p=p, a=a, P=P, M=M, Q=Q, LR=LR,
+                                       PQ=PQ, ROE=ROE)
+
+    def calibrate_distortions(self, coc=None, *, lr=None, p=None, a=None,
+                              kind='lower', names=None):
+        """Calibrate the standard distortion set to a pricing target on this grid.
+
+        The ``Aggregate`` method over this grid; see
+        :meth:`aggregate.Aggregate.calibrate_distortions` for the arguments
+        and the result. ``names`` defaults to
+        ``_pricing.DEFAULT_CALIBRATION_DISTORTIONS``. The cautions under
+        :meth:`price_pentagon` apply.
+        """
+        from . import _pricing
+        if names is None:
+            names = _pricing.DEFAULT_CALIBRATION_DISTORTIONS
+        return _pricing.calibrate_distortions(self, coc, lr=lr, p=p, a=a,
+                                              kind=kind, names=names)
+
     # ---- moments ----------------------------------------------------------
     @property
     def agg_m(self):

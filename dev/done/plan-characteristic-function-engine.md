@@ -1048,6 +1048,15 @@ Landed as `FamilyTweedie`, `FamilyNormalInverseGaussian`, `FamilyVarianceGamma` 
 - **Tolerances.** The `1 < p < 2` comparison with the compound engine is at 1e-6, not the plan's unstated roundoff: `tweedie 1.5 100 2` has an exponential severity, whose continuous part rings at 3e-7 on a 1/8 grid where the compound engine is exact. The normal inverse Gaussian oracle is at 1e-7, since scipy's `norminvgauss.cdf` is quadrature at about 1e-8. The `p = 4` moment case is `tweedie 4 1 1` (cv 1), not a cv-3 law, which is window limited at log2 16.
 - `temperedstable C G M Y [mu]` needed the parser to admit an optional trailing parameter; `FAMILY_REQUIRED` carries the count, and the refusal names the optional part in brackets.
 
+### [Characteristic-Function-Pricing], 1.32.0
+
+Landed as `AggregateCHF.price_pentagon` and `calibrate_distortions`, `exhibits/_characteristic_function.py`, `charts/_emit_characteristic_function.py`, a scoped `validation` section in `formats/formats-raw.yaml`, the `AggregateCHF` fixture in `tests/test_exhibits.py`, `tests/capture_exhibit_snapshots.py` and section `EX` of `decl-testers.agg`, a `chfagg` in the `test_charts_ir.py` sweep, and two tests: the pricing oracle (shapes 8e-12, pentagon 2e-9, both inside the plan's 1e-8) and the exhibit and chart availability with the companion present on a gamma and absent on a stable law. Divergences:
+
+- **The chart's companion is the reference law's masses, only where scipy is cheap.** The plan names "the family's reference law as the companion series where one exists"; `levy_stable` has one but its `cdf` is quadrature at every point, minutes at a grid's size, so a stable law draws alone. A Tweedie with `1 < p < 2` has an `Aggregate` reference, which is not a scipy law, and draws alone too.
+- **The `validation` frame's `value` and `target` columns needed sheet entries**: the format sheet is a registry of the column vocabulary and `tests/test_exhibits.py` sweeps every float column; `stats_df`'s columns were already covered by the `stats` exhibit's catch-all pattern.
+- **The regenerated exhibit snapshot moved one unrelated entry by last-digit noise** (`economic_tail/raw/Tower`, 1e-16 relative); the committed values were put back so the diff is the eight new entries, which a load-and-compare confirms (git's text diff pairs the new sorted-in blocks with look-alike neighbors and reports deletions that are not there).
+- The pricing wrappers import `_pricing` lazily, since `_pricing` imports the module tree that imports this one.
+
 The 2026-10-29 one-sided and two-sided measurements came from
 scratch prototypes of the kernels in Mathematics (nine scripts, the last six on
 the two-sided method: plain split, resolution transfer, full halves and crop,

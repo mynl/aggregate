@@ -869,3 +869,46 @@ def test_untilted_window_balances_truncation_against_coverage():
     assert 'wraps in' in v.loc['outside mass', 'note'] or 'hints{' in v.loc['outside mass', 'note']
     log2, bs = c.recommended_grid()
     assert log2 > 16
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Pricing]: pricing, exhibits and the chart
+# ----------------------------------------------------------------------
+
+def _numeric(df):
+    return df.select_dtypes('number').to_numpy(dtype=float)
+
+
+def test_pricing_agrees_with_the_compound_engine_on_one_grid():
+    c = build('chfagg G gamma 4 25', log2=12, bs=1 / 4)
+    a = build('agg G dfreq [1] sev 25 * gamma 4', log2=12, bs=1 / 4)
+    rc = c.calibrate_distortions(0.10, p=0.99)
+    ra = a.calibrate_distortions(0.10, p=0.99)
+    assert list(rc.distortion_df.index) == list(ra.distortion_df.index)
+    assert np.max(np.abs(_numeric(rc.distortion_df) - _numeric(ra.distortion_df))) < 1e-8
+    pc = c.price_pentagon(p=0.99, ROE=0.1)
+    pa = a.price_pentagon(p=0.99, ROE=0.1)
+    assert list(pc.columns) == list(pa.columns)
+    assert np.max(np.abs(_numeric(pc) - _numeric(pa))) < 1e-8
+    with pytest.raises(ValueError):
+        c.price_pentagon(p=1, ROE=0.1)             # unbounded: p = 1 is refused
+
+
+def test_exhibits_and_charts_are_the_generic_four_and_the_one_chart():
+    from aggregate.exhibits import available_exhibits, exhibit_frames
+    from aggregate.charts import available_charts, build_chart_doc, primary_chart
+    c = build('chfagg G gamma 4 25', log2=12)
+    assert [n for n, _ in available_exhibits(c)] == ['summary', 'tail', 'stats', 'validation']
+    for name in ('summary', 'tail', 'stats', 'validation'):
+        (block, served, kw), = exhibit_frames(c, name)
+        assert block == f'{name}_df' and 'caption' in kw
+        pd.testing.assert_frame_equal(served, getattr(c, block))
+    assert available_charts(c) == ['chfagg'] and primary_chart(c) == 'chfagg'
+    doc = build_chart_doc(c, 'chfagg')
+    names = {s.name for s in doc.series}
+    assert names == {'gamma', 'Reference'}
+    s = build('chfagg S stable 1.5 1', log2=12)
+    assert {x.name for x in build_chart_doc(s, 'chfagg').series} == {'stable'}
+    assert not hasattr(c, 'pnl_program') and not hasattr(c, 'reins_program')
+    before = build('chfagg G gamma 4 25', update=False)
+    assert available_charts(before) == []

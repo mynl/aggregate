@@ -663,15 +663,20 @@ class UnderwritingTransformer(Transformer):
 
     def chf_family(self, c):
         """``FAMILY p1 p2 ...``: the family's positional parameters, by name."""
-        from .characteristic_function import FAMILY_PARAMETERS
+        from .characteristic_function import FAMILY_PARAMETERS, FAMILY_REQUIRED
         word, numbers = c
         family = self._chf_family_word(word)
         numbers = list(np.atleast_1d(numbers))
         names = FAMILY_PARAMETERS[family]
-        if len(numbers) != len(names):
+        required = FAMILY_REQUIRED[family]
+        if not required <= len(numbers) <= len(names):
+            count = (f'{required} numbers' if required == len(names)
+                     else f'{required} to {len(names)} numbers')
+            optional = names[required:]
+            tail = f" [{' '.join(optional)}]" if optional else ''
             raise ValueError(
-                f"chfagg: {family} takes {len(names)} numbers, "
-                f"{' '.join(names)}, got {len(numbers)}")
+                f"chfagg: {family} takes {count}, "
+                f"{' '.join(names[:required])}{tail}, got {len(numbers)}")
         spec = {"family": family, "form": None}
         spec.update({k: float(v) for k, v in zip(names, numbers)})
         return spec

@@ -204,7 +204,7 @@ def test_untilted_stable_reproduces_the_measured_table(log2, bs, errors):
 def test_rule_a_sizes_an_untilted_stable_window_from_the_power_tail():
     c = AggregateCHF('S', 'stable', alpha=1.5, beta=1)
     c.update(tilt=False)
-    assert c.tilt == (0.0, 0.0) and c.outside_mass == 0.0
+    assert c.tilt == (0.0, 0.0) and 0 < c.outside_mass < 1e-5   # wrapped in, reported
     fam = c.family
     assert c.x_max >= (fam.stable.tail_constant / 5e-6) ** (1 / 1.5)
     assert c.x_min < 0 and c.x_min % c.bs == 0
@@ -501,7 +501,7 @@ def test_tilt_keyword_forms():
     c.update(log2=12, tilt=True)
     assert c.tilt[1] not in (0.0, 1.0) and c.tilt[1] > 5
     c.update(log2=12, tilt=False)
-    assert c.tilt == (0.0, 0.0) and c.outside_mass == 0 and abs(c.total_mass - 1) < 1e-9
+    assert c.tilt == (0.0, 0.0) and 0 < c.outside_mass < 1e-5 and abs(c.total_mass - 1) < 1e-9
     assert c.edge_error > 0.1                       # the untilted wrap at the edge
     for bad in (-1, 'x', np.inf):
         with pytest.raises(ValueError, match='tilt must be'):
@@ -637,7 +637,7 @@ def test_two_sided_untilted_wraps():
     body = both['tilt'] > 1e-12
     rel = (both['wrap'] - both['tilt']).abs() / both['tilt']
     assert rel[body].max() > 0.1
-    assert c.tilt == (0.0, 0.0) and c.outside_mass == 0
+    assert c.tilt == (0.0, 0.0) and 0 < c.outside_mass < 1e-5
 
 
 def test_two_sided_number_tilts_both_halves_and_info_shows_the_transfer():
@@ -729,7 +729,7 @@ def test_build_chfagg_returns_an_updated_tilted_object():
 
 def test_build_chfagg_hints_reach_update():
     w = build('chfagg W stable 1.5 1 hints{tilt=False}')
-    assert w.tilt == (0.0, 0.0) and w.outside_mass == 0
+    assert w.tilt == (0.0, 0.0) and 0 < w.outside_mass < 1e-5
     e = build('chfagg E stable 1.5 1 hints{tilt=8; log2=12; bs=1/32}')
     assert e.tilt == (0.0, 8.0) and e.log2 == 12 and e.bs == 1 / 32
     g = build('chfagg G gamma 4 25', log2=12, bs=1 / 4)
@@ -747,3 +747,125 @@ def test_tilt_is_inert_on_an_agg():
 def test_chfagg_is_a_declaration_word():
     from aggregate.decl_words import decl_words
     assert 'chfagg' in decl_words()['declarations']
+
+
+# ----------------------------------------------------------------------
+# [Characteristic-Function-Families]: tweedie for every p, and three more laws
+# ----------------------------------------------------------------------
+
+def _against_reference(c, tol):
+    ref = c.family.reference
+    exact = _reference_masses(ref, c.xs, c.bs)
+    assert np.max(np.abs(c.agg_density - exact)) < tol
+
+
+@pytest.mark.parametrize('p, mean, dispersion', [(0, 100, 900), (2, 100, 0.25), (3, 100, 0.0025)])
+def test_tweedie_normal_gamma_inverse_gaussian_members(p, mean, dispersion):
+    c = build(f'chfagg T tweedie {p} {mean} {dispersion}')
+    _against_reference(c, 1e-9)
+    assert c.validation_description == 'not unreasonable'
+    assert c.agg_m == mean and c.family.moments[1] == pytest.approx(dispersion * mean ** p)
+
+
+def test_tweedie_compound_member_against_the_compound_engine_and_the_series():
+    from aggregate.tweedie import Tweedie, tweedie_density
+    c = build('chfagg T tweedie 1.5 100 2', log2=14, bs=1 / 8)
+    tw = Tweedie(1.5, 100, 2)
+    f, shape, rate = (float(v) for v in tw.po_gamma_shape_rate)
+    a = build(f'agg TW {f} claims sev {1 / rate} * gamma {shape} poisson', log2=14, bs=1 / 8)
+    both = pd.concat([a.density_df['p_total'].rename('agg'),
+                      c.density_df['p_total'].rename('chf')], axis=1, join='inner')
+    # the severity is exponential (shape 1), so the continuous part rings
+    # at about 3e-7 on this grid where the compound engine is exact
+    assert np.max(np.abs(both['agg'] - both['chf'])) < 1e-6
+    assert c.family.atom == (0.0, pytest.approx(np.exp(-f)))
+    # bucket 0 holds the atom plus the continuous mass on [0, h / 2)
+    assert 0 < c.agg_density[0] - np.exp(-f) < 1e-5
+    body = c.xs[1:400]
+    dens = np.array([tweedie_density(x, p=1.5, μ=100, σ2=2) for x in body])
+    # a bucket mass over bs is the density's bucket average, not its value
+    assert np.max(np.abs(c.agg_density[1:400] / c.bs - dens)) < 1e-5
+    assert c.family.moments[2] == pytest.approx(1.5 * c.family.moments[1] ** 0.5 / 100)
+
+
+@pytest.mark.parametrize('p, mean, dispersion', [(-1, 1, 1), (2.5, 100, 0.02), (4, 1, 1)])
+def test_tweedie_stable_members_match_their_moments(p, mean, dispersion):
+    c = build(f'chfagg T tweedie {p} {mean} {dispersion}')
+    assert abs(c.est_m - mean) < 1e-6 * mean
+    assert abs(c.est_cv - c.agg_cv) < 1e-4 * c.agg_cv
+    assert c.family.reference is None
+    assert c.family.tilt_side is None and c.tilt == (0.0, 0.0)
+
+
+def test_tweedie_cv_form_and_refusals():
+    c = build('chfagg T tweedie 2.5 100 cv 0.5')
+    assert c.family.dispersion == pytest.approx(0.25 * 100 ** -0.5)
+    assert c.pprogram.split() == 'chfagg T tweedie 2.5 100 cv 0.5'.split()
+    for program, match in [('chfagg T tweedie 1 100 2', 'lattice law'),
+                           ('chfagg T tweedie 0.5 100 2', 'no Tweedie law'),
+                           ('chfagg T tweedie inf 100 2', 'stable law with index 1'),
+                           ('chfagg T tweedie 1.5 -100 2', 'mean must be positive')]:
+        with pytest.raises(ValueError, match=match):
+            build(program)
+
+
+def test_tweedie_fz_is_repaired_for_the_stable_members():
+    """``Tweedie.fz`` returns an updated ``AggregateCHF`` where it returned ``None`` or an untilted law."""
+    from aggregate.characteristic_function import AggregateCHF
+    from aggregate.tweedie import Tweedie
+    for p in (2.5, 4, -1):
+        fz = Tweedie(p, 1, 1).fz
+        assert isinstance(fz, AggregateCHF)
+        assert abs(fz.est_m - 1) < 1e-6
+    # the p = 0 reproductive law carries its dispersion
+    assert Tweedie(0, 100, 900).fz.std() == pytest.approx(30)
+
+
+def test_normal_inverse_gaussian_against_scipy():
+    c = build('chfagg N norminvgauss 2 0.5 3 1')
+    _against_reference(c, 1e-7)          # scipy's cdf is quadrature, about 1e-8
+    mean, var, skew = c.family.moments
+    g = np.sqrt(4 - 0.25)
+    assert mean == pytest.approx(1 + 3 * 0.5 / g) and var == pytest.approx(3 * 4 / g ** 3)
+    assert abs(c.est_m - mean) < 1e-6 and abs(c.est_skew - skew) < 1e-4
+    with pytest.raises(ValueError, match='beta'):
+        build('chfagg N norminvgauss 1 2 3 0')
+
+
+def test_variance_gamma_laplace_special_case_and_cumulants():
+    c = build('chfagg V variancegamma 0.2 1 0 0')
+    _against_reference(c, 1e-7)
+    assert c.family.reference.dist.name == 'laplace'
+    d = build('chfagg V variancegamma 0.2 0.5 -0.1 0')
+    mean, var, skew = d.family.moments
+    assert (mean, var) == (-0.1, pytest.approx(0.04 + 0.5 * 0.01))
+    assert abs(d.est_m - mean) < 1e-6 and abs(d.est_cv - d.agg_cv) < 1e-5 and abs(d.est_skew - skew) < 1e-3
+    assert d.family.reference is None
+
+
+def test_tempered_stable_cumulants():
+    c = build('chfagg T temperedstable 1 5 10 0.5')
+    fam = c.family
+    mean, var, skew = fam.moments
+    assert fam.mu == 0 and fam.cumulant(1) == mean
+    assert abs(c.est_m - mean) < 1e-6 and abs(c.est_sd ** 2 - var) < 1e-6 * var
+    assert abs(c.est_skew - skew) < 1e-5
+    d = build('chfagg T temperedstable 1 5 10 1.5 2')
+    assert d.family.mu == 2 and abs(d.est_m - d.family.moments[0]) < 1e-6
+    assert d.pprogram.split()[-5:] == ['temperedstable', '1', '5', '10', '1.5', '2'][-5:]
+    for program, match in [('chfagg T temperedstable 1 5 10 2', 'below 2'),
+                           ('chfagg T temperedstable 1 5 10 1', 'not 0 or 1'),
+                           ('chfagg T temperedstable 1 5 10', 'takes 4 to 5 numbers')]:
+        with pytest.raises(ValueError, match=match):
+            build(program)
+
+
+def test_untilted_window_balances_truncation_against_coverage():
+    """A Tweedie with p > 2 and a small tilt cannot have both at log2 16; the rule picks the balance and both rows flag."""
+    c = build('chfagg T tweedie 2.5 100 2')
+    v = c.validation_df
+    assert v.loc['truncation error', 'status'] == 'flag'
+    assert v.loc['outside mass', 'status'] == 'flag'
+    assert 'wraps in' in v.loc['outside mass', 'note'] or 'hints{' in v.loc['outside mass', 'note']
+    log2, bs = c.recommended_grid()
+    assert log2 > 16

@@ -6401,5 +6401,78 @@
         "topic:numerics"
       ]
     }
+  },
+  "chfagg CHF.Tweedie      tweedie 1.5 100 2 note{the compound Poisson gamma member, with its atom at 0 split out}": {
+    "kind": "chfagg",
+    "name": "CHF.Tweedie",
+    "spec": {
+      "name": "CHF.Tweedie",
+      "family": "tweedie",
+      "form": null,
+      "p": 1.5,
+      "mean": 100.0,
+      "dispersion": 2.0,
+      "note": "the compound Poisson gamma member, with its atom at 0 split out",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.TweedieCV    tweedie 2.5 100 cv 0.5 note{a positive extreme stable member, tilted by its own theta}": {
+    "kind": "chfagg",
+    "name": "CHF.TweedieCV",
+    "spec": {
+      "name": "CHF.TweedieCV",
+      "family": "tweedie",
+      "form": "cv",
+      "p": 2.5,
+      "mean": 100.0,
+      "cv": 0.5,
+      "note": "a positive extreme stable member, tilted by its own theta",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.NIG          norminvgauss 2 0.5 3 1 note{normal inverse Gaussian: alpha beta delta mu}": {
+    "kind": "chfagg",
+    "name": "CHF.NIG",
+    "spec": {
+      "name": "CHF.NIG",
+      "family": "norminvgauss",
+      "form": null,
+      "alpha": 2.0,
+      "beta": 0.5,
+      "delta": 3.0,
+      "mu": 1.0,
+      "note": "normal inverse Gaussian: alpha beta delta mu",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 0 note{variance gamma: sigma nu theta mu}": {
+    "kind": "chfagg",
+    "name": "CHF.VG",
+    "spec": {
+      "name": "CHF.VG",
+      "family": "variancegamma",
+      "form": null,
+      "sigma": 0.2,
+      "nu": 0.5,
+      "theta": -0.1,
+      "mu": 0.0,
+      "note": "variance gamma: sigma nu theta mu",
+      "hints": ""
+    }
+  },
+  "chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, and an optional mu}": {
+    "kind": "chfagg",
+    "name": "CHF.CGMY",
+    "spec": {
+      "name": "CHF.CGMY",
+      "family": "temperedstable",
+      "form": null,
+      "C": 1.0,
+      "G": 5.0,
+      "M": 10.0,
+      "Y": 0.5,
+      "note": "tempered stable: C G M Y, and an optional mu",
+      "hints": ""
+    }
   }
 }

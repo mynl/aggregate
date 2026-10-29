@@ -782,7 +782,8 @@ class Tweedie:
                     # normal
                     match self.mode:
                         case Mode.REPRODUCTIVE:
-                            self._fz = ss.norm(loc=self.mean, scale=1.)
+                            # the variance is the dispersion at p = 0
+                            self._fz = ss.norm(loc=self.mean, scale=self.dispersion ** 0.5)
                         case Mode.ADDITIVE:
                             self._fz = ss.norm(loc=self.mean, scale=self.dispersion ** 0.5)
                 case self.p if 1 < self.p < 2:
@@ -791,46 +792,17 @@ class Tweedie:
                     # po_gamma_shape_rate accounts for mode of self.
                     f, s, r = self.po_gamma_shape_rate
                     self._fz = build(f'agg TW{id(self)} {f} claims sev {1/r} * gamma {s} poisson')
-                case self.p if 2 < self.p < np.inf:
-                    # positive extreme stable
-                    assert 0 < self.alpha < 1
-                    if self.theta < 0:
-                        NotImplementedError('Negative theta for positive extreme stable')
-                    else:
-                        match self.mode:
-                            case Mode.REPRODUCTIVE:
-                                self._fz = ss.levy_stable(self.alpha, 1.0, loc=0, scale=self.index ** (1 / self.alpha - 1))
-                            case Mode.ADDITIVE:
-                                self._fz = ss.levy_stable(self.alpha, 1.0, loc=0, scale=self.index ** (1 / self.alpha))
-                case self.p if np.isinf(self.p):
-                    # Cauchy
-                    if self.theta != 0:
-                        NotImplementedError('Negative theta for Cauchy; no closed form expression, create via FourierTools')
-                    else:
-                        print('set up Cauchy')
-                        self._fz = ss.levy_stable(self.alpha, 1.0, loc=0, scale=self.index)
-                    assert self.alpha == 1
-                    match self.mode:
-                        case Mode.REPRODUCTIVE:
-                            pass
-                        case Mode.ADDITIVE:
-                            pass
-                case self.p if self.p < 0:
-                    # extreme stable, supported on whole real line
-                    assert 1 < self.alpha < 2
-                    # assert self.theta <= 0, f'Invalid theta for spectrally negative extreme stable'
-                    # if self.theta < 0:
-                    #     NotImplementedError('Negative theta for spectrally negative extreme; no closed form expression, create via FourierTools')
-                    # return this regardless of theta (and mode)!
-                    self._fz = ss.levy_stable(self.alpha, -1.0, scale=self.index ** (1 / self.alpha))
-                    # match self.mode:
-                    #     case Mode.REPRODUCTIVE:
-                    #         # raise NotImplementedError('Reproductive spectrally positive extreme stable')
-                    #     case Mode.ADDITIVE:
-                    #         self._fz = ss.levy_stable(self.alpha, -1.0, scale=self.index ** (1 / self.alpha))
                 case _:
-                    # this should really be caught elsewhere an never occur!
-                    raise ValueError(f'Invalid p: {self.p}')
+                    # the stable members, p > 2, p < 0 and p = inf: no scipy
+                    # law carries the tilt theta applies, so the distribution
+                    # is computed by inverting the characteristic function
+                    # (dev/done/plan-characteristic-function-engine.md,
+                    # [Characteristic-Function-Families])
+                    from .characteristic_function import AggregateCHF, FamilyTweedie
+                    fam = FamilyTweedie({'p': self.p, 'mean': self.mean,
+                                         'dispersion': self.dispersion})
+                    self._fz = AggregateCHF.from_family(f'TW{id(self)}', fam)
+                    self._fz.update()
         return self._fz
 
     @property

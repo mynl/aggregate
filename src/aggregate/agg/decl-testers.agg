@@ -1541,4 +1541,9 @@ chfagg CFE.Untilted   stable 1.5 1 hints{tilt=False}        note{wraps; the teac
 chfagg CFE.Tilt8      stable 1.5 1 hints{tilt=8}            note{eight e-folds across the window};
 chfagg CFE.Gamma      gamma 4 25 hints{log2=12; bs=1/4}     note{the agg G dfreq [1] sev 25 * gamma 4 grid};
 chfagg CFE.Norm       norm 100 cv 0.3                       note{the mean and cv form};
-chfagg CFE.InvGauss   invgauss 100 cv 0.5                   note{shape 400}
+chfagg CFE.InvGauss   invgauss 100 cv 0.5                   note{shape 400};
+chfagg CFE.Tweedie    tweedie 1.5 100 2                      note{atom exp(-lambda) at 0, split out of phi};
+chfagg CFE.TweedieP   tweedie -1 1 1                         note{extreme stable member on the whole line};
+chfagg CFE.NIG        norminvgauss 2 0.5 3 1                 note{against scipy.stats.norminvgauss};
+chfagg CFE.Laplace    variancegamma 0.2 1 0 0                note{the Laplace special case};
+chfagg CFE.CGMY       temperedstable 1 5 10 1.5 2            note{Y above 1, with mu}

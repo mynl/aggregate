@@ -4,11 +4,11 @@ r"""Distributions computed by inverting a characteristic function.
 characteristic function on the FFT's frequency grid and inverting with one
 ``irfft``, instead of discretizing a severity and applying a frequency
 generating function. The families are infinitely divisible laws with
-closed-form characteristic functions: the alpha-stable laws, the normal, gamma
-and inverse Gaussian laws in this step, with the whole Tweedie family, the
-normal inverse Gaussian, variance gamma and tempered stable laws to follow
+closed-form characteristic functions: the alpha-stable laws, the whole
+Tweedie family, and the normal, gamma, inverse Gaussian, normal inverse
+Gaussian, variance gamma and tempered stable laws
 (``dev/done/plan-characteristic-function-engine.md``,
-``[Characteristic-Function-Engine]``).
+``[Characteristic-Function-Engine]``). The DecL statement is ``chfagg``.
 
 Reached by submodule, ``from aggregate.characteristic_function import
 AggregateCHF``, as ``Tweedie``, ``Stable`` and ``AggregateNTT`` are.
@@ -69,13 +69,25 @@ logger = logging.getLogger(__name__)
 #: parser maps ``ID numberl`` onto these; the class takes them as keywords.
 FAMILY_PARAMETERS = {
     'stable': ('alpha', 'beta', 'scale', 'loc'),
+    'tweedie': ('p', 'mean', 'dispersion'),
     'norm': ('mean', 'sd'),
     'gamma': ('shape', 'scale'),
     'invgauss': ('mean', 'shape'),
+    'norminvgauss': ('alpha', 'beta', 'delta', 'mu'),
+    'variancegamma': ('sigma', 'nu', 'theta', 'mu'),
+    'temperedstable': ('C', 'G', 'M', 'Y', 'mu'),
+}
+
+#: How many of a family's positional parameters are required; the rest are
+#: optional and trail. ``stable`` and ``tweedie`` have their own grammar.
+FAMILY_REQUIRED = {
+    'norm': 2, 'gamma': 2, 'invgauss': 2,
+    'norminvgauss': 4, 'variancegamma': 4, 'temperedstable': 4,
 }
 
 #: The ``mean cv`` form of the families that have one.
 FAMILY_CV_PARAMETERS = {
+    'tweedie': ('mean', 'cv'),
     'norm': ('mean', 'cv'),
     'gamma': ('mean', 'cv'),
     'invgauss': ('mean', 'cv'),
@@ -265,6 +277,40 @@ def chernoff_edge(cgf, s_max, log_eps, scale):
         if res.success and np.isfinite(res.fun) and res.fun < g[i]:
             return float(res.fun)
     return float(g[i])
+
+
+def chernoff_tail(cgf, s_max, x, scale):
+    r"""The Chernoff bound :math:`\exp\inf_{0<s<s_{\max}}(K(s) - sx)` on :math:`\Pr(X > x)`.
+
+    The companion of :func:`chernoff_edge`, with the same scan and refinement;
+    the left tail is this with ``cgf(s) = K(-s)`` at ``-x``. The bound is 1
+    where no ``s`` improves on it.
+    """
+    if not np.isfinite(scale) or scale <= 0:
+        scale = 1.0
+    s = np.logspace(-9, 9, 217) / scale
+    s = s[s < s_max]
+    if len(s) == 0:
+        return 1.0
+    with np.errstate(all='ignore'):
+        g = np.asarray(cgf(s), dtype=float) - s * x
+    ok = np.isfinite(g)
+    if not ok.any():
+        return 1.0
+    g = np.where(ok, g, np.inf)
+    i = int(np.argmin(g))
+    lo = s[max(i - 1, 0)]
+    hi = s[min(i + 1, len(s) - 1)]
+    best = float(g[i])
+    if hi > lo:
+        def objective(u):
+            k = float(cgf(np.array([u]))[0])
+            return k - u * x if np.isfinite(k) else np.inf
+        with np.errstate(all='ignore'):
+            res = minimize_scalar(objective, bounds=(lo, hi), method='bounded')
+        if res.success and np.isfinite(res.fun) and res.fun < best:
+            best = float(res.fun)
+    return float(min(1.0, math.exp(min(best, 0.0))))
 
 
 # ======================================================================
@@ -810,12 +856,294 @@ class FamilyUser(Family):
         return f'FamilyUser({self.label!r})'
 
 
+class FamilyTweedie(Family):
+    r"""The Tweedie law for every admissible power, ``tweedie p mean dispersion`` or ``tweedie p mean cv c``.
+
+    Wraps :class:`aggregate.tweedie.Tweedie` in its reproductive form
+    :math:`(p, \mu, \sigma^2)`, which supplies the cumulant function
+    :math:`K(s) = \lambda[\kappa(\theta + s/\lambda) - \kappa(\theta)]`,
+    :math:`\lambda = 1/\sigma^2`, with
+    :math:`\kappa(\theta) = \frac{\alpha-1}{\alpha}\big(\frac{\theta}{\alpha-1}\big)^\alpha`,
+    :math:`\alpha = (p-2)/(p-1)`, and :math:`\varphi(t) = \exp K(it)`. The
+    mean is :math:`\mu`, the variance :math:`\sigma^2\mu^p` and the skewness
+    :math:`p\cdot\mathrm{cv}`, since the third cumulant is
+    :math:`\sigma^4 p\,\mu^{2p-1}`.
+
+    Every member with a finite mean is a natural exponential family with
+    :math:`\theta` interior to its domain, so :math:`K` is finite near 0 and
+    the law is light on both sides: the members with :math:`p > 2` are the
+    positive extreme stable laws already tilted by their own :math:`\theta`,
+    and those with :math:`p < 0` the extreme stable laws on the whole line.
+    For :math:`1 < p < 2` the law is compound Poisson with an atom
+    :math:`e^{-\lambda_f}` at 0, split out of :math:`\varphi` before
+    inversion and added back to the bucket at 0 so that frequency truncation
+    does not ring there. :math:`p = 1` is a lattice law with the dispersion
+    as its step, refused with a pointer at ``agg ... poisson dsev [phi]``, as
+    is :math:`0 < p < 1`, where no law exists.
+    """
+
+    name = 'tweedie'
+
+    def __init__(self, parameters, form=None):
+        from .tweedie import Tweedie
+        super().__init__(parameters, form)
+        p = self.parameters
+        power, mean = float(p['p']), float(p['mean'])
+        if power == 1:
+            raise ValueError(
+                'chfagg: tweedie 1 is a lattice law with the dispersion as its '
+                'step; declare it as agg NAME <mean/phi> claims poisson dsev [phi]')
+        if 0 < power < 1:
+            raise ValueError(f'chfagg: no Tweedie law has 0 < p < 1, got p = {power}')
+        if np.isinf(power):
+            raise ValueError(
+                'chfagg: tweedie inf is the stable law with index 1 and no tilt '
+                '(its theta is 0 for every mean), which has a power tail; declare '
+                'it as chfagg NAME stable 1 1 <scale> <loc>')
+        if mean <= 0:
+            raise ValueError(f'chfagg: the Tweedie mean must be positive, got {mean}')
+        if form == 'cv':
+            cv = float(p['cv'])
+            if cv <= 0:
+                raise ValueError(f'chfagg: the Tweedie cv must be positive, got {cv}')
+            dispersion = cv ** 2 * mean ** (2 - power)
+        else:
+            dispersion = float(p['dispersion'])
+            if dispersion <= 0:
+                raise ValueError(f'chfagg: the Tweedie dispersion must be positive, got {dispersion}')
+        self.tweedie = Tweedie(power, mean, dispersion)
+        self.power = power
+        self.mean = mean
+        self.dispersion = dispersion
+        lam = 1 / dispersion
+        theta = self.tweedie.theta
+        # the domain of K: theta + s / lambda stays on kappa's side of 0
+        if power == 0:
+            self.cgf_domain = (-np.inf, np.inf)
+        elif power < 0:
+            self.cgf_domain = (-lam * theta, np.inf)
+        elif np.isinf(power):
+            self.cgf_domain = (-np.inf, -lam * theta)
+        else:
+            self.cgf_domain = (-np.inf, -lam * theta)
+        self.support = (-np.inf, np.inf) if power <= 0 else (0.0, np.inf)
+        if 1 < power < 2:
+            frequency = self.tweedie.po_gamma_shape_rate[0]
+            self.atom = (0.0, float(np.exp(-frequency)))
+
+    def chf(self, s):
+        s = np.asarray(s, dtype=complex)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            return np.asarray(self.tweedie.chf(s), dtype=complex)
+
+    def cgf(self, s):
+        s = np.asarray(s, dtype=float)
+        lo, hi = self.cgf_domain
+        out = np.full(s.shape, np.nan)
+        ok = (s > lo) & (s < hi)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            out[ok] = np.real(self.tweedie.K(s[ok]))
+        return out
+
+    @property
+    def moments(self):
+        var = self.dispersion * self.mean ** self.power
+        cv = np.sqrt(var) / self.mean
+        return (self.mean, var, self.power * cv)
+
+    @property
+    def reference(self):
+        """scipy for the normal, gamma and inverse Gaussian members; the compound engine's ``Aggregate`` for ``1 < p < 2``; else ``None``."""
+        if self.power in (0, 2, 3) or 1 < self.power < 2:
+            return self.tweedie.fz
+        return None
+
+    def to_decl(self):
+        p = self.parameters
+        if self.form == 'cv':
+            return f"tweedie {p['p']:g} {p['mean']:g} cv {p['cv']:g}"
+        return f"tweedie {p['p']:g} {p['mean']:g} {p['dispersion']:g}"
+
+
+class FamilyNormalInverseGaussian(Family):
+    r"""The normal inverse Gaussian law, ``norminvgauss alpha beta delta mu``.
+
+    With :math:`|\beta| < \alpha`, :math:`\delta > 0` and
+    :math:`\gamma = \sqrt{\alpha^2 - \beta^2}`,
+    :math:`K(s) = \mu s + \delta\big(\gamma - \sqrt{\alpha^2 - (\beta+s)^2}\big)`
+    for :math:`-\alpha-\beta < s < \alpha-\beta` and
+    :math:`\varphi(s) = \exp K(is)` on the principal square root
+    [Barndorff-Nielsen 1997]. Mean :math:`\mu + \delta\beta/\gamma`, variance
+    :math:`\delta\alpha^2/\gamma^3`, skewness :math:`3\beta/(\alpha\sqrt{\delta\gamma})`.
+    The scipy law is ``norminvgauss(a=alpha*delta, b=beta*delta, loc=mu, scale=delta)``.
+    """
+
+    name = 'norminvgauss'
+
+    def __init__(self, parameters, form=None):
+        super().__init__(parameters, form)
+        p = self.parameters
+        self.alpha, self.beta = float(p['alpha']), float(p['beta'])
+        self.delta, self.mu = float(p['delta']), float(p['mu'])
+        if not abs(self.beta) < self.alpha:
+            raise ValueError(f'norminvgauss: |beta| < alpha is needed, got alpha {self.alpha}, beta {self.beta}')
+        if self.delta <= 0:
+            raise ValueError(f'norminvgauss: delta must be positive, got {self.delta}')
+        self.gamma = math.sqrt(self.alpha ** 2 - self.beta ** 2)
+        self.cgf_domain = (-self.alpha - self.beta, self.alpha - self.beta)
+
+    def chf(self, s):
+        s = np.asarray(s, dtype=complex)
+        a, b, d, m = self.alpha, self.beta, self.delta, self.mu
+        return np.exp(1j * m * s + d * (self.gamma - np.sqrt(a ** 2 - (b + 1j * s) ** 2)))
+
+    def cgf(self, s):
+        s = np.asarray(s, dtype=float)
+        lo, hi = self.cgf_domain
+        out = np.full(s.shape, np.nan)
+        ok = (s > lo) & (s < hi)
+        out[ok] = self.mu * s[ok] + self.delta * (
+            self.gamma - np.sqrt(self.alpha ** 2 - (self.beta + s[ok]) ** 2))
+        return out
+
+    @property
+    def moments(self):
+        a, b, d, g = self.alpha, self.beta, self.delta, self.gamma
+        return (self.mu + d * b / g, d * a ** 2 / g ** 3, 3 * b / (a * math.sqrt(d * g)))
+
+    @property
+    def reference(self):
+        return ss.norminvgauss(a=self.alpha * self.delta, b=self.beta * self.delta,
+                               loc=self.mu, scale=self.delta)
+
+    def to_decl(self):
+        return self._positional_decl()
+
+
+class FamilyVarianceGamma(Family):
+    r"""The variance gamma law, ``variancegamma sigma nu theta mu``.
+
+    Madan, Carr and Chang's :math:`(\sigma, \nu, \theta)` with a location
+    :math:`\mu`: :math:`K(s) = \mu s - \nu^{-1}\log(1 - \theta\nu s - \sigma^2\nu s^2/2)`
+    between the roots of the quadratic, and
+    :math:`\varphi(s) = e^{i\mu s}(1 - i\theta\nu s + \sigma^2\nu s^2/2)^{-1/\nu}`.
+    Mean :math:`\mu + \theta`, variance :math:`\sigma^2 + \nu\theta^2`, third
+    cumulant :math:`2\theta^3\nu^2 + 3\sigma^2\theta\nu`. At :math:`\theta = 0`,
+    :math:`\nu = 1` it is the Laplace law with scale :math:`\sigma/\sqrt2`,
+    which is its scipy reference. :math:`|\varphi|` decays only as
+    :math:`t^{-2/\nu}`, so a large :math:`\nu` is flagged by the truncation row.
+    """
+
+    name = 'variancegamma'
+
+    def __init__(self, parameters, form=None):
+        super().__init__(parameters, form)
+        p = self.parameters
+        self.sigma, self.nu = float(p['sigma']), float(p['nu'])
+        self.theta, self.mu = float(p['theta']), float(p['mu'])
+        if self.sigma <= 0 or self.nu <= 0:
+            raise ValueError(f'variancegamma: sigma and nu must be positive, got {self.sigma}, {self.nu}')
+        disc = math.sqrt(self.theta ** 2 * self.nu ** 2 + 2 * self.sigma ** 2 * self.nu)
+        denom = self.sigma ** 2 * self.nu
+        self.cgf_domain = ((-self.theta * self.nu - disc) / denom, (-self.theta * self.nu + disc) / denom)
+
+    def chf(self, s):
+        s = np.asarray(s, dtype=complex)
+        return (np.exp(1j * self.mu * s)
+                * (1 - 1j * self.theta * self.nu * s + 0.5 * self.sigma ** 2 * self.nu * s ** 2) ** (-1 / self.nu))
+
+    def cgf(self, s):
+        s = np.asarray(s, dtype=float)
+        lo, hi = self.cgf_domain
+        out = np.full(s.shape, np.nan)
+        ok = (s > lo) & (s < hi)
+        q = 1 - self.theta * self.nu * s[ok] - 0.5 * self.sigma ** 2 * self.nu * s[ok] ** 2
+        out[ok] = self.mu * s[ok] - np.log(q) / self.nu
+        return out
+
+    @property
+    def moments(self):
+        var = self.sigma ** 2 + self.nu * self.theta ** 2
+        k3 = 2 * self.theta ** 3 * self.nu ** 2 + 3 * self.sigma ** 2 * self.theta * self.nu
+        return (self.mu + self.theta, var, k3 / var ** 1.5)
+
+    @property
+    def reference(self):
+        if self.theta == 0 and self.nu == 1:
+            return ss.laplace(loc=self.mu, scale=self.sigma / math.sqrt(2))
+        return None
+
+    def to_decl(self):
+        return self._positional_decl()
+
+
+class FamilyTemperedStable(Family):
+    r"""The CGMY tempered stable law, ``temperedstable C G M Y [mu]``.
+
+    Carr, Geman, Madan and Yor's law with :math:`Y < 2`, :math:`Y \notin \{0, 1\}`:
+    :math:`K(s) = \mu s + C\Gamma(-Y)\big[(M-s)^Y - M^Y + (G+s)^Y - G^Y\big]`
+    for :math:`-G < s < M`, :math:`\varphi(s) = \exp K(is)` on the principal
+    powers, and cumulants :math:`\kappa_n = C\Gamma(n-Y)\big(M^{Y-n} + (-1)^n G^{Y-n}\big)`,
+    which give the mean :math:`\mu + \kappa_1`, variance and skewness.
+    """
+
+    name = 'temperedstable'
+
+    def __init__(self, parameters, form=None):
+        super().__init__(parameters, form)
+        p = self.parameters
+        self.C, self.G, self.M, self.Y = (float(p['C']), float(p['G']), float(p['M']), float(p['Y']))
+        self.mu = float(p.get('mu', 0.0))
+        if self.C <= 0 or self.G <= 0 or self.M <= 0:
+            raise ValueError(f'temperedstable: C, G and M must be positive, got {self.C}, {self.G}, {self.M}')
+        if not self.Y < 2 or self.Y in (0.0, 1.0):
+            raise ValueError(f'temperedstable: Y must be below 2 and not 0 or 1, got {self.Y}')
+        self.cgf_domain = (-self.G, self.M)
+        self.gamma_minus_y = gamma_function(-self.Y)
+
+    def _k(self, s):
+        C, G, M, Y = self.C, self.G, self.M, self.Y
+        return self.mu * s + C * self.gamma_minus_y * ((M - s) ** Y - M ** Y + (G + s) ** Y - G ** Y)
+
+    def chf(self, s):
+        s = np.asarray(s, dtype=complex)
+        return np.exp(self._k(1j * s))
+
+    def cgf(self, s):
+        s = np.asarray(s, dtype=float)
+        out = np.full(s.shape, np.nan)
+        ok = (s > -self.G) & (s < self.M)
+        out[ok] = self._k(s[ok])
+        return out
+
+    def cumulant(self, n):
+        """The ``n``-th cumulant, :math:`C\\Gamma(n-Y)(M^{Y-n} + (-1)^n G^{Y-n})`."""
+        C, G, M, Y = self.C, self.G, self.M, self.Y
+        return C * gamma_function(n - Y) * (M ** (Y - n) + (-1) ** n * G ** (Y - n))
+
+    @property
+    def moments(self):
+        k1, k2, k3 = (self.cumulant(n) for n in (1, 2, 3))
+        return (self.mu + k1, k2, k3 / k2 ** 1.5)
+
+    def to_decl(self):
+        p = self.parameters
+        parts = ['temperedstable'] + [f'{p[k]:g}' for k in ('C', 'G', 'M', 'Y')]
+        if 'mu' in p:
+            parts.append(f'{p["mu"]:g}')
+        return ' '.join(parts)
+
+
 #: Family word to class.
 FAMILIES = {
     'stable': FamilyStable,
+    'tweedie': FamilyTweedie,
     'norm': FamilyNormal,
     'gamma': FamilyGamma,
     'invgauss': FamilyInverseGaussian,
+    'norminvgauss': FamilyNormalInverseGaussian,
+    'variancegamma': FamilyVarianceGamma,
+    'temperedstable': FamilyTemperedStable,
 }
 
 
@@ -1191,26 +1519,85 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             tau = float(mode)
         return h, x0, tau
 
+    def _light_outside(self, h, x0, n):
+        """``(below, above)`` for an untilted law: the Chernoff bounds on the mass outside ``[x0, x0 + n h)``, which wraps in."""
+        fam = self.family
+        if not np.isfinite(fam.scale) and fam.cgf_domain == (0.0, 0.0):
+            return 0.0, 0.0
+        lo, hi = fam.support
+        s_minus, s_plus = fam.cgf_domain
+        scale = fam.scale if np.isfinite(fam.scale) and fam.scale > 0 else 1.0
+        x_top = x0 + n * h
+        above = 0.0 if x_top >= hi else (
+            chernoff_tail(fam.cgf, s_plus, x_top, scale) if s_plus > 0 else 1.0)
+        below = 0.0 if x0 <= lo else (
+            chernoff_tail(lambda u: fam.cgf(-u), -s_minus, -x0, scale) if s_minus < 0 else 1.0)
+        return float(below), float(above)
+
     def _plain_window(self, log2, bucket_sizing_p, bs):
-        """Rule A or C with no tilt: both edges at half the budget, the slack split."""
+        r"""Rule A or C with no tilt: ``(h, x0)``.
+
+        Rule A sizes the window from the edges at half the budget and splits
+        the slack of ``round_bucket``'s rounding between the sides, cut at a
+        finite support bound, so that neither tail's wrap lands on the far
+        end of the other side; 0 stays a grid point. That bucket is then
+        checked against frequency truncation: where :math:`|\varphi(\pi/h)|`
+        is above the mass the window leaves outside (the Chernoff bounds,
+        which wrap in), the bucket walks down the ladder, the window
+        shortening around the body, to the rung that minimizes
+        :math:`\max(|\varphi(\pi/h)|, \text{outside})`. A law whose
+        characteristic function decays slowly for its tail's reach, such as a
+        Tweedie with :math:`p > 2` and a small tilt, cannot have both at one
+        ``log2``, and the rule picks the balance and flags both rows; a law
+        rule A already resolves keeps rule A's bucket.
+        """
         n = 2 ** log2
         if self._x_min_fixed is not None:
             return float(bs or self._fixed_grid[0]), self._x_min_fixed
         eps = 1.0 - bucket_sizing_p
-        x_l, x_r = window_edges(self.family, eps / 2)
+        fam = self.family
+        x_l, x_r = window_edges(fam, eps / 2)
         if not (np.isfinite(x_l) and np.isfinite(x_r)) or x_r <= x_l:
             raise ValueError(
-                f'{self.name}: cannot size a window for {self.family!r}; '
+                f'{self.name}: cannot size a window for {fam!r}; '
                 'give bs and log2')
-        h = float(bs) if bs else round_bucket((x_r - x_l) / n)
-        # round_bucket rounds up by as much as 2x, so the window is wider than
-        # the edges need; the slack is split between the sides, cut at a
-        # finite support bound, so that neither tail's wrap lands on the far
-        # end of the other side. 0 stays a grid point.
-        slack = max(n * h - (x_r - x_l), 0.0)
-        x_left = max(self.family.support[0], x_l - slack / 2)
-        x0 = h * math.floor(x_left / h + 1e-12)
-        return h, x0
+        lo, hi = fam.support
+
+        def place(h):
+            """The left edge for a bucket ``h``: the slack split, or the window centered on the body when it is short."""
+            width = n * h
+            if width >= x_r - x_l:
+                slack = width - (x_r - x_l)
+                x_left = max(lo, x_l - slack / 2)
+            else:
+                mean = fam.moments[0]
+                center = mean if np.isfinite(mean) else 0.5 * (x_l + x_r)
+                x_left = min(max(lo, center - width / 2), x_r - width)
+                x_left = max(lo, x_left)
+            return h * math.floor(x_left / h + 1e-12)
+
+        if bs:
+            h = float(bs)
+            return h, place(h)
+        h = round_bucket((x_r - x_l) / n)
+        trunc = float(abs(fam.chf(np.array([np.pi / h]))[0]))
+        if trunc <= TRUNCATION_FLAG:
+            return h, place(h)
+        # walk the bucket down the ladder while that lowers the worse of the
+        # two errors; at most twenty rungs, a factor of about a million
+        best_h, best_x0 = h, place(h)
+        best = max(trunc, sum(self._light_outside(h, best_x0, n)))
+        for _ in range(20):
+            h = _round_bucket_down(h * (1 - 1e-9))
+            x0 = place(h)
+            trunc = float(abs(fam.chf(np.array([np.pi / h]))[0]))
+            score = max(trunc, sum(self._light_outside(h, x0, n)))
+            if score < best:
+                best, best_h, best_x0 = score, h, x0
+            elif trunc < score:
+                # the outside mass now dominates and only grows
+                break
+        return best_h, best_x0
 
     def _light_edge(self, fam, h, sigma2=0.0):
         """The left edge of a right-heavy half: its support bound or the 1e-40 Chernoff edge, a multiple of ``h``.
@@ -1453,7 +1840,9 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             return B * d_minus ** -alpha, A * d_plus ** -alpha
         fam = self._tilt_family()
         if fam is None:
-            return 0.0, 0.0
+            if self._x_min_fixed is not None:
+                return 0.0, 0.0
+            return self._light_outside(h, x0, n)
         if self.family.tilt_side == 'left':
             y_top = -(x0 - h / 2)
             return fam.tail_mass_above(y_top), 0.0
@@ -1490,8 +1879,9 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         for log2 in range(8, RECOMMENDED_LOG2_MAX + 1):
             h, _, x0, _ = self.grid_window(log2, p)
             resolved = not np.isfinite(scale) or scale / h >= MIN_BUCKETS_PER_SCALE
-            covered = sum(self._outside_at(log2, h, x0)) <= eps
-            if resolved and covered:
+            truncated = float(abs(self.family.chf(np.array([np.pi / h]))[0])) > TRUNCATION_FLAG
+            covered = x0 is None or sum(self._outside_at(log2, h, x0)) <= eps
+            if resolved and covered and not truncated:
                 return log2, h
         return RECOMMENDED_LOG2_MAX, h
 
@@ -1566,6 +1956,9 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         elif fam is None:
             p = invert_characteristic_function(self.family.chf, x0, h, n, 0.0,
                                                self.family.atom)
+            # the mass outside an untilted window wraps in; it is reported,
+            # and stays out of the first bucket
+            below, above = self._outside_at(log2, h, x0)
             edge_fam = self._tilt_family()
             if edge_fam is not None and self.family.tilt_side != 'split':
                 # the wrap of an untilted heavy tail, for the record
@@ -1842,18 +2235,23 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         neg = float(np.min(self.agg_density))
         rows.append(('most negative bucket', neg, 0.0, neg < -1e-12,
                      'a negative mass is frequency truncation ringing'))
-        if self.family.power_tails:
-            budget = 1.0 - self.bucket_sizing_p
-            om = self.outside_mass
+        budget = 1.0 - self.bucket_sizing_p
+        om = self.outside_mass
+        if self._x_min_fixed is None:
             if om > budget:
                 log2, bs = self.recommended_grid()
-                covered = sum(self._outside_at(log2, bs, self.grid_window(log2, self.bucket_sizing_p)[2])) <= budget
+                x0 = self.grid_window(log2, self.bucket_sizing_p)[2]
+                covered = (x0 is None or
+                           sum(self._outside_at(log2, bs, x0)) <= budget)
                 advice = (f'use hints{{log2={log2}; bs={bs:g}}}' if covered else
                           f'coverage needs log2 above {RECOMMENDED_LOG2_MAX}; '
                           f'log2={log2} with bs={bs:g} is the most this engine offers')
-            else:
+            elif tilted:
                 advice = 'the mass the window leaves out, below and above'
+            else:
+                advice = 'the mass outside the window, which wraps in (a Chernoff bound on a light tail)'
             rows.append(('outside mass', om, budget, om > budget, advice))
+        if self.family.power_tails:
             rows.append(('edge error', self.edge_error, EDGE_ERROR_FLAG,
                          self.edge_error > EDGE_ERROR_FLAG,
                          'modeled worst relative bucket error: damped wrap plus amplified roundoff'

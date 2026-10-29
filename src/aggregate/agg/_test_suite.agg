@@ -385,3 +385,13 @@ chfagg CHF.GammaCV      gamma 100 cv 0.5 hints{log2=14} note{the mean and cv for
 chfagg CHF.Normal as "Signed" norm 100 30 note{a signed window, with a display label}
 
 chfagg CHF.InvGauss     invgauss 100 400 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400}
+
+chfagg CHF.Tweedie      tweedie 1.5 100 2 note{the compound Poisson gamma member, with its atom at 0 split out}
+
+chfagg CHF.TweedieCV    tweedie 2.5 100 cv 0.5 note{a positive extreme stable member, tilted by its own theta}
+
+chfagg CHF.NIG          norminvgauss 2 0.5 3 1 note{normal inverse Gaussian: alpha beta delta mu}
+
+chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 0 note{variance gamma: sigma nu theta mu}
+
+chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, and an optional mu}

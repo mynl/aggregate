@@ -255,7 +255,8 @@ def test_accessors_delegate_to_the_grid_distribution(gamma_chf):
 
 def test_frames_carry_the_aggregate_columns(gamma_chf):
     c = gamma_chf
-    assert list(c.density_df.columns) == ['loss', 'p_total', 'p', 'F', 'S', 'lev', 'exa']
+    assert list(c.density_df.columns) == ['loss', 'p_total', 'p', 'log_p', 'F', 'S', 'lev', 'exa',
+                                          'exlea', 'e', 'exgta', 'exeqa']
     assert c.density_df.index.name == 'loss'
     a = build('agg G dfreq [1] sev 25 * gamma 4', log2=14)
     assert list(c.summary_df.columns) == list(a.summary_df.columns)
@@ -1489,3 +1490,79 @@ def test_the_two_reports_reach_the_exhibits():
     names = [n for n, _ in exhibits.available_exhibits(c)]
     assert 'bs_window' in names and 'tail_behavior' in names
     assert 'bs_window' not in [n for n, _ in exhibits.available_exhibits(build('chfagg R 25 * gamma 4', update=False))]
+
+
+# ----------------------------------------------------------------------
+# [CHF-Accessor-Parity]: the cheap members
+# ----------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def gamma_pair():
+    """``25 * gamma 4`` as a chfagg on its default grid and as the compound engine on the same grid."""
+    c = build('chfagg P.G 25 * gamma 4')
+    a = build('agg P.G dfreq [1] sev 25 * gamma 4', log2=c.log2, bs=c.bs)
+    return c, a
+
+
+def _nums(x):
+    return (x.select_dtypes('number').to_numpy(dtype=float) if isinstance(x, pd.DataFrame)
+            else np.asarray(x, dtype=float))
+
+
+def test_density_df_has_aggregates_columns(gamma_pair):
+    c, a = gamma_pair
+    assert list(c.density_df.columns) == list(a.density_df.columns)
+    assert c.density_df.index.name == a.density_df.index.name
+    df = c.density_df
+    assert np.isnan(df['exgta'].iloc[-1]) or df['S'].iloc[-1] > 1e-12
+    assert (df['exeqa'] == df['loss']).all() and (df['e'] == c.est_m).all()
+    assert len(c.density) <= len(df) and (c.density.p_total > 0).all()
+
+
+def test_pricing_members_agree_with_the_compound_engine(gamma_pair):
+    from aggregate import Distortion
+    c, a = gamma_pair
+    d = Distortion('ph', 0.8)
+    for f in (lambda o: o.price(0.99, d), lambda o: o.price_ccoc(0.1, p=0.99),
+              lambda o: o.price_pentagon_ex(p=0.99, LR=0.7),
+              lambda o: o.evaluate(120, p=0.99).evaluation_df,
+              lambda o: o.evaluate(120).evaluation_df):
+        assert np.nanmax(np.abs(_nums(f(c)) - _nums(f(a)))) < 1e-10
+    with pytest.raises(ValueError, match='needs the premium'):
+        c.evaluate()
+    c.apply_distortion(d)
+    a.apply_distortion(d)
+    ex_c, ex_a = c.density_df['exag'].to_numpy(), a.density_df['exag'].to_numpy()
+    assert np.max(np.abs(ex_c - ex_a)) < 1e-9 * np.max(ex_a)
+
+
+def test_sample_spec_json_value_type_and_str(gamma_pair):
+    import json as _json
+    c, _ = gamma_pair
+    s = c.sample(1000)
+    assert list(s.columns) == ['loss'] and len(s) == 1000 and s['loss'].isin(c.xs).all()
+    assert c.value_type == 'loss'
+    with pytest.raises(AttributeError):
+        c.value_type = 'payoff'
+    assert c.spec['family'] == 'gamma' and c.spec['chf_scale'] == 25
+    assert _json.loads(c.json())['shape'] == 4
+    r = AggregateCHF(**c.spec)
+    r.update(log2=c.log2, bs=c.bs)
+    assert np.array_equal(r.agg_density, c.agg_density)
+    assert str(c).startswith(c.info) and 'Mean' in str(c)
+
+
+def test_prob_eq_0_is_the_atom_plus_its_bucket():
+    from aggregate.tweedie import Tweedie
+    c = build('chfagg T tweedie 1.5 100 2', log2=14, bs=1 / 8)
+    tw = Tweedie(1.5, 100, 2)
+    f, shape, rate = (float(v) for v in tw.po_gamma_shape_rate)
+    a = build(f'agg TW {f} claims sev {1 / rate} * gamma {shape} poisson', log2=14, bs=1 / 8)
+    atom = c.family.atom[1]
+    # the atom plus the continuous mass on [0, h / 2); the continuous part
+    # rings at its jump at 0+ (about 3e-7 on this grid, see the oracle test
+    # above), so the bucket agrees with the compound engine's to that
+    assert atom < c.prob_eq_0 < atom + 1e-5
+    assert c.prob_eq_0 == pytest.approx(a.prob_eq_0, abs=1e-6)
+    assert c.prob_eq_0 == c.agg_density[0]
+    assert build('chfagg T tweedie 1.5 100 2', update=False).prob_eq_0 is None

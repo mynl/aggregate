@@ -162,12 +162,10 @@
   for a two-sided law the closed-form correction for each half's left-out mass
   re-entering through the other's tail, which sets the interior error below
   `alpha = 1`. The validation mean row of every stable law flags until then.
-- **[Characteristic-Function-Aggregate-Parity]**: `AggregateCHF`'s DecL, frames,
-  verdict and members in `Aggregate`'s shape, six steps,
-  `dev/done/plan-characteristic-function-aggregate-parity.md`.
-  `[CHF-Arithmetic-Form]` landed at 1.35.0, `[CHF-Aggregate-Frames]` at 1.36.0,
-  `[CHF-Validation-Verdict]` at 1.37.0, `[CHF-Sharpen]` at 1.38.0 (closing that
-  entry), `[CHF-Grid-And-Tail-Reports]` at 1.39.0; the cheap accessors follow.
+- **[Characteristic-Function-Aggregate-Parity]**: done, 1.35.0 to 1.40.0,
+  `dev/done/plan-characteristic-function-aggregate-parity.md`. Left over: a
+  distortion on a grid whose truncation rings (`choquet_weights` refuses the
+  negative masses), and the `sharpen` exhibit for `AggregateCHF`.
 - **[Stable-Conversion-Chfagg-Spelling]**: the `stable` conversion statement
   keeps `stable alpha beta [scale [loc]]`, the `Stable` parameters, while a
   `chfagg` writes `c * stable alpha beta + b` from 1.35.0. Add the `chfagg`

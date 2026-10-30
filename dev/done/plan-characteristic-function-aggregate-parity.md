@@ -722,3 +722,16 @@ Landed as specified, with these divergences.
 4. **`bs_description` says `wraps in` for an untilted grid and `leaves out` for a tilted one**, and adds `(raise log2 to N)` when the recommended `log2` is larger, in `Aggregate`'s form.
 5. **`dev/FEATURES.csv`** marks the seven members on `AggregateCHF`; the two exhibit lists in the tests grow to six.
 
+### [CHF-Accessor-Parity], 1.40.0
+
+Landed as specified, with these divergences.
+
+1. **The pricing acceptance runs on the default grid, not `hints{log2=12; bs=1/4}`.** On that grid `25 * gamma 4`'s truncation is 1.6e-10 (the gamma's characteristic function decays like `t^-4`), so the masses ring at about -4.9e-12 in the far tail, and the proportional hazard distortion, infinitely steep at 0, turns that into atom weights of -6.7e-10; `choquet_weights` refuses both. Even `hints{log2=14; bs=1/16}` (truncation 4e-13) gives weights of -8.3e-12. On the default grid (log2 16, bs 1/64, truncation 1.6e-15) `price`, `price_ccoc`, `price_pentagon_ex` and `evaluate` agree with the compound engine to 3e-11 and `exag` to 1.2e-10 relative. The delegation is left exactly `Aggregate`'s; tolerating the ringing would need a cleaned law for pricing, which is not a thin delegation. `apply_distortion`'s Notes say so. **For the author:** `tweedie 1.5 100 2` is refused on its default grid too (masses of -1.8e-8 at the jump at 0+), so distortion pricing of a Tweedie compound member needs a `chfagg` route this plan does not provide; the compound engine (`agg ... poisson` with a gamma severity) prices it.
+2. **`prob_eq_0` of `tweedie 1.5 100 2` is the atom plus its bucket, not the atom to 1e-9.** The bucket at 0 holds the atom and the continuous mass on `[0, h/2)`, as `Aggregate.prob_eq_0` documents (on log2 14, bs 1/8: 4.828e-5 against an atom of 4.540e-5). The test checks the bucket, and agreement with the compound engine's `prob_eq_0` on one grid to 1e-6, the ringing the existing oracle test allows.
+3. **`var_dict` takes `var` and `tvar`.** `_pricing.price` passes `kind='var'`, which the 1.34.0 `var_dict` handed to `q` and failed; it now marshals the kinds as `Aggregate.var_dict` does.
+4. **`spec` is the constructor's arguments** (`self._spec`, set in 1.36.0 for `id`), so `AggregateCHF(**c.spec)` rebuilds the law; a law built from a `Family` object records `to_decl()` as its family. `sample` clips negative masses to 0 for the weights.
+5. **`dev/FEATURES.csv`** marks the eleven members; `__str__` has no row.
+
+### Close
+
+All six steps landed, 1.35.0 to 1.40.0, each a commit with its tier 3 gate green (and the `RuntimeWarning` gate at every step but 1.39.0, which added only reports). The usage page is `D:/Projects/Using/aggregate/chf.qmd`, with `chf-stable.qmd`, rewritten for the arithmetic form. Left for the author: the Loss Lab ripple (its `gamma 4 25` probe and fixtures, and the capability test that expects four exhibits and no sharpen or evaluate), the distortion refusal on ringing grids, the `sharpen` exhibit, `[Stable-Conversion-Chfagg-Spelling]`, and the `Stable.fz` finding of step 1.

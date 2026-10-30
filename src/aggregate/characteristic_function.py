@@ -48,7 +48,7 @@ from scipy.special import gamma as gamma_function
 from scipy.special import zeta as hurwitz_zeta
 
 from ._aggregate import (_STATS_ROW_INDEX, SUMMARY_PERCENTILES, Aggregate,
-                         _summary_pct_label, return_period_frame)
+                         _summary_pct_label, return_period_frame, value_type_label)
 from ._bucket_window import BUCKET_SIZING_P
 from ._grid_distribution import GridDistribution
 from ._help import HelpMixin
@@ -2478,8 +2478,14 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return self._grid_distribution().prob_loss_assets(p=p, L=L, a=a)
 
     def var_dict(self, p, kind='lower', snap=False):
-        """``{name: q(p)}``, the one-entry form of ``Portfolio.var_dict``."""
-        x = self.q(p, kind)
+        """``{name: q(p)}``, the one-entry form of ``Portfolio.var_dict``, as ``Aggregate.var_dict``.
+
+        ``kind`` is ``'lower'`` (also ``'var'``), ``'upper'`` or ``'tvar'``,
+        the kinds :meth:`price` passes through.
+        """
+        if kind == 'var':
+            kind = 'lower'
+        x = self.tvar(p) if kind == 'tvar' else self.q(p, kind)
         if snap:
             x = self.snap(x)
         return {self.name: x}
@@ -2669,25 +2675,192 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
     # ---- frames -----------------------------------------------------------
     @property
     def density_df(self):
-        """Per-bucket frame: ``loss``, ``p_total``, ``p``, ``F``, ``S``, ``lev``, ``exa``, indexed by ``loss``.
+        r"""Per-bucket frame with ``Aggregate.density_df``'s columns, indexed by ``loss``.
 
-        The columns ``Aggregate.density_df`` carries that pricing reads;
-        ``lev`` is the direct sum :math:`\\sum_{x \\le a} x\\,p + a\\,S(a)`,
-        which carries the window origin.
+        ``loss, p_total, p, log_p, F, S, lev, exa, exlea, e, exgta, exeqa``,
+        with ``Aggregate``'s guards: ``lev`` is the direct sum
+        :math:`\sum_{x \le a} x\,p + a\,S(a)`, which carries the window
+        origin; ``exlea`` (``exgta``) is ``nan`` where ``F`` (``S``) is at or
+        below the noise floor; ``e`` is the grid mean, so on a tilted grid
+        ``exgta`` is the window's. ``p == p_total``, ``exa == lev`` and
+        ``exeqa == loss`` are duplicated on purpose, as on ``Aggregate``.
         """
         if self._density_df is None:
+            from ._validation import VALIDATION_NOISE
             self._require_update()
             x = np.asarray(self.xs, dtype=float)
             p = self.agg_density
             df = pd.DataFrame({'loss': x, 'p_total': p}).set_index('loss', drop=False)
             df['p'] = df['p_total']
+            with np.errstate(divide='ignore', invalid='ignore'):
+                df['log_p'] = np.log(df['p'])
             F = np.cumsum(p)
+            S = 1.0 - F
             df['F'] = F
-            df['S'] = 1.0 - F
-            df['lev'] = np.cumsum(x * p) + x * df['S'].to_numpy()
+            df['S'] = S
+            cum_xp = np.cumsum(x * p)
+            df['lev'] = cum_xp + x * S
             df['exa'] = df['lev']
+            with np.errstate(divide='ignore', invalid='ignore'):
+                exlea = cum_xp / F
+                exgta = (self.est_m - cum_xp) / S
+            exlea[F <= VALIDATION_NOISE] = np.nan
+            exgta[S <= VALIDATION_NOISE] = np.nan
+            df['exlea'] = exlea
+            df['e'] = self.est_m
+            df['exgta'] = exgta
+            df['exeqa'] = df['loss']
             self._density_df = df
         return self._density_df
+
+    @property
+    def density(self):
+        """The rows of :attr:`density_df` with positive mass, as ``Aggregate.density``."""
+        return self.density_df.query('p_total > 0')
+
+    @property
+    def value_type(self):
+        """``'loss'`` (the configured label), read-only: every law here is a loss."""
+        return value_type_label(True)
+
+    @property
+    def prob_eq_0(self):
+        """``P(X == 0)`` read off the grid, ``pmf(0)``; ``None`` before :meth:`update`.
+
+        For a Tweedie law with ``1 < p < 2`` it is the atom at 0 plus the
+        continuous mass rounding to the bucket at 0, as on ``Aggregate``.
+        """
+        if self.agg_density is None:
+            return None
+        return float(self.pmf(0.0))
+
+    @property
+    def spec(self):
+        """The constructor's arguments, the DecL spec when built from DecL; treat as read-only."""
+        return self._spec
+
+    def json(self):
+        """The spec as a JSON string."""
+        return json.dumps(self._spec)
+
+    def sample(self, n, replace=True):
+        """Draw ``n`` grid points with the grid's masses as weights, as ``Aggregate.sample``.
+
+        Returns a one-column (``loss``) frame. On a tilted grid the weights
+        are the window's, which sum to ``1 - outside_above``; ``pandas``
+        renormalizes them.
+        """
+        import aggregate.random_agg as ar
+        df = self.density_df
+        return df[['loss']].sample(n=n, weights=df.p_total.clip(lower=0.0),
+                                   replace=replace, random_state=ar.RANDOM,
+                                   ignore_index=True)
+
+    def price(self, p, g, kind='var'):
+        """Price with a regulatory capital rule and a pricing distortion, ``Aggregate.price``'s delegation to ``_pricing.price``."""
+        from . import _pricing
+        return _pricing.price(self, p, g, kind)
+
+    def price_ccoc(self, ccoc, *, p):
+        """The constant cost of capital price at a VaR level, ``price_pentagon(p=p, ROE=ccoc)``, as ``Aggregate.price_ccoc``."""
+        from . import _pricing
+        return _pricing.price_ccoc(self, ccoc, p=p)
+
+    def price_pentagon_ex(self, *, p=None, a=None, L=None, M=None, P=None, Q=None,
+                          LR=None, PQ=None, ROE=None):
+        """The pricing octet over the full pentagon vocabulary, as ``Aggregate.price_pentagon_ex`` with no reinsurance views."""
+        from . import _pricing
+        return _pricing.price_pentagon_ex(self, p=p, a=a, L=L, M=M, P=P, Q=Q, LR=LR,
+                                          PQ=PQ, ROE=ROE)
+
+    def evaluate(self, P=None, *, p=None, a=None, names=None):
+        """Evaluate the position ``P - X``, the breakeven acceptability panel, as ``Aggregate.evaluate``.
+
+        Parameters
+        ----------
+        P : float
+            The premium held. Required: a law declared from its characteristic
+            function carries no expected premium.
+        p, a : float, optional
+            At most one: the capital anchor as a VaR probability or an asset
+            level; neither is the unlimited reading.
+        names : sequence of str, optional
+            The distortion families; default ``_pricing.EVAL_FAMILIES``, or
+            ``EVAL_FAMILIES_ANCHORED`` with an anchor.
+
+        Returns
+        -------
+        EvaluationResult
+        """
+        from . import _pricing
+        from ._grid_distribution import GridDistribution
+        from .results import EvaluationResult
+        if P is None:
+            raise ValueError(f'{self.name}: evaluate needs the premium P=; a chfagg '
+                             'carries no expected premium.')
+        if p is not None and a is not None:
+            raise ValueError('evaluate: pass at most one of p= or a=.')
+        _pricing.guard_unbounded_anchor(self, p, where='evaluate')
+        s = self.density_df['p_total']
+        assets = p_val = None
+        if p is not None or a is not None:
+            gd = GridDistribution.from_series(s, bs=self.bs, name=self.name,
+                                              is_loss_value=True)
+            if a is None:
+                assets, p_val = float(gd.q(p)), float(p)
+            else:
+                assets = float(gd.snap(a))
+                p_val = float(gd.cdf(assets))
+        panel = _pricing.evaluate_constant_premium(
+            s.index.to_numpy(dtype=float), s.to_numpy(dtype=float), self.bs, float(P),
+            assets=assets, names=names)
+        panel = pd.concat([panel], keys=[self.name], names=['Step'])
+        _pricing.warn_degenerate(panel, self.name)
+        default_names = (_pricing.EVAL_FAMILIES if assets is None
+                         else _pricing.EVAL_FAMILIES_ANCHORED)
+        return EvaluationResult(
+            evaluation_df=panel, premium=float(P), reins_view=None, p=p_val, a=assets,
+            names=tuple(names if names is not None else default_names), _source=self)
+
+    def apply_distortion(self, dist, *, view='ask', S_calculation='forwards',
+                         allow_deficit=False):
+        r"""Apply a distortion to the grid, appending ``gS``, ``gp_total`` and ``exag`` to :attr:`density_df`, as ``Aggregate.apply_distortion``.
+
+        Routes through :func:`~aggregate.spectral.choquet_weights`, so
+        :math:`\mathrm{exag}(a) = \sum_{x \le a} x\,gp + a\,g(S(a))` carries the
+        window origin. A tilted grid's deficit is its ``outside_above``; a
+        materially defective one needs ``allow_deficit=True``. A mass
+        distortion is refused, since every law here is unbounded.
+
+        Notes
+        -----
+        Frequency truncation rings: the masses carry errors up to about
+        :math:`h\,|\varphi(\pi/h)|`, negative where the law is thin, which
+        the compound engine's masses never carry, and a distortion with an
+        infinite slope at 0 amplifies them in the far tail. On a grid whose
+        truncation is not at roundoff :func:`~aggregate.spectral.choquet_weights`
+        can therefore refuse (measured: ``25 * gamma 4`` at log2 12 and
+        ``bs=1/4``, :math:`|\varphi(\pi/h)| = 1.6\times10^{-10}`, negative
+        masses of -4.9e-12 and proportional hazard weights of -6.7e-10). A
+        finer bucket cures it; the default grid has the truncation at roundoff.
+        """
+        from .spectral import choquet_weights
+        if self.agg_density is None:
+            logger.warning('You must update before applying a distortion ')
+            return
+        if getattr(dist, 'has_mass', False) and not self.bounded:
+            raise ValueError(
+                f'mass distortion ({dist.label}) on an unbounded law: the mass lands '
+                f'on the last represented bucket, a different bounded problem.')
+        g, _, _ = dist.effective_g(view, is_loss_value=True)
+        df = self.density_df
+        x = df.loss.to_numpy()
+        p = df.p_total.to_numpy()
+        w = choquet_weights(x, p, g, S_calculation=S_calculation,
+                            allow_deficit=allow_deficit)
+        df['gS'] = w.gS
+        df['gp_total'] = w.gp
+        df['exag'] = np.cumsum(x * w.gp) + x * w.gS
 
     @property
     def summary_df(self):
@@ -3612,6 +3785,14 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         parts.append(f'Validation: {self.validation_description}.')
         return (f'<h3>AggregateCHF object: {self.label}</h3>\n'
                 f'<p>{" ".join(parts)}</p>')
+
+    def __str__(self):
+        """``info`` then ``summary_df``, as ``Aggregate.__str__``."""
+        s = [self.info]
+        with pd.option_context('display.width', 200, 'display.max_columns', 15,
+                               'display.float_format', lambda x: f'{x:,.5g}'):
+            s.append(str(self.summary_df))
+        return '\n'.join(s)
 
     def __repr__(self):
         grid = (f', log2 {self.log2}, bs {self.bs:g}' if self.agg_density is not None

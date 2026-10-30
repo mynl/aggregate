@@ -107,7 +107,7 @@ def pmf_deficit(ob):
     return 1.0 - float(np.sum(dens))
 
 
-def explain_validation(rv, deficit=None):
+def explain_validation(rv, deficit=None, subject='severity'):
     """
     Explain the validation result rv.
     Don't over report: if you fail CV don't need to be told you fail Skew too.
@@ -127,6 +127,10 @@ def explain_validation(rv, deficit=None):
         :attr:`~aggregate.constants.Validation.DEFECTIVE`. Optional because
         the flag alone is enough to name the failure; the magnitude is what
         tells the reader whether it matters.
+    subject : str, default 'severity'
+        What an ``INFEASIBLE`` grid cannot reproduce, in the prefix ``grid
+        infeasible for this <subject>``: ``'law'`` for a law computed from its
+        characteristic function (``[CHF-Validation-Verdict]``).
     """
     if rv == Validation.NOT_UNREASONABLE:
         return "not unreasonable"
@@ -146,8 +150,11 @@ def explain_validation(rv, deficit=None):
     if rv & Validation.AGG_MEAN:
         parts.append('agg mean')
     if rv & Validation.ALIASING:
-        parts.append('agg mean lost in the convolution, possible FFT wrap; '
-                     'raise log2')
+        parts.append('mass outside the window wrapped in; raise log2' if subject == 'law'
+                     else 'agg mean lost in the convolution, possible FFT wrap; '
+                          'raise log2')
+    if rv & Validation.TRUNCATION:
+        parts.append('characteristic function truncated at pi / bs, lower bs')
     if not (rv & Validation.SEV_MEAN) and (rv & Validation.SEV_CV):
         parts.append('sev cv')
     if not (rv & Validation.AGG_MEAN) and (rv & Validation.AGG_CV):
@@ -167,7 +174,7 @@ def explain_validation(rv, deficit=None):
     # moments hold still reads "not unreasonable" after the clause, and one
     # whose moments fail is told why they did. Same idiom as ``reinsurance``.
     if rv & Validation.INFEASIBLE:
-        return f'grid infeasible for this severity; {out}'
+        return f'grid infeasible for this {subject}; {out}'
     return out
 
 
@@ -475,6 +482,82 @@ def valid_portfolio(port):
     return rv
 
 
+def valid_characteristic_function(obj):
+    r"""The :class:`~aggregate.constants.Validation` flags of a law computed from its characteristic function.
+
+    The ``AggregateCHF`` counterpart of :func:`valid_aggregate`, kept beside it
+    rather than merged (the module's convention). Cached on ``obj._valid``,
+    which ``update`` clears.
+
+    Parameters
+    ----------
+    obj : AggregateCHF
+
+    Returns
+    -------
+    Validation
+
+    Notes
+    -----
+    The moment flags are ``valid_aggregate``'s, read off the same store
+    (``stats_df``): ``AGG_MEAN`` when the noise-aware relative error of the
+    mean exceeds ``eps``, ``AGG_CV`` and ``AGG_SKEW`` at ``10 eps`` and
+    ``100 eps``, tested only where the theoretical value is finite and above
+    :data:`VALIDATION_NOISE`, so a window statistic of a moment the law lacks
+    never fails. A stable law with a mean therefore fails ``agg mean`` by the
+    tail mass beyond its window, which the explanation quantifies. The grid
+    flags carry the inversion's checks:
+
+    * ``DEFECTIVE``: the deficit :math:`1 - \sum p` above
+      :data:`DEFICIT_MATERIALITY`, the mass a tilted window leaves out above;
+    * ``ALIASING``: an untilted grid whose outside mass exceeds
+      ``1 - bucket_sizing_p``, or whose heavy tail's edge error exceeds
+      ``EDGE_ERROR_FLAG``, mass that wrapped in;
+    * ``TRUNCATION``: ``truncation_error`` above ``TRUNCATION_FLAG``;
+    * ``INFEASIBLE``: no grid up to ``RECOMMENDED_LOG2_MAX`` meets coverage,
+      truncation and resolution together, checked only when one of the
+      three fails here.
+
+    The most negative bucket and the buckets per scale stay advisory rows of
+    ``info``: ``Aggregate``'s verdict has no negative mass or resolution test,
+    and a coarse grid shows in the moment errors.
+    """
+    if getattr(obj, '_valid', None) is not None:
+        return obj._valid
+    if obj.agg_density is None:
+        return Validation.NOT_UPDATED
+    from .characteristic_function import EDGE_ERROR_FLAG, TRUNCATION_FLAG
+    rv = Validation.NOT_UNREASONABLE
+    eps = obj.validation_eps
+    st = obj.stats_df
+    err = st['error'].abs()
+    if float(err.get(('agg', 'mean'), 0.0)) > eps:
+        rv |= Validation.AGG_MEAN
+    mixed, emp = st['mixed'], st['gross_empirical']
+    for measure, flag, mult in (('cv', Validation.AGG_CV, 10), ('skew', Validation.AGG_SKEW, 100)):
+        theo, est = float(mixed[('agg', measure)]), float(emp[('agg', measure)])
+        if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                and not np.isclose(est, theo, rtol=mult * eps, atol=VALIDATION_NOISE)):
+            rv |= flag
+    obj._deficit = pmf_deficit(obj)
+    if np.isfinite(obj._deficit) and obj._deficit > DEFICIT_MATERIALITY:
+        rv |= Validation.DEFECTIVE
+    budget = 1.0 - obj.bucket_sizing_p
+    untilted = max(obj.tilt) == 0
+    coverage_fails = obj._x_min_fixed is None and obj.outside_mass > budget
+    if untilted and (coverage_fails or (obj.family.power_tails
+                                        and np.isfinite(obj.edge_error)
+                                        and obj.edge_error > EDGE_ERROR_FLAG)):
+        rv |= Validation.ALIASING
+    truncated = obj.truncation_error > TRUNCATION_FLAG
+    if truncated:
+        rv |= Validation.TRUNCATION
+    if (coverage_fails or truncated or obj._coarse()) and not obj._recommended_grid_met():
+        rv |= Validation.INFEASIBLE
+    obj._valid = rv
+    return rv
+
+
 #: The six scored terms of :func:`validation_score`, as
 #: ``((component, measure), tolerance_multiple)``. The multiples are exactly the
 #: ones :func:`valid_aggregate` / :func:`valid_portfolio` apply: mean at ``eps``,
@@ -627,6 +710,35 @@ def validation_description(obj):
     return explain_validation(rv, getattr(obj, '_deficit', None))
 
 
+def validation_opening(short, eps, components='severity and for the aggregate'):
+    """The first two sentences of every validation explanation, as a list.
+
+    Shared by :func:`validation_explanation` (``Aggregate`` and ``Portfolio``)
+    and ``AggregateCHF.validation_explanation``, which names its one
+    component.
+
+    Parameters
+    ----------
+    short : str
+        The one-line verdict, :func:`explain_validation`'s.
+    eps : float or None
+        The object's ``validation_eps``.
+    components : str
+        What the moments are compared for, completing ``compared for ...``.
+
+    Returns
+    -------
+    list of str
+    """
+    tol = f'{eps:.3g}' if isinstance(eps, (int, float)) else 'the configured eps'
+    return [f'Validation of the realized grid against the analytic moments: '
+            f'{short}.',
+            f'Each of mean, CV and skewness is compared for {components}, and a '
+            f'relative error above {tol} fails; only the lowest-order failure is '
+            f'reported, since a mean that is wrong makes the higher moments '
+            f'uninformative.']
+
+
 def validation_explanation(obj):
     """Long-narrative explanation of the validation result (str).
 
@@ -646,14 +758,7 @@ def validation_explanation(obj):
         return ('Not validated: the object has not been updated, so there is no '
                 'realized grid to compare the analytic moments against. Call '
                 'update() (or build with update=True).')
-    eps = getattr(obj, 'validation_eps', None)
-    tol = f'{eps:.3g}' if isinstance(eps, (int, float)) else 'the configured eps'
-    out = [f'Validation of the realized grid against the analytic moments: '
-           f'{short}.',
-           f'Each of mean, CV and skewness is compared for severity and for the '
-           f'aggregate, and a relative error above {tol} fails; only the '
-           f'lowest-order failure is reported, since a mean that is wrong makes '
-           f'the higher moments uninformative.']
+    out = validation_opening(short, getattr(obj, 'validation_eps', None))
     if rv & Validation.INFEASIBLE:
         f = getattr(obj, '_bs_feasibility', None) or {}
         lost = f.get('lost_at_zero', np.nan)

@@ -6,13 +6,15 @@ percentiles by ``Freq``, ``Sev`` and ``Agg``, the first two empty), ``tail``
 (the return period ladder), ``stats`` (the moment store) and ``validation``
 (the law's moments against the grid's). The insurer treatments are
 ``Aggregate``'s: the summary's ``Agg`` row is flagged as the total and the
-moment store drops its raw moment rows. A ``chfagg`` has no frequency,
+moment store drops its raw moment rows, and the validation's ``Agg`` row is
+emphasized when ``valid`` fails it (1.37.0). A ``chfagg`` has no frequency,
 severity, cession or ledger, so none of the other exhibits apply.
 """
 
 from ..characteristic_function import AggregateCHF
-from ._core import (register_simple_exhibit, stats, summary,
-                    _stats_insurer_moment_store, _summary_flags)
+from ._core import (register_simple_exhibit, stats, summary, validation,
+                    _moment_validation_emphasis, _stats_insurer_moment_store,
+                    _summary_flags)
 
 register_simple_exhibit(
     'summary', 'Summary', 'summary_df', [AggregateCHF],
@@ -54,3 +56,11 @@ def _summary_insurer_chf(obj, blocks):
     """The summary with ``Aggregate``'s row flags: the ``Agg`` row is the total."""
     block_name, df, kw = blocks[0]
     return [(block_name, df, dict(kw, row_flags=_summary_flags(df)))]
+
+
+@validation.insurer.register(AggregateCHF)
+def _validation_insurer_chf(obj, blocks):
+    """The validation with ``Aggregate``'s emphasis: the ``Agg`` row when :attr:`~AggregateCHF.valid` fails it."""
+    block_name, df, kw = blocks[0]
+    flags = _moment_validation_emphasis(df, lambda unit: obj.valid)
+    return [(block_name, df, dict(kw, row_flags=flags))]

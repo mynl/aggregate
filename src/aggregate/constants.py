@@ -214,7 +214,10 @@ class Validation(Flag):
     severity cannot be reproduced on this grid at **any** bucket size, which
     is a reading about the grid rather than a failure, and so is transparent
     to :attr:`passes`; it explains the moment flags underneath it rather than
-    adding to them.
+    adding to them. ``TRUNCATION`` flags a law computed from its
+    characteristic function whose transform at the highest frequency kept,
+    :math:`\\pi/bs`, is above the truncation flag; ``Aggregate`` never sets it
+    (``[CHF-Validation-Verdict]``, 1.37.0).
     """
 
     NOT_UNREASONABLE = 0
@@ -229,6 +232,7 @@ class Validation(Flag):
     NOT_UPDATED = auto()
     DEFECTIVE = auto()
     INFEASIBLE = auto()
+    TRUNCATION = auto()
 
     @property
     def passes(self):

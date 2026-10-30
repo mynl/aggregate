@@ -123,7 +123,7 @@ def test_gamma_shape_one_is_truncation_limited_and_flagged():
     c.update()
     assert c.truncation_error > 1e-6
     assert c._checks_frame().loc['truncation error', 'status'] == 'flag'
-    assert 'truncation error' in c.validation_description
+    assert 'characteristic function truncated at pi / bs' in c.validation_description
     exact = _reference_masses(c.family.reference, c.xs, c.bs)
     assert np.max(np.abs(c.agg_density - exact)) < 1e-4
 
@@ -266,7 +266,7 @@ def test_frames_carry_the_aggregate_columns(gamma_chf):
     assert set(c._checks_frame()['status']) <= {'ok', 'flag'}
     assert c._checks_frame().loc['mean rel error', 'status'] == 'ok'
     assert c.validation_description == 'not unreasonable'
-    assert 'ok' in c.validation_explanation
+    assert 'not unreasonable' in c.validation_explanation
     assert c.summary_df.loc['Agg', 'Mean'] == pytest.approx(100)
 
 
@@ -305,7 +305,7 @@ def test_plot_returns_a_figure(gamma_chf):
 def test_before_update_the_frames_say_so():
     c = AggregateCHF('G', 'gamma', shape=4, scale=25)
     assert c.tail_df is None
-    assert c.validation_description == 'not updated'
+    assert c.validation_description == 'n/a, not updated'
     assert np.isnan(c.summary_df.loc['Agg', 'P99'])
     assert c.summary_df.loc['Agg', 'Mean'] == 100
     assert 'not updated' in repr(c)
@@ -540,7 +540,7 @@ def test_tilted_validation_rows_and_info():
     assert 'hints{log2=' in v.loc['outside mass', 'note']
     assert v.loc['tilt', 'value'] == c.tilt[1]
     assert v.loc['edge error', 'status'] == 'ok'
-    assert 'outside mass' in c.validation_description
+    assert 'pmf deficit' in c.validation_description
     info = c.info
     assert 'tilt' in info and 'theta' in info and 'outside mass' in info
     log2, bs = c.recommended_grid()
@@ -1288,3 +1288,88 @@ def test_info_has_aggregates_rows_then_the_inversion_block():
         n_ok = int((checks.drop([i for i in checks.index if i.startswith(('mean', 'cv', 'skew'))])['status']
                     == 'ok').sum())
         assert rows['checks'].startswith(f'{n_ok} ok'), program
+
+
+# ----------------------------------------------------------------------
+# [CHF-Validation-Verdict]: Aggregate's verdict, vocabulary and opening
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize('program, verdict', [
+    ('gamma 100 cv 0.5', 'not unreasonable'),
+    ('25 * gamma 4', 'not unreasonable'),
+    ('30 * norm + 100', 'not unreasonable'),
+    ('tweedie 1.5 100 2', 'not unreasonable'),
+    ('2 * stable 1.5 1 + 10', 'fails agg mean'),
+    ('stable 1.1 1', 'fails agg mean'),
+])
+def test_the_verdict_is_aggregates(program, verdict):
+    c = build(f'chfagg V {program}')
+    assert c.validation_description == verdict
+    assert c.validation_explanation.startswith(
+        f'Validation of the realized grid against the analytic moments: {verdict}. Each of '
+        'mean, CV and skewness is compared for the aggregate, and a relative error above '
+        '0.0001 fails;')
+    assert bool(c.valid.passes) == (verdict == 'not unreasonable')
+
+
+def test_the_grid_flags():
+    from aggregate.constants import Validation
+    g = build('chfagg V gamma 0.3 hints{log2=10}')
+    assert g.valid & Validation.TRUNCATION
+    assert 'characteristic function truncated at pi / bs, lower bs' in g.validation_description
+    s = build('chfagg V stable 0.7 1')
+    assert s.valid & Validation.DEFECTIVE and s.valid & Validation.INFEASIBLE
+    assert s.validation_description.startswith('grid infeasible for this law; fails pmf deficit')
+    w = build('chfagg V stable 1.5 1 hints{tilt=False}')
+    assert w.valid & Validation.ALIASING
+    assert 'mass outside the window wrapped in' in w.validation_description
+    u = build('chfagg V 25 * gamma 4', update=False)
+    assert u.valid == Validation.NOT_UPDATED and u.validation_description == 'n/a, not updated'
+    assert u.validation_explanation.startswith('Not validated')
+    a = build('agg V.A dfreq [1] sev 25 * gamma 4', log2=10)
+    assert not (a.valid & Validation.TRUNCATION) and Validation.TRUNCATION.value > Validation.INFEASIBLE.value
+    assert not Validation.TRUNCATION.passes
+
+
+def test_the_score_and_eps_are_aggregates():
+    c = build('chfagg V 25 * gamma 4')
+    assert c.validation_eps == build('agg V.A dfreq [1] sev 25 * gamma 4', log2=10).validation_eps
+    assert 0 <= c.validation_score < 1
+    assert build('chfagg V 2 * stable 1.5 1 + 10').validation_score > 1
+
+
+def test_tweedie_truncation_is_the_continuous_part():
+    c = build('chfagg T tweedie 1.5 100 2')
+    assert c.truncation_error == pytest.approx(1.129e-7, rel=1e-3)
+    assert c.recommended_grid()[0] < 24
+
+
+@pytest.mark.parametrize('program', ['2 * stable 1.5 1 + 10', 'stable 1.1 1', '2 * stable 1.5 0.5', 'stable 1.5 -1'])
+def test_the_completed_stable_mean_is_the_theoretical(program):
+    c = build(f'chfagg V {program}')
+    tail, completed = c._completed_mean()
+    assert abs(completed - c.actual_m) < 1e-5 * max(abs(c.actual_m), c.family.scale)
+    assert f'{completed:,.6g}' in c.validation_explanation
+
+
+def test_aggregate_and_portfolio_keep_their_opening():
+    from aggregate import build as b
+    a = b('agg O.A 10 claims sev lognorm 10 cv 1 poisson')
+    p = b('port O.P agg O.X 10 claims sev lognorm 10 cv 1 poisson agg O.Y 5 claims sev gamma 20 cv 0.5 poisson')
+    for obj in (a, p):
+        assert obj.validation_explanation.startswith(
+            f'Validation of the realized grid against the analytic moments: {obj.validation_description}. '
+            'Each of mean, CV and skewness is compared for severity and for the aggregate, and a '
+            'relative error above 0.0001 fails; only the lowest-order failure is reported, since a '
+            'mean that is wrong makes the higher moments uninformative.')
+
+
+def test_every_corpus_explanation_has_the_shared_opening():
+    root = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg'
+    lines = [ln.rstrip().rstrip(';') for ln in (root / '_test_suite.agg').read_text(encoding='utf-8').splitlines()
+             if ln.startswith('chfagg ')]
+    for program in lines:
+        c = build(program)
+        assert c.validation_explanation.startswith(
+            f'Validation of the realized grid against the analytic moments: {c.validation_description}. '
+            'Each of mean, CV and skewness is compared for the aggregate'), program

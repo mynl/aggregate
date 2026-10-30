@@ -796,6 +796,50 @@ class FamilyStable(Family):
                 break
         return float(total)
 
+    def tail_mean_above(self, x):
+        r"""``P[(X - delta_1) 1{X > x}]`` for ``beta = 1`` and ``alpha > 1``, the tail mean beyond ``x`` from the location.
+
+        Parameters
+        ----------
+        x : float
+            A point above the location, well into the tail.
+
+        Returns
+        -------
+        float
+
+        Notes
+        -----
+        With :math:`u = x - \delta_1` and the series of
+        :meth:`tail_mass_above`, :math:`\Pr(X > \delta_1 + v) = \sum_k t_k v^{-k\alpha}`,
+        :math:`\mathsf{P}[(X - \delta_1)1_{X > x}] = uS(x) + \int_u^\infty S = \sum_k t_k u^{1-k\alpha}\,k\alpha/(k\alpha - 1)`,
+        summed to its smallest term as the tail mass is. The first term is
+        :math:`A\alpha u^{1-\alpha}/(\alpha - 1)`; at :math:`\alpha = 1.1` the
+        rest moves the completed mean of ``stable 1.1 1`` at log2 16 from
+        3.6e-4 to under 1e-5 of the scale.
+        """
+        st = self.stable
+        a, g = st.alpha, st.scale
+        u = float(x) - st.loc
+        if not (a > 1 and a < 2 and st.beta == 1 and u > 0):
+            raise ValueError('tail_mean_above: needs beta = 1, 1 < alpha < 2 and x above the location')
+        s_signed = g ** a / math.cos(math.pi * a / 2)
+        log_s = math.log(abs(s_signed))
+        sign_s = 1.0 if s_signed > 0 else -1.0
+        total = 0.0
+        last = np.inf
+        for k in range(1, 400):
+            log_mag = math.lgamma(k * a) - math.lgamma(k + 1) + k * (log_s - a * math.log(u))
+            mag = math.exp(log_mag)
+            if mag > last:
+                break
+            last = mag
+            term = -((-1) ** k) * math.sin(k * math.pi * a) * mag * sign_s ** k / math.pi
+            total += term * u * k * a / (k * a - 1)
+            if mag < 1e-18 * max(abs(total), 1e-300):
+                break
+        return float(total)
+
     def halves(self):
         r"""The two totally skewed laws whose sum is this one: ``(plus, minus)``.
 
@@ -1331,6 +1375,10 @@ class FamilyAffine(Family):
         """``Pr(Y > x) = Pr(X > (x - b) / c)``."""
         return self.base.tail_mass_above((float(x) - self.b) / self.c)
 
+    def tail_mean_above(self, x):
+        """``P[(Y - delta_1) 1{Y > x}] = c P[(X - delta_1) 1{X > (x - b) / c}]``, for ``alpha > 1`` where the location is equivariant."""
+        return self.c * self.base.tail_mean_above((float(x) - self.b) / self.c)
+
     def location_under(self, c, b):
         """The location of ``c Y + b``, composed through the base."""
         return self.base.location_under(c * self.c, c * self.b + b)
@@ -1419,6 +1467,33 @@ def make_family(family, form=None, **parameters):
     if form == 'cv' and family not in FAMILY_CV_PARAMETERS:
         raise ValueError(f'chfagg: {family} has no mean cv form')
     return cls(parameters, form)
+
+
+def truncation_at(family, h):
+    r"""The frequency truncation of a bucket ``h``: :math:`|\varphi(\pi/h)|` of the part the inversion transforms.
+
+    For a law with an atom :math:`(x_a, w)` that is
+    :math:`|\varphi(\pi/h) - w e^{i\pi x_a/h}|`, since the inversion
+    subtracts the atom before transforming and adds it back to its bucket
+    (:func:`invert_characteristic_function`); the whole law's value tends to
+    :math:`w`, which no bucket reduces. ``tweedie 1.5 100 2``: 4.54e-5 for the
+    whole law, 1.13e-7 for the continuous part.
+
+    Parameters
+    ----------
+    family : Family
+    h : float
+
+    Returns
+    -------
+    float
+    """
+    s = np.array([np.pi / h])
+    c = complex(family.chf(s)[0])
+    if family.atom is not None:
+        xa, w = family.atom
+        c -= w * np.exp(1j * np.pi * xa / h)
+    return float(abs(c))
 
 
 def window_edges(family, eps_side):
@@ -1593,6 +1668,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.note = note
         self.tags = tuple(tags) if tags else ()
         self.hints = hints
+        #: the relative error tolerance of the moment validation, as on ``Aggregate``
+        self.validation_eps = get_settings().validation.eps
         #: the constructor's arguments, the DecL spec when built from DecL
         self._spec = {'name': name, **spec, 'note': note, 'tags': list(self.tags),
                       'hints': hints, 'label': label}
@@ -1628,6 +1705,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self._gd = None
         self._density_df = None
         self.figure = None
+        self._valid = None
+        self._deficit = np.nan
 
     # ---- constructors -----------------------------------------------------
     @classmethod
@@ -1851,7 +1930,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             h = float(bs)
             return h, place(h)
         h = round_bucket((x_r - x_l) / n)
-        trunc = float(abs(fam.chf(np.array([np.pi / h]))[0]))
+        trunc = truncation_at(fam, h)
         if trunc <= TRUNCATION_FLAG:
             return h, place(h)
         # walk the bucket down the ladder while that lowers the worse of the
@@ -1861,7 +1940,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         for _ in range(20):
             h = _round_bucket_down(h * (1 - 1e-9))
             x0 = place(h)
-            trunc = float(abs(fam.chf(np.array([np.pi / h]))[0]))
+            trunc = truncation_at(fam, h)
             score = max(trunc, sum(self._light_outside(h, x0, n)))
             if score < best:
                 best, best_h, best_x0 = score, h, x0
@@ -2142,19 +2221,33 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         grows ``log2`` is resolution, at least :data:`MIN_BUCKETS_PER_SCALE`
         buckets per body scale (:attr:`Family.scale`).
         """
+        log2, h, _ = self._recommend(epsilon)
+        return log2, h
+
+    def _recommend(self, epsilon=None):
+        """``(log2, bs, met)``: :meth:`recommended_grid` and whether its grid meets the target."""
         if self._x_min_fixed is not None:
-            return self._fixed_grid[1], self._fixed_grid[0]
+            return self._fixed_grid[1], self._fixed_grid[0], True
         eps = epsilon if epsilon is not None else 1.0 - self.bucket_sizing_p
         p = 1.0 - eps
         scale = self.family.scale
         for log2 in range(8, RECOMMENDED_LOG2_MAX + 1):
             h, _, x0, _ = self.grid_window(log2, p)
             resolved = not np.isfinite(scale) or scale / h >= MIN_BUCKETS_PER_SCALE
-            truncated = float(abs(self.family.chf(np.array([np.pi / h]))[0])) > TRUNCATION_FLAG
+            truncated = truncation_at(self.family, h) > TRUNCATION_FLAG
             covered = x0 is None or sum(self._outside_at(log2, h, x0)) <= eps
             if resolved and covered and not truncated:
-                return log2, h
-        return RECOMMENDED_LOG2_MAX, h
+                return log2, h, True
+        return RECOMMENDED_LOG2_MAX, h, False
+
+    def _recommended_grid_met(self):
+        """Whether some grid up to ``RECOMMENDED_LOG2_MAX`` meets coverage, truncation and resolution; ``False`` sets ``INFEASIBLE``."""
+        return self._recommend()[2]
+
+    def _coarse(self):
+        """Whether the grid has fewer than ``MIN_BUCKETS_PER_SCALE`` buckets per body scale."""
+        scale = self.family.scale
+        return bool(np.isfinite(scale) and scale / self.bs < MIN_BUCKETS_PER_SCALE)
 
     def update(self, log2=None, bs=0, bucket_sizing_p=BUCKET_SIZING_P, tilt=True,
                **kwargs):
@@ -2260,9 +2353,11 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.edge_error = edge_error
         self.xs = x0 + h * np.arange(n)
         self.agg_density = p
-        self.truncation_error = float(abs(self.family.chf(np.array([np.pi / h]))[0]))
+        self.truncation_error = truncation_at(self.family, h)
         self._gd = None
         self._density_df = None
+        self._valid = None
+        self._deficit = np.nan
         self._write_empirical_moments()
 
     @property
@@ -2749,24 +2844,156 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return df
 
     @property
+    def valid(self):
+        """The :class:`~aggregate.constants.Validation` flags of the grid; see :func:`aggregate._validation.valid_characteristic_function`."""
+        from . import _validation
+        return _validation.valid_characteristic_function(self)
+
+    @property
+    def validation_score(self):
+        """Continuous validation score in units of the tolerance, ``Aggregate.validation_score``'s (float).
+
+        The aggregate mean, CV and skewness errors over their tolerances,
+        combined as a power mean with ``power=2``; the severity terms are
+        ``nan`` and drop out. See
+        :func:`~aggregate._validation.validation_score`.
+        """
+        from . import _validation
+        return _validation.validation_score(self)
+
+    @property
     def validation_description(self):
-        """One-line verdict: ``not unreasonable`` or the flagged checks."""
-        if self.agg_density is None:
-            return 'not updated'
-        flagged = [r[0] for r in self._validation_rows() if r[3]]
-        return 'not unreasonable' if not flagged else 'flags ' + ', '.join(flagged)
+        """One-line verdict in ``Aggregate``'s words: ``not unreasonable``, ``fails agg mean``, ``n/a, not updated``."""
+        from ._validation import explain_validation
+        rv = self.valid
+        return explain_validation(rv, self._deficit, subject='law')
+
+    def _completed_mean(self):
+        r"""``(tail_mean, completed)``: the window's mean completed by the closed-form tails it leaves out, or ``None``.
+
+        Only for a tilted grid of a law with a power tail and a mean,
+        :math:`\alpha > 1`.
+
+        Notes
+        -----
+        The window sum leaves the mass above it out and puts the mass below
+        it at the first grid point :math:`x_0`. With
+        :math:`\Pr(X > x) \sim A(x - \delta_1)^{-\alpha}` above,
+        :math:`\mathsf{P}[(X - \delta_1)1_{X > u}] = A\alpha d^{1-\alpha}/(\alpha - 1)`,
+        :math:`d = u - \delta_1`, at the top bucket edge :math:`u`; below, the
+        same with :math:`B` and :math:`d = \delta_1 - l` at the bottom edge
+        :math:`l`, entering with the opposite sign, less the :math:`x_0` the
+        grid already counted for that mass. The completed mean is the window
+        mean plus both corrections; ``[CHF-Tail-Completion]`` in
+        ``dev/TODO.md`` carries the same tails into ``tvar`` and ``lev``.
+        """
+        fam = self.family
+        if self.agg_density is None or not fam.power_tails or max(self.tilt) == 0:
+            return None
+        A, B, alpha = fam.power_tails
+        if not alpha > 1:
+            return None
+        d1, h = fam.location, self.bs
+        upper = lower = 0.0
+        if A > 0 and self.outside_above > 0:
+            top = self.x_max + h / 2
+            if fam.tilt_side == 'right':
+                # one-sided: the series, as outside_above is
+                beyond = fam.tail_mean_above(top)
+            else:
+                beyond = A * alpha * (top - d1) ** (1 - alpha) / (alpha - 1)
+            upper = d1 * self.outside_above + beyond
+        if B > 0 and self.outside_below > 0:
+            bottom = self.x_min - h / 2
+            if fam.tilt_side == 'left':
+                beyond = fam.reflected().tail_mean_above(-bottom)
+            else:
+                beyond = B * alpha * (d1 - bottom) ** (1 - alpha) / (alpha - 1)
+            lower = d1 * self.outside_below - beyond - self.x_min * self.outside_below
+        return upper + lower, self.est_m + upper + lower
 
     @property
     def validation_explanation(self):
-        """The verbose form of :attr:`validation_description`, one sentence per check."""
-        if self.agg_density is None:
-            return 'The object has not been updated, so there is no grid to validate.'
-        parts = []
-        for name, value, target, flagged, note in self._validation_rows():
-            verdict = 'flagged' if flagged else 'ok'
-            tgt = '' if not np.isfinite(target) else f' against {target:g}'
-            parts.append(f'{name} {value:.4g}{tgt}, {verdict}: {note}.')
-        return ' '.join(parts)
+        """The verbose form of :attr:`validation_description`: ``Aggregate``'s opening, then the inversion's checks in words."""
+        from . import _validation
+        from .constants import Validation
+        rv = self.valid
+        if rv & Validation.NOT_UPDATED:
+            return ('Not validated: the object has not been updated, so there is no '
+                    'realized grid to compare the analytic moments against. Call '
+                    'update() (or build with update=True).')
+        out = _validation.validation_opening(self.validation_description,
+                                             self.validation_eps, 'the aggregate')
+        out.append("A law computed from its characteristic function has no frequency "
+                   "or severity, so the aggregate is its one component and the "
+                   "theoretical moments are the law's own, from its cumulants.")
+        rows = {r[0]: r for r in self._validation_rows()}
+        budget = 1.0 - self.bucket_sizing_p
+        if rv & Validation.INFEASIBLE:
+            log2, bs = self.recommended_grid()
+            out.append(f'No grid up to log2 {RECOMMENDED_LOG2_MAX} covers this law at '
+                       f'the budget while keeping the truncation and the resolution: '
+                       f'log2={log2} with bs={bs:g} is the most this engine offers, '
+                       f'so the failures here are the price of the law, not of the '
+                       f'grid chosen.')
+        if rv & Validation.DEFECTIVE:
+            out.append(f'The realized masses sum to {self.total_mass:.6g}: the window '
+                       f'leaves {self._deficit:.3e} of the probability out above it, '
+                       f'the closed-form tail mass, rather than wrapping it in. The '
+                       f'cumulative masses are right throughout the window. Raise '
+                       f'log2 to widen it.')
+        if rv & Validation.ALIASING:
+            out.append(f'The grid is untilted, so the mass outside the window wraps '
+                       f'onto it: {self.outside_mass:.3g} outside against a budget of '
+                       f'{budget:g}, edge error {self.edge_error:.3g}. Raise log2, or '
+                       f'let a heavy-tailed law tilt (the default, hints{{tilt=True}}).')
+        if rv & Validation.TRUNCATION:
+            out.append(f'The characteristic function at the highest frequency kept, '
+                       f'pi / bs, is {self.truncation_error:.3g} against '
+                       f'{TRUNCATION_FLAG:g}, so the masses ring at the scale of the '
+                       f'bucket. Lower bs.')
+        window = (f'The window from {self.x_min:,.6g} to {self.x_max:,.6g} holds '
+                  f'{self.total_mass:.6g} of the mass; {self.outside_mass:.3g} lies '
+                  f'outside it, {self.outside_below:.3g} below and '
+                  f'{self.outside_above:.3g} above, against a budget of {budget:g}')
+        if 'outside mass' in rows and rows['outside mass'][3]:
+            window += f': {rows["outside mass"][4]}'
+        out.append(window + '.')
+        if self.family.power_tails:
+            if max(self.tilt) > 0:
+                out.append(f'The heavy tail is tilted by ({self.tilt[0]:.3g}, '
+                           f'{self.tilt[1]:.3g}) e-folds across the window, theta '
+                           f'({self.tilt_theta[0]:.3g}, {self.tilt_theta[1]:.3g}) per '
+                           f'unit of loss, with a modeled edge error of '
+                           f'{self.edge_error:.3g} against {EDGE_ERROR_FLAG:g}.')
+            else:
+                out.append(f'The heavy tail is not tilted; the relative wrap at the '
+                           f'edge is {self.edge_error:.3g} against {EDGE_ERROR_FLAG:g}.')
+        if self.transfer_sigma:
+            out.append(f'The two halves of the split trade a normal law with sigma '
+                       f"{self.transfer_sigma:.3g}, which keeps the narrow half's "
+                       f'truncation at roundoff and leaves the product unchanged.')
+        if not rv & Validation.TRUNCATION:
+            out.append(f'The truncation, |phi(pi / bs)| of the part transformed, is '
+                       f'{self.truncation_error:.3g} against {TRUNCATION_FLAG:g}.')
+        scale = self.family.scale
+        if np.isfinite(scale):
+            out.append(f'The body scale {scale:,.4g} spans {scale / self.bs:,.3g} '
+                       f'buckets, against at least {MIN_BUCKETS_PER_SCALE}; the most '
+                       f'negative bucket is {float(np.min(self.agg_density)):.3g}.')
+        done = self._completed_mean()
+        if done is not None:
+            tail, completed = done
+            out.append(f'The law has a power tail, so the window mean '
+                       f'{self.est_m:,.6g} omits the tail beyond it, '
+                       f'{tail:,.6g} in closed form; the completed mean '
+                       f'{completed:,.6g} against the theoretical {self.actual_m:,.6g} '
+                       f'is the check the window cannot make.')
+        if rv == Validation.NOT_UNREASONABLE:
+            out.append('Nothing failed, so the object is not unreasonable. That is '
+                       'a statement about the numerics reproducing the model, not '
+                       'about the model being right for the risk.')
+        return ' '.join(out)
 
     # ---- display ----------------------------------------------------------
     def _spec_hash(self):

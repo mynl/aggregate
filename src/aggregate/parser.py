@@ -48,9 +48,10 @@ from types import SimpleNamespace
 from typing import Iterator
 
 import numpy as np
-from lark import Lark, Transformer
+from lark import Lark
 from lark.exceptions import (UnexpectedCharacters, UnexpectedInput,
                              UnexpectedToken, VisitError)
+from lark.visitors import Transformer_NonRecursive
 
 from .constants import NTT_EXPONENT_MAX_BITS
 from .parser_errors import format_error
@@ -512,9 +513,20 @@ def _number_to_float(s: str):
     return float(s)
 
 
-class UnderwritingTransformer(Transformer):
+class UnderwritingTransformer(Transformer_NonRecursive):
     """Transform a Lark parse tree into the SLY-compatible
-    ``(kind, name, spec)`` tuple consumed by ``aggregate.underwriter``."""
+    ``(kind, name, spec)`` tuple consumed by ``aggregate.underwriter``.
+
+    Notes
+    -----
+    The grammar writes its lists left recursively (``numberl: numberl expr``),
+    the efficient direction for an Earley parser, so a list of ``n`` items is a
+    tree ``n`` levels deep. Lark's plain ``Transformer`` uses two Python frames
+    per level and exhausted the interpreter's stack at about 500 items. The
+    non-recursive base walks the same tree, in the same left to right order,
+    with an explicit stack, so the length of a list is bounded by time rather
+    than by the recursion limit.
+    """
 
     def __init__(self, safe_lookup_function, debug: bool = False) -> None:
         super().__init__()

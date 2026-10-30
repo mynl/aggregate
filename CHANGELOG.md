@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.43.1 - 2026-10-30
+
+**[Long-DecL-Lists] A DecL list of any length parses: `UnderwritingTransformer` derives from `lark.visitors.Transformer_NonRecursive`.** A `dsev` vector of about 500 numbers, or a list of comparable length under any other left recursive rule such as inline `elt` rows, raised `RecursionError`. A vector of 40,000 numbers now parses in about 8 seconds. Specs and results are unchanged.
+
 ## 1.43.0 - 2026-10-30
 
 **[Stable-Arithmetic] `stable.NAME` references take `+`, `-`, `*`, `/`, unary minus and `@`, and `stable NAME <expression>` stores the result.** An expression alone returns an anonymous `Stable`, has kind `conversion` and stores nothing. `stable z <expression>` stores the four computed numbers, bound at parse time. Each occurrence of a reference is an independent copy: `stable.x + stable.x` has scale `2 ** (1 / alpha)`, `2 * stable.x` has scale 2, and `t @ stable.x` is the sum of `t` copies. New in Python: `Stable.__truediv__` and `Stable.__rmatmul__`. A `RecipeNotFound` for a name holding a minus sign, of any kind, now gives the spaced spelling, and a parse error no longer suggests a `builtin_*` terminal name. See `dev/done/plan-stable-expressions.md`.

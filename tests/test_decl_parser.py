@@ -14,6 +14,7 @@ Two test functions:
 
 import json
 import math
+import sys
 from fractions import Fraction
 from pathlib import Path
 
@@ -136,3 +137,36 @@ def test_spec_matches_snapshot(line: str, underwriter):
     assert kind == expected["kind"]
     assert name == expected["name"]
     _assert_equal(_normalize(spec), expected["spec"])
+
+
+def test_list_longer_than_recursion_limit(underwriter):
+    """A vector far longer than the recursion limit parses, in the order written.
+
+    Each item of a left recursive list is one level of the parse tree, and the
+    recursive ``lark.Transformer`` raised ``RecursionError`` at about 500.
+    """
+    xs = list(range(1, 2 * sys.getrecursionlimit() + 1))
+    line = f"agg LongVector 1 claim dsev [{' '.join(map(str, xs))}] fixed"
+    kind, name, spec = underwriter.parser.parse(underwriter.lexer.tokenize(line))
+    assert (kind, name) == ("agg", "LongVector")
+    assert list(spec["sev_xs"]) == xs
+
+
+def test_loss_table_longer_than_recursion_limit(underwriter):
+    """An inline event loss table far longer than the recursion limit parses."""
+    n = 2 * sys.getrecursionlimit()
+    rows = " ".join(f"[{i} .001 {i}]" for i in range(1, n + 1))
+    line = f"agg LongTable elt [{rows}]"
+    kind, name, spec = underwriter.parser.parse(underwriter.lexer.tokenize(line))
+    assert (kind, name) == ("agg", "LongTable")
+    assert len(spec["elt_sources"][0]["rows"]) == n
+
+
+def test_long_vector_builds_the_right_distribution():
+    """A long severity vector reaches the distribution, not just the spec."""
+    from aggregate import build
+
+    n = 600
+    xs = " ".join(str(i) for i in range(1, n + 1))
+    agg = build(f"agg LongVectorBuilt 1 claim dsev [{xs}] fixed")
+    assert agg.est_m == pytest.approx((n + 1) / 2)

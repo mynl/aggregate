@@ -73,7 +73,7 @@ def biv():
 
 @pytest.fixture(scope='module')
 def chf():
-    return build('chfagg FCC.CHF gamma 4 25', log2=12)
+    return build('chfagg FCC.CHF 25 * gamma 4', log2=12)
 
 
 @pytest.fixture(scope='module')

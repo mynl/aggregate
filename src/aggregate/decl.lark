@@ -63,23 +63,35 @@ conversion_out: TWEEDIE expr expr expr        -> conversion_tweedie_dispersion
 // ----------------------------------------------------------------------
 // A law computed by sampling its closed-form characteristic function on the
 // FFT frequency grid and inverting, with no severity or count to speak of:
-// the stable laws, the whole Tweedie family, and the normal, gamma and
-// inverse Gaussian laws, by name. ``stable`` and ``tweedie`` are keywords
-// with the shapes of the conversion statements; every other family word is
-// an ordinary ID validated by the transformer, so ``chfagg`` is the only new
-// reserved word. Not a port_item: a ``chfagg`` cannot appear inside a
+// the stable laws, the whole Tweedie family, and the normal, gamma, inverse
+// Gaussian, normal inverse Gaussian, variance gamma and tempered stable laws,
+// by name. ``stable`` and ``tweedie`` are keywords; every other family word
+// is an ordinary ID validated by the transformer, so ``chfagg`` is the only
+// new reserved word. Not a port_item: a ``chfagg`` cannot appear inside a
 // portfolio, pnl or bivariate, as ``nttagg`` cannot. See
 // dev/done/plan-characteristic-function-engine.md.
 // ======================================================================
 
 chfagg_out: CHFAGG name as_label chf_body trailer
 
-chf_body: STABLE numberl                -> chf_stable
-        | STABLE numberl ID             -> chf_stable_param
-        | TWEEDIE expr expr expr        -> chf_tweedie_dispersion
-        | TWEEDIE expr expr CV expr     -> chf_tweedie_cv
-        | ID numberl                    -> chf_family
-        | ID expr CV expr               -> chf_family_cv
+// Scale and location are arithmetic around the law, as on an agg severity:
+// ``c * FAMILY shapes + b``, the positional numbers the family's shapes only
+// (dev/done/plan-characteristic-function-aggregate-parity.md). Scalars, not
+// vectors: a chfagg has no vector form.
+chf_body: chf_law                       -> chf_plain
+        | expr TIMES chf_law            -> chf_scaled
+        | chf_law PLUS expr             -> chf_plus
+        | chf_law MINUS expr            -> chf_minus
+        | expr TIMES chf_law PLUS expr  -> chf_scaled_plus
+        | expr TIMES chf_law MINUS expr -> chf_scaled_minus
+
+chf_law: STABLE numberl                 -> chf_stable
+       | STABLE numberl ID              -> chf_stable_param
+       | TWEEDIE expr expr expr         -> chf_tweedie_dispersion
+       | TWEEDIE expr expr CV expr      -> chf_tweedie_cv
+       | ID numberl                     -> chf_family
+       | ID expr CV expr                -> chf_family_cv
+       | ID                             -> chf_family_bare
 
 // ======================================================================
 // Distortion

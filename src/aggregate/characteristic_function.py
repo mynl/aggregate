@@ -59,30 +59,44 @@ from .stable import Stable
 from .utilities import _round_bucket_down, round_bucket
 
 __all__ = ['AggregateCHF', 'Family', 'FamilyNormal', 'FamilyGamma',
-           'FamilyInverseGaussian', 'FamilyStable', 'FamilyUser',
+           'FamilyInverseGaussian', 'FamilyStable', 'FamilyUser', 'FamilyAffine',
            'FAMILY_PARAMETERS', 'FAMILY_CV_PARAMETERS', 'make_family',
-           'invert_characteristic_function', 'chernoff_edge']
+           'arithmetic_spelling', 'invert_characteristic_function', 'chernoff_edge']
 
 logger = logging.getLogger(__name__)
 
-#: Positional parameter names of each family's DecL body, in order. The
-#: parser maps ``ID numberl`` onto these; the class takes them as keywords.
+#: The shape parameters of each family's DecL body, in order: the positional
+#: numbers a ``chfagg`` takes, scipy's where scipy has the law. Scale and
+#: location are DecL arithmetic, ``c * FAMILY shapes + b``, held in the spec
+#: as ``chf_scale`` and ``chf_loc`` ([CHF-Arithmetic-Form]). ``tweedie``
+#: keeps its reproductive parameters; the variance gamma and tempered stable
+#: laws keep their published ones, less the location. The classes also take
+#: the full parameter set as keywords from Python.
 FAMILY_PARAMETERS = {
-    'stable': ('alpha', 'beta', 'scale', 'loc'),
+    'stable': ('alpha', 'beta'),
     'tweedie': ('p', 'mean', 'dispersion'),
+    'norm': (),
+    'gamma': ('shape',),
+    'invgauss': ('mu',),
+    'norminvgauss': ('a', 'b'),
+    'variancegamma': ('sigma', 'nu', 'theta'),
+    'temperedstable': ('C', 'G', 'M', 'Y'),
+}
+
+#: How many shapes each family takes; every shape is required.
+FAMILY_REQUIRED = {k: len(v) for k, v in FAMILY_PARAMETERS.items()}
+
+#: The positional parameters the ``chfagg`` body took before 1.35.0, scale
+#: and location among them, kept to compute the arithmetic spelling a
+#: refused body points at (:func:`arithmetic_spelling`).
+LEGACY_PARAMETERS = {
+    'stable': ('alpha', 'beta', 'scale', 'loc'),
     'norm': ('mean', 'sd'),
     'gamma': ('shape', 'scale'),
     'invgauss': ('mean', 'shape'),
     'norminvgauss': ('alpha', 'beta', 'delta', 'mu'),
     'variancegamma': ('sigma', 'nu', 'theta', 'mu'),
     'temperedstable': ('C', 'G', 'M', 'Y', 'mu'),
-}
-
-#: How many of a family's positional parameters are required; the rest are
-#: optional and trail. ``stable`` and ``tweedie`` have their own grammar.
-FAMILY_REQUIRED = {
-    'norm': 2, 'gamma': 2, 'invgauss': 2,
-    'norminvgauss': 4, 'variancegamma': 4, 'temperedstable': 4,
 }
 
 #: The ``mean cv`` form of the families that have one.
@@ -317,6 +331,24 @@ def chernoff_tail(cgf, s_max, x, scale):
 # families
 # ======================================================================
 
+def _decl_number(x):
+    """A DecL number: an integral value without a decimal point, else twelve significant digits."""
+    x = float(x)
+    if x == int(x) and abs(x) < 1e15:
+        return str(int(x))
+    return f'{x:.12g}'
+
+
+def render_affine(c, b, body):
+    """``c * body + b`` as DecL, a unit scale and a zero shift omitted, a negative shift written ``- |b|``."""
+    out = body if c == 1 else f'{_decl_number(c)} * {body}'
+    if b > 0:
+        out += f' + {_decl_number(b)}'
+    elif b < 0:
+        out += f' - {_decl_number(-b)}'
+    return out
+
+
 class Family:
     r"""The closed forms of one law, as the engine needs them.
 
@@ -390,29 +422,36 @@ class Family:
         """A scipy frozen law, or ``None``."""
         return None
 
-    def to_decl(self):
-        """The DecL body as written, ``family`` first."""
+    def _affine_parts(self):
+        """``(c, b, body)``: the law is ``c * body + b``, ``body`` the family word and its shapes, or its ``mean cv`` form."""
         raise NotImplementedError
+
+    def location_under(self, c, b):
+        r"""The :attr:`location` of :math:`cX + b`: :math:`c\delta_1 + b`, overridden where the location is not equivariant."""
+        return c * self.location + b
+
+    def to_decl(self):
+        """The DecL body, ``c * FAMILY shapes + b``, a unit scale and a zero shift omitted."""
+        return render_affine(*self._affine_parts())
 
     def __repr__(self):
         return f'{type(self).__name__}({self.to_decl()!r})'
 
     # ---- helpers shared by the two-form families -----------------------
-    def _positional_decl(self):
-        """``name p1 p2 ...`` in the family's positional order, or the cv form."""
-        if self.form == 'cv':
-            a, b = FAMILY_CV_PARAMETERS[self.name]
-            return f'{self.name} {self.parameters[a]:g} cv {self.parameters[b]:g}'
-        parts = [f'{self.parameters[k]:g}' for k in FAMILY_PARAMETERS[self.name]
-                 if k in self.parameters]
-        return ' '.join([self.name, *parts])
+    def _cv_decl(self):
+        """``name mean cv c``, the ``mean cv`` form as written."""
+        a, b = FAMILY_CV_PARAMETERS[self.name]
+        return (f'{self.name} {_decl_number(self.parameters[a])} cv '
+                f'{_decl_number(self.parameters[b])}')
 
 
 class FamilyNormal(Family):
-    r"""The normal law, ``norm mean sd`` or ``norm mean cv c``.
+    r"""The normal law, ``norm`` (standard, no shapes) or ``norm mean cv c``.
 
     :math:`\varphi(s) = \exp(i\mu s - \sigma^2 s^2/2)`, entire;
-    :math:`K(s) = \mu s + \sigma^2 s^2/2` on the whole line.
+    :math:`K(s) = \mu s + \sigma^2 s^2/2` on the whole line. DecL writes
+    :math:`N(\mu, \sigma^2)` as ``sigma * norm + mu``; from Python the keywords
+    ``mean`` and ``sd`` default to 0 and 1.
     """
 
     name = 'norm'
@@ -420,8 +459,8 @@ class FamilyNormal(Family):
     def __init__(self, parameters, form=None):
         super().__init__(parameters, form)
         p = self.parameters
-        self.mean = float(p['mean'])
-        self.sd = float(self.mean * p['cv']) if form == 'cv' else float(p['sd'])
+        self.mean = float(p.get('mean', 0.0))
+        self.sd = float(self.mean * p['cv']) if form == 'cv' else float(p.get('sd', 1.0))
         if self.sd <= 0:
             raise ValueError(f'norm: the standard deviation must be positive, got {self.sd}')
 
@@ -441,12 +480,14 @@ class FamilyNormal(Family):
     def reference(self):
         return ss.norm(loc=self.mean, scale=self.sd)
 
-    def to_decl(self):
-        return self._positional_decl()
+    def _affine_parts(self):
+        if self.form == 'cv':
+            return 1.0, 0.0, self._cv_decl()
+        return self.sd, self.mean, 'norm'
 
 
 class FamilyGamma(Family):
-    r"""The gamma law, ``gamma shape scale`` or ``gamma mean cv c``.
+    r"""The gamma law, ``gamma shape`` (scale 1) or ``gamma mean cv c``; ``scale`` from Python.
 
     :math:`\varphi(s) = (1 - i\theta s)^{-k}` on the principal branch, which
     is analytic on the upper half plane since
@@ -467,7 +508,7 @@ class FamilyGamma(Family):
             self.shape = 1 / cv ** 2
             self.theta = mean * cv ** 2
         else:
-            self.shape, self.theta = float(p['shape']), float(p['scale'])
+            self.shape, self.theta = float(p['shape']), float(p.get('scale', 1.0))
         if self.shape <= 0 or self.theta <= 0:
             raise ValueError('gamma: shape and scale must be positive, got '
                              f'{self.shape} and {self.theta}')
@@ -493,12 +534,14 @@ class FamilyGamma(Family):
     def reference(self):
         return ss.gamma(self.shape, scale=self.theta)
 
-    def to_decl(self):
-        return self._positional_decl()
+    def _affine_parts(self):
+        if self.form == 'cv':
+            return 1.0, 0.0, self._cv_decl()
+        return self.theta, 0.0, f'gamma {_decl_number(self.shape)}'
 
 
 class FamilyInverseGaussian(Family):
-    r"""The inverse Gaussian law, ``invgauss mean shape`` or ``invgauss mean cv c``.
+    r"""The inverse Gaussian law, ``invgauss mu`` (scipy's shape) or ``invgauss mean cv c``.
 
     With mean :math:`\mu` and shape :math:`\lambda`,
     :math:`K(s) = (\lambda/\mu)\big(1 - \sqrt{1 - 2\mu^2 s/\lambda}\big)` for
@@ -506,7 +549,10 @@ class FamilyInverseGaussian(Family):
     principal square root, whose argument has positive real part on the
     upper half plane. Variance :math:`\mu^3/\lambda`, skewness
     :math:`3\sqrt{\mu/\lambda}`. The scipy law is
-    ``invgauss(mu / lam, scale=lam)``.
+    ``invgauss(mu / lam, scale=lam)``, so DecL's ``invgauss mu`` is the law
+    with mean ``mu`` and shape 1, and ``lam * invgauss mu`` has mean
+    ``lam * mu`` and shape ``lam``. From Python the keywords ``mean`` and
+    ``shape`` give the law directly.
     """
 
     name = 'invgauss'
@@ -515,11 +561,13 @@ class FamilyInverseGaussian(Family):
     def __init__(self, parameters, form=None):
         super().__init__(parameters, form)
         p = self.parameters
-        self.mean = float(p['mean'])
         if form == 'cv':
+            self.mean = float(p['mean'])
             self.lam = self.mean / float(p['cv']) ** 2
+        elif 'mu' in p:
+            self.mean, self.lam = float(p['mu']), 1.0
         else:
-            self.lam = float(p['shape'])
+            self.mean, self.lam = float(p['mean']), float(p['shape'])
         if self.mean <= 0 or self.lam <= 0:
             raise ValueError('invgauss: mean and shape must be positive, got '
                              f'{self.mean} and {self.lam}')
@@ -547,12 +595,21 @@ class FamilyInverseGaussian(Family):
     def reference(self):
         return ss.invgauss(self.mean / self.lam, scale=self.lam)
 
-    def to_decl(self):
-        return self._positional_decl()
+    def _affine_parts(self):
+        if self.form == 'cv':
+            return 1.0, 0.0, self._cv_decl()
+        return self.lam, 0.0, f'invgauss {_decl_number(self.mean / self.lam)}'
 
 
 class FamilyStable(Family):
-    r"""The alpha-stable law, ``stable alpha beta [scale [loc]] [s0|s1]``.
+    r"""The alpha-stable law, ``stable alpha beta [s0|s1]``; ``scale`` and ``loc`` from Python.
+
+    DecL writes :math:`\gamma Z + \delta` for the standard law
+    :math:`Z \sim S(\alpha, \beta, 1, 0)` as ``gamma * stable alpha beta + delta``,
+    which is :math:`S(\alpha, \beta, \gamma, \delta; 0)` in S0 and, in S1,
+    :math:`S(\alpha, \beta, \gamma, \delta; 1)` for :math:`\alpha \ne 1` and
+    :math:`S(1, \beta, \gamma, \delta - (2/\pi)\beta\gamma\log\gamma; 1)` at
+    :math:`\alpha = 1`, as scipy's ``levy_stable(loc, scale)`` defines it.
 
     Wraps :class:`aggregate.stable.Stable`, which holds the S1 parameters and
     the closed forms. The characteristic function is the S1 form on the real
@@ -808,16 +865,32 @@ class FamilyStable(Family):
     def reference(self):
         return self.stable.fz
 
-    def to_decl(self):
-        p = self.parameters
-        parts = ['stable', f'{p["alpha"]:g}', f'{p["beta"]:g}']
-        if 'scale' in p:
-            parts.append(f'{p["scale"]:g}')
-            if 'loc' in p:
-                parts.append(f'{p["loc"]:g}')
-        if str(p.get('parameterization', 'S1')).upper() == 'S0':
-            parts.append('s0')
-        return ' '.join(parts)
+    def location_under(self, c, b):
+        r"""The S1 location :math:`\delta_1` of :math:`cX + b`.
+
+        S0 is equivariant for every :math:`\alpha`, so the S0 location of
+        :math:`cX + b` is :math:`c\delta_0 + b`, converted back to S1 at the
+        scale :math:`c\gamma`. For :math:`\alpha \ne 1` that is
+        :math:`c\delta_1 + b`; at :math:`\alpha = 1` it is
+        :math:`c\delta_1 + b - (2/\pi)\beta c\gamma\log c`.
+        """
+        st = self.stable
+        return Stable.s0_to_s1(st.alpha, st.beta, c * st.scale, c * st.loc0 + b)
+
+    def _affine_parts(self):
+        r"""``(gamma, shift, 'stable alpha beta [s0]')``: :math:`X = \gamma Z + \text{shift}`.
+
+        The shift is the S0 location :math:`\delta_0`, which equals the S1
+        location away from :math:`\alpha = 1`: the standard laws of the two
+        forms coincide at :math:`\alpha = 1` and differ by
+        :math:`\beta\tan(\pi\alpha/2)` elsewhere, where S1 is equivariant.
+        """
+        st = self.stable
+        s0 = str(self.parameters.get('parameterization', 'S1')).upper() == 'S0'
+        body = f'stable {_decl_number(st.alpha)} {_decl_number(self.parameters["beta"])}'
+        if s0:
+            return st.scale, st.loc0, body + ' s0'
+        return st.scale, (st.loc0 if st.alpha == 1 else st.loc), body
 
 
 class FamilyUser(Family):
@@ -899,7 +972,7 @@ class FamilyTweedie(Family):
             raise ValueError(
                 'chfagg: tweedie inf is the stable law with index 1 and no tilt '
                 '(its theta is 0 for every mean), which has a power tail; declare '
-                'it as chfagg NAME stable 1 1 <scale> <loc>')
+                'it as chfagg NAME <scale> * stable 1 1 + <shift>')
         if mean <= 0:
             raise ValueError(f'chfagg: the Tweedie mean must be positive, got {mean}')
         if form == 'cv':
@@ -958,17 +1031,24 @@ class FamilyTweedie(Family):
             return self.tweedie.fz
         return None
 
-    def to_decl(self):
+    def _affine_parts(self):
         p = self.parameters
         if self.form == 'cv':
-            return f"tweedie {p['p']:g} {p['mean']:g} cv {p['cv']:g}"
-        return f"tweedie {p['p']:g} {p['mean']:g} {p['dispersion']:g}"
+            body = f"tweedie {_decl_number(p['p'])} {_decl_number(p['mean'])} cv {_decl_number(p['cv'])}"
+        else:
+            body = (f"tweedie {_decl_number(p['p'])} {_decl_number(p['mean'])} "
+                    f"{_decl_number(p['dispersion'])}")
+        return 1.0, 0.0, body
 
 
 class FamilyNormalInverseGaussian(Family):
-    r"""The normal inverse Gaussian law, ``norminvgauss alpha beta delta mu``.
+    r"""The normal inverse Gaussian law, ``norminvgauss a b``, scipy's shapes.
 
-    With :math:`|\beta| < \alpha`, :math:`\delta > 0` and
+    DecL's ``delta * norminvgauss a b + mu`` is scipy's
+    ``norminvgauss(a, b, loc=mu, scale=delta)``, the law below with
+    :math:`\alpha = a/\delta` and :math:`\beta = b/\delta`; from Python the
+    keywords ``alpha``, ``beta``, ``delta`` and ``mu`` give it directly. With
+    :math:`|\beta| < \alpha`, :math:`\delta > 0` and
     :math:`\gamma = \sqrt{\alpha^2 - \beta^2}`,
     :math:`K(s) = \mu s + \delta\big(\gamma - \sqrt{\alpha^2 - (\beta+s)^2}\big)`
     for :math:`-\alpha-\beta < s < \alpha-\beta` and
@@ -983,8 +1063,11 @@ class FamilyNormalInverseGaussian(Family):
     def __init__(self, parameters, form=None):
         super().__init__(parameters, form)
         p = self.parameters
-        self.alpha, self.beta = float(p['alpha']), float(p['beta'])
-        self.delta, self.mu = float(p['delta']), float(p['mu'])
+        if 'a' in p:
+            self.alpha, self.beta, self.delta, self.mu = float(p['a']), float(p['b']), 1.0, 0.0
+        else:
+            self.alpha, self.beta = float(p['alpha']), float(p['beta'])
+            self.delta, self.mu = float(p['delta']), float(p['mu'])
         if not abs(self.beta) < self.alpha:
             raise ValueError(f'norminvgauss: |beta| < alpha is needed, got alpha {self.alpha}, beta {self.beta}')
         if self.delta <= 0:
@@ -1016,15 +1099,18 @@ class FamilyNormalInverseGaussian(Family):
         return ss.norminvgauss(a=self.alpha * self.delta, b=self.beta * self.delta,
                                loc=self.mu, scale=self.delta)
 
-    def to_decl(self):
-        return self._positional_decl()
+    def _affine_parts(self):
+        d = self.delta
+        return d, self.mu, (f'norminvgauss {_decl_number(self.alpha * d)} '
+                            f'{_decl_number(self.beta * d)}')
 
 
 class FamilyVarianceGamma(Family):
-    r"""The variance gamma law, ``variancegamma sigma nu theta mu``.
+    r"""The variance gamma law, ``variancegamma sigma nu theta``; the location ``mu`` is ``+ mu``.
 
     Madan, Carr and Chang's :math:`(\sigma, \nu, \theta)` with a location
-    :math:`\mu`: :math:`K(s) = \mu s - \nu^{-1}\log(1 - \theta\nu s - \sigma^2\nu s^2/2)`
+    :math:`\mu` (DecL's shift, the keyword ``mu`` from Python, default 0):
+    :math:`K(s) = \mu s - \nu^{-1}\log(1 - \theta\nu s - \sigma^2\nu s^2/2)`
     between the roots of the quadratic, and
     :math:`\varphi(s) = e^{i\mu s}(1 - i\theta\nu s + \sigma^2\nu s^2/2)^{-1/\nu}`.
     Mean :math:`\mu + \theta`, variance :math:`\sigma^2 + \nu\theta^2`, third
@@ -1040,7 +1126,7 @@ class FamilyVarianceGamma(Family):
         super().__init__(parameters, form)
         p = self.parameters
         self.sigma, self.nu = float(p['sigma']), float(p['nu'])
-        self.theta, self.mu = float(p['theta']), float(p['mu'])
+        self.theta, self.mu = float(p['theta']), float(p.get('mu', 0.0))
         if self.sigma <= 0 or self.nu <= 0:
             raise ValueError(f'variancegamma: sigma and nu must be positive, got {self.sigma}, {self.nu}')
         disc = math.sqrt(self.theta ** 2 * self.nu ** 2 + 2 * self.sigma ** 2 * self.nu)
@@ -1073,12 +1159,13 @@ class FamilyVarianceGamma(Family):
             return ss.laplace(loc=self.mu, scale=self.sigma / math.sqrt(2))
         return None
 
-    def to_decl(self):
-        return self._positional_decl()
+    def _affine_parts(self):
+        return 1.0, self.mu, ' '.join(['variancegamma', *(_decl_number(x) for x in
+                                       (self.sigma, self.nu, self.theta))])
 
 
 class FamilyTemperedStable(Family):
-    r"""The CGMY tempered stable law, ``temperedstable C G M Y [mu]``.
+    r"""The CGMY tempered stable law, ``temperedstable C G M Y``; the location ``mu`` is ``+ mu``.
 
     Carr, Geman, Madan and Yor's law with :math:`Y < 2`, :math:`Y \notin \{0, 1\}`:
     :math:`K(s) = \mu s + C\Gamma(-Y)\big[(M-s)^Y - M^Y + (G+s)^Y - G^Y\big]`
@@ -1126,12 +1213,163 @@ class FamilyTemperedStable(Family):
         k1, k2, k3 = (self.cumulant(n) for n in (1, 2, 3))
         return (self.mu + k1, k2, k3 / k2 ** 1.5)
 
-    def to_decl(self):
-        p = self.parameters
-        parts = ['temperedstable'] + [f'{p[k]:g}' for k in ('C', 'G', 'M', 'Y')]
-        if 'mu' in p:
-            parts.append(f'{p["mu"]:g}')
-        return ' '.join(parts)
+    def _affine_parts(self):
+        return 1.0, self.mu, ' '.join(['temperedstable', *(_decl_number(x) for x in
+                                       (self.C, self.G, self.M, self.Y))])
+
+
+class FamilyAffine(Family):
+    r"""The law of :math:`Y = cX + b`, :math:`c > 0`, for a family's law :math:`X`: DecL's ``c * FAMILY shapes + b``.
+
+    Implements the family protocol from the base's closed forms, so the
+    engine (window, tilt, split, inversion) runs on it unchanged.
+
+    Parameters
+    ----------
+    base : Family
+        The law of :math:`X`.
+    scale : float
+        :math:`c > 0`.
+    shift : float
+        :math:`b`.
+
+    Notes
+    -----
+    :math:`\varphi_Y(s) = e^{ibs}\varphi_X(cs)`, also on the tilted contour,
+    and :math:`K_Y(s) = K_X(cs) + bs` on :math:`(s_-/c, s_+/c)`. A power tail
+    :math:`\Pr(X > x) \sim A x^{-\alpha}` becomes
+    :math:`\Pr(Y > y) \sim Ac^\alpha y^{-\alpha}`, so the tail constants scale
+    by :math:`c^\alpha`; the support, the atom and the mean map through
+    :math:`x \mapsto cx + b`, the variance scales by :math:`c^2` and the
+    skewness is unchanged. The location the power edges are measured from is
+    the base's :meth:`Family.location_under`, which for a stable law at
+    :math:`\alpha = 1` in S1 carries the :math:`\beta\gamma\log c` term. The
+    scipy reference is the base's frozen law with ``loc`` and ``scale``
+    mapped, which is right for every law scipy holds as a location and scale
+    family, :math:`\alpha = 1` included.
+    """
+
+    def __init__(self, base, scale=1.0, shift=0.0):
+        c, b = float(scale), float(shift)
+        if not (np.isfinite(c) and c > 0):
+            raise ValueError(
+                f'chfagg: the scale c of c * {base.name} must be positive and finite, '
+                f'got {c:g}; a reflection -X is not supported (for a stable law '
+                'negate beta)')
+        if not np.isfinite(b):
+            raise ValueError(f'chfagg: the shift must be finite, got {b:g}')
+        super().__init__(base.parameters, base.form)
+        self.base = base
+        self.c = c
+        self.b = b
+        self.name = base.name
+        s_minus, s_plus = base.cgf_domain
+        self.cgf_domain = (s_minus / c, s_plus / c)
+        if base.power_tails:
+            A, B, alpha = base.power_tails
+            self.power_tails = (A * c ** alpha, B * c ** alpha, alpha)
+        self.tilt_side = base.tilt_side
+        self.location = base.location_under(c, b)
+        lo, hi = base.support
+        self.support = (c * lo + b, c * hi + b)
+        self.atom = None if base.atom is None else (c * base.atom[0] + b, base.atom[1])
+
+    def chf(self, s):
+        s = np.asarray(s, dtype=complex)
+        return np.exp(1j * self.b * s) * self.base.chf(self.c * s)
+
+    def cgf(self, s):
+        s = np.asarray(s, dtype=float)
+        return self.base.cgf(self.c * s) + self.b * s
+
+    @property
+    def scale(self):
+        return self.c * self.base.scale
+
+    @property
+    def moments(self):
+        mean, var, skew = self.base.moments
+        return (self.c * mean + self.b, self.c ** 2 * var, skew)
+
+    @property
+    def reference(self):
+        """The scipy law of ``c X + b``, or ``None`` where the base has none or it is not a scipy frozen law.
+
+        A stable law is rebuilt through :class:`~aggregate.stable.Stable` at
+        the mapped scale and S1 location, since scipy's S1 ``loc`` is Nolan's
+        :math:`\\delta_1`, which is not equivariant at :math:`\\alpha = 1`
+        (measured: ``2 * stable 1 0.5 + 3`` is scipy's S1 law with ``loc``
+        2.5587, not 3). Every other law maps scipy's ``loc`` and ``scale``.
+        """
+        st = getattr(self.base, 'stable', None)
+        if st is not None:
+            return Stable(st.alpha, st.beta, self.c * st.scale, self.location).fz
+        ref = self.base.reference
+        if ref is None or not hasattr(ref, 'dist') or not hasattr(ref, 'kwds'):
+            return None
+        kw = dict(ref.kwds)
+        kw['loc'] = self.c * kw.get('loc', 0.0) + self.b
+        kw['scale'] = self.c * kw.get('scale', 1.0)
+        return ref.dist(*ref.args, **kw)
+
+    @property
+    def density_bound(self):
+        """The base's bound over ``c``."""
+        return self.base.density_bound / self.c
+
+    def tail_mass_above(self, x):
+        """``Pr(Y > x) = Pr(X > (x - b) / c)``."""
+        return self.base.tail_mass_above((float(x) - self.b) / self.c)
+
+    def location_under(self, c, b):
+        """The location of ``c Y + b``, composed through the base."""
+        return self.base.location_under(c * self.c, c * self.b + b)
+
+    def halves(self):
+        """The base's halves under the same scale, the shift on the plus half."""
+        plus, minus = self.base.halves()
+        return FamilyAffine(plus, self.c, self.b), FamilyAffine(minus, self.c, 0.0)
+
+    def reflected(self):
+        """The family of ``-Y = c (-X) - b``."""
+        return FamilyAffine(self.base.reflected(), self.c, -self.b)
+
+    def _affine_parts(self):
+        c0, b0, body = self.base._affine_parts()
+        return self.c * c0, self.c * b0 + self.b, body
+
+
+def arithmetic_spelling(family, numbers, parameterization=None):
+    """The ``chfagg`` body, in arithmetic form, of a body written with scale and location numbers before 1.35.0.
+
+    Parameters
+    ----------
+    family : str
+        The family word.
+    numbers : sequence of float
+        The positional numbers as written, in the order of
+        :data:`LEGACY_PARAMETERS`.
+    parameterization : str, optional
+        ``'s0'`` or ``'s1'`` for a stable law.
+
+    Returns
+    -------
+    str or None
+        The body that declares the same law, ``c * FAMILY shapes + b``, or
+        ``None`` when the numbers do not make a law under the old reading
+        either.
+    """
+    names = LEGACY_PARAMETERS.get(family)
+    required = {'stable': 2, 'temperedstable': 4}.get(family, len(names or ()))
+    if names is None or not required <= len(numbers) <= len(names):
+        return None
+    params = dict(zip(names, (float(x) for x in numbers)))
+    if parameterization is not None:
+        params['parameterization'] = str(parameterization).upper()
+    try:
+        return make_family(family, None, **params).to_decl()
+    except (KeyError, ValueError, TypeError):
+        return None
 
 
 #: Family word to class.
@@ -1238,16 +1476,22 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
     ----------
     name : str
         The object's name, the DecL handle.
-    family : str
-        The family word: ``'stable'``, ``'norm'``, ``'gamma'`` or
-        ``'invgauss'`` (:data:`FAMILIES`).
+    family : str or Family
+        The family word (:data:`FAMILIES`), or a family object.
     form : str or None
         ``'cv'`` for the ``mean cv`` form of a two-form family.
     note, tags, hints, label, label_map
         The DecL trailer, as on every first-class class.
+    chf_scale, chf_loc : float, default 1 and 0
+        DecL's arithmetic, ``chf_scale * FAMILY shapes + chf_loc``: the law
+        declared is that of :math:`cX + b`, held as a :class:`FamilyAffine`,
+        with :math:`c > 0`. These are the spec keys, as ``sev_scale`` and
+        ``sev_loc`` hold the same arithmetic on an ``agg`` severity.
     **parameters
-        The family's parameters as written, keyed by name
-        (:data:`FAMILY_PARAMETERS`, :data:`FAMILY_CV_PARAMETERS`).
+        The family's parameters, keyed by name: the shapes
+        (:data:`FAMILY_PARAMETERS`), the ``mean cv`` form
+        (:data:`FAMILY_CV_PARAMETERS`), or from Python the full parameter set
+        each family class lists, scale and location included.
 
     Notes
     -----
@@ -1320,12 +1564,18 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
     """
 
     def __init__(self, name, family, form=None, note='', tags=(), hints='',
-                 label=None, label_map=None, **parameters):
+                 label=None, label_map=None, chf_scale=1.0, chf_loc=0.0,
+                 **parameters):
         self.name = name
         if isinstance(family, Family):
-            self.family = family
+            fam = family
         else:
-            self.family = make_family(family, form, **parameters)
+            fam = make_family(family, form, **parameters)
+        self.chf_scale = float(chf_scale)
+        self.chf_loc = float(chf_loc)
+        if (self.chf_scale, self.chf_loc) != (1.0, 0.0):
+            fam = FamilyAffine(fam, self.chf_scale, self.chf_loc)
+        self.family = fam
         self._init_labels(label=label, label_map=label_map)
         self.note = note
         self.tags = tuple(tags) if tags else ()
@@ -1562,6 +1812,9 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                 f'{self.name}: cannot size a window for {fam!r}; '
                 'give bs and log2')
         lo, hi = fam.support
+        # the grid points are the multiples of h from an anchor: 0, or an
+        # atom, which must be a grid point (a shifted Tweedie's sits at b)
+        anchor = fam.atom[0] if fam.atom is not None else 0.0
 
         def place(h):
             """The left edge for a bucket ``h``: the slack split, or the window centered on the body when it is short."""
@@ -1574,7 +1827,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                 center = mean if np.isfinite(mean) else 0.5 * (x_l + x_r)
                 x_left = min(max(lo, center - width / 2), x_r - width)
                 x_left = max(lo, x_left)
-            return h * math.floor(x_left / h + 1e-12)
+            return anchor + h * math.floor((x_left - anchor) / h + 1e-12)
 
         if bs:
             h = float(bs)

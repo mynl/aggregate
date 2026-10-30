@@ -598,44 +598,113 @@ class UnderwritingTransformer(Transformer):
         return c[0]
 
     # ----- chfagg ([Characteristic-Function-Statement]) --------------
-    _CHFAGG_FORM = ('chfagg NAME stable alpha beta [scale [loc]] [s0|s1] | '
-                    'tweedie p mean dispersion | tweedie p mean cv c | '
-                    'FAMILY p1 p2 | FAMILY mean cv c')
+    _CHFAGG_FORM = ('chfagg NAME [c *] LAW [+ b | - b], LAW one of stable alpha beta '
+                    '[s0|s1], tweedie p mean dispersion, tweedie p mean cv c, norm, '
+                    'gamma shape, invgauss mu, norminvgauss a b, variancegamma sigma '
+                    'nu theta, temperedstable C G M Y, or FAMILY mean cv c')
 
     def chfagg_out(self, c):
         """``chfagg NAME <body> <trailer>`` -> ``('chfagg', name, spec)``.
 
-        The spec carries the parameters as written, keyed by name, with
-        ``family`` and, for a two-form family, ``form`` (``'cv'`` or
-        ``None``), so the writer renders back exactly what was written and
+        The spec carries the shapes as written, keyed by name, with
+        ``family``, ``form`` (``'cv'`` or ``None``) and, when written, the
+        arithmetic ``chf_scale`` and ``chf_loc``, so the writer renders back
+        exactly what was written and
         :class:`aggregate.characteristic_function.AggregateCHF` converts.
         """
         _, name, as_label, body, trailer = c
         return ("chfagg", name, {"name": name, **as_label, **body, **trailer})
 
+    # ``c * LAW + b``: the arithmetic around the law ([CHF-Arithmetic-Form])
+    def chf_plain(self, c):
+        """``LAW``."""
+        return c[0]
+
+    @staticmethod
+    def _chf_scale(law, scale):
+        scale = float(scale)
+        if not (np.isfinite(scale) and scale > 0):
+            raise ValueError(
+                f"chfagg: the scale in 'c * {law['family']}' must be positive, got "
+                f"{scale:g}; a reflection is not supported (for a stable law, "
+                "negate beta)")
+        law["chf_scale"] = scale
+        return law
+
+    def chf_scaled(self, c):
+        """``c * LAW``."""
+        scale, _times, law = c
+        return self._chf_scale(law, scale)
+
+    def chf_plus(self, c):
+        """``LAW + b``."""
+        law, _plus, shift = c
+        law["chf_loc"] = float(shift)
+        return law
+
+    def chf_minus(self, c):
+        """``LAW - b``."""
+        law, _minus, shift = c
+        law["chf_loc"] = -float(shift)
+        return law
+
+    def chf_scaled_plus(self, c):
+        """``c * LAW + b``."""
+        scale, _times, law, _plus, shift = c
+        law = self._chf_scale(law, scale)
+        law["chf_loc"] = float(shift)
+        return law
+
+    def chf_scaled_minus(self, c):
+        """``c * LAW - b``."""
+        scale, _times, law, _minus, shift = c
+        law = self._chf_scale(law, scale)
+        law["chf_loc"] = -float(shift)
+        return law
+
+    @staticmethod
+    def _chf_refuse_count(family, names, numbers, parameterization=None):
+        """Raise the refusal of a body whose numbers are not the family's shapes, pointing at the arithmetic spelling."""
+        from .characteristic_function import _decl_number, arithmetic_spelling
+        count = (f"{len(names)} shape{'s' if len(names) != 1 else ''}, {' '.join(names)}"
+                 if names else 'no shape (the standard law)')
+        written = ' '.join([family, *(_decl_number(x) for x in numbers)])
+        if parameterization is not None:
+            written += f' {parameterization}'
+        msg = f"chfagg: {family} takes {count}, got {len(numbers)}."
+        new = arithmetic_spelling(family, numbers, parameterization)
+        if new is not None:
+            msg += (f" Scale and location are arithmetic around the law, as on an agg "
+                    f"severity: write '{written}' as '{new}'.")
+        else:
+            msg += (f" Scale and location are arithmetic around the law: "
+                    f"c * {family} shapes + b.")
+        if len(numbers) == len(names) + 1 and float(numbers[-1]) < 0:
+            # NUMBER absorbs a glued minus, so 'gamma 4 -10' is two numbers
+            msg += (f" A minus glued to a number is its sign; a shift is written "
+                    f"with a space, '- {_decl_number(-float(numbers[-1]))}'.")
+        raise ValueError(msg)
+
     def chf_stable(self, c):
-        """``stable alpha beta [scale [loc]]``."""
+        """``stable alpha beta``."""
         _st, numbers = c
         return self._chf_stable_spec(numbers, None)
 
     def chf_stable_param(self, c):
-        """``stable alpha beta [scale [loc]] s0|s1``."""
+        """``stable alpha beta s0|s1``."""
         _st, numbers, param = c
         return self._chf_stable_spec(numbers, str(param))
 
     def _chf_stable_spec(self, numbers, parameterization):
         numbers = list(np.atleast_1d(numbers))
-        if not 2 <= len(numbers) <= 4:
-            raise ValueError(
-                f"chfagg: the stable body is '{self._STABLE_FORM}', with two to "
-                f"four numbers, got {len(numbers)}")
         if parameterization is not None and parameterization.upper() not in ('S0', 'S1'):
             raise ValueError(
-                f"chfagg: the stable body is '{self._STABLE_FORM}'; the last "
+                f"chfagg: the stable law is 'stable alpha beta [s0|s1]'; the last "
                 f"word must be s0 or s1, got {parameterization!r}")
-        spec = {"family": "stable", "form": None}
-        for key, value in zip(('alpha', 'beta', 'scale', 'loc'), numbers):
-            spec[key] = float(value)
+        if len(numbers) != 2:
+            self._chf_refuse_count('stable', ('alpha', 'beta'), numbers, parameterization)
+        spec = {"family": "stable", "form": None,
+                "alpha": float(numbers[0]), "beta": float(numbers[1])}
         if parameterization is not None:
             spec["parameterization"] = parameterization
         return spec
@@ -662,21 +731,21 @@ class UnderwritingTransformer(Transformer):
         return word
 
     def chf_family(self, c):
-        """``FAMILY p1 p2 ...``: the family's positional parameters, by name."""
-        from .characteristic_function import FAMILY_PARAMETERS, FAMILY_REQUIRED
+        """``FAMILY s1 s2 ...``: the family's shapes, by name."""
         word, numbers = c
+        return self._chf_family_spec(word, list(np.atleast_1d(numbers)))
+
+    def chf_family_bare(self, c):
+        """``FAMILY`` with no numbers: the standard law of a family with no shape, ``norm``."""
+        word, = c
+        return self._chf_family_spec(word, [])
+
+    def _chf_family_spec(self, word, numbers):
+        from .characteristic_function import FAMILY_PARAMETERS
         family = self._chf_family_word(word)
-        numbers = list(np.atleast_1d(numbers))
         names = FAMILY_PARAMETERS[family]
-        required = FAMILY_REQUIRED[family]
-        if not required <= len(numbers) <= len(names):
-            count = (f'{required} numbers' if required == len(names)
-                     else f'{required} to {len(names)} numbers')
-            optional = names[required:]
-            tail = f" [{' '.join(optional)}]" if optional else ''
-            raise ValueError(
-                f"chfagg: {family} takes {count}, "
-                f"{' '.join(names[:required])}{tail}, got {len(numbers)}")
+        if len(numbers) != len(names):
+            self._chf_refuse_count(family, names, numbers)
         spec = {"family": family, "form": None}
         spec.update({k: float(v) for k, v in zip(names, numbers)})
         return spec

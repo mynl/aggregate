@@ -6289,7 +6289,7 @@
       "hints": ""
     }
   },
-  "chfagg CHF.Stable       stable 1.5 1 2 0 note{a totally skewed stable law, tilted}": {
+  "chfagg CHF.Stable       2 * stable 1.5 1 note{a totally skewed stable law, tilted}": {
     "kind": "chfagg",
     "name": "CHF.Stable",
     "spec": {
@@ -6298,13 +6298,12 @@
       "form": null,
       "alpha": 1.5,
       "beta": 1.0,
-      "scale": 2.0,
-      "loc": 0.0,
+      "chf_scale": 2.0,
       "note": "a totally skewed stable law, tilted",
       "hints": ""
     }
   },
-  "chfagg CHF.StableS0     stable 1.5 1 2 -2 s0 note{the same law written in S0}": {
+  "chfagg CHF.StableS0     2 * stable 1.5 1 s0 - 2 note{the same law written in S0}": {
     "kind": "chfagg",
     "name": "CHF.StableS0",
     "spec": {
@@ -6313,9 +6312,9 @@
       "form": null,
       "alpha": 1.5,
       "beta": 1.0,
-      "scale": 2.0,
-      "loc": -2.0,
       "parameterization": "s0",
+      "chf_scale": 2.0,
+      "chf_loc": -2.0,
       "note": "the same law written in S0",
       "hints": ""
     }
@@ -6346,7 +6345,7 @@
       "hints": "tilt=8"
     }
   },
-  "chfagg CHF.Gamma        gamma 4 25 note{the compound engine's gamma 4 25 severity, computed directly}": {
+  "chfagg CHF.Gamma        25 * gamma 4 note{the compound engine's 25 * gamma 4 severity, computed directly}": {
     "kind": "chfagg",
     "name": "CHF.Gamma",
     "spec": {
@@ -6354,8 +6353,8 @@
       "family": "gamma",
       "form": null,
       "shape": 4.0,
-      "scale": 25.0,
-      "note": "the compound engine's gamma 4 25 severity, computed directly",
+      "chf_scale": 25.0,
+      "note": "the compound engine's 25 * gamma 4 severity, computed directly",
       "hints": ""
     }
   },
@@ -6372,7 +6371,7 @@
       "hints": "log2=14"
     }
   },
-  "chfagg CHF.Normal as \"Signed\" norm 100 30 note{a signed window, with a display label}": {
+  "chfagg CHF.Normal as \"Signed\" 30 * norm + 100 note{a signed window, with a display label}": {
     "kind": "chfagg",
     "name": "CHF.Normal",
     "spec": {
@@ -6380,21 +6379,21 @@
       "label": "Signed",
       "family": "norm",
       "form": null,
-      "mean": 100.0,
-      "sd": 30.0,
+      "chf_scale": 30.0,
+      "chf_loc": 100.0,
       "note": "a signed window, with a display label",
       "hints": ""
     }
   },
-  "chfagg CHF.InvGauss     invgauss 100 400 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400}": {
+  "chfagg CHF.InvGauss     400 * invgauss 0.25 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400}": {
     "kind": "chfagg",
     "name": "CHF.InvGauss",
     "spec": {
       "name": "CHF.InvGauss",
       "family": "invgauss",
       "form": null,
-      "mean": 100.0,
-      "shape": 400.0,
+      "mu": 0.25,
+      "chf_scale": 400.0,
       "note": "inverse Gaussian with mean 100 and shape 400",
       "hints": "",
       "tags": [
@@ -6430,22 +6429,22 @@
       "hints": ""
     }
   },
-  "chfagg CHF.NIG          norminvgauss 2 0.5 3 1 note{normal inverse Gaussian: alpha beta delta mu}": {
+  "chfagg CHF.NIG          3 * norminvgauss 6 1.5 + 1 note{normal inverse Gaussian: scipy's shapes a b, scaled and shifted}": {
     "kind": "chfagg",
     "name": "CHF.NIG",
     "spec": {
       "name": "CHF.NIG",
       "family": "norminvgauss",
       "form": null,
-      "alpha": 2.0,
-      "beta": 0.5,
-      "delta": 3.0,
-      "mu": 1.0,
-      "note": "normal inverse Gaussian: alpha beta delta mu",
+      "a": 6.0,
+      "b": 1.5,
+      "chf_scale": 3.0,
+      "chf_loc": 1.0,
+      "note": "normal inverse Gaussian: scipy's shapes a b, scaled and shifted",
       "hints": ""
     }
   },
-  "chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 0 note{variance gamma: sigma nu theta mu}": {
+  "chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 note{variance gamma: sigma nu theta}": {
     "kind": "chfagg",
     "name": "CHF.VG",
     "spec": {
@@ -6455,12 +6454,11 @@
       "sigma": 0.2,
       "nu": 0.5,
       "theta": -0.1,
-      "mu": 0.0,
-      "note": "variance gamma: sigma nu theta mu",
+      "note": "variance gamma: sigma nu theta",
       "hints": ""
     }
   },
-  "chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, and an optional mu}": {
+  "chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, a location written + mu}": {
     "kind": "chfagg",
     "name": "CHF.CGMY",
     "spec": {
@@ -6471,11 +6469,11 @@
       "G": 5.0,
       "M": 10.0,
       "Y": 0.5,
-      "note": "tempered stable: C G M Y, and an optional mu",
+      "note": "tempered stable: C G M Y, a location written + mu",
       "hints": ""
     }
   },
-  "chfagg CHF.RefGamma     gamma 4 25 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below}": {
+  "chfagg CHF.RefGamma     25 * gamma 4 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below}": {
     "kind": "chfagg",
     "name": "CHF.RefGamma",
     "spec": {
@@ -6483,7 +6481,7 @@
       "family": "gamma",
       "form": null,
       "shape": 4.0,
-      "scale": 25.0,
+      "chf_scale": 25.0,
       "note": "a law pinned to its grid, for the reference below",
       "hints": "log2=12; bs=1/4"
     }

@@ -1365,19 +1365,18 @@ def _render_nttagg(name: str, spec: dict, trailer: bool = True) -> _Block:
          *_render_trailer(spec, trailer)])
 
 
-def _render_chf_body(spec: dict) -> str:
-    """Render a ``chfagg`` body from its spec: the family word and the parameters as written.
+def _render_chf_law(spec: dict) -> str:
+    """Render a ``chfagg`` law from its spec: the family word and its shapes as written.
 
-    ``stable`` renders its two to four numbers and the parameterization word
-    when one was written; ``tweedie`` its ``p mean dispersion`` or ``p mean
-    cv c``; every other family its positional parameters in the order of
-    ``FAMILY_PARAMETERS`` or, with ``form == 'cv'``, ``mean cv c``.
+    ``stable`` renders ``alpha beta`` and the parameterization word when one
+    was written; ``tweedie`` its ``p mean dispersion`` or ``p mean cv c``;
+    every other family its shapes in the order of ``FAMILY_PARAMETERS`` or,
+    with ``form == 'cv'``, ``mean cv c``.
     """
     from .characteristic_function import FAMILY_CV_PARAMETERS, FAMILY_PARAMETERS
     family = spec['family']
     if family == 'stable':
-        parts = [family] + [_fmt_num(spec[k]) for k in ('alpha', 'beta', 'scale', 'loc')
-                            if k in spec]
+        parts = [family, _fmt_num(spec['alpha']), _fmt_num(spec['beta'])]
         if spec.get('parameterization'):
             parts.append(str(spec['parameterization']))
         return ' '.join(parts)
@@ -1391,6 +1390,20 @@ def _render_chf_body(spec: dict) -> str:
         return f'{family} {_fmt_num(spec[a])} cv {_fmt_num(spec[b])}'
     return ' '.join([family, *(_fmt_num(spec[k]) for k in FAMILY_PARAMETERS[family]
                                if k in spec)])
+
+
+def _render_chf_body(spec: dict) -> str:
+    """Render a ``chfagg`` body: ``c * LAW + b`` from ``chf_scale`` and ``chf_loc``, a unit scale and a zero shift omitted."""
+    out = _render_chf_law(spec)
+    c = float(spec.get('chf_scale', 1.0))
+    b = float(spec.get('chf_loc', 0.0))
+    if c != 1:
+        out = f'{_fmt_num(c)} * {out}'
+    if b > 0:
+        out += f' + {_fmt_num(b)}'
+    elif b < 0:
+        out += f' - {_fmt_num(-b)}'
+    return out
 
 
 def _render_chfagg(name: str, spec: dict, trailer: bool = True) -> _Block:

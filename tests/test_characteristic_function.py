@@ -32,7 +32,7 @@ def _reference_masses(ref, xs, bs):
 # ----------------------------------------------------------------------
 
 def test_kernel_against_the_round_discretization_gamma():
-    """``chfagg G gamma 4 25`` and ``agg G dfreq [1] sev 25 * gamma 4`` agree bucket for bucket."""
+    """``chfagg G 25 * gamma 4`` and ``agg G dfreq [1] sev 25 * gamma 4`` agree bucket for bucket."""
     a = build('agg G dfreq [1] sev 25 * gamma 4', log2=12, bs=1 / 4)
     c = AggregateCHF('G', 'gamma', shape=4, scale=25)
     c.update(log2=12, bs=1 / 4)
@@ -219,7 +219,7 @@ def test_from_family_accepts_a_stable_object():
     c = AggregateCHF.from_family('S', Stable(1.5, 0.5, 2, 1), note='x')
     assert isinstance(c.family, FamilyStable)
     assert c.family.tilt_side == 'split'
-    assert c.family.to_decl() == 'stable 1.5 0.5 2 1'
+    assert c.family.to_decl() == '2 * stable 1.5 0.5 + 1'
     assert c.note == 'x'
     with pytest.raises(TypeError):
         AggregateCHF.from_family('S', object())
@@ -274,8 +274,8 @@ def test_info_repr_and_html(gamma_chf):
     c = gamma_chf
     info = c.info
     assert info.startswith('chfagg object name')
-    assert 'gamma 4 25' in info
-    assert "AggregateCHF('G': 'gamma 4 25', log2 14" in repr(c)
+    assert '25 * gamma 4' in info
+    assert "AggregateCHF('G': '25 * gamma 4', log2 14" in repr(c)
     html = c._repr_html_()
     assert '<h3>AggregateCHF object: G</h3>' in html and '<table' in html
     assert 'Validation: not unreasonable.' in c._text_info_blob()
@@ -656,14 +656,14 @@ def test_two_sided_number_tilts_both_halves_and_info_shows_the_transfer():
 # ----------------------------------------------------------------------
 
 CHF_PROGRAMS = [
-    'chfagg S stable 1.5 1 2 0',
-    'chfagg S0 stable 1.5 1 2 -2 s0',
+    'chfagg S 2 * stable 1.5 1',
+    'chfagg S0 2 * stable 1.5 1 s0 - 2',
     'chfagg W stable 0.7 1 hints{tilt=False}',
     'chfagg T stable 1.5 0.5 hints{tilt=8}',
-    'chfagg G gamma 4 25',
+    'chfagg G 25 * gamma 4',
     'chfagg GC gamma 100 cv 0.5 hints{log2=14}',
-    'chfagg N as "Signed" norm 100 30 note{a note}',
-    'chfagg I invgauss 100 400 tags{topic:numerics}',
+    'chfagg N as "Signed" 30 * norm + 100 note{a note}',
+    'chfagg I 400 * invgauss 0.25 tags{topic:numerics}',
     'chfagg IC invgauss 100 cv 0.5',
     'chfagg TW tweedie 1.5 100 2',
     'chfagg TWC tweedie 2.5 100 cv 0.5',
@@ -694,20 +694,28 @@ def test_chfagg_parses_and_the_writer_round_trips(program, underwriter):
 
 
 def test_chfagg_spec_carries_the_parameters_as_written(underwriter):
-    _, _, spec = _parse(underwriter, 'chfagg S0 stable 1.5 1 2 -2 s0')
-    assert spec['parameterization'] == 's0' and spec['loc'] == -2
+    _, _, spec = _parse(underwriter, 'chfagg S0 2 * stable 1.5 1 s0 - 2')
+    assert spec['parameterization'] == 's0' and spec['alpha'] == 1.5
+    assert spec['chf_scale'] == 2 and spec['chf_loc'] == -2
     _, _, spec = _parse(underwriter, 'chfagg GC gamma 100 cv 0.5')
     assert spec['form'] == 'cv' and spec['mean'] == 100 and spec['cv'] == 0.5
-    _, _, spec = _parse(underwriter, 'chfagg N as "Signed" norm 100 30')
-    assert spec['label'] == 'Signed' and spec['sd'] == 30
+    assert 'chf_scale' not in spec and 'chf_loc' not in spec
+    _, _, spec = _parse(underwriter, 'chfagg N as "Signed" 30 * norm + 100')
+    assert spec['label'] == 'Signed' and spec['chf_scale'] == 30 and spec['chf_loc'] == 100
+    _, _, spec = _parse(underwriter, 'chfagg G 2 * gamma 100 cv 0.5 + 10')
+    assert spec['form'] == 'cv' and spec['chf_scale'] == 2 and spec['chf_loc'] == 10
 
 
 @pytest.mark.parametrize('program, match', [
     ('chfagg X lognorm 1 2', 'unknown family'),
-    ('chfagg X stable 1.5', 'two to four numbers'),
-    ('chfagg X stable 1.5 1 2 0 5', 'two to four numbers'),
+    ('chfagg X stable 1.5', 'stable takes 2 shapes, alpha beta, got 1'),
+    ('chfagg X stable 1.5 1 2 0 5', 'stable takes 2 shapes, alpha beta, got 5'),
     ('chfagg X stable 1.5 1 s2', 'must be s0 or s1'),
-    ('chfagg X gamma 1 2 3', 'takes 2 numbers'),
+    ('chfagg X gamma 1 2 3', 'gamma takes 1 shape, shape, got 3'),
+    ('chfagg X gamma', 'gamma takes 1 shape, shape, got 0'),
+    ('chfagg X norm 100', 'norm takes no shape'),
+    ('chfagg X -2 * gamma 4', 'must be positive'),
+    ('chfagg X 0 * norm', 'must be positive'),
     ('chfagg X stable 1.5 cv 1', ''),
 ])
 def test_chfagg_refusals_name_the_form(program, match, underwriter):
@@ -717,14 +725,14 @@ def test_chfagg_refusals_name_the_form(program, match, underwriter):
 
 def test_build_chfagg_returns_an_updated_tilted_object():
     from aggregate.characteristic_function import AggregateCHF
-    s = build('chfagg S stable 1.5 1 2 0')
+    s = build('chfagg S 2 * stable 1.5 1')
     assert isinstance(s, AggregateCHF)
     assert s.agg_density is not None and s.tilt[1] > 5 and s.tilt[0] == 0
-    assert s.program == 'chfagg S stable 1.5 1 2 0'
+    assert s.program == 'chfagg S 2 * stable 1.5 1'
     assert s.pprogram.split() == s.program.split()
     assert not hasattr(s, 'pnl_program') and not hasattr(s, 'reins_program')
     assert not hasattr(s, 'sharpen')
-    t = build('chfagg T stable 1.5 0.5 2 0')
+    t = build('chfagg T 2 * stable 1.5 0.5')
     assert t.tilt[0] > 0 and t.tilt[1] > 0
 
 
@@ -733,11 +741,11 @@ def test_build_chfagg_hints_reach_update():
     assert w.tilt == (0.0, 0.0) and 0 < w.outside_mass < 1e-5
     e = build('chfagg E stable 1.5 1 hints{tilt=8; log2=12; bs=1/32}')
     assert e.tilt == (0.0, 8.0) and e.log2 == 12 and e.bs == 1 / 32
-    g = build('chfagg G gamma 4 25', log2=12, bs=1 / 4)
+    g = build('chfagg G 25 * gamma 4', log2=12, bs=1 / 4)
     assert (g.log2, g.bs) == (12, 0.25)
     n = build('chfagg N as "Signed" norm 100 cv 0.3 note{a note}')
     assert n.label == 'Signed' and n.note == 'a note' and n.x_min < 0
-    assert build('chfagg G gamma 4 25', update=False).agg_density is None
+    assert build('chfagg G 25 * gamma 4', update=False).agg_density is None
 
 
 def test_tilt_is_inert_on_an_agg():
@@ -823,21 +831,21 @@ def test_tweedie_fz_is_repaired_for_the_stable_members():
 
 
 def test_normal_inverse_gaussian_against_scipy():
-    c = build('chfagg N norminvgauss 2 0.5 3 1')
+    c = build('chfagg N 3 * norminvgauss 6 1.5 + 1')
     _against_reference(c, 1e-7)          # scipy's cdf is quadrature, about 1e-8
     mean, var, skew = c.family.moments
     g = np.sqrt(4 - 0.25)
     assert mean == pytest.approx(1 + 3 * 0.5 / g) and var == pytest.approx(3 * 4 / g ** 3)
     assert abs(c.est_m - mean) < 1e-6 and abs(c.est_skew - skew) < 1e-4
     with pytest.raises(ValueError, match='beta'):
-        build('chfagg N norminvgauss 1 2 3 0')
+        build('chfagg N norminvgauss 1 2')
 
 
 def test_variance_gamma_laplace_special_case_and_cumulants():
-    c = build('chfagg V variancegamma 0.2 1 0 0')
+    c = build('chfagg V variancegamma 0.2 1 0')
     _against_reference(c, 1e-7)
     assert c.family.reference.dist.name == 'laplace'
-    d = build('chfagg V variancegamma 0.2 0.5 -0.1 0')
+    d = build('chfagg V variancegamma 0.2 0.5 -0.1')
     mean, var, skew = d.family.moments
     assert (mean, var) == (-0.1, pytest.approx(0.04 + 0.5 * 0.01))
     assert abs(d.est_m - mean) < 1e-6 and abs(d.est_cv - d.agg_cv) < 1e-5 and abs(d.est_skew - skew) < 1e-3
@@ -851,12 +859,13 @@ def test_tempered_stable_cumulants():
     assert fam.mu == 0 and fam.cumulant(1) == mean
     assert abs(c.est_m - mean) < 1e-6 and abs(c.est_sd ** 2 - var) < 1e-6 * var
     assert abs(c.est_skew - skew) < 1e-5
-    d = build('chfagg T temperedstable 1 5 10 1.5 2')
-    assert d.family.mu == 2 and abs(d.est_m - d.family.moments[0]) < 1e-6
-    assert d.pprogram.split()[-5:] == ['temperedstable', '1', '5', '10', '1.5', '2'][-5:]
+    d = build('chfagg T temperedstable 1 5 10 1.5 + 2')
+    assert d.family.moments[0] == pytest.approx(d.family.base.moments[0] + 2)
+    assert abs(d.est_m - d.family.moments[0]) < 1e-6
+    assert ' '.join(d.pprogram.split()).endswith('temperedstable 1 5 10 1.5 + 2')
     for program, match in [('chfagg T temperedstable 1 5 10 2', 'below 2'),
                            ('chfagg T temperedstable 1 5 10 1', 'not 0 or 1'),
-                           ('chfagg T temperedstable 1 5 10', 'takes 4 to 5 numbers')]:
+                           ('chfagg T temperedstable 1 5 10', 'temperedstable takes 4 shapes, C G M Y, got 3')]:
         with pytest.raises(ValueError, match=match):
             build(program)
 
@@ -881,7 +890,7 @@ def _numeric(df):
 
 
 def test_pricing_agrees_with_the_compound_engine_on_one_grid():
-    c = build('chfagg G gamma 4 25', log2=12, bs=1 / 4)
+    c = build('chfagg G 25 * gamma 4', log2=12, bs=1 / 4)
     a = build('agg G dfreq [1] sev 25 * gamma 4', log2=12, bs=1 / 4)
     rc = c.calibrate_distortions(0.10, p=0.99)
     ra = a.calibrate_distortions(0.10, p=0.99)
@@ -898,7 +907,7 @@ def test_pricing_agrees_with_the_compound_engine_on_one_grid():
 def test_exhibits_and_charts_are_the_generic_four_and_the_one_chart():
     from aggregate.exhibits import available_exhibits, exhibit_frames
     from aggregate.charts import available_charts, build_chart_doc, primary_chart
-    c = build('chfagg G gamma 4 25', log2=12)
+    c = build('chfagg G 25 * gamma 4', log2=12)
     assert [n for n, _ in available_exhibits(c)] == ['summary', 'tail', 'stats', 'validation']
     for name in ('summary', 'tail', 'stats', 'validation'):
         (block, served, kw), = exhibit_frames(c, name)
@@ -911,7 +920,7 @@ def test_exhibits_and_charts_are_the_generic_four_and_the_one_chart():
     s = build('chfagg S stable 1.5 1', log2=12)
     assert {x.name for x in build_chart_doc(s, 'chfagg').series} == {'stable'}
     assert not hasattr(c, 'pnl_program') and not hasattr(c, 'reins_program')
-    before = build('chfagg G gamma 4 25', update=False)
+    before = build('chfagg G 25 * gamma 4', update=False)
     assert available_charts(before) == []
 
 
@@ -921,7 +930,7 @@ def test_exhibits_and_charts_are_the_generic_four_and_the_one_chart():
 
 def test_chfagg_as_a_severity_matches_the_direct_severity():
     """``agg X dfreq [2] sev chfagg.G`` and ``agg X dfreq [2] sev 25 * gamma 4`` agree on one grid."""
-    g = build('chfagg SR.G gamma 4 25 hints{log2=12; bs=1/4}')
+    g = build('chfagg SR.G 25 * gamma 4 hints{log2=12; bs=1/4}')
     a = build('agg SR.X dfreq [2] sev chfagg.SR.G', log2=12, bs=1 / 4)
     b = build('agg SR.Y dfreq [2] sev 25 * gamma 4', log2=12, bs=1 / 4)
     assert np.max(np.abs(a.density_df['p_total'] - b.density_df['p_total'])) < 1e-10
@@ -931,7 +940,7 @@ def test_chfagg_as_a_severity_matches_the_direct_severity():
 
 
 def test_ssev_chfagg_keeps_the_negative_atoms_and_sev_clamps_them():
-    build('chfagg SR.N norm 100 30 hints{log2=12; bs=1/4}')
+    build('chfagg SR.N 30 * norm + 100 hints{log2=12; bs=1/4}')
     signed = build('agg SR.S dfreq [1] ssev chfagg.SR.N', log2=12, bs=1 / 4)
     assert signed.density_df.index.min() < 0
     assert abs(signed.est_m - 100) < 1e-9
@@ -941,7 +950,7 @@ def test_ssev_chfagg_keeps_the_negative_atoms_and_sev_clamps_them():
 
 
 def test_hygiene_error_names_with_hints_and_gives_the_chfagg_grid():
-    build('chfagg SR.H gamma 4 25')
+    build('chfagg SR.H 25 * gamma 4')
     with pytest.raises(ValueError, match=r'with_hints\(\)') as err:
         build('agg SR.UsesH dfreq [2] sev chfagg.SR.H')
     assert 'hints{log2=16; bs=1/64}' in str(err.value)
@@ -961,19 +970,19 @@ def test_with_hints_pins_the_grid_and_carries_tilt():
 
 def test_output_hook_and_support_for_the_reference():
     from aggregate.tail import output_support_max
-    g = build('chfagg SR.O gamma 4 25', log2=12)
+    g = build('chfagg SR.O 25 * gamma 4', log2=12)
     xs, ps = g._output_xs_ps()
     assert xs is g.xs and ps is g.agg_density
     assert output_support_max(g) == np.inf
     for program in ('agg SR.A dfreq [1] dsev [1]', 'port SR.P agg SR.PA dfreq [1] dsev [1]'):
         xs, ps = build(program, log2=8)._output_xs_ps()
         assert len(xs) == len(ps) > 0
-    assert build('chfagg SR.U gamma 4 25', update=False)._output_xs_ps() == (None, None)
+    assert build('chfagg SR.U 25 * gamma 4', update=False)._output_xs_ps() == (None, None)
 
 
 def test_tilted_reference_reports_its_deficit():
     from aggregate.constants import DefectiveDistributionWarning
-    s = build('chfagg SR.T stable 1.5 1 2 0 hints{log2=12; bs=1/8}')
+    s = build('chfagg SR.T 2 * stable 1.5 1 hints{log2=12; bs=1/8}')
     with pytest.warns(DefectiveDistributionWarning, match='missing'):
         t = build('agg SR.UsesT dfreq [1] ssev chfagg.SR.T', log2=14, bs=1 / 8)
     # ssev keeps the signed atoms; the reference renormalizes over the deficit
@@ -982,7 +991,7 @@ def test_tilted_reference_reports_its_deficit():
 
 def test_sev_chfagg_round_trips_through_the_writer(underwriter):
     from aggregate.decl_writer import spec_to_decl
-    underwriter.build('chfagg SR.R gamma 4 25 hints{log2=12; bs=1/4}')
+    underwriter.build('chfagg SR.R 25 * gamma 4 hints{log2=12; bs=1/4}')
     for program in ('agg SR.RT dfreq [2] sev chfagg.SR.R',
                     'agg SR.RS dfreq [1] ssev chfagg.SR.R!'):
         kind, name, spec = _parse(underwriter, program)
@@ -1032,7 +1041,7 @@ def test_the_ft_shim_forwards_and_warns():
 
 def test_simpson_inversion_and_exact_comparison_agree_on_a_normal():
     from aggregate.pedagogy import chf_exact_comparison, chf_simpson_inversion
-    n = build('chfagg P.N norm 100 30', log2=12)
+    n = build('chfagg P.N 30 * norm + 100', log2=12)
     df = chf_simpson_inversion(n)
     body = df['grid'] > 1e-8
     assert np.max(np.abs(df['simpson'] - df['grid'])[body]) < 1e-6
@@ -1051,7 +1060,7 @@ def test_each_pedagogy_figure_runs_on_its_example():
     import matplotlib.pyplot as plt
     from aggregate.pedagogy import (chf_inversion_figure, chf_simpson_figure,
                                     chf_wrapping_figure)
-    n = build('chfagg P.F norm 100 30', log2=10)
+    n = build('chfagg P.F 30 * norm + 100', log2=10)
     for verbose in (True, False):
         plt.close(chf_inversion_figure(n, suptitle='normal', verbose=verbose))
     fig, table = chf_wrapping_figure(n, wraps=(-1, 1))
@@ -1061,7 +1070,7 @@ def test_each_pedagogy_figure_runs_on_its_example():
     s = build('chfagg P.S stable 1.5 1', log2=10)
     plt.close(chf_inversion_figure(s))           # levy_stable: no companion, no error
     with pytest.raises(ValueError, match='reference'):
-        chf_wrapping_figure(build('chfagg P.V variancegamma 0.2 0.5 -0.1 0', log2=10))
+        chf_wrapping_figure(build('chfagg P.V variancegamma 0.2 0.5 -0.1', log2=10))
     plotly = pytest.importorskip('plotly')
     from aggregate.pedagogy import chf_fourier3d_figure
     assert chf_fourier3d_figure(n) is not None
@@ -1094,3 +1103,113 @@ def test_tweedie_test_and_audit_over_the_characteristic_function():
     assert abs(m - 1) < 1e-6 and abs(v - 1) < 1e-4
     with pytest.warns(DeprecationWarning, match='chf_law'):
         tw.ft
+
+
+# ----------------------------------------------------------------------
+# [CHF-Arithmetic-Form]: scale and shift as arithmetic around the law
+# ----------------------------------------------------------------------
+
+#: Bodies written with scale and location numbers before 1.35.0, the full
+#: Python parameters that law has, and the arithmetic spelling now required.
+REFUSED_SPELLINGS = [
+    ('gamma 4 25', 'gamma', dict(shape=4, scale=25), '25 * gamma 4'),
+    ('norm 100 30', 'norm', dict(mean=100, sd=30), '30 * norm + 100'),
+    ('invgauss 100 400', 'invgauss', dict(mean=100, shape=400), '400 * invgauss 0.25'),
+    ('stable 1.5 1 2 10', 'stable', dict(alpha=1.5, beta=1, scale=2, loc=10), '2 * stable 1.5 1 + 10'),
+    ('stable 1.5 0.5 2 0', 'stable', dict(alpha=1.5, beta=0.5, scale=2, loc=0), '2 * stable 1.5 0.5'),
+    ('stable 1 0.5 2 3', 'stable', dict(alpha=1, beta=0.5, scale=2, loc=3), '2 * stable 1 0.5 + 3.44127120031'),
+    ('stable 1 0.5 2 3 s0', 'stable', dict(alpha=1, beta=0.5, scale=2, loc=3, parameterization='S0'),
+     '2 * stable 1 0.5 s0 + 3'),
+    ('stable 0.7 1 3 5', 'stable', dict(alpha=0.7, beta=1, scale=3, loc=5), '3 * stable 0.7 1 + 5'),
+    ('norminvgauss 2 0.5 3 1', 'norminvgauss', dict(alpha=2, beta=0.5, delta=3, mu=1),
+     '3 * norminvgauss 6 1.5 + 1'),
+    ('variancegamma 0.2 0.5 -0.1 0.05', 'variancegamma', dict(sigma=0.2, nu=0.5, theta=-0.1, mu=0.05),
+     'variancegamma 0.2 0.5 -0.1 + 0.05'),
+    ('temperedstable 1 5 10 1.5 2', 'temperedstable', dict(C=1, G=5, M=10, Y=1.5, mu=2),
+     'temperedstable 1 5 10 1.5 + 2'),
+]
+
+
+@pytest.mark.parametrize('old, family, params, new', REFUSED_SPELLINGS)
+def test_a_refused_spelling_points_at_the_same_law(old, family, params, new):
+    """The refusal names the arithmetic spelling, and that spelling builds the old law's masses on the old law's grid."""
+    with pytest.raises(ValueError, match='as ' + repr(new).replace('*', r'\*').replace('+', r'\+')):
+        build(f'chfagg X {old}')
+    c = build(f'chfagg X {new}')
+    old_law = AggregateCHF('Y', family, **params)
+    old_law.update()
+    assert (c.bs, c.log2, c.x_min) == (old_law.bs, old_law.log2, pytest.approx(old_law.x_min, abs=1e-12))
+    assert np.max(np.abs(c.agg_density - old_law.agg_density)) < 1e-12
+
+
+def test_shift_and_scale_are_arithmetic_on_the_law():
+    g = build('chfagg G 25 * gamma 4 hints{log2=12; bs=1/4}')
+    a = build('agg A dfreq [1] sev 25 * gamma 4', log2=12, bs=1 / 4)
+    assert np.max(np.abs(g.agg_density - a.agg_density)) < 1e-10
+    s = build('chfagg S 25 * gamma 4 + 10 hints{log2=12; bs=1/4}')
+    assert s.est_m == pytest.approx(110, rel=1e-9)
+    assert s.family.moments == pytest.approx((110, 2500, 1.0))
+    m = build('chfagg M 25 * gamma 4 - 10 hints{log2=12; bs=1/4}')
+    assert m.est_m == pytest.approx(90, rel=1e-9) and m.support == (-10, np.inf)
+    cv = build('chfagg C 2 * gamma 100 cv 0.5')
+    assert cv.family.moments[0] == pytest.approx(200)
+    n = build('chfagg N norm')
+    assert abs(n.est_m) < 1e-9 and n.est_sd == pytest.approx(1, rel=1e-6)
+
+
+def test_stable_at_alpha_one_is_the_law_of_c_z_plus_b():
+    """``2 * stable 1 0.5 + 3`` is :math:`2Z + 3`: scipy's S1 law at ``loc`` 3 less (2/pi) beta gamma log gamma."""
+    c = build('chfagg S 2 * stable 1 0.5 + 3')
+    loc1 = 3 - 2 / np.pi * 0.5 * 2 * np.log(2)
+    assert c.family.location == pytest.approx(loc1)
+    ref = ss.levy_stable(1, 0.5, loc=loc1, scale=2)
+    if ss.levy_stable.parameterization == 'S0':
+        ref = ss.levy_stable(1, 0.5, loc=3, scale=2)
+    sel = (c.xs > -30) & (c.xs < 60)
+    edges = c.xs[sel] + c.bs / 2
+    F = np.cumsum(c.agg_density)[sel]
+    assert np.max(np.abs(F - ref.cdf(edges))) < 1e-7
+    assert np.max(np.abs(F - c.family.reference.cdf(edges))) < 1e-7
+
+
+def test_a_shifted_atom_stays_a_grid_point():
+    c = build('chfagg T 2 * tweedie 1.5 100 2 + 10.3')
+    xa, w = c.family.atom
+    assert xa == 10.3 and c.x_min == pytest.approx(10.3)
+    assert c.est_m == pytest.approx(210.3, rel=1e-6)
+
+
+@pytest.mark.parametrize('program', [
+    'chfagg A 25 * gamma 4 + 10', 'chfagg B 25 * gamma 4 - 10', 'chfagg C 2 * gamma 100 cv 0.5 + 10',
+    'chfagg D norm', 'chfagg E 3 * norminvgauss 6 1.5 + 1', 'chfagg F variancegamma 0.2 0.5 -0.1 + 0.05',
+    'chfagg H 2 * stable 1 0.5 s0 + 3', 'chfagg K 2 * tweedie 1.5 100 2 + 10.3'])
+def test_arithmetic_round_trips_and_renders_as_written(program, underwriter):
+    from aggregate.decl_writer import spec_to_decl
+    kind, name, spec = _parse(underwriter, program)
+    rendered = spec_to_decl(spec, kind, name)
+    assert ' '.join(rendered.split()) == program
+    assert build(program).family.to_decl() == program.split(' ', 2)[2]
+
+
+def test_every_corpus_chfagg_line_round_trips():
+    from aggregate.decl_writer import spec_to_decl
+    from aggregate import Underwriter
+    uw = Underwriter(update=False)
+    root = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg'
+    lines = [ln.rstrip().rstrip(';') for f in ('_test_suite.agg', 'decl-testers.agg')
+             for ln in (root / f).read_text(encoding='utf-8').splitlines() if ln.startswith('chfagg ')]
+    assert len(lines) >= 30
+    for program in lines:
+        kind, name, spec = _parse(uw, program)
+        kind2, name2, spec2 = _parse(uw, spec_to_decl(spec, kind, name))
+        assert (kind2, name2, spec2) == (kind, name, spec), program
+
+
+def test_a_glued_minus_is_a_sign_and_a_spaced_minus_is_a_shift(underwriter):
+    """``NUMBER`` absorbs a glued minus; the shipped resolver keeps that reading (``KNOWN_AMBIGUOUS`` in ``test_grammar_ambiguity.py``)."""
+    _, _, spec = _parse(underwriter, 'chfagg V variancegamma 0.2 0.5 -0.1')
+    assert spec['theta'] == -0.1 and 'chf_loc' not in spec
+    _, _, spec = _parse(underwriter, 'chfagg G 25 * gamma 4 - 10')
+    assert spec['shape'] == 4 and spec['chf_loc'] == -10
+    with pytest.raises(ValueError, match="glued to a number is its sign; a shift is written with a space, '- 10'"):
+        _parse(underwriter, 'chfagg G 25 * gamma 4 -10')

@@ -367,35 +367,37 @@ nttagg NTT.Arithmetic dfreq [1:3] dsev [1:3] [1/2 (1/2-1/(13*11*(19**3))) (1/(13
 # FFT frequency grid and inverting to bucket masses, with no severity and no
 # count: the stable laws, tilted along a shifted contour so the heavy tail
 # does not wrap, and the normal, gamma and inverse Gaussian laws by name.
+# The positional numbers are the shapes; scale and location are arithmetic
+# around the law, c * FAMILY shapes + b, as on an agg severity.
 # The family word is an ordinary identifier; stable and tweedie are keywords.
 # See dev/done/plan-characteristic-function-engine.md.
 
-chfagg CHF.Stable       stable 1.5 1 2 0 note{a totally skewed stable law, tilted}
+chfagg CHF.Stable       2 * stable 1.5 1 note{a totally skewed stable law, tilted}
 
-chfagg CHF.StableS0     stable 1.5 1 2 -2 s0 note{the same law written in S0}
+chfagg CHF.StableS0     2 * stable 1.5 1 s0 - 2 note{the same law written in S0}
 
 chfagg CHF.Wrap         stable 0.7 1 hints{tilt=False} note{the same law untilted, wrapping, for teaching}
 
 chfagg CHF.TwoSided     stable 1.5 0.5 hints{tilt=8} note{two heavy tails, split, both halves tilted by 8 e-folds}
 
-chfagg CHF.Gamma        gamma 4 25 note{the compound engine's gamma 4 25 severity, computed directly}
+chfagg CHF.Gamma        25 * gamma 4 note{the compound engine's 25 * gamma 4 severity, computed directly}
 
 chfagg CHF.GammaCV      gamma 100 cv 0.5 hints{log2=14} note{the mean and cv form, with a grid hint}
 
-chfagg CHF.Normal as "Signed" norm 100 30 note{a signed window, with a display label}
+chfagg CHF.Normal as "Signed" 30 * norm + 100 note{a signed window, with a display label}
 
-chfagg CHF.InvGauss     invgauss 100 400 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400}
+chfagg CHF.InvGauss     400 * invgauss 0.25 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400}
 
 chfagg CHF.Tweedie      tweedie 1.5 100 2 note{the compound Poisson gamma member, with its atom at 0 split out}
 
 chfagg CHF.TweedieCV    tweedie 2.5 100 cv 0.5 note{a positive extreme stable member, tilted by its own theta}
 
-chfagg CHF.NIG          norminvgauss 2 0.5 3 1 note{normal inverse Gaussian: alpha beta delta mu}
+chfagg CHF.NIG          3 * norminvgauss 6 1.5 + 1 note{normal inverse Gaussian: scipy's shapes a b, scaled and shifted}
 
-chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 0 note{variance gamma: sigma nu theta mu}
+chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 note{variance gamma: sigma nu theta}
 
-chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, and an optional mu}
+chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, a location written + mu}
 
-chfagg CHF.RefGamma     gamma 4 25 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below}
+chfagg CHF.RefGamma     25 * gamma 4 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below}
 
 agg CHF.UsesRef         dfreq [2] sev chfagg.CHF.RefGamma note{a chfagg serving as a severity: two claims of the gamma law}

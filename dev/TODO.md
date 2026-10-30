@@ -164,6 +164,16 @@
   `alpha = 1`. The validation mean row of every stable law flags until then.
 - **[CHF-Sharpen]**: `sharpen` on `AggregateCHF` through `recommended_grid`,
   so the Loss Lab's sharpening leaf lights for a `chfagg`.
+- **[Characteristic-Function-Aggregate-Parity]**: `AggregateCHF`'s DecL, frames,
+  verdict and members in `Aggregate`'s shape, six steps,
+  `dev/done/plan-characteristic-function-aggregate-parity.md`.
+  `[CHF-Arithmetic-Form]` landed at 1.35.0; frames, verdict, sharpen, the grid
+  and tail reports and the cheap accessors follow.
+- **[Stable-Conversion-Chfagg-Spelling]**: the `stable` conversion statement
+  keeps `stable alpha beta [scale [loc]]`, the `Stable` parameters, while a
+  `chfagg` writes `c * stable alpha beta + b` from 1.35.0. Add the `chfagg`
+  spelling to the conversion's printed equivalents; the two differ in meaning
+  only at `alpha = 1` in S1.
 - **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`;
   `pedagogy.similar_risks_example` raises `TypeError`, passing arguments that
   `Portfolio.plot` and `Bounds.plot_envelope` do not take.

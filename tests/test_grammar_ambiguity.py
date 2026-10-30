@@ -12,7 +12,7 @@ sweeps it over every shipped ``.agg`` library. The set of ambiguous statements
 must equal :data:`KNOWN_AMBIGUOUS` exactly -- so a new ambiguity fails here
 rather than becoming a silent behaviour change.
 
-Two entries are accepted today; see :data:`KNOWN_AMBIGUOUS` for why each is
+Three entries are accepted today; see :data:`KNOWN_AMBIGUOUS` for why each is
 tolerated. Neither is a defect in the sense of producing a wrong answer.
 
 Companion: ``tests/test_trailer_attachment.py`` pins *which* parse
@@ -45,14 +45,22 @@ AGG_DIR = Path(aggregate.__file__).parent / 'agg'
 #: trailing ``note{...}`` can bind either way. ``resolve`` binds it to the
 #: bivariate, which is the documented behaviour; this fixture exists precisely
 #: to hold that line. See ``tests/test_trailer_attachment.py``.
+#:
+#: ``CHF.VG``, ``chfagg ... variancegamma 0.2 0.5 -0.1``: ``NUMBER`` absorbs a
+#: glued leading minus, so ``-0.1`` is the third shape or ``MINUS 0.1``, a
+#: shift of the two-shape law (from 1.35.0, ``[CHF-Arithmetic-Form]``).
+#: ``resolve`` reads the glued minus as the sign, the only reading with the
+#: family's shape count; a spaced ``- 0.1`` is the shift.
+#: ``test_characteristic_function.py`` pins both readings.
 KNOWN_AMBIGUOUS = {
     'UM.Scaled',
     'AE.Trailer.BivariateBare',
+    'CHF.VG',
 }
 
 _NAME_RE = re.compile(
     r'^\s*(?:netceded|grossceded|grossnet)?\s*'
-    r'(?:agg|sev|ssev|port|pnl|xpnl|bivariate|bv|clash|dist|distortion)\s+(\S+)',
+    r'(?:agg|sev|ssev|port|pnl|xpnl|bivariate|bv|clash|dist|distortion|chfagg)\s+(\S+)',
     re.I,
 )
 

@@ -118,7 +118,7 @@ def build_objects() -> dict:
         'agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 '
         'copula gumbel 0.4 poisson')
     objs['PnL'] = build('pnl Deal 1000 premium less agg Deal_e 1000 prem at 70% lr sev lognorm 100 cv 2 poisson')
-    objs['AggregateCHF'] = build('chfagg CHF gamma 4 25', log2=12)
+    objs['AggregateCHF'] = build('chfagg CHF 25 * gamma 4', log2=12)
     objs['Severity'] = a.sevs[0]
     objs['Frequency'] = a.frequency
     # The canonical quantile engine every q / tvar / cdf / sf routes through, and

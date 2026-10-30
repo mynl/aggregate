@@ -165,12 +165,17 @@
 - **[Characteristic-Function-Aggregate-Parity]**: done, 1.35.0 to 1.40.0,
   `dev/done/plan-characteristic-function-aggregate-parity.md`. Left over: a
   distortion on a grid whose truncation rings (`choquet_weights` refuses the
-  negative masses), and the `sharpen` exhibit for `AggregateCHF`.
+  negative masses). The `sharpen` exhibit landed at 1.41.0, with the Loss Lab's
+  ripple.
 - **[Stable-Conversion-Chfagg-Spelling]**: the `stable` conversion statement
   keeps `stable alpha beta [scale [loc]]`, the `Stable` parameters, while a
   `chfagg` writes `c * stable alpha beta + b` from 1.35.0. Add the `chfagg`
   spelling to the conversion's printed equivalents; the two differ in meaning
   only at `alpha = 1` in S1.
+- **[Chfagg-From-Stable-Expression]**: `chfagg C stable.x0 + 2 * stable.x1 + 3`,
+  a combination's parameters on a grid, closing the loop from parameters to
+  density. Pended by the author, 2026-10-30; depends on `[Stable-Arithmetic]` in
+  `dev/plan-stable-expressions.md`.
 - **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`;
   `pedagogy.similar_risks_example` raises `TypeError`, passing arguments that
   `Portfolio.plot` and `Bounds.plot_envelope` do not take.

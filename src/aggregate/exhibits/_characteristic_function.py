@@ -5,7 +5,8 @@ in ``Aggregate``'s shapes ([CHF-Aggregate-Frames]): ``summary`` (moments and
 percentiles by ``Freq``, ``Sev`` and ``Agg``, the first two empty), ``tail``
 (the return period ladder), ``stats`` (the moment store) and ``validation``
 (the law's moments against the grid's), with ``bs_window`` and
-``tail_behavior`` from 1.39.0. The insurer treatments are
+``tail_behavior`` from 1.39.0, and ``sharpen`` from 1.41.0, registered in the
+package beside its ``Aggregate`` treatment. The insurer treatments are
 ``Aggregate``'s: the summary's ``Agg`` row is flagged as the total and the
 moment store drops its raw moment rows, and the validation's ``Agg`` row is
 emphasized when ``valid`` fails it (1.37.0). A ``chfagg`` has no frequency,

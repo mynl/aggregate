@@ -2724,6 +2724,11 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return value_type_label(True)
 
     @property
+    def exp_premium(self):
+        """``0.0``, read-only: ``Aggregate``'s reading of an exposure stating no premium, so :meth:`evaluate` needs ``P=``."""
+        return 0.0
+
+    @property
     def prob_eq_0(self):
         """``P(X == 0)`` read off the grid, ``pmf(0)``; ``None`` before :meth:`update`.
 

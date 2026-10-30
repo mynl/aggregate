@@ -1415,6 +1415,47 @@ def test_two_sided_recommended_grid_covers():
     assert d.outside_mass <= 1 - d.bucket_sizing_p
 
 
+def test_sharpen_exhibit_reads_the_audit_once_a_probe_has_run():
+    from aggregate.exhibits import Perspective, available_exhibits, build_exhibit, exhibit_frames
+    s = build('chfagg H stable 1.1 1')
+    assert 'sharpen' not in [n for n, _ in available_exhibits(s)]
+    with pytest.raises(ValueError, match='not available'):
+        exhibit_frames(s, 'sharpen')
+    s.sharpen()
+    assert 'sharpen' in [n for n, _ in available_exhibits(s)]
+    (name, raw, _), = exhibit_frames(s, 'sharpen')
+    assert name == 'sharpen_df'
+    pd.testing.assert_frame_equal(raw, s.sharpen_df)
+    blocks = exhibit_frames(s, 'sharpen', Perspective.INSURER)
+    assert [b for b, _, _ in blocks] == ['score_grid', 'sharpen_df']
+    grid = blocks[0][1]
+    assert grid.index.name == 'bs' and list(grid.columns.names) == [None, 'log2']
+    assert [c for c in grid['score'].columns if c.startswith('**')] == ['**16']
+    flags = grid['defective'].stack().dropna().tolist()
+    assert [f for f in flags if f.startswith('**')] == ['**True**']
+    assert build_exhibit(s, 'sharpen', Perspective.INSURER) is not None
+    # a confirmed grid is one cell, and the grid reading holds
+    g = build('chfagg G 25 * gamma 4').sharpen()
+    grid = exhibit_frames(g, 'sharpen', Perspective.INSURER)[0][1]
+    assert grid.shape == (1, 2) and grid.iloc[0, 1] == '**False**'
+
+
+def test_a_law_states_no_premium_and_evaluate_says_so():
+    g = build('chfagg G 25 * gamma 4')
+    assert g.exp_premium == 0.0
+    with pytest.raises(AttributeError):
+        g.exp_premium = 1.0
+    with pytest.raises(ValueError, match='needs the premium'):
+        g.evaluate()
+
+
+def test_evaluate_on_a_ringing_grid_refuses_in_a_sentence_and_answers_anchored():
+    t = build('chfagg T tweedie 1.5 100 2')
+    with pytest.raises(ValueError, match='not positive and decreasing'):
+        t.evaluate(130)
+    assert (t.evaluate(130, p=0.99).evaluation_df['status'] == 'ok').all()
+
+
 def test_forced_sharpen_is_thrifty_and_restores_without_execute():
     g = build('chfagg H 25 * gamma 4')
     g.sharpen(good_enough=0)

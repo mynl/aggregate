@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.41.0 - 2026-10-30
+
+**[CHF-Loss-Lab-Ripple] A `chfagg` has the `sharpen` exhibit once a probe has run and a read-only `exp_premium` of 0, and a calibration on a survival function that is not positive and decreasing raises `ValueError` rather than a bare `AssertionError`.** The exhibit reads `sharpen_df`, with the score grid first under the insurer perspective and captions for a law's probe of at most two cells. `exp_premium` is `Aggregate`'s reading of an exposure stating no premium. The refusal applies to every kind and reaches `evaluate(P)` with no anchor on a ringing grid, such as `tweedie 1.5 100 2`; anchored at `p=` that law answers. All three are what the Loss Lab needs: its Sharpen leaf serves the exhibit, its Evaluate form asks for a premium when `exp_premium` is 0, and its Evaluate route turns a `ValueError` into a 400.
+
 ## 1.40.0 - 2026-10-30
 
 **[CHF-Accessor-Parity] A `chfagg` has `Aggregate`'s cheap members: `value_type`, `prob_eq_0`, `spec`, `json`, `density`, `sample`, `price`, `price_ccoc`, `price_pentagon_ex`, `evaluate`, `apply_distortion` and `__str__`.** Each is `Aggregate`'s thin delegation to `_pricing` or `density_df`, without reinsurance views; `evaluate` needs the premium `P=`, since a `chfagg` carries none, and `value_type` is read-only `'loss'`. `density_df` gains `log_p`, `exlea`, `e`, `exgta` and `exeqa` with `Aggregate`'s guards, in `Aggregate`'s column order, and `var_dict` takes the `var` and `tvar` kinds `price` passes. On one grid `25 * gamma 4` and `agg dfreq [1] sev 25 * gamma 4` price, evaluate and complete the pentagon to 3e-11. A distortion is refused on a grid whose frequency truncation rings, as `choquet_weights` refuses negative masses: `25 * gamma 4` at `hints{log2=12; bs=1/4}`, and `tweedie 1.5 100 2`, whose density jumps at 0+. Last of six steps of `dev/done/plan-characteristic-function-aggregate-parity.md`; the Loss Lab's capability test for a `chfagg` (six exhibits, `can_sharpen` and `can_evaluate` now true) and its `gamma 4 25` fixtures need updating.

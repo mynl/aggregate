@@ -88,6 +88,7 @@ from .._aggregate import Aggregate
 from .._pnl import PnL
 from .._portfolio import Portfolio
 from ..bivariate import BivariateAggregate
+from ..characteristic_function import AggregateCHF
 from ..results import RuinResult
 from ..spectral import Distortion
 
@@ -332,28 +333,62 @@ def _sharpen_insurer(obj, blocks):
     two grid axes on the two axes of a table, not twenty columns of working
     with the deciding numbers buried among them. See :func:`_sharpen_grid`.
     """
+    return _sharpen_reading(
+        blocks,
+        'Every cell the probe walked: bucket size down and log2 across, '
+        'score on the left and the defective flag on the right. ** marks '
+        'the grid the object started on and, around its defective flag, '
+        'the cell selected. Lower scores are better, a defective cell '
+        'loses mass off the end of the grid and is never selected, and '
+        'the blanks are where the line search stopped rather than cells '
+        'that failed.',
+        'The same walk with its working, one row per grid tried. The six '
+        'u_ columns are relative errors against the analytic moments and '
+        'are what the score is built from; aliasing and the validation '
+        'verdict say whether a cell was sound as well as accurate.')
+
+
+def _sharpen_reading(blocks, grid_caption, walk_caption):
+    """The insurer view of a probe: the decision grid, then the walk with its working."""
     (walk_name, walk, walk_kw), = blocks
     grid = _sharpen_grid(walk)
     # The bs labels are already text (``1/64``, ``**2``); 's' keeps the
     # sheet's numeric ``bs`` format off them.
     formatters = {'bs': 's',
                   **{c: '.5f' for c in grid.columns if c[0] == 'score'}}
-    return [
-        ('score_grid', grid,
-         dict(formatters=formatters, caption=(
-             'Every cell the probe walked: bucket size down and log2 across, '
-             'score on the left and the defective flag on the right. ** marks '
-             'the grid the object started on and, around its defective flag, '
-             'the cell selected. Lower scores are better, a defective cell '
-             'loses mass off the end of the grid and is never selected, and '
-             'the blanks are where the line search stopped rather than cells '
-             'that failed.'))),
-        (walk_name, walk, dict(walk_kw, caption=(
-            'The same walk with its working, one row per grid tried. The six '
-            'u_ columns are relative errors against the analytic moments and '
-            'are what the score is built from; aliasing and the validation '
-            'verdict say whether a cell was sound as well as accurate.'))),
-    ]
+    return [('score_grid', grid, dict(formatters=formatters, caption=grid_caption)),
+            (walk_name, walk, dict(walk_kw, caption=walk_caption))]
+
+
+register_simple_exhibit(
+    'sharpen', 'Grid probe', 'sharpen_df', [AggregateCHF],
+    caption='The grids the last probe tried, the current one and at most one '
+            'step toward the recommended grid, with their working: the realized '
+            'bucket size and log2, the moment errors and inversion terms that '
+            'make up the score, and the validation verdict. Aliasing and the '
+            'severity columns are blank: a law computed this way has no severity.')
+
+
+@sharpen.insurer.register(AggregateCHF)
+def _sharpen_insurer_chf(obj, blocks):
+    """The grid and the walk of :func:`_sharpen_insurer`, captioned for a law's probe.
+
+    A law's probe tries at most two cells, and its defective flag is the mass
+    outside the window over the budget, so where neither cell meets the budget
+    the selected one is defective and a re-run continues.
+    """
+    return _sharpen_reading(
+        blocks,
+        'The cells the probe tried: bucket size down and log2 across, score on '
+        'the left and the defective flag on the right. ** marks the grid the '
+        'object started on and, around its defective flag, the cell selected. '
+        'Lower scores are better. A defective cell leaves more mass outside the '
+        'window than the budget allows; it is selected only when no cell tried '
+        'meets the budget, and a re-run continues toward the recommended grid.',
+        'The same cells with their working, one row per grid tried. The u_ '
+        'columns are the terms of the score in tolerance units: the moment '
+        'errors against the closed forms, then the coverage, edge, truncation '
+        'and resolution of the inversion. A blank term does not apply to this law.')
 
 
 tail_behavior = register_simple_exhibit(

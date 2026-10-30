@@ -385,6 +385,12 @@ def _calibration_survival(density, bs, assets):
     0-based frame and pass ``assets`` in that frame; both branches of
     :func:`calibrate_distortions` do. ``ess_sup`` is read off the index, so it
     comes back in whatever frame the caller passed.
+
+    Raises
+    ------
+    ValueError
+        When a negative mass stops ``S`` being strictly positive and weakly
+        decreasing, as on a grid whose inverted characteristic function rings.
     """
     Splus = (1 - density.loc[0:assets].cumsum()).values
     last_non_zero = np.argwhere(Splus)
@@ -399,7 +405,11 @@ def _calibration_survival(density, bs, assets):
         ess_sup = density.index[last_non_zero + 1]
     else:
         S = (1 - density.loc[0:assets - bs].cumsum()).values
-    assert np.all(S > 0) and np.all(S[:-1] >= S[1:])
+    if not (np.all(S > 0) and np.all(S[:-1] >= S[1:])):
+        raise ValueError(
+            'a distortion cannot be calibrated on this grid: its survival function '
+            f'is not positive and decreasing (smallest mass {density.min():.3g}). '
+            'Refine the grid, or anchor at a lower asset level.')
     return S, ess_sup
 
 

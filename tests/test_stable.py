@@ -416,3 +416,231 @@ def test_library_laws_have_the_classical_characteristic_functions(name, psi):
     assert x.name == name
     assert np.allclose(x.chf(T), np.exp(psi(T)), rtol=1e-12, atol=0)
     assert isinstance(build(name), Stable)
+
+
+# ----------------------------------------------------------------------
+# Arithmetic on references ([Stable-Arithmetic], dev/done/plan-stable-expressions.md)
+# ----------------------------------------------------------------------
+
+@pytest.fixture
+def laws(uw):
+    """The three laws of the plan's Goal, and the two of ``OPERATOR_FORMS``."""
+    uw.build_many('stable x0 1.5 0\n\nstable x1 1.5 0.85\n\nstable x2 1.5 -0.5\n\n'
+                  'stable x 1.5 0.6 1.3 -0.4\n\nstable y 1.5 -0.9 0.7 2.5')
+    return uw
+
+
+@pytest.mark.parametrize('program, expected', [
+    ('3 * stable.x0', (1.5, 0, 3, 0)),
+    ('stable.x1 + stable.x2', (1.5, 0.175, 1.5874010519681994, 0)),
+    ('stable.x0 + 2 * stable.x1 + 3', (1.5, 0.6279767062808198, 2.4472608147714756, 3)),
+])
+def test_the_goal_expressions_return_their_measured_values(laws, program, expected):
+    assert np.allclose(_params(laws(program)), expected, rtol=1e-14, atol=0)
+
+
+X, Y = Stable(1.5, 0.6, 1.3, -0.4), Stable(1.5, -0.9, 0.7, 2.5)
+
+OPERATOR_FORMS = [
+    ('stable.x * 3', X * 3),
+    ('stable.x / 3', X / 3),
+    ('3 + stable.x', 3 + X),
+    ('3 - stable.x', 3 - X),
+    ('stable.x - 3', X - 3),
+    ('stable.x -3', X - 3),
+    ('stable.x - -3', X + 3),
+    ('-stable.x', -X),
+    ('- stable.x', -X),
+    ('stable.x - stable.y', X - Y),
+    ('stable.x -stable.y', X - Y),
+    ('stable.x - -stable.y', X - (-Y)),
+    ('2 * 3 * stable.x', 2 * (3 * X)),
+    ('2 * stable.x * 3', 2 * (X * 3)),
+    ('2 * (stable.x + stable.y) - 1', 2 * (X + Y) - 1),
+    ('(1/2) * stable.x', 0.5 * X),
+    ('1/2 * stable.x', 0.5 * X),
+    ('(1+2) * stable.x', 3 * X),
+    ('-2 * stable.x', -2 * X),
+    ('exp(0) * stable.x', X),
+    ('50% * stable.x', 0.5 * X),
+    ('stable.x / 4 * 2', X / 4 * 2),
+    ('-(stable.x + 1)', -(X + 1)),
+    ('(stable.x)', X),
+    ('stable.x + 1 + 2', X + 3),
+    ('1 + stable.x + 2', X + 3),
+    ('1 - stable.x - 2', 1 - X - 2),
+    ('stable.x - 3 * stable.y', X - 3 * Y),
+    ('stable.x -3 * stable.y', X - 3 * Y),
+    ('2 @ stable.x', 2 @ X),
+    ('1/2 @ stable.x', 0.5 @ X),
+    ('3 * 2 @ stable.x', 3 * (2 @ X)),
+    ('2 @ 3 * stable.x', 2 @ (3 * X)),
+    ('stable.x + 2 @ stable.y + 1', X + (2 @ Y) + 1),
+]
+
+
+@pytest.mark.parametrize('program, law', OPERATOR_FORMS, ids=[p for p, _ in OPERATOR_FORMS])
+def test_every_operator_form_agrees_with_python(laws, program, law):
+    _same_law(laws(program), law, rtol=1e-14)
+
+
+@pytest.mark.parametrize('alpha', [0.7, 1, 1.5])
+def test_combination_has_the_product_of_characteristic_functions(uw, alpha):
+    """The oracle through the DecL path, which pins the alpha = 1 logarithm."""
+    a, b = Stable(alpha, 0.6, 1.3, -0.4), Stable(alpha, -0.9, 0.7, 2.5)
+    uw.build_many(f'stable a {alpha} 0.6 1.3 -0.4\n\nstable b {alpha} -0.9 0.7 2.5')
+    z = uw('2 * stable.a + stable.b - 3 * stable.a + 1')
+    expected = a.chf(2 * T) * b.chf(T) * a.chf(-3 * T) * np.exp(1j * T)
+    assert np.allclose(z.chf(T), expected, rtol=1e-12, atol=0)
+
+
+@pytest.mark.parametrize('alpha', [0.7, 1, 1.5])
+def test_each_occurrence_of_a_reference_is_an_independent_copy(uw, alpha):
+    uw(f'stable x {alpha} 0.6')
+    assert np.isclose(uw('stable.x + stable.x').scale, 2 ** (1 / alpha), rtol=1e-14)
+    assert uw('2 * stable.x').scale == 2
+    difference = uw('stable.x - stable.x')
+    assert difference.loc == 0 and difference.beta == 0
+    assert np.isclose(difference.scale, 2 ** (1 / alpha), rtol=1e-14)
+
+
+@pytest.mark.parametrize('alpha', [0.7, 1, 1.5, 1.9])
+def test_copies_operator_is_the_sum_and_the_power_of_the_characteristic_function(alpha):
+    """``t @ X`` has characteristic function phi ** t, at alpha = 1 too."""
+    x = Stable(alpha, 0.6, 1.3, -0.4)
+    _same_law(2 @ x, x + x)
+    _same_law(3 @ x, x + x + x)
+    # the semigroup at a time that is not an integer
+    _same_law(0.5 @ x + 0.5 @ x, x)
+    _same_law(0.25 @ (4 @ x), x)
+    assert np.allclose((3 @ x).chf(T), x.chf(T) ** 3, rtol=1e-12, atol=0)
+    assert (2 @ x).beta == x.beta
+
+
+@pytest.mark.parametrize('t', [0, -1])
+def test_copies_operator_refuses_a_count_that_is_not_positive(laws, t):
+    with pytest.raises(ValueError, match='independent copies'):
+        laws(f'{t} @ stable.x')
+
+
+def test_limit_law_of_two_units():
+    """The sum of two Pareto limits has the mean and right tail of the two books."""
+    uw = build.fork(name='limits')
+    uw.build_many('stable A 1000 claims sev 100 * lomax 1.5\n\n'
+                  'stable B 400 claims sev 250 * lomax 1.5')
+    total = uw('stable.A + stable.B')
+    assert total.beta == 1
+    assert np.isclose(total.mean, 400000, rtol=1e-12)
+    assert np.isclose(total.scale, 34721.690825521684, rtol=1e-12)
+    assert np.isclose(total.tail_constant, 1000 * 100 ** 1.5 + 400 * 250 ** 1.5, rtol=1e-12)
+    net = uw('stable.A - stable.B')
+    assert np.isclose(net.beta, -0.22514822655441366, rtol=1e-12)
+    assert net.loc == 0
+
+
+def test_a_result_is_anonymous_stored_nowhere_and_of_kind_conversion(laws):
+    before = set(laws._recipes)
+    rv = laws.build_many('stable.x0 + 1')
+    assert len(rv) == 1 and rv[0].kind == 'conversion'
+    assert rv[0].object.name is None and rv[0].object._label is None
+    assert set(laws._recipes) == before
+
+
+def test_a_lone_reference_keeps_its_name_and_parentheses_do_too(uw):
+    uw('stable x0 as "My law" 1.5 0')
+    assert uw('stable.x0').name == 'x0'
+    assert uw('(stable.x0)').name == 'x0'
+
+
+def test_stable_name_expression_stores_four_numbers_and_the_program(laws):
+    program = 'stable z stable.x0 + 2 * stable.x1 + 3'
+    z = laws(program)
+    assert (z.name, z.program) == ('z', program)
+    spec = laws._recipes[('stable', 'z')].spec
+    assert np.allclose([spec[k] for k in ('alpha', 'beta', 'scale', 'loc')],
+                       (1.5, 0.6279767062808198, 2.4472608147714756, 3), rtol=1e-14, atol=0)
+    assert all(type(spec[k]) is float for k in ('alpha', 'beta', 'scale', 'loc'))
+    # bound at parse time, like every dotted reference other than sev agg.NAME
+    laws('stable x0 1.5 0 9')
+    assert laws('stable.z').scale == z.scale
+
+
+def test_stable_name_expression_keeps_its_own_label_and_note(laws):
+    laws('stable z as Combo stable.x - stable.y note{net}')
+    rec = laws.recipe('z')
+    assert rec.spec['label'] == 'Combo' and rec.note == 'net'
+    assert str(laws('z')).startswith('Combo (z): ')
+
+
+def test_stable_name_reference_is_a_copy_under_the_new_name(uw):
+    uw('stable x0 as "My law" 1.5 0 note{first}')
+    z = uw('stable z stable.x0')
+    assert (z.name, z._label) == ('z', None)
+    assert uw.recipe('z').note == ''
+    _same_law(z, uw('stable.x0'), rtol=0)
+
+
+def test_a_stored_expression_is_an_unparser_fixed_point(laws):
+    laws.build_many('stable z as Combo stable.x0 + 2 * stable.x1 - 3 note{n}')
+    spec = laws._recipes[('stable', 'z')].spec
+    assert laws.parser.parse(laws.lexer.tokenize(spec_to_decl(spec, 'stable'))) == ('stable', 'z', spec)
+
+
+@pytest.mark.parametrize('program, match', [
+    ('stable.x + stable.other', 'common alpha'),
+    ('0 * stable.x', 'zero'),
+    ('stable.x * 0', 'zero'),
+    ('stable.x / 0', 'zero'),
+])
+def test_arithmetic_refusals(laws, program, match):
+    laws('stable other 1.2 0')
+    with pytest.raises(ValueError, match=match):
+        laws(program)
+
+
+def test_reference_to_nothing_inside_an_expression(laws):
+    with pytest.raises(RecipeNotFound) as e:
+        laws('stable.x + stable.nope')
+    assert (e.value.kind, e.value.name) == ('stable', 'nope')
+
+
+@pytest.mark.parametrize('program', ['stable.x0 + tweedie.t0', 'stable.x + 2 * 3', '3 @ tweedie.t0',
+                                     'stable.x + stable 1.5 0'])
+def test_arithmetic_parse_errors(laws, program):
+    laws('tweedie t0 1.5 10 2')
+    with pytest.raises(ValueError) as e:
+        laws(program)
+    assert hasattr(e.value, 'report')
+
+
+def test_preview_of_an_expression_reports_each_reference_and_registers_nothing(laws):
+    before = set(laws._recipes)
+    pv = laws.preview('stable.x0 + 2 * stable.x1')
+    assert pv.resolved == (ResolvedReference('stable', 'x0', 'session'),
+                           ResolvedReference('stable', 'x1', 'session'))
+    assert set(laws._recipes) == before
+
+
+@pytest.mark.parametrize('program, kind, name, spaced', [
+    ('stable.x1-stable.x2', 'stable', 'x1-stable.x2', 'stable.x1 - stable.x2'),
+    ('agg.A-1', 'agg', 'A-1', 'agg.A - 1'),
+])
+def test_minus_in_a_reference_has_a_hint(laws, program, kind, name, spaced):
+    with pytest.raises(RecipeNotFound) as e:
+        laws(program)
+    assert (e.value.kind, e.value.name) == (kind, name)
+    assert f'no recipe named {name!r} of kind {kind!r}' in e.value.message
+    assert f'To subtract, write spaces: {spaced}' in e.value.message
+
+
+def test_a_dashed_name_that_exists_still_resolves(uw):
+    uw('stable a-b 1.5 0')
+    assert uw('stable.a-b').name == 'a-b'
+    assert uw('stable.a-b + 1').loc == 1
+
+
+def test_division_agrees_with_multiplication():
+    x = Stable(1, 0.6, 1.3, -0.4)
+    _same_law(x / 4, x * 0.25, rtol=0)
+    assert Stable(1.5, 0).__truediv__('a') is NotImplemented
+    assert Stable(1.5, 0).__rmatmul__('a') is NotImplemented

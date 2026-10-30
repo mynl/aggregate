@@ -114,6 +114,18 @@ class Stable(LabeledMixin):
     :math:`(2/\pi)\beta\gamma a\log|a|` when :math:`\alpha = 1`. Adding a
     number shifts the location. ``sum()`` works, because ``0 + X`` is ``X``.
 
+    **Independent copies.** These operations act on laws, not on random
+    variables, and each operand is an independent copy. Hence ``X + X`` is not
+    ``2 * X``: at :math:`\alpha = 3/2` the first has scale
+    :math:`2^{2/3} = 1.5874` and the second has scale 2, and that difference is
+    the stability property itself. Likewise ``X - X`` is a symmetric stable law
+    with scale 1.5874, not zero. ``t @ X`` is the sum of ``t`` independent copies,
+    with characteristic function :math:`\varphi^t`, so scale
+    :math:`t^{1/\alpha}\gamma` and location :math:`t\delta_1`. This is the law at
+    time ``t`` of the Levy process with :math:`X` at time 1, and ``t`` need not be
+    an integer. At :math:`\alpha = 1` it has no logarithm term, which only a
+    change of scale brings.
+
     **Facts.** The mean is :math:`\delta_1` for :math:`\alpha > 1` and does not
     exist otherwise. For :math:`\alpha \ne 1`, :math:`X - \delta_1` is strictly
     stable and :math:`\Pr(X > \delta_1) = 1/2 + \arctan(\beta\tan(\pi\alpha/2))/(\pi\alpha)`,
@@ -456,6 +468,46 @@ class Stable(LabeledMixin):
         return Stable(self.alpha, np.sign(a) * self.beta, abs(a) * self.scale, loc)
 
     __rmul__ = __mul__
+
+    def __truediv__(self, other):
+        if not _is_real(other):
+            return NotImplemented
+        if other == 0:
+            raise ValueError('Stable: division by zero does not give a stable law')
+        return self * (1 / other)
+
+    def __rmatmul__(self, other):
+        r"""``t @ X``: the sum of ``t`` independent copies of this law.
+
+        Parameters
+        ----------
+        other : float
+            The number of copies ``t``, positive and not necessarily an integer.
+
+        Returns
+        -------
+        Stable
+            The same ``alpha`` and ``beta``, scale ``t ** (1 / alpha) * scale`` and
+            location ``t * loc``. Anonymous, like every operator's result.
+
+        Notes
+        -----
+        The characteristic function is :math:`\varphi^t`, by infinite divisibility.
+        Raising the S1 form to the power :math:`t` multiplies the exponent, so
+        :math:`\gamma^\alpha` and :math:`\delta_1` scale by :math:`t` and the skewness
+        is unchanged, at every :math:`\alpha`. The logarithm term at
+        :math:`\alpha = 1` in :meth:`__mul__` comes from a change of scale and does
+        not arise here. The ``@`` is the one on an ``agg``, where ``2 @ agg.X``
+        doubles the claim count.
+        """
+        if not _is_real(other):
+            return NotImplemented
+        t = float(other)
+        if not 0 < t < np.inf:
+            raise ValueError(
+                f'Stable: the number of independent copies in t @ X must be positive '
+                f'and finite, got {other}')
+        return Stable(self.alpha, self.beta, t ** (1 / self.alpha) * self.scale, t * self.loc)
 
     # ----- the generalized central limit theorem ----------------------
     @classmethod

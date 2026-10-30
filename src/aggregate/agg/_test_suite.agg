@@ -423,3 +423,7 @@ tweedie SN.Tweedie       1.5 10 2 note{p, mean, dispersion}
 tweedie SN.TweedieCv     1.5 10 cv 0.8 note{the mean and cv form, stored as a dispersion}
 
 tweedie SN.TweedieBook as Book 10 claims sev gamma 10 cv 1 note{the compound form}
+
+stable SN.Sum            stable.SN.Plain + 2 * stable.SN.Scaled + 3 note{a stored combination: four numbers, the expression in program}
+
+stable SN.Copies as "Three copies" 3 @ stable.SN.Plain - 1

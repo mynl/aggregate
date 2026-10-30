@@ -31,7 +31,7 @@
           | conversion_out   -> answer_conversion
           | stable_out       -> answer_stable
           | tweedie_out      -> answer_tweedie
-          | BUILTIN_STABLE   -> answer_stable_ref
+          | stable_sum       -> answer_stable_sum
           | BUILTIN_TWEEDIE  -> answer_tweedie_ref
           | expr             -> answer_expr
     
@@ -81,10 +81,42 @@
     stable_out: STABLE name as_label numberl trailer                 -> stable_out_numbers
               | STABLE name as_label numberl ID trailer              -> stable_out_param
               | STABLE name as_label expr CLAIMS SEV sev trailer     -> stable_out_compound
+              | STABLE name as_label stable_sum trailer              -> stable_out_expression
     
     tweedie_out: TWEEDIE name as_label expr expr expr trailer        -> tweedie_out_dispersion
                | TWEEDIE name as_label expr expr CV expr trailer     -> tweedie_out_cv
                | TWEEDIE name as_label expr CLAIMS SEV sev trailer   -> tweedie_out_compound
+    
+    // Arithmetic on stable references ([Stable-Arithmetic]). The operations act on
+    // laws, not on random variables: each occurrence of a reference is a fresh
+    // independent copy, so ``stable.x + stable.x`` is not ``2 * stable.x``.
+    // ``t @ stable.x`` is the sum of t independent copies, the ``@`` of
+    // ``builtin_agg``. The prefix is what keeps this context free: BUILTIN_STABLE
+    // selects these productions before any lookup, where ``agg.X + 3`` shifts a
+    // severity. The numeric side is ``expr``, so ``+``, ``-`` and ``*`` between
+    // numbers still need parentheses: ``(1+2) * stable.x``. A law has to be named to
+    // enter arithmetic. Admitting ``STABLE numberl`` as an atom would make the
+    // ordinary statement ``stable 1.5 -0.5`` ambiguous, because NUMBER absorbs a
+    // glued leading minus. See dev/done/plan-stable-expressions.md.
+    ?stable_sum: stable_sum PLUS stable_term     -> stable_add
+               | stable_sum MINUS stable_term    -> stable_subtract
+               | stable_sum PLUS expr            -> stable_shift_up
+               | stable_sum MINUS expr           -> stable_shift_down
+               | expr PLUS stable_term           -> stable_number_plus
+               | expr MINUS stable_term          -> stable_number_minus
+               | stable_term
+    
+    ?stable_term: expr TIMES stable_term             -> stable_scaled
+                | expr INHOMOG_MULTIPLY stable_term  -> stable_copies
+                | stable_factor
+    
+    ?stable_factor: stable_factor TIMES expr     -> stable_times
+                  | stable_factor DIVIDE expr    -> stable_divide
+                  | MINUS stable_atom            -> stable_negate
+                  | stable_atom
+    
+    ?stable_atom: BUILTIN_STABLE                 -> stable_ref
+                | "(" stable_sum ")"             -> stable_parens
     
     // ======================================================================
     // Characteristic function law (chfagg)

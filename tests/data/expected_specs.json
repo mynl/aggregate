@@ -6609,5 +6609,32 @@
       "note": "the compound form",
       "hints": ""
     }
+  },
+  "stable SN.Sum            stable.SN.Plain + 2 * stable.SN.Scaled + 3 note{a stored combination: four numbers, the expression in program}": {
+    "kind": "stable",
+    "name": "SN.Sum",
+    "spec": {
+      "name": "SN.Sum",
+      "alpha": 1.5,
+      "beta": 0.7555555555555555,
+      "scale": 4.3267487109222245,
+      "loc": -3.0,
+      "note": "a stored combination: four numbers, the expression in program",
+      "hints": ""
+    }
+  },
+  "stable SN.Copies as \"Three copies\" 3 @ stable.SN.Plain - 1": {
+    "kind": "stable",
+    "name": "SN.Copies",
+    "spec": {
+      "name": "SN.Copies",
+      "alpha": 1.5,
+      "beta": 0.0,
+      "scale": 2.080083823051904,
+      "loc": -1.0,
+      "label": "Three copies",
+      "note": "",
+      "hints": ""
+    }
   }
 }

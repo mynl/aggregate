@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.43.0 - 2026-10-30
+
+**[Stable-Arithmetic] `stable.NAME` references take `+`, `-`, `*`, `/`, unary minus and `@`, and `stable NAME <expression>` stores the result.** An expression alone returns an anonymous `Stable`, has kind `conversion` and stores nothing. `stable z <expression>` stores the four computed numbers, bound at parse time. Each occurrence of a reference is an independent copy: `stable.x + stable.x` has scale `2 ** (1 / alpha)`, `2 * stable.x` has scale 2, and `t @ stable.x` is the sum of `t` copies. New in Python: `Stable.__truediv__` and `Stable.__rmatmul__`. A `RecipeNotFound` for a name holding a minus sign, of any kind, now gives the spaced spelling, and a parse error no longer suggests a `builtin_*` terminal name. See `dev/done/plan-stable-expressions.md`.
+
 ## 1.42.0 - 2026-10-30
 
 **[Named-Conversion-Statements] `stable NAME ...` and `tweedie NAME ...` store a law in the recipe base, referenced as `stable.NAME` and `tweedie.NAME`.** Both take the conversion forms with an optional `as` label and the trailer, and store canonical numbers under the new kinds `stable` and `tweedie`: the S1 `alpha`, `beta`, `scale`, `loc`, and `p`, `mean`, `dispersion`. `Stable` and `TweedieConversion` gain `name`, `label`, `program` and `from_spec`, and the string of a named law leads with its name. `library.agg` gains `stable Cauchy`, `Levy`, `Landau` and `Holtsmark`. A bare name held under two kinds now raises the `KeyError` listing its dotted spellings, in `build` and `preview`, where a parse error appeared before. `TweedieConversion` no longer has `__slots__`. See `dev/done/plan-stable-expressions.md`.

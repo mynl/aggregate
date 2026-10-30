@@ -172,13 +172,12 @@
   `chfagg` writes `c * stable alpha beta + b` from 1.35.0. Add the `chfagg`
   spelling to the conversion's printed equivalents; the two differ in meaning
   only at `alpha = 1` in S1.
-- **[Stable-Expressions]**: `[Named-Conversion-Statements]` landed at 1.42.0, named
-  `stable` and `tweedie` laws referenced as `stable.NAME` and `tweedie.NAME`.
-  `[aLL-Named-Laws]` and `[Stable-Arithmetic]` follow; see
-  `dev/done/plan-stable-expressions.md`.
+- **[Stable-Expressions]**: done, 1.42.0 and 1.43.0, with aggregate-api 1.39.0,
+  `dev/done/plan-stable-expressions.md`. Left over: arithmetic on Tweedie laws, for
+  scaling and for sums with equal `phi * mu ** (p - 1)`.
 - **[Chfagg-From-Stable-Expression]**: `chfagg C stable.x0 + 2 * stable.x1 + 3`,
   a combination's parameters on a grid, closing the loop from parameters to
-  density. Pended by the author, 2026-10-30; depends on `[Stable-Arithmetic]` in
+  density. Pended by the author, 2026-10-30; `[Stable-Arithmetic]` landed at 1.43.0, in
   `dev/done/plan-stable-expressions.md`.
 - **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`;
   `pedagogy.similar_risks_example` raises `TypeError`, passing arguments that

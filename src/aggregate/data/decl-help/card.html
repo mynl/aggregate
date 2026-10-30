@@ -223,6 +223,8 @@ xpnl Book.PnL
         <li><code class="dh">chfagg S 2 * stable 1.5 1 + 10</code> a law from its characteristic function, shapes only, scaled and shifted as a severity is: stable, tweedie, norm, gamma, invgauss and more.</li>
         <li><code class="dh">tweedie 1.5 100 2</code> converts between Tweedie parameterizations.</li>
         <li><code class="dh">stable 1000 claims sev 100 * lomax 1.5</code> the stable limit of a Pareto book.</li>
+        <li><code class="dh">stable x 1.5 0.85</code> names a stable law, referenced as <code class="dh">stable.x</code>; <code class="dh">tweedie t 1.5 100 2</code> likewise.</li>
+        <li><code class="dh">stable.x + 2 * stable.y + 3</code> combines named laws with a common alpha, each reference an independent copy.</li>
         <li>Everything else: <a href="https://aggregate.readthedocs.io/en/latest/4_dec_Language_Reference.html" target="_blank" rel="noopener">the DecL reference</a>.</li>
       </ul>
     </div>

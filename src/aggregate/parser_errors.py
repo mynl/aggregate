@@ -696,13 +696,15 @@ def _did_you_mean(got: str, expected_terminals: Iterable[str]) -> list[str]:
     are considered as candidates. Matching is case-insensitive against
     the lowercased terminal name -- a reasonable proxy for the
     underlying literal for the DecL keyword terminals in
-    ``decl.lark`` (e.g. ``MIXED`` -> ``"mixed"``).
+    ``decl.lark`` (e.g. ``MIXED`` -> ``"mixed"``). A ``BUILTIN_*`` terminal
+    is excluded because its name is not a word anyone can write: ``stable``
+    is close enough to ``builtin_stable`` to be suggested it.
     """
     if not got:
         return []
     candidates = [
         t.lower()
         for t in expected_terminals
-        if t.isupper() and t.isascii() and not t.startswith("__")
+        if t.isupper() and t.isascii() and not t.startswith(("__", "BUILTIN_"))
     ]
     return get_close_matches(got.lower(), candidates, n=3, cutoff=0.6)

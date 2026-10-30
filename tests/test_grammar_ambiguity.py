@@ -215,3 +215,62 @@ def test_named_laws_are_unambiguous(explicit_parser, program):
     tree = explicit_parser.parse(program)
     n = len(list(tree.find_data('_ambig')))
     assert n == 0, f'{program!r} has {n} ambiguous span(s)'
+
+
+# [Stable-Arithmetic] (1.43.0): every operator form has one parse, and an
+# ordinary conversion beside them keeps its one parse.
+STABLE_ARITHMETIC_PROGRAMS = [
+    '3 * stable.x0',
+    'stable.x1 + stable.x2',
+    'stable.x0 + 2 * stable.x1 + 3',
+    'stable z stable.x0 + 2 * stable.x1 + 3',
+    'stable z stable.x0',
+    'stable z as Combo stable.x - stable.y note{net}',
+    'stable z 3 @ stable.x',
+    'stable.x * 3',
+    'stable.x / 3',
+    '3 + stable.x',
+    '3 - stable.x',
+    'stable.x - 3',
+    'stable.x -3',
+    '-stable.x',
+    '- stable.x',
+    'stable.x - -stable.y',
+    'stable.x -stable.y',
+    'stable.x - -3',
+    '2 * 3 * stable.x',
+    '2 * stable.x * 3',
+    '2 * (stable.x + stable.y) - 1',
+    '(1/2) * stable.x',
+    '1/2 * stable.x',
+    '(1+2) * stable.x',
+    '-2 * stable.x',
+    'exp(1) * stable.x',
+    '2 ** 3 * stable.x',
+    '50% * stable.x',
+    'stable.x / 3 * 2',
+    '-(stable.x + 1)',
+    '(stable.x)',
+    '((stable.x) + 1) * 2',
+    'stable.x + 1 + 2',
+    '1 + stable.x + 2',
+    '1 - stable.x - 2',
+    'stable.x - 3 * stable.y',
+    'stable.x -3 * stable.y',
+    '2 @ stable.x',
+    '3 * 2 @ stable.x',
+    '2 @ 3 * stable.x',
+    '1/2 @ stable.x',
+    'stable.x + 2 @ stable.y + 1',
+    'stable.x1-stable.x2',
+    'stable 1.5 -0.5',
+    'stable 1.5 0.5 -3',
+]
+
+
+@pytest.mark.parametrize('program', STABLE_ARITHMETIC_PROGRAMS)
+def test_stable_arithmetic_is_unambiguous(explicit_parser, program):
+    """The ladder of ``stable_sum`` has one parse for every operator form."""
+    tree = explicit_parser.parse(program)
+    n = len(list(tree.find_data('_ambig')))
+    assert n == 0, f'{program!r} has {n} ambiguous span(s)'

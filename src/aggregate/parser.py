@@ -1215,10 +1215,73 @@ class UnderwritingTransformer(Transformer):
         _, _, law = self.conversion_stable_compound([st, en, claims, sev_word, sev])
         return self._stable_declaration(name, as_label, law, trailer)
 
-    def answer_stable_ref(self, c):
-        """A whole statement ``stable.NAME``: the stored law, with its name and label."""
+    # ----- arithmetic on stable references ([Stable-Arithmetic]) ---------
+    # Each callback applies an operator of ``Stable``, which holds the
+    # mathematics. A lone reference keeps its name and label, since ``from_spec``
+    # supplies them, and the operators return an anonymous law. ``float`` because
+    # an ``expr`` can be a numpy scalar, which would otherwise try the operator
+    # first.
+
+    def answer_stable_sum(self, c):
+        """A whole statement that is a stable expression: an answer, stored nowhere."""
+        return ("conversion", "stable", c[0])
+
+    def stable_out_expression(self, c):
+        """``stable NAME [as LABEL] <expression> <trailer>``: its four numbers, stored."""
+        _st, name, as_label, law, trailer = c
+        return self._stable_declaration(name, as_label, law, trailer)
+
+    def stable_ref(self, c):
         from .stable import Stable
-        return ("conversion", "stable", Stable.from_spec(self.safe_lookup(str(c[0]))))
+        return Stable.from_spec(self.safe_lookup(str(c[0])))
+
+    def stable_parens(self, c):
+        return c[0]
+
+    def stable_add(self, c):
+        a, _, b = c
+        return a + b
+
+    def stable_subtract(self, c):
+        a, _, b = c
+        return a - b
+
+    def stable_shift_up(self, c):
+        law, _, x = c
+        return law + float(x)
+
+    def stable_shift_down(self, c):
+        law, _, x = c
+        return law - float(x)
+
+    def stable_number_plus(self, c):
+        x, _, law = c
+        return float(x) + law
+
+    def stable_number_minus(self, c):
+        x, _, law = c
+        return float(x) - law
+
+    def stable_scaled(self, c):
+        x, _, law = c
+        return float(x) * law
+
+    def stable_copies(self, c):
+        """``t @ X``, the sum of ``t`` independent copies of ``X``."""
+        t, _, law = c
+        return float(t) @ law
+
+    def stable_times(self, c):
+        law, _, x = c
+        return law * float(x)
+
+    def stable_divide(self, c):
+        law, _, x = c
+        return law / float(x)
+
+    def stable_negate(self, c):
+        _, law = c
+        return -law
 
     @staticmethod
     def _tweedie_declaration(name, as_label, law, trailer):

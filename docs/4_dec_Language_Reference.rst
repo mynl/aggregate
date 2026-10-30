@@ -156,6 +156,30 @@ The distribution values of a ``Stable`` (``pdf``, ``cdf``, ``ppf`` and the rest)
 
 ``library.agg`` has four stable laws under their classical names: ``stable.Cauchy``, ``stable.Levy``, ``stable.Landau`` and ``stable.Holtsmark``.
 
+**Arithmetic on stable laws.** ``stable.NAME`` references combine, one statement at a time, by the rules of :class:`aggregate.stable.Stable`, so the laws need a common :math:`\alpha`::
+
+    stable x0 1.5 0
+    stable x1 1.5 0.85
+    stable x2 1.5 -0.5
+
+    3 * stable.x0                              # alpha 1.5, beta 0, scale 3, location 0
+    stable.x1 + stable.x2                      # alpha 1.5, beta 0.175, scale 1.5874, location 0
+    stable.x0 + 2 * stable.x1 + 3              # alpha 1.5, beta 0.62798, scale 2.44726, location 3
+    stable z stable.x0 + 2 * stable.x1 + 3     # the same law, stored as stable.z
+
+The operators are ``+`` and ``-`` between laws, ``+``, ``-``, ``*`` and ``/`` with a number, unary minus, and ``t @ stable.x``. On the numeric side anything an expression accepts works, so ``1/2 * stable.x`` and ``(1+2) * stable.x`` are fine, and as everywhere in DecL ``(1+2)`` needs its parentheses. An expression alone is an answer: it returns an anonymous ``Stable`` and stores nothing. ``stable z <expression>`` stores the four computed numbers, with the expression kept in ``program``. A reference resolves when the statement is parsed, so redefining ``x0`` later does not change a stored ``z``. A law has to be named to enter arithmetic, so ``3 * stable 1.5 0`` is a parse error. A ``tweedie`` reference takes no arithmetic, since a sum of two Tweedie laws is rarely Tweedie.
+
+**The operations act on laws, not on random variables, and each occurrence of a reference is a fresh independent copy.** So ``stable.x + stable.x`` is not ``2 * stable.x``. At :math:`\alpha=3/2` the first has scale :math:`2^{2/3}=1.5874` and the second has scale 2, and that difference is the stability property itself. Likewise ``stable.x - stable.x`` is a symmetric stable law with scale 1.5874, not zero. ``t @ stable.x`` is the sum of ``t`` independent copies, with scale :math:`t^{1/\alpha}\gamma` and location :math:`t\delta`, and ``t`` need not be an integer: it is the law at time ``t`` of the Levy process with ``stable.x`` at time 1. It is the ``@`` of ``2 @ agg.X``.
+
+**A subtraction needs a space.** A name may contain a minus sign, so ``stable.x1-stable.x2`` is one name, and the error for a missing name of that shape gives the spaced spelling. ``stable.x1 - stable.x2`` and ``stable.x1 -stable.x2`` both subtract.
+
+The limit laws of two units combine. With :math:`\lambda\theta^\alpha` the right tail constant of each, the sum has the sum of the means and of the tail constants::
+
+    stable A 1000 claims sev 100 * lomax 1.5
+    stable B 400 claims sev 250 * lomax 1.5
+    stable.A + stable.B                        # beta 1, mean 400,000, tail constant 2,581,138.83
+    stable.A - stable.B                        # beta -0.22515, location 0
+
 Exact Compounds (nttagg)
 ========================
 

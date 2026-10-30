@@ -2785,8 +2785,16 @@ class Underwriter(HelpMixin):
         name = '.'.join(name)
         try:
             parsed = self[(kind, name)]
-        except LookupError:
+        except LookupError as e:
             logger.error('ERROR id %s.%s not found in the recipe base.', kind, name)
+            if isinstance(e, RecipeNotFound) and '-' in name:
+                # ``-`` is a legal name character, so ``stable.a-stable.b`` and
+                # ``agg.A-1`` lex as one name and the arithmetic never happens.
+                first, rest = name.split('-', 1)
+                raise RecipeNotFound(
+                    f'{e.message}. A name may contain a minus sign, so {buildinid} is '
+                    f'one name. To subtract, write spaces: {kind}.{first} - {rest}',
+                    kind=kind, name=name) from None
             raise
         logger.debug('UnderwritingParser.safe_lookup | retrieved %s.%s as type %s.%s',
                      kind, name, parsed.kind, parsed.name)

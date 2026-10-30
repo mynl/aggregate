@@ -1580,3 +1580,11 @@ stable NL.Limit2    400 claims sev 250 * lomax 1.5            note{a second book
 tweedie NL.T0       1.5 10 2                                  note{p, mean, dispersion};
 tweedie NL.Cv       1.5 10 cv 0.8                             note{stored as a dispersion};
 tweedie NL.Book as "A book" 10 claims sev gamma 10 cv 1       note{the compound form};
+
+# Arithmetic on stable references ([Stable-Arithmetic], 1.43.0). Each occurrence
+# of a reference is an independent copy. An expression alone is an answer that
+# declares nothing, so it lives in tests/test_stable.py; these store a result.
+stable NL.Combo     stable.NL.X0 + 2 * stable.NL.X1 + 3       note{the three operations in one law};
+stable NL.Net as Net stable.NL.Limit - stable.NL.Limit2       note{two limit laws, a long and a short position};
+stable NL.Copies    3 @ stable.NL.X1                          note{three independent copies};
+stable NL.Copy      stable.NL.X0                              note{a copy under another name};

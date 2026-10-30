@@ -136,6 +136,12 @@ def test_did_you_mean_ignores_anonymous_terminals():
     assert _did_you_mean("anon_0", ["__ANON_0", "__ANON_1"]) == []
 
 
+def test_did_you_mean_ignores_builtin_terminals():
+    # The name of a BUILTIN_* terminal is not a word anyone can write, and
+    # 'stable' is close enough to 'builtin_stable' to be matched.
+    assert _did_you_mean("stable", ["BUILTIN_STABLE", "BUILTIN_TWEEDIE"]) == []
+
+
 def test_did_you_mean_case_insensitive():
     # 'MiXeD' should still nominate 'mixed' as the close match.
     assert "mixed" in _did_you_mean("MiXeD", ["MIXED", "NET"])

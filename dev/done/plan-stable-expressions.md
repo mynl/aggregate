@@ -5,8 +5,8 @@ csl: D:/Projects/Biblio/journal-of-risk-and-uncertainty.csl
 
 # Plan: named stable and tweedie statements, and arithmetic on stable references
 
-`[Stable-Expressions]`. Drafted 2026-10-30 against aggregate 1.40.0. **Status: ruled
-2026-10-30, executing; see the Execution log.** Two minor bumps in aggregate, `[Named-Conversion-Statements]` and
+`[Stable-Expressions]`. Drafted 2026-10-30 against aggregate 1.40.0. **Status: done, 1.42.0
+and 1.43.0 with aggregate-api 1.39.0; see the Execution log.** Two minor bumps in aggregate, `[Named-Conversion-Statements]` and
 `[Stable-Arithmetic]`, and one in aggregate-api, `[aLL-Named-Laws]`. Versions are
 assigned at execution, because `dev/plan-severity-parameter-count.md` may land first and
 a 1.41.0 was in progress in this worktree when the plan was drafted.
@@ -580,6 +580,17 @@ the same 3 ambiguous entries, and 733 statements parse in the same time within n
 - **`[Mirrors]`: two lines of `agg.sublime-syntax`, not three.** Only 109 and 161 hold
   `chfagg\.`; line 106 is the `port.` rule.
 - **`[Stable-Independent-Copies]`**, ruling 13, is an addition to the plan by the author.
+
+- **`[aLL-Named-Laws]`: the arithmetic tests are gated on the library.** The plan puts
+  `stable.x0 + 1` and `stable.Holtsmark + 1` in the aggregate-api step, which runs before
+  `[Stable-Arithmetic]` exists. They skip until `Stable.__truediv__` appears, as the conversion
+  tests in that file skip before 1.22.0 and 1.23.0, and they were run after 1.43.0 landed.
+
+### Findings fixed at execution
+
+- `_did_you_mean` treated every upper-case terminal as a keyword, so `2 * stable 1 2` drew
+  `Did you mean: builtin_stable?`, since `stable` is close enough to that terminal's name. It
+  now excludes `BUILTIN_*`, which no one can write. No plan step covered this.
 
 ### Accepted findings
 

@@ -142,6 +142,9 @@ EDGE_ERROR_FLAG = 1e-3
 STATS_COLUMNS = ['e0.m0', 'mixed', 'independent', 'after_occ', 'empirical',
                  'occ_impact', 'agg_impact', 'gross_empirical', 'error']
 
+#: The note on the frequency and severity rows of a law's tail report.
+_NO_COMPONENT = 'none: a characteristic function law'
+
 #: The six measures of a moment store block.
 _MEASURES = ('ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew')
 
@@ -1716,6 +1719,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.figure = None
         self._valid = None
         self._deficit = np.nan
+        self._bs_given = False
 
     # ---- constructors -----------------------------------------------------
     @classmethod
@@ -2319,6 +2323,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         log2 = 16 if log2 is None else int(log2)
         n = 2 ** log2
         mode = self._tilt_mode(tilt)
+        #: whether the bucket was given (rule C) rather than sized (rule A)
+        self._bs_given = bool(bs)
         sigma = 0.0
         h, log2, x0, tau_pair = self.grid_window(log2, bucket_sizing_p, tilt, bs)
         fam = self._tilt_family() if mode != 'off' else None
@@ -2425,8 +2431,10 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
 
     @property
     def bounded(self):
-        """``False``: every family in scope has an unbounded support."""
-        return False
+        """Whether both sides of the law are bounded, from :attr:`tail_class` as on ``Aggregate``; ``False`` for every family in scope."""
+        from .tail import TailClass
+        left, right = self._tail_sides()
+        return left == TailClass.BOUNDED and right == TailClass.BOUNDED
 
     @property
     def support(self):
@@ -3004,6 +3012,247 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                        'about the model being right for the risk.')
         return ' '.join(out)
 
+    # ---- grid and tail reports -------------------------------------------
+    def _rule_a_edges(self):
+        """``(x_l, x_r)``: rule A's window edges for the grid's tilt mode, ``nan`` for a law built from a bare characteristic function."""
+        fam = self.family
+        if self._x_min_fixed is not None:
+            return np.nan, np.nan
+        eps = 1.0 - self.bucket_sizing_p
+        mode = self._tilt_mode(self.tilt_setting)
+        if mode != 'off' and fam.tilt_side == 'split':
+            A, B, alpha = fam.power_tails
+            return (fam.location - (B / (eps / 2)) ** (1 / alpha),
+                    fam.location + (A / (eps / 2)) ** (1 / alpha))
+        tf = self._tilt_family() if mode != 'off' else None
+        if tf is None:
+            return window_edges(fam, eps / 2)
+        A, _, alpha = tf.power_tails
+        lo, _ = tf.support
+        if np.isfinite(lo):
+            y_l = lo
+        else:
+            y_l = -chernoff_edge(lambda u: tf.cgf(-u), -tf.cgf_domain[0],
+                                 math.log(TILT_LEFT_EPS), tf.scale)
+        y_r = tf.location + (A / eps) ** (1 / alpha)
+        if fam.tilt_side == 'left':
+            return -y_r, -y_l
+        return y_l, y_r
+
+    @property
+    def bs_window_df(self):
+        """The grid decision in ``Aggregate.bs_window_df``'s columns and dtypes, indexed by ``method``; ``None`` before :meth:`update`.
+
+        Rows: ``rule A``, the window edges from the closed-form tails at
+        ``1 - bucket_sizing_p`` and the bucket that spans them; ``cap``, the
+        tilted bucket cap, when it binds; ``given``, a bucket and ``log2``
+        given (rule C); ``recommended``, :meth:`recommended_grid`; and
+        ``used``, the realized grid. ``selected`` marks the method the grid
+        came from. ``coverage`` is ``1-`` the mass the window is sized to
+        leave out (``used``: the mass it does leave out), ``clipped`` the mass
+        a tilted grid leaves out above, and ``log2_need`` the recommended
+        ``log2``.
+        """
+        if self.agg_density is None:
+            return None
+        n = 2 ** self.log2
+        eps = 1.0 - self.bucket_sizing_p
+        tilted = max(self.tilt) > 0
+        log2_need, bs_need, _ = self._recommend()
+        x_l, x_r = self._rule_a_edges()
+        h_a = round_bucket((x_r - x_l) / n) if np.isfinite(x_r - x_l) else np.nan
+        cap = (self._bucket_cap(two_sided=self.family.tilt_side == 'split')
+               if tilted else np.inf)
+        if self._bs_given or self._x_min_fixed is not None:
+            used = 'given'
+        elif np.isfinite(cap) and cap < h_a:
+            used = 'cap'
+        else:
+            used = 'rule A'
+        rows = [('rule A', bool(np.isfinite(h_a)), used == 'rule A', x_l, x_r, x_r - x_l, h_a,
+                 self.log2, log2_need, f'1-{eps:g}', np.nan,
+                 'window edges from the closed-form tails at the budget')]
+        if np.isfinite(cap) and cap < h_a:
+            rows.append(('cap', True, used == 'cap', self.x_min, self.x_min + cap * n,
+                         cap * n, cap, self.log2, log2_need, f'1-{self.outside_mass:.3g}',
+                         np.nan, 'tilted bucket cap: truncation at roundoff under the '
+                         'tilt, ten buckets per scale; the window ends short'))
+        if used == 'given':
+            rows.append(('given', True, True, self.x_min, self.x_min + self.bs * n,
+                         self.bs * n, self.bs, self.log2, log2_need,
+                         f'1-{self.outside_mass:.3g}', np.nan, 'bs and log2 given (rule C)'))
+        r_x0 = self.grid_window(log2_need, self.bucket_sizing_p, self.tilt_setting)[2] \
+            if self._x_min_fixed is None else self.x_min
+        r_w = bs_need * 2 ** log2_need
+        rows.append(('recommended', True, False, np.nan if r_x0 is None else r_x0,
+                     np.nan if r_x0 is None else r_x0 + r_w, r_w, bs_need, log2_need,
+                     log2_need, f'1-{eps:g}', np.nan,
+                     'the smallest grid meeting coverage, truncation and resolution'))
+        rows.append(('used', True, False, self.x_min, self.x_min + self.bs * n,
+                     self.bs * n, self.bs, self.log2, log2_need,
+                     f'1-{self.outside_mass:.3g}',
+                     self.outside_above if tilted else np.nan, f'realized grid ({used})'))
+        cols = ['method', 'applies', 'selected', 'x_min', 'x_max', 'W', 'bs', 'log2',
+                'log2_need', 'coverage', 'clipped', 'note']
+        df = pd.DataFrame(rows, columns=cols).set_index('method')
+        for c in ('x_min', 'x_max', 'W', 'bs', 'clipped'):
+            df[c] = df[c].astype(float)
+        for c in ('log2', 'log2_need'):
+            df[c] = df[c].astype('Int64')
+        for c in ('applies', 'selected'):
+            df[c] = df[c].astype(bool)
+        return df
+
+    @property
+    def bs_description(self):
+        """One line on the grid, ``Aggregate.bs_description``'s form."""
+        from ._bucket_window import _fmt_bs
+        df = self.bs_window_df
+        if df is None:
+            return 'grid: not updated'
+        used = df.loc['used']
+        method = df.index[df['selected']][0] if df['selected'].any() else 'used'
+        out = (f'{method} grid: bs={_fmt_bs(self.bs)}, log2={self.log2}, window '
+               f'[{self.x_min:,.6g}, {used["x_max"]:,.6g}] of width {used["W"]:,.6g}')
+        if self.outside_mass > 0:
+            verb = 'leaves out' if max(self.tilt) > 0 else 'wraps in'
+            out += f'; {verb} ~{self.outside_mass:.3g} of the mass'
+        if int(used['log2_need']) > self.log2:
+            out += f' (raise log2 to {int(used["log2_need"])})'
+        return out
+
+    @property
+    def bs_explanation(self):
+        """Prose on how the grid was chosen, ``Aggregate.bs_explanation``'s counterpart."""
+        df = self.bs_window_df
+        if df is None:
+            return 'The object has not been updated, so there is no grid to explain.'
+        from ._bucket_window import _fmt_bs
+        used = df.loc['used']
+        eps = 1.0 - self.bucket_sizing_p
+        out = [f'The window is sized from the law\'s closed-form tails, a Chernoff '
+               f'edge on a light side and the power tail on a heavy one, so that '
+               f'{eps:g} of the mass lies beyond its edges. Log2 is {self.log2}.']
+        if 'given' in df.index:
+            out.append(f'The bucket {_fmt_bs(self.bs)} and log2 were given (rule C), '
+                       f'so the window starts at {self.x_min:,.6g} and runs '
+                       f'{used["W"]:,.6g}.')
+        else:
+            ra = df.loc['rule A']
+            out.append(f'Rule A puts the edges at {ra["x_min"]:,.6g} and '
+                       f'{ra["x_max"]:,.6g}, a width of {ra["W"]:,.6g} and a bucket of '
+                       f'{_fmt_bs(ra["bs"])}.')
+            if 'cap' in df.index:
+                out.append(f'The law is tilted, so the bucket is capped at '
+                           f'{_fmt_bs(self.bs)} to keep the truncation at roundoff and '
+                           f'ten buckets per scale, and the window ends short of the '
+                           f'edge, at {used["x_max"]:,.6g}, with {self.outside_above:.3g} '
+                           f'of the mass left out above it rather than wrapped.')
+        out.append(f'The realized window is [{self.x_min:,.6g}, {used["x_max"]:,.6g}], '
+                   f'with {self.outside_mass:.3g} of the mass outside it.')
+        rec = df.loc['recommended']
+        if int(rec['log2']) > self.log2:
+            out.append(f'Covering the law at the budget needs log2 {int(rec["log2"])} '
+                       f'with bs {_fmt_bs(rec["bs"])}, which is what sharpen moves '
+                       f'toward.')
+        else:
+            out.append(f'The smallest grid meeting coverage, truncation and resolution '
+                       f'is log2 {int(rec["log2"])} with bs {_fmt_bs(rec["bs"])}.')
+        return ' '.join(out)
+
+    def _tail_sides(self):
+        """``(left, right)``: each side's :class:`~aggregate.tail.TailClass`, from the family protocol.
+
+        ``BOUNDED`` at a finite support end; ``POWER_LAW`` where the side has a
+        power tail constant; ``SUPER_EXPONENTIAL`` where the cumulant generating
+        function is finite on that whole side (the normal); else
+        ``EXPONENTIAL``. A bare characteristic function (``from_chf``) has no
+        closed forms and is ``UNKNOWN`` on both sides.
+        """
+        from .tail import TailClass
+        fam = self.family
+        if isinstance(fam, FamilyUser):
+            return TailClass.UNKNOWN, TailClass.UNKNOWN
+        lo, hi = fam.support
+        A, B, _ = fam.power_tails if fam.power_tails else (0.0, 0.0, None)
+        s_minus, s_plus = fam.cgf_domain
+
+        def side(finite_end, const, whole):
+            if finite_end:
+                return TailClass.BOUNDED
+            if const > 0:
+                return TailClass.POWER_LAW
+            return TailClass.SUPER_EXPONENTIAL if whole else TailClass.EXPONENTIAL
+
+        return (side(np.isfinite(lo), B, s_minus == -np.inf),
+                side(np.isfinite(hi), A, s_plus == np.inf))
+
+    def _tail_row(self):
+        """The aggregate :class:`~aggregate.tail.TailRow`: the law's support, sides, concentration and power note."""
+        from . import tail as _tail
+        left, right = self._tail_sides()
+        lo, hi = self.family.support
+        conc, cv = _tail.concentration(self.actual_m, self.actual_sd)
+        alpha = self.family.power_tails[2] if self.family.power_tails else None
+        note = _tail._power_note(alpha) if _tail.TailClass.POWER_LAW in (left, right) else ''
+        return _tail.TailRow(component='aggregate', family=self.family.name,
+                             min=float(lo), max=float(hi), left_tail=left,
+                             right_tail=right, concentrated=conc, cv=cv, note=note)
+
+    @property
+    def tail_class(self):
+        """The ``(freq, sev, agg)`` :class:`~aggregate.tail.TailClasses` triple: ``freq`` and ``sev`` ``None``, ``agg`` the heavier side's class."""
+        from . import tail as _tail
+        return _tail.TailClasses(None, None, _tail._heaviest(self._tail_sides()))
+
+    @property
+    def tail_behavior_df(self):
+        """The tail report in ``Aggregate.tail_behavior_df``'s columns, indexed by ``component``.
+
+        Rows ``frequency`` and ``severity``, empty with the note that a law
+        computed from its characteristic function has neither, and
+        ``aggregate``, the law's support, each side's tail class, ``bounded``,
+        and the concentration and coefficient of variation where the law has a
+        standard deviation. Valid before :meth:`update`.
+        """
+        from . import tail as _tail
+        r = self._tail_row()
+        empty = {'family': None, 'min': np.nan, 'max': np.nan, 'left_tail': None,
+                 'right_tail': None, 'bounded': False, 'concentrated': None,
+                 'cv': np.nan, 'note': _NO_COMPONENT}
+        data = [{'component': 'frequency', **empty}, {'component': 'severity', **empty},
+                {'component': 'aggregate', 'family': r.family, 'min': r.min, 'max': r.max,
+                 'left_tail': _tail.tail_class_label(r.left_tail),
+                 'right_tail': _tail.tail_class_label(r.right_tail),
+                 'bounded': bool(np.isfinite(r.min) and np.isfinite(r.max)),
+                 'concentrated': r.concentrated,
+                 'cv': np.nan if r.cv is None else r.cv, 'note': r.note}]
+        cols = ['component', 'family', 'min', 'max', 'left_tail', 'right_tail',
+                'bounded', 'concentrated', 'cv', 'note']
+        return pd.DataFrame(data, columns=cols).set_index('component')
+
+    @property
+    def tail_description(self):
+        """Three aligned lines on the frequency, severity and aggregate tails, as on ``Aggregate``; also the tail lines of :attr:`info`."""
+        return '\n'.join(info_row(label, value) for label, value in self._tail_info_rows())
+
+    @property
+    def tail_explanation(self):
+        """Prose over the tail report."""
+        from . import tail as _tail
+        row = self._tail_row()
+        out = ['A law computed from its characteristic function has no frequency or '
+               'severity, so its tails are its own, read from its closed forms: a '
+               'power tail constant, a support bound, or the domain of its cumulant '
+               'generating function.',
+               f'The law is {_tail.describe_row(row)}.']
+        if row.note:
+            out.append(f'Its {row.note}.')
+        if row.cv is not None:
+            tag = 'concentrated' if row.concentrated else 'not concentrated'
+            out.append(f'It is {tag}: cv ~ {row.cv:.3g}.')
+        return ' '.join(out)
+
     # ---- sharpen ----------------------------------------------------------
     def _sharpen_terms(self):
         """The score terms of the current grid: ``validation_score_terms``'s six, then the four of the inversion.
@@ -3267,9 +3516,11 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return hashlib.md5(blob.encode('utf-8')).hexdigest()[:8].upper()
 
     def _tail_info_rows(self):
-        """The three tail lines of :attr:`info`, ``(label, value)``."""
-        return [('frequency tail', INFO_NA), ('severity tail', INFO_NA),
-                ('aggregate tail', INFO_NA)]
+        """The three tail lines of :attr:`info` and :attr:`tail_description`, ``(label, value)``."""
+        from . import tail as _tail
+        line = _tail.describe_rows([self._tail_row()])[0]
+        return [('frequency tail', _NO_COMPONENT), ('severity tail', _NO_COMPONENT),
+                ('aggregate tail', line[len('aggregate tail'):].strip())]
 
     @property
     def info(self):

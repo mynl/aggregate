@@ -712,3 +712,13 @@ Landed as specified, with these divergences.
 4. **Not registered for the `sharpen` exhibit.** The plan does not ask for it, and the app's Sharpen leaf reads `sharpen_program` and `sharpen_description`, not the exhibit. Registering `AggregateCHF` there is one call and a caption when wanted, and would add to the Loss Lab's exhibit list.
 5. **`dev/FEATURES.csv`** marks the five sharpen members on `AggregateCHF`.
 
+### [CHF-Grid-And-Tail-Reports], 1.39.0
+
+Landed as specified, with these divergences.
+
+1. **`tail_class` is `TailClasses(None, None, agg)` with `agg` the heavier side.** The plan named the method without its value. `Aggregate`'s triple is frequency, severity and aggregate rungs; a law has no first two, and its aggregate rung is taken as the heavier of its two sides (`_tail._heaviest`), so a signed law with a power left tail reports `power-law`.
+2. **A bare characteristic function (`from_chf`) is `undetermined` on both sides**, `TailClass.UNKNOWN`, since it has no closed forms to read; its `bs_window_df` has rule A inapplicable and the grid `given`.
+3. **`bs_window_df`'s `selected` marks the method the grid came from** (`rule A`, `cap` or `given`), as `Aggregate`'s marks the winning method, and `used` is never selected. `coverage` on `rule A` and `recommended` is the budget the window is sized to (`1-1e-05`), on `cap`, `given` and `used` the mass actually outside (`1-4.34e-06`). The `recommended` row of a two-sided law has no `x_min` (the crop places it), so its edges are `nan`.
+4. **`bs_description` says `wraps in` for an untilted grid and `leaves out` for a tilted one**, and adds `(raise log2 to N)` when the recommended `log2` is larger, in `Aggregate`'s form.
+5. **`dev/FEATURES.csv`** marks the seven members on `AggregateCHF`; the two exhibit lists in the tests grow to six.
+

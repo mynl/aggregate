@@ -13644,6 +13644,375 @@
    "n_stub_levels": 1
   }
  ],
+ "bs_window/insurer/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "rule A",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 581.1327139709916,
+       "text": "581.1"
+      },
+      {
+       "raw": 581.1327139709916,
+       "text": "581.1"
+      },
+      {
+       "raw": 0.25,
+       "text": "0.250000"
+      },
+      {
+       "raw": 12,
+       "text": "12"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1e-05",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "window edges from the closed-form tails at the budget"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "given",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 0.25,
+       "text": "0.250000"
+      },
+      {
+       "raw": 12,
+       "text": "12"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1.01e-12",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "bs and log2 given (rule C)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "recommended",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 2.0,
+       "text": "2.000000"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1e-05",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "the smallest grid meeting coverage, truncation and resolution"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 0.25,
+       "text": "0.250000"
+      },
+      {
+       "raw": 12,
+       "text": "12"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1.01e-12",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "realized grid (given)"
+     ]
+    }
+   ],
+   "caption": "How the grid was chosen: the window edges from the law's closed-form tails, the tilted bucket cap where it binds, a given grid, the recommended grid, and the grid used. Coverage is the fraction of the law the window holds; clipped is the mass a tilted grid leaves out above its window rather than wrapping in.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "method"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c1",
+     "name": [
+      "applies"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c2",
+     "name": [
+      "selected"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "x_min"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "x_max"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "W"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 6,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c6",
+     "name": [
+      "bs"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c7",
+     "name": [
+      "log2"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c8",
+     "name": [
+      "log2_need"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c10",
+     "name": [
+      "clipped"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c11",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "method"
+     },
+     {
+      "text": "applies"
+     },
+     {
+      "text": "selected"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "W"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "coverage"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "bs_window/insurer/BivariateAggregate": [
   {
    "body": [
@@ -15307,6 +15676,375 @@
     }
    ],
    "caption": "How the grid was chosen: the candidate windows, which one applied, and the bucket size and log2 that follow from it. Each method's window is [x_min, x_max] with width W = x_max - x_min, and coverage is the fraction of the distribution the window holds. A clipped row is a window that did not fit and was cut to the grid, which is where aliasing comes from.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "method"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c1",
+     "name": [
+      "applies"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c2",
+     "name": [
+      "selected"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "x_min"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c4",
+     "name": [
+      "x_max"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c5",
+     "name": [
+      "W"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 6,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c6",
+     "name": [
+      "bs"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c7",
+     "name": [
+      "log2"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "int",
+     "format": {
+      "group": true,
+      "kind": "int"
+     },
+     "key": "c8",
+     "name": [
+      "log2_need"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "coverage"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "kind": "sci"
+     },
+     "key": "c10",
+     "name": [
+      "clipped"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c11",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "method"
+     },
+     {
+      "text": "applies"
+     },
+     {
+      "text": "selected"
+     },
+     {
+      "text": "x_min"
+     },
+     {
+      "text": "x_max"
+     },
+     {
+      "text": "W"
+     },
+     {
+      "text": "bs"
+     },
+     {
+      "text": "log2"
+     },
+     {
+      "text": "log2_need"
+     },
+     {
+      "text": "coverage"
+     },
+     {
+      "text": "clipped"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "bs_window/raw/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "rule A",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 581.1327139709916,
+       "text": "581.1"
+      },
+      {
+       "raw": 581.1327139709916,
+       "text": "581.1"
+      },
+      {
+       "raw": 0.25,
+       "text": "0.25"
+      },
+      {
+       "raw": 12,
+       "text": "12"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1e-05",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "window edges from the closed-form tails at the budget"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "given",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 0.25,
+       "text": "0.25"
+      },
+      {
+       "raw": 12,
+       "text": "12"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1.01e-12",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "bs and log2 given (rule C)"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "recommended",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 2.0,
+       "text": "2"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1e-05",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "the smallest grid meeting coverage, truncation and resolution"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "used",
+      {
+       "raw": true,
+       "text": "True"
+      },
+      {
+       "raw": false,
+       "text": "False"
+      },
+      {
+       "raw": 0.0,
+       "text": "0.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 1024.0,
+       "text": "1,024.0"
+      },
+      {
+       "raw": 0.25,
+       "text": "0.25"
+      },
+      {
+       "raw": 12,
+       "text": "12"
+      },
+      {
+       "raw": 9,
+       "text": "9"
+      },
+      "1-1.01e-12",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "realized grid (given)"
+     ]
+    }
+   ],
+   "caption": "How the grid was chosen: the window edges from the law's closed-form tails, the tilted bucket cap where it binds, a given grid, the recommended grid, and the grid used. Coverage is the fraction of the law the window holds; clipped is the mass a tilted grid leaves out above its window rather than wrapping in.",
    "columns": [
     {
      "align": "l",
@@ -110097,6 +110835,239 @@
    "n_stub_levels": 1
   }
  ],
+ "tail_behavior/insurer/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "frequency",
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "",
+      "",
+      {
+       "raw": false,
+       "text": "False"
+      },
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "none: a characteristic function law"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "severity",
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "",
+      "",
+      {
+       "raw": false,
+       "text": "False"
+      },
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "none: a characteristic function law"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "aggregate",
+      "gamma",
+      {
+       "raw": 0.0,
+       "text": "0.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "bounded",
+      "exponential",
+      {
+       "raw": false,
+       "text": "False"
+      },
+      "False",
+      {
+       "raw": 0.5,
+       "text": "0.50000"
+      },
+      ""
+     ]
+    }
+   ],
+   "caption": "What each tail of the law looks like: its support, the tail class on each side from its closed forms (a power tail, a support bound, or the domain of its cumulant generating function), and the coefficient of variation. The frequency and severity rows are empty: a law computed this way has neither.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "min"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "max"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
  "tail_behavior/insurer/Portfolio": [
   {
    "body": [
@@ -110846,6 +111817,239 @@
      "dtype": "float",
      "format": {
       "digits": 3,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c3",
+     "name": [
+      "max"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c4",
+     "name": [
+      "left_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c5",
+     "name": [
+      "right_tail"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "bool",
+     "key": "c6",
+     "name": [
+      "bounded"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c7",
+     "name": [
+      "concentrated"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "cv"
+     ],
+     "raw": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c9",
+     "name": [
+      "note"
+     ],
+     "wrap": true
+    }
+   ],
+   "head": [
+    [
+     {
+      "text": "component"
+     },
+     {
+      "text": "family"
+     },
+     {
+      "text": "min"
+     },
+     {
+      "text": "max"
+     },
+     {
+      "text": "left_tail"
+     },
+     {
+      "text": "right_tail"
+     },
+     {
+      "text": "bounded"
+     },
+     {
+      "text": "concentrated"
+     },
+     {
+      "text": "cv"
+     },
+     {
+      "text": "note"
+     }
+    ]
+   ],
+   "ir_version": 1,
+   "n_head_levels": 1,
+   "n_stub_levels": 1
+  }
+ ],
+ "tail_behavior/raw/AggregateCHF": [
+  {
+   "body": [
+    {
+     "cells": [
+      "frequency",
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "",
+      "",
+      {
+       "raw": false,
+       "text": "False"
+      },
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "none: a characteristic function law"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "severity",
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "",
+      "",
+      {
+       "raw": false,
+       "text": "False"
+      },
+      "",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "none: a characteristic function law"
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "aggregate",
+      "gamma",
+      {
+       "raw": 0.0,
+       "text": "0.00000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      "bounded",
+      "exponential",
+      {
+       "raw": false,
+       "text": "False"
+      },
+      "False",
+      {
+       "raw": 0.5,
+       "text": "0.50000"
+      },
+      ""
+     ]
+    }
+   ],
+   "caption": "What each tail of the law looks like: its support, the tail class on each side from its closed forms (a power tail, a support bound, or the domain of its cumulant generating function), and the coefficient of variation. The frequency and severity rows are empty: a law computed this way has neither.",
+   "columns": [
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c0",
+     "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "key": "c1",
+     "name": [
+      "family"
+     ],
+     "wrap": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "group": true,
+      "kind": "dec"
+     },
+     "key": "c2",
+     "name": [
+      "min"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 2,
       "group": true,
       "kind": "dec"
      },

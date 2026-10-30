@@ -4,7 +4,8 @@ The four generic exhibits, each a passthrough over the frame of the same name,
 in ``Aggregate``'s shapes ([CHF-Aggregate-Frames]): ``summary`` (moments and
 percentiles by ``Freq``, ``Sev`` and ``Agg``, the first two empty), ``tail``
 (the return period ladder), ``stats`` (the moment store) and ``validation``
-(the law's moments against the grid's). The insurer treatments are
+(the law's moments against the grid's), with ``bs_window`` and
+``tail_behavior`` from 1.39.0. The insurer treatments are
 ``Aggregate``'s: the summary's ``Agg`` row is flagged as the total and the
 moment store drops its raw moment rows, and the validation's ``Agg`` row is
 emphasized when ``valid`` fails it (1.37.0). A ``chfagg`` has no frequency,
@@ -13,8 +14,8 @@ severity, cession or ledger, so none of the other exhibits apply.
 
 from ..characteristic_function import AggregateCHF
 from ._core import (register_simple_exhibit, stats, summary, validation,
-                    _moment_validation_emphasis, _stats_insurer_moment_store,
-                    _summary_flags)
+                    _moment_validation_emphasis, _perspectives_updated,
+                    _stats_insurer_moment_store, _summary_flags)
 
 register_simple_exhibit(
     'summary', 'Summary', 'summary_df', [AggregateCHF],
@@ -47,6 +48,24 @@ register_simple_exhibit(
             'TVaR (the priced number), excess VaR over the mean (the capital), '
             'and VaR to mean leverage. On a tilted heavy-tailed grid the TVaR '
             'is the window\'s and omits the mass reported above it.')
+
+register_simple_exhibit(
+    'bs_window', 'Grid sizing', 'bs_window_df', [AggregateCHF],
+    predicate=_perspectives_updated,
+    caption="How the grid was chosen: the window edges from the law's "
+            'closed-form tails, the tilted bucket cap where it binds, a given '
+            'grid, the recommended grid, and the grid used. Coverage is the '
+            'fraction of the law the window holds; clipped is the mass a tilted '
+            'grid leaves out above its window rather than wrapping in.')
+
+register_simple_exhibit(
+    'tail_behavior', 'Tail behavior', 'tail_behavior_df', [AggregateCHF],
+    predicate=_perspectives_updated,
+    caption='What each tail of the law looks like: its support, the tail class '
+            'on each side from its closed forms (a power tail, a support bound, '
+            'or the domain of its cumulant generating function), and the '
+            'coefficient of variation. The frequency and severity rows are '
+            'empty: a law computed this way has neither.')
 
 stats.insurer.register(AggregateCHF)(_stats_insurer_moment_store)
 

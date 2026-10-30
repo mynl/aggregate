@@ -167,7 +167,7 @@
   `dev/done/plan-characteristic-function-aggregate-parity.md`.
   `[CHF-Arithmetic-Form]` landed at 1.35.0, `[CHF-Aggregate-Frames]` at 1.36.0,
   `[CHF-Validation-Verdict]` at 1.37.0, `[CHF-Sharpen]` at 1.38.0 (closing that
-  entry); the grid and tail reports and the cheap accessors follow.
+  entry), `[CHF-Grid-And-Tail-Reports]` at 1.39.0; the cheap accessors follow.
 - **[Stable-Conversion-Chfagg-Spelling]**: the `stable` conversion statement
   keeps `stable alpha beta [scale [loc]]`, the `Stable` parameters, while a
   `chfagg` writes `c * stable alpha beta + b` from 1.35.0. Add the `chfagg`

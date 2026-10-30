@@ -904,11 +904,12 @@ def test_pricing_agrees_with_the_compound_engine_on_one_grid():
         c.price_pentagon(p=1, ROE=0.1)             # unbounded: p = 1 is refused
 
 
-def test_exhibits_and_charts_are_the_generic_four_and_the_one_chart():
+def test_exhibits_and_charts_are_the_generic_six_and_the_one_chart():
     from aggregate.exhibits import available_exhibits, exhibit_frames
     from aggregate.charts import available_charts, build_chart_doc, primary_chart
     c = build('chfagg G 25 * gamma 4', log2=12)
-    assert [n for n, _ in available_exhibits(c)] == ['summary', 'tail', 'stats', 'validation']
+    assert [n for n, _ in available_exhibits(c)] == ['summary', 'tail', 'stats', 'validation',
+                                                    'bs_window', 'tail_behavior']
     for name in ('summary', 'tail', 'stats', 'validation'):
         (block, served, kw), = exhibit_frames(c, name)
         assert block == f'{name}_df' and 'caption' in kw
@@ -1434,3 +1435,57 @@ def test_sharpen_df_has_aggregates_columns_then_the_inversion_terms():
     assert c.sharpen_df.index.names == a.sharpen_df.index.names
     assert c.sharpen_df['u_sev_mean'].isna().all() and c.sharpen_df['aliasing'].isna().all()
     assert 'power tail' in c.sharpen_explanation
+
+
+# ----------------------------------------------------------------------
+# [CHF-Grid-And-Tail-Reports]: the grid sizing and tail reports
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize('program', ['25 * gamma 4', '2 * stable 1.5 1 + 10', 'stable 1.5 0.5',
+                                     'stable 1.1 1', '25 * gamma 4 hints{log2=12; bs=1/4}'])
+def test_grid_and_tail_frames_have_the_aggregate_shapes(program):
+    a = build('agg R.A 10 claims sev lognorm 10 cv 1 poisson')
+    c = build(f'chfagg R {program}')
+    for frame in ('bs_window_df', 'tail_behavior_df'):
+        cf, af = getattr(c, frame), getattr(a, frame)
+        assert list(cf.columns) == list(af.columns), frame
+        assert cf.dtypes.to_dict() == af.dtypes.to_dict(), frame
+        assert cf.index.name == af.index.name, frame
+    assert list(c.tail_behavior_df.index) == ['frequency', 'severity', 'aggregate']
+    bw = c.bs_window_df
+    assert {'rule A', 'recommended', 'used'} <= set(bw.index) and bw['selected'].sum() == 1
+    assert bw.loc['used', 'bs'] == c.bs and bw.loc['used', 'log2'] == c.log2
+    assert bw.loc['used', 'log2_need'] == c.recommended_grid()[0]
+    assert c.bs_description.split(' grid:')[0] in bw.index
+    assert build(f'chfagg R {program}', update=False).bs_window_df is None
+
+
+@pytest.mark.parametrize('program, left, right', [
+    ('stable 1.5 1', 'super-exponential', 'power-law'),
+    ('stable 1.5 -1', 'power-law', 'super-exponential'),
+    ('stable 1.5 0.5', 'power-law', 'power-law'),
+    ('stable 0.7 1', 'bounded', 'power-law'),
+    ('stable 2 0', 'super-exponential', 'super-exponential'),
+    ('30 * norm + 100', 'super-exponential', 'super-exponential'),
+    ('25 * gamma 4', 'bounded', 'exponential'),
+    ('400 * invgauss 0.25', 'bounded', 'exponential'),
+    ('tweedie 1.5 100 2', 'bounded', 'exponential'),
+    ('3 * norminvgauss 6 1.5 + 1', 'exponential', 'exponential'),
+    ('variancegamma 0.2 0.5 -0.1', 'exponential', 'exponential'),
+    ('temperedstable 1 5 10 0.5', 'exponential', 'exponential'),
+])
+def test_tail_classes_from_the_family_protocol(program, left, right):
+    c = build(f'chfagg R {program}', update=False)
+    row = c.tail_behavior_df.loc['aggregate']
+    assert (row['left_tail'], row['right_tail']) == (left, right)
+    assert c.bounded is False
+    assert c.tail_description.splitlines()[0].split(None, 2)[2] == 'none: a characteristic function law'
+    assert c.tail_description.splitlines()[-1] in c.info.splitlines()
+
+
+def test_the_two_reports_reach_the_exhibits():
+    from aggregate import exhibits
+    c = build('chfagg R 2 * stable 1.5 1 + 10')
+    names = [n for n, _ in exhibits.available_exhibits(c)]
+    assert 'bs_window' in names and 'tail_behavior' in names
+    assert 'bs_window' not in [n for n, _ in exhibits.available_exhibits(build('chfagg R 25 * gamma 4', update=False))]

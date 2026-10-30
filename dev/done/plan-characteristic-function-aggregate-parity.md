@@ -702,3 +702,13 @@ Landed as specified, with these divergences.
 5. **The opening helper is `validation_opening(short, eps, components)`**, a list of the two sentences, so each caller appends. Measured: `validation_description` and `validation_explanation` of all 157 `agg` and `port` lines of `_test_suite.agg` are identical before and after; a test pins the opening literal for one `Aggregate` and one `Portfolio`.
 6. **`INFEASIBLE` is computed only when coverage, truncation or resolution fails on the grid at hand**, since `recommended_grid` walks log2 8 to 24 and most laws need none of it; the verdict is cached on `_valid` and cleared by `update`. The coverage advice in the checks keeps its coverage-only test, so a law short of truncation is not told coverage needs log2 above 24.
 
+### [CHF-Sharpen], 1.38.0
+
+Landed as specified, with these divergences.
+
+1. **Soundness is the coverage budget.** The plan's gate was `Aggregate`'s, which marks a cell unsound at a deficit above 1e-12 (`VALIDATION_NOISE`); a tilted window always leaves its tail out (`2 * stable 1.5 1 + 10` at log2 16, 4.3e-6), so no stable center would ever have been confirmed, against the plan's own acceptance. Raised at review; the author ruled 2026-10-30 that the concept stands with the method tweaked. The analog: `defective` in `sharpen_df` is `u_coverage > 1`, the outside mass over `1 - bucket_sizing_p`, which `_pick_cell` and the gate read unchanged.
+2. **`stable 1.1 1` at log2 19 scores 0.615, not under 0.5.** It reaches log2 19 in exactly three calls (17, 18, 19) and is sound there (`u_coverage` 0.92); a grid that just meets the recommended coverage carries `u_coverage` near 1 and `u_resolution` 0.625, so its score sits near 0.6 by construction. The test checks the three calls, soundness, and the bucket for bucket rebuild from `program`. A fourth call finds the recommended cell equal to the center and confirms it.
+3. **`sharpen_explanation`'s `reason`, `recommended` and the one or two cells** are this probe's; `sharpen_description` reuses `_bucket_window`'s `_fmt_bs`, `_move_phrase` and `_sharpen_fmt`, so the two classes print the same phrases.
+4. **Not registered for the `sharpen` exhibit.** The plan does not ask for it, and the app's Sharpen leaf reads `sharpen_program` and `sharpen_description`, not the exhibit. Registering `AggregateCHF` there is one call and a caption when wanted, and would add to the Loss Lab's exhibit list.
+5. **`dev/FEATURES.csv`** marks the five sharpen members on `AggregateCHF`.
+

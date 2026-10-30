@@ -731,7 +731,7 @@ def test_build_chfagg_returns_an_updated_tilted_object():
     assert s.program == 'chfagg S 2 * stable 1.5 1'
     assert s.pprogram.split() == s.program.split()
     assert not hasattr(s, 'pnl_program') and not hasattr(s, 'reins_program')
-    assert not hasattr(s, 'sharpen')
+    assert hasattr(s, 'sharpen')                     # [CHF-Sharpen], 1.38.0
     t = build('chfagg T 2 * stable 1.5 0.5')
     assert t.tilt[0] > 0 and t.tilt[1] > 0
 
@@ -1373,3 +1373,64 @@ def test_every_corpus_explanation_has_the_shared_opening():
         assert c.validation_explanation.startswith(
             f'Validation of the realized grid against the analytic moments: {c.validation_description}. '
             'Each of mean, CV and skewness is compared for the aggregate'), program
+
+
+# ----------------------------------------------------------------------
+# [CHF-Sharpen]: a closed-form sharpen
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize('program', ['gamma 100 cv 0.5', '2 * stable 1.5 1 + 10', 'stable 1.5 0.5'])
+def test_sharpen_confirms_a_sound_grid_without_running(program):
+    c = build(f'chfagg H {program}')
+    hints = c.hints
+    assert c.sharpen() is c
+    assert c._sharpen_state['ran'] is False and len(c.sharpen_df) == 1
+    assert c.note.startswith('sharpen: grid confirmed') and c.hints == hints
+    assert c.log2 == 16 and c.sharpen_description.startswith('Sharpen: not run')
+
+
+def test_sharpen_grows_one_log2_per_call_to_the_recommended_grid():
+    s = build('chfagg H stable 1.1 1')
+    assert s.recommended_grid()[0] == 19
+    seen = []
+    for _ in range(3):
+        s.sharpen()
+        seen.append(s.log2)
+    assert seen == [17, 18, 19]
+    assert s.sharpen_df.loc[s.sharpen_df['selected'], 'u_coverage'].iloc[0] <= 1
+    assert 'hints{log2=19; bs=1/16}' in s.program
+    r = build(s.program)
+    assert (r.log2, r.bs) == (s.log2, s.bs)
+    assert np.max(np.abs(r.agg_density - s.agg_density)) == 0
+    assert s.sharpen_program.startswith('chfagg H')
+
+
+def test_two_sided_recommended_grid_covers():
+    c = build('chfagg H stable 1.5 0.5')
+    log2, bs = c.recommended_grid()
+    assert log2 == 16
+    d = build(f'chfagg H stable 1.5 0.5 hints{{log2={log2}; bs={bs}}}')
+    assert d.outside_mass <= 1 - d.bucket_sizing_p
+
+
+def test_forced_sharpen_is_thrifty_and_restores_without_execute():
+    g = build('chfagg H 25 * gamma 4')
+    g.sharpen(good_enough=0)
+    assert int(g.sharpen_df.loc[g.sharpen_df['selected'], 'log2'].iloc[0]) <= 16
+    s = build('chfagg H stable 1.1 1')
+    p0 = s.agg_density.copy()
+    s.sharpen(execute=False)
+    assert s.log2 == 16 and np.array_equal(s.agg_density, p0)
+    assert 'probe not executed, recommends log2 17' in s.note
+
+
+def test_sharpen_df_has_aggregates_columns_then_the_inversion_terms():
+    a = build('agg H.A 10 claims sev lognorm 10 cv 1 poisson')
+    a.sharpen(good_enough=0)
+    c = build('chfagg H stable 1.1 1')
+    c.sharpen()
+    assert list(c.sharpen_df.columns) == list(a.sharpen_df.columns) + [
+        'u_coverage', 'u_edge', 'u_truncation', 'u_resolution']
+    assert c.sharpen_df.index.names == a.sharpen_df.index.names
+    assert c.sharpen_df['u_sev_mean'].isna().all() and c.sharpen_df['aliasing'].isna().all()
+    assert 'power tail' in c.sharpen_explanation

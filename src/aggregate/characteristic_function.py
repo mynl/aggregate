@@ -145,6 +145,12 @@ STATS_COLUMNS = ['e0.m0', 'mixed', 'independent', 'after_occ', 'empirical',
 #: The six measures of a moment store block.
 _MEASURES = ('ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew')
 
+#: The moment terms of a ``sharpen_df`` row, ``Aggregate.sharpen_df``'s, and
+#: the four terms of the inversion appended after its columns ([CHF-Sharpen]).
+_SHARPEN_MOMENT_TERMS = ('u_sev_mean', 'u_sev_cv', 'u_sev_skew', 'u_agg_mean',
+                         'u_agg_cv', 'u_agg_skew')
+_SHARPEN_INVERSION_TERMS = ('u_coverage', 'u_edge', 'u_truncation', 'u_resolution')
+
 
 # ======================================================================
 # the kernel
@@ -1676,6 +1682,9 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         #: an explicit grid left edge, set by :meth:`from_chf`; ``None`` means
         #: the left edge comes from the window rule
         self._x_min_fixed = None
+        #: the last :meth:`sharpen` probe, as on ``Aggregate``
+        self._sharpen_df = None
+        self._sharpen_state = None
         self._reset_grid()
         #: the moment store, ``Aggregate.stats_df``'s rows and columns
         self.stats_df = self._theoretical_stats_df()
@@ -2235,7 +2244,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             h, _, x0, _ = self.grid_window(log2, p)
             resolved = not np.isfinite(scale) or scale / h >= MIN_BUCKETS_PER_SCALE
             truncated = truncation_at(self.family, h) > TRUNCATION_FLAG
-            covered = x0 is None or sum(self._outside_at(log2, h, x0)) <= eps
+            # a two-sided law has no x_min before the crop; _outside_at estimates it
+            covered = sum(self._outside_at(log2, h, x0)) <= eps
             if resolved and covered and not truncated:
                 return log2, h, True
         return RECOMMENDED_LOG2_MAX, h, False
@@ -2736,8 +2746,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
             if om > budget:
                 log2, bs = self.recommended_grid()
                 x0 = self.grid_window(log2, self.bucket_sizing_p)[2]
-                covered = (x0 is None or
-                           sum(self._outside_at(log2, bs, x0)) <= budget)
+                covered = sum(self._outside_at(log2, bs, x0)) <= budget
                 advice = (f'use hints{{log2={log2}; bs={bs:g}}}' if covered else
                           f'coverage needs log2 above {RECOMMENDED_LOG2_MAX}; '
                           f'log2={log2} with bs={bs:g} is the most this engine offers')
@@ -2994,6 +3003,262 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                        'a statement about the numerics reproducing the model, not '
                        'about the model being right for the risk.')
         return ' '.join(out)
+
+    # ---- sharpen ----------------------------------------------------------
+    def _sharpen_terms(self):
+        """The score terms of the current grid: ``validation_score_terms``'s six, then the four of the inversion.
+
+        ``u_agg_mean`` is dropped (``nan``) for a law with a power tail, whose
+        mean shortfall is the window's tail; the severity terms are ``nan``.
+        """
+        from . import _validation
+        terms = _validation.validation_score_terms(self)
+        fam = self.family
+        if fam.power_tails:
+            terms['u_agg_mean'] = np.nan
+        budget = 1.0 - self.bucket_sizing_p
+        scale = fam.scale
+        terms['u_coverage'] = self.outside_mass / budget
+        terms['u_edge'] = (self.edge_error / EDGE_ERROR_FLAG
+                           if fam.power_tails and np.isfinite(self.edge_error) else np.nan)
+        terms['u_truncation'] = self.truncation_error / TRUNCATION_FLAG
+        terms['u_resolution'] = (MIN_BUCKETS_PER_SCALE * self.bs / scale
+                                 if np.isfinite(scale) and scale > 0 else np.nan)
+        return terms
+
+    def _sharpen_row(self, bs0, d_log2, power, seconds, note='', caught=()):
+        """One ``sharpen_df`` row for the grid the object is on."""
+        from . import _validation
+        terms = self._sharpen_terms()
+        row = {'d_bs': math.log2(self.bs / bs0), 'd_log2': d_log2, 'bs': float(self.bs),
+               'log2': int(self.log2), 'extent': float(self.bs) * (1 << int(self.log2)),
+               'x_min': float(self.x_min),
+               'score': _validation.combine_score_terms(terms, power)}
+        row.update({k: terms[k] for k in _SHARPEN_MOMENT_TERMS})
+        row['aliasing'] = np.nan
+        row['deficit'] = _validation.pmf_deficit(self)
+        # the soundness gate's analog: the outside mass over the coverage budget
+        row['defective'] = bool(terms['u_coverage'] > 1)
+        row['validation'] = self.validation_description
+        row['warnings'] = len(caught)
+        row['warns'] = ','.join(sorted({type(w.message).__name__ for w in caught}))
+        row['seconds'] = seconds
+        row['selected'] = False
+        row['note'] = note
+        row.update({k: terms[k] for k in _SHARPEN_INVERSION_TERMS})
+        return row
+
+    def sharpen(self, bs=None, log2=None, *, log2_cap=20, bs_limit=16, power=2,
+                good_enough=0.5, execute=True):
+        r"""Audit the grid and move toward :meth:`recommended_grid`, ``Aggregate.sharpen``'s analog.
+
+        Parameters
+        ----------
+        bs, log2 : float, int, optional
+            The center of the probe; default the current grid. An object not
+            yet updated is updated first.
+        log2_cap : int, default 20
+            ``log2`` is never grown beyond this.
+        bs_limit : float, default 16
+            Accepted for ``Aggregate.sharpen``'s signature and inert: there is
+            no bucket walk here (Notes).
+        power : float, default 2
+            Exponent of the power mean that combines the score terms.
+        good_enough : float, default 0.5
+            The target score. A sound center at or under it is confirmed and
+            nothing runs; ``good_enough=0`` forces the probe.
+        execute : bool, default True
+            ``True`` leaves the object on the chosen cell; ``False`` restores
+            the center.
+
+        Returns
+        -------
+        AggregateCHF
+            ``self``, updated in place. :attr:`program`, :attr:`note` and
+            :attr:`hints` record the outcome as on ``Aggregate``: a moved grid
+            as ``hints{log2=...; bs=...}``, a confirmed one as
+            ``note{sharpen: grid confirmed, no change}``.
+
+        Notes
+        -----
+        **Why not Aggregate's probe.** ``Aggregate.sharpen`` walks the bucket
+        while :attr:`validation_score` improves. On a law with a power tail
+        the only live moment term is the mean, whose shortfall is the tail
+        beyond the window and shrinks as the window widens whatever the body
+        costs: measured on ``2 * stable 1.5 1 + 10`` at log2 16, every doubling
+        of ``bs`` from 1/16 to 1 improves it, and the walk lands on two buckets
+        per scale with an edge error of :math:`10^4`.
+
+        **The score.** In tolerance units, the power mean of the live terms:
+        ``u_agg_mean``, ``u_agg_cv`` and ``u_agg_skew`` from
+        :func:`~aggregate._validation.validation_score_terms` (live by
+        ``Aggregate``'s rule, except ``u_agg_mean`` for a power tail, whose
+        shortfall no grid under the cap removes); ``u_coverage``, the outside
+        mass over ``1 - bucket_sizing_p``; ``u_edge``, the edge error over
+        :data:`EDGE_ERROR_FLAG` for a power tail; ``u_truncation``, the
+        truncation over :data:`TRUNCATION_FLAG`; ``u_resolution``,
+        :data:`MIN_BUCKETS_PER_SCALE` buckets per scale over the realized
+        count.
+
+        **The cells.** The center and the :meth:`recommended_grid` cell, its
+        ``log2`` capped at the center's plus one and at ``log2_cap``, so a call
+        grows the grid by at most one ``log2`` and a re-run continues; a
+        recommended ``log2`` below the center's is taken as it is. Each cell
+        is a real :meth:`update`. The pick is
+        ``aggregate._bucket_window._pick_cell``'s: sound first, then thrifty,
+        then the score, where a cell is sound when its outside mass is within
+        the budget (``defective`` is ``u_coverage > 1``): a tilted grid
+        always leaves some mass out, so ``Aggregate``'s test, a deficit above
+        1e-12, would call every one unsound.
+        """
+        from . import _program
+        from ._bucket_window import _pick_cell, _sharpen_frame
+        import time
+        import warnings as _warnings
+        if self.agg_density is None:
+            self.update(log2=log2 or 16, bs=bs or 0)
+        p_sizing, tilt = self.bucket_sizing_p, self.tilt_setting
+        if (bs and float(bs) != self.bs) or (log2 and int(log2) != self.log2):
+            self.update(log2=int(log2 or self.log2), bs=float(bs or self.bs),
+                        bucket_sizing_p=p_sizing, tilt=tilt)
+        bs0, log20 = float(self.bs), int(self.log2)
+        rows = [self._sharpen_row(bs0, 0, power, 0.0, note='center (current grid)')]
+        center_score = rows[0]['score']
+        state = {'power': power, 'good_enough': good_enough, 'execute': execute,
+                 'center_score': center_score, 'bs0': bs0, 'log20': log20,
+                 'bs_exact': False, 'lattice': None, 'grew': False,
+                 'center_defective': rows[0]['defective'], 'passed_over': 0}
+        if (np.isfinite(center_score) and center_score <= good_enough
+                and not rows[0]['defective']):
+            rows[0]['selected'] = True
+            rows[0]['note'] = ('center (current grid); at or under target and sound, '
+                               'probe not run')
+            self._sharpen_df = _sharpen_frame(rows)
+            self._sharpen_state = {**state, 'ran': False, 'moved': False}
+            _program.pin_sharpen(self)
+            return self
+        log2_r, bs_r = self.recommended_grid()
+        log2_c = min(log2_r, log20 + 1, int(log2_cap))
+        bs_c = bs_r if log2_c == log2_r else self.grid_window(log2_c, p_sizing, tilt)[0]
+        note = 'recommended grid' if log2_c == log2_r else (
+            f'toward the recommended grid, log2 {log2_r}, capped at {log2_c}')
+        if (bs_c, log2_c) != (bs0, log20):
+            t0 = time.perf_counter()
+            try:
+                with _warnings.catch_warnings(record=True) as caught:
+                    _warnings.simplefilter('always')
+                    self.update(log2=log2_c, bs=bs_c, bucket_sizing_p=p_sizing, tilt=tilt)
+                rows.append(self._sharpen_row(bs0, log2_c - log20, power,
+                                              time.perf_counter() - t0, note, caught))
+            except Exception as e:      # noqa: BLE001 a cell may legitimately fail
+                logger.info('sharpen: cell (bs %s, log2 %s) failed: %s', bs_c, log2_c, e)
+        df = pd.DataFrame(rows)
+        pick = _pick_cell(df)
+        pick = 0 if pick is None else pick
+        df.loc[pick, 'selected'] = True
+        moved = bool(pick != 0)
+        if moved and execute:
+            reason = 'the recommended cell scores better and was taken'
+        elif moved:
+            reason = 'the recommended cell scores better; not executed'
+        else:
+            reason = 'the center scores at least as well, so the grid was kept'
+        target = df.loc[pick] if (moved and execute) else df.loc[0]
+        if (float(self.bs), int(self.log2)) != (float(target['bs']), int(target['log2'])):
+            self.update(log2=int(target['log2']), bs=float(target['bs']),
+                        bucket_sizing_p=p_sizing, tilt=tilt)
+        state['grew'] = bool(moved and df.loc[pick, 'log2'] > log20)
+        state['passed_over'] = int(((df['score'] < df.loc[pick, 'score'])
+                                    & df['defective'].astype(bool)).sum())
+        self._sharpen_df = _sharpen_frame(df)
+        self._sharpen_state = {**state, 'ran': True, 'moved': moved and execute,
+                               'reason': reason, 'recommended': (log2_r, bs_r)}
+        _program.pin_sharpen(self)
+        return self
+
+    @property
+    def sharpen_df(self):
+        """The last :meth:`sharpen` probe, ``Aggregate.sharpen_df``'s columns then ``u_coverage``, ``u_edge``, ``u_truncation`` and ``u_resolution``.
+
+        Indexed by ``(d_bs, d_log2)``; ``d_bs`` is the base 2 logarithm of the
+        bucket ratio to the center, not always an integer here, since
+        :meth:`recommended_grid` moves along the ``round_bucket`` ladder. The
+        severity terms and ``aliasing`` are ``nan``. ``None`` before
+        :meth:`sharpen` runs.
+        """
+        df = getattr(self, '_sharpen_df', None)
+        return None if df is None else df.copy()
+
+    @property
+    def sharpen_description(self):
+        """One-line summary of the last :meth:`sharpen` probe."""
+        from ._bucket_window import _fmt_bs, _move_phrase, _sharpen_fmt
+        df = getattr(self, '_sharpen_df', None)
+        st = getattr(self, '_sharpen_state', None)
+        if df is None or st is None:
+            return 'Sharpen: not run.'
+        if not st['ran']:
+            return (f'Sharpen: not run, the grid already scores '
+                    f'{_sharpen_fmt(st["center_score"])} against a target of '
+                    f'{st["good_enough"]:g} and its outside mass is within the budget.')
+        win = df[df['selected']].iloc[0]
+        head = (f'Sharpen: {len(df)} cells in {float(df["seconds"].sum()):.2f}s, best '
+                f'score {_sharpen_fmt(win["score"])} vs '
+                f'{_sharpen_fmt(st["center_score"])} at the center, target '
+                f'{st["good_enough"]:g}.')
+        if win['bs'] == st['bs0'] and int(win['log2']) == st['log20']:
+            return f'{head} Kept bs {_fmt_bs(st["bs0"])}, log2 {st["log20"]}.'
+        move = _move_phrase(st, win)
+        if st['execute']:
+            return f'{head} Moved: {move}.'
+        return f'{head} Recommends {move}; not executed, grid restored.'
+
+    @property
+    def sharpen_explanation(self):
+        """Verbose prose explaining the last :meth:`sharpen` probe, in a law's words."""
+        from ._bucket_window import _fmt_bs, _sharpen_fmt
+        df = getattr(self, '_sharpen_df', None)
+        st = getattr(self, '_sharpen_state', None)
+        if df is None or st is None:
+            return 'Sharpen has not been run on this object.'
+        center = df.iloc[0]
+        live = [k for k in (*_SHARPEN_MOMENT_TERMS, *_SHARPEN_INVERSION_TERMS)
+                if np.isfinite(center[k])]
+        out = [self.sharpen_description,
+               f'The score is in units of the tolerances: the power mean (power '
+               f'{st["power"]:g}) of the live terms, here {", ".join(live)}. The moment '
+               f'terms are the validation errors of the law over their tolerances; '
+               f'u_coverage is the mass outside the window over the budget '
+               f'{1 - self.bucket_sizing_p:g}, u_edge the modeled edge error over '
+               f'{EDGE_ERROR_FLAG:g}, u_truncation the truncation over '
+               f'{TRUNCATION_FLAG:g}, and u_resolution {MIN_BUCKETS_PER_SCALE} buckets '
+               f'per body scale over the buckets the grid has.']
+        if self.family.power_tails:
+            out.append('The law has a power tail, so its mean term is not scored: '
+                       'the window mean falls short by the tail beyond the window, '
+                       'which no grid under the cap removes and the validation '
+                       'explanation quantifies, and a bucket walk on it would run '
+                       'to the coarsest bucket however much the body lost.')
+        if not st['ran']:
+            out.append(f'The center already meets the target of '
+                       f'{st["good_enough"]:g} with its outside mass within the '
+                       f'budget, so no other grid was tried.')
+            return ' '.join(out)
+        log2_r, bs_r = st['recommended']
+        out.append(f'The probe compares the center, bs {_fmt_bs(st["bs0"])} and log2 '
+                   f'{st["log20"]}, with the recommended grid, log2 {log2_r} and bs '
+                   f'{_fmt_bs(bs_r)}, its log2 capped at one above the center so a '
+                   f'call grows the grid by at most one; a re-run continues. A cell '
+                   f'is sound when its outside mass is within the budget, and a sound '
+                   f'cell is preferred, then the smaller grid, then the score: '
+                   f'{st["reason"]}.')
+        return ' '.join(out)
+
+    @property
+    def sharpen_program(self):
+        """The program that rebuilds this law on the sharpened grid; ``''`` before :meth:`sharpen` (``Aggregate.sharpen_program``)."""
+        from . import _program
+        return _program.sharpen_program(self)
 
     # ---- display ----------------------------------------------------------
     def _spec_hash(self):

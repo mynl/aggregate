@@ -9,9 +9,11 @@ which is reliable in the body and unreliable in the far tail; see the class
 Notes.
 
 The answer to a bare ``stable`` DecL statement, ``build('stable 1.5 1 2 0')``,
-is one of these. Submodule access only: ``from aggregate.stable import
-Stable``, as for ``aggregate.tweedie.Tweedie``. A leaf module, importing only
-numpy and scipy, so the parser can import it lazily.
+is one of these, and so is a named law, ``stable x0 1.5 0``, stored in the recipe
+base and referenced as ``stable.x0``. Submodule access only: ``from
+aggregate.stable import Stable``, as for ``aggregate.tweedie.Tweedie``. A leaf
+module, importing only numpy, scipy and ``_labeled`` (which imports nothing of
+this package), so the parser can import it lazily.
 
 Moved from PMIR's ``pmir_legacy/stable.py`` (March 2025) without its claim
 count emergence methods, which stay in PMIR. See
@@ -23,6 +25,8 @@ import numbers
 import numpy as np
 import scipy.stats as ss
 from scipy.special import gamma as gamma_function
+
+from ._labeled import LabeledMixin
 
 __all__ = ['Stable']
 
@@ -45,7 +49,7 @@ def _is_real(x):
     return isinstance(x, numbers.Real) and not isinstance(x, bool)
 
 
-class Stable:
+class Stable(LabeledMixin):
     r"""The parameters of an alpha-stable law, in Nolan's S1 and S0 forms.
 
     Parameters
@@ -62,11 +66,21 @@ class Stable:
     parameterization : {'S1', 'S0'}, default 'S1'
         How ``loc`` is read, case-insensitive. The object always stores the S1
         location as :attr:`loc`; :attr:`loc0` is the S0 location.
+    name : str, optional
+        The handle of a law declared with ``stable NAME ...``. Arithmetic returns
+        an anonymous law.
+    label : str, optional
+        The display label, the DecL ``as`` clause.
 
     Attributes
     ----------
     alpha, beta, scale, loc : float
         The S1 parameters.
+    name : str or None
+        The handle, ``None`` for an anonymous law.
+    program : str
+        The DecL statement, set when the recipe base builds a declaration, else
+        empty.
 
     Notes
     -----
@@ -135,7 +149,11 @@ class Stable:
     (0.0, 3.174802)
     """
 
-    def __init__(self, alpha, beta, scale=1.0, loc=0.0, parameterization='S1'):
+    #: The DecL statement; the recipe base sets this on an object it builds.
+    program = ''
+
+    def __init__(self, alpha, beta, scale=1.0, loc=0.0, parameterization='S1',
+                 name=None, label=None):
         param = str(parameterization).upper()
         if param not in ('S0', 'S1'):
             raise ValueError(
@@ -158,12 +176,37 @@ class Stable:
             # normal: the skewness has no effect, so normalize it away
             beta = 0.0
         if param == 'S0':
-            loc = self.s0_to_s1(alpha, beta, scale, loc)
+            loc = float(self.s0_to_s1(alpha, beta, scale, loc))
         self.alpha = alpha
         self.beta = beta
         self.scale = scale
         self.loc = loc
+        self.name = name
+        self._init_labels(label=label)
         self._fz = None
+
+    @classmethod
+    def from_spec(cls, spec):
+        """The law a stored ``stable`` spec describes.
+
+        Parameters
+        ----------
+        spec : dict
+            Holds ``alpha``, ``beta``, ``scale`` and ``loc``, the location in
+            S1, and optionally ``name`` and ``label``. The trailer keys are
+            ignored.
+
+        Returns
+        -------
+        Stable
+        """
+        return cls(spec['alpha'], spec['beta'], spec['scale'], spec['loc'],
+                   name=spec.get('name'), label=spec.get('label'))
+
+    def _label_default(self):
+        """The short spelling, since an anonymous law has no handle to fall back on."""
+        return ' '.join(['stable', *(_fmt_short(x) for x in
+                                     (self.alpha, self.beta, self.scale, self.loc))])
 
     # ----- parameterizations -----------------------------------------
     @staticmethod
@@ -461,13 +504,26 @@ class Stable:
 
     # ----- text ------------------------------------------------------
     def to_decl(self):
-        """The ``stable`` statement for this law, in S1, at full precision."""
-        return (f'stable {_fmt_full(self.alpha)} {_fmt_full(self.beta)} '
+        """The ``stable`` statement for this law, in S1, at full precision.
+
+        The statement of a named law includes the name and the label, so it
+        declares the law again.
+        """
+        from .decl_writer import _render_label
+        head = 'stable'
+        if self.name:
+            head = f'stable {self.name}{_render_label(self._label)}'
+        return (f'{head} {_fmt_full(self.alpha)} {_fmt_full(self.beta)} '
                 f'{_fmt_full(self.scale)} {_fmt_full(self.loc)}')
 
     def __repr__(self):
+        extra = ''
+        if self.name is not None:
+            extra += f', name={self.name!r}'
+        if self._label is not None:
+            extra += f', label={self._label!r}'
         return (f'Stable(alpha={_fmt_full(self.alpha)}, beta={_fmt_full(self.beta)}, '
-                f'scale={_fmt_full(self.scale)}, loc={_fmt_full(self.loc)})')
+                f'scale={_fmt_full(self.scale)}, loc={_fmt_full(self.loc)}{extra})')
 
     def __str__(self):
         g = _fmt_short
@@ -479,7 +535,8 @@ class Stable:
             return g(0.0 if abs(x) <= 1e-12 * self.scale else x)
 
         head = f'stable {g(self.alpha)} {g(self.beta)} {g(self.scale)}'
-        parts = [f'{head} {g_loc(self.loc)} = {head} {g_loc(self.loc0)} s0']
+        lead = f'{self._title_name}: ' if self.name else ''
+        parts = [f'{lead}{head} {g_loc(self.loc)} = {head} {g_loc(self.loc0)} s0']
         mean = self.mean
         if np.isfinite(mean):
             parts.append(f'mean {g_loc(mean)}')

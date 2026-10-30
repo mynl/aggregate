@@ -27,6 +27,10 @@ answer: sev_out          -> answer_sev
       | chfagg_out       -> answer_chfagg
       | distortion_out   -> answer_distortion
       | conversion_out   -> answer_conversion
+      | stable_out       -> answer_stable
+      | tweedie_out      -> answer_tweedie
+      | BUILTIN_STABLE   -> answer_stable_ref
+      | BUILTIN_TWEEDIE  -> answer_tweedie_ref
       | expr             -> answer_expr
 
 // ======================================================================
@@ -49,6 +53,9 @@ answer: sev_out          -> answer_sev
 // the transformer), or a Poisson count and a Pareto severity, whose stable
 // limit it computes. CLAIMS is a keyword, so the forms cannot collide. See
 // dev/done/plan-stable-statement.md.
+//
+// A name in the head turns the same statement into a declaration: see
+// ``stable_out`` and ``tweedie_out`` below.
 // ======================================================================
 
 conversion_out: TWEEDIE expr expr expr        -> conversion_tweedie_dispersion
@@ -57,6 +64,25 @@ conversion_out: TWEEDIE expr expr expr        -> conversion_tweedie_dispersion
               | STABLE numberl                -> conversion_stable
               | STABLE numberl ID             -> conversion_stable_param
               | STABLE expr CLAIMS SEV sev    -> conversion_stable_compound
+
+// ======================================================================
+// Named stable and tweedie laws
+// ----------------------------------------------------------------------
+// The conversions above with a name, a label and a trailer, stored in the
+// recipe base under the kinds ``stable`` and ``tweedie``, and referenced as
+// ``stable.NAME`` and ``tweedie.NAME``. The stored spec is canonical and
+// numeric whichever form was written: the four S1 numbers, or p, mean and
+// dispersion. A name is never a NUMBER, so the name slot cannot collide with
+// the numbers of a conversion. See dev/done/plan-stable-expressions.md.
+// ======================================================================
+
+stable_out: STABLE name as_label numberl trailer                 -> stable_out_numbers
+          | STABLE name as_label numberl ID trailer              -> stable_out_param
+          | STABLE name as_label expr CLAIMS SEV sev trailer     -> stable_out_compound
+
+tweedie_out: TWEEDIE name as_label expr expr expr trailer        -> tweedie_out_dispersion
+           | TWEEDIE name as_label expr expr CV expr trailer     -> tweedie_out_cv
+           | TWEEDIE name as_label expr CLAIMS SEV sev trailer   -> tweedie_out_compound
 
 // ======================================================================
 // Characteristic function law (chfagg)
@@ -1062,6 +1088,8 @@ FREQ.2: /(?:binomial|pascal|poisson|bernoulli|geometric|fixed|neymanA|neymana|ne
 BUILTIN_AGG.3:  /agg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_PORT.3: /port\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_CHFAGG.3: /chfagg\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+BUILTIN_STABLE.3: /stable\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
+BUILTIN_TWEEDIE.3: /tweedie\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_SEV.3:  /sev\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 BUILTIN_DIST.3: /(?:distortion|dist)\.[a-zA-Z][a-zA-Z0-9._:~\-]*/
 NOTE.3:         /note\{[^}]*\}/
@@ -1104,7 +1132,8 @@ LT_INT: /\d+(?![0-9.eE_%a-zA-Z])/
 //   1. (?!agg\.|sev\.|dist(ortion)?\.) — anything starting with agg.,
 //                                sev., dist. or distortion. is
 //                                BUILTIN_AGG / BUILTIN_SEV / BUILTIN_DIST
-//                                territory.
+//                                territory, and likewise port., chfagg.,
+//                                stable. and tweedie.
 //   2. (?!keyword(?![namechar])) — reject a keyword standing alone (i.e.,
 //                                followed by a non-name character or end
 //                                of input). Names containing a keyword as
@@ -1116,7 +1145,7 @@ LT_INT: /\d+(?![0-9.eE_%a-zA-Z])/
 // both the keyword and ID interpretations for inputs like `dsev` or
 // `sev.One`, leaving the grammar ambiguous and relying on tie-breaker
 // heuristics to land on the intended parse.
-ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.|chfagg\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
+ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.|chfagg\.|stable\.|tweedie\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
 
 EXPONENT:         "**" | "^"
 PLUS:             "+"

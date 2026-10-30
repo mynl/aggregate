@@ -24,6 +24,7 @@ import numpy as np
 import pytest
 
 from aggregate import build, tweedie_convert, tweedie_density
+from aggregate.decl_writer import spec_to_decl
 from aggregate.tweedie import Tweedie, TweedieConversion, TweedieParameters
 
 
@@ -360,3 +361,85 @@ def test_tweedie_cv_provenance_leaves_hashes_alone():
     assert '_tweedie_cv' not in a.spec and '_tweedie_cv' not in b.spec
     assert a._spec_hash() == '618DBE6E'
     assert b._spec_hash() == 'F0160E2C'
+
+
+# ----------------------------------------------------------------------
+# Named laws ([Named-Conversion-Statements], dev/done/plan-stable-expressions.md)
+# ----------------------------------------------------------------------
+
+@pytest.fixture
+def uw():
+    """A fork, so nothing declared here reaches the shared ``build``."""
+    return build.fork(name='tweedie-names')
+
+
+NAMED = [
+    ('tweedie t0 1.5 10 2', None, TweedieConversion.from_dispersion(1.5, 10, 2)),
+    ('tweedie t0 1.5 10 cv 0.8', None, TweedieConversion.from_cv(1.5, 10, 0.8)),
+    ('tweedie t0 10 claims sev gamma 10 cv 1', None, TweedieConversion.from_compound(10, 10, 1)),
+    ('tweedie t0 as "My law" 1.5 10 2', 'My law', TweedieConversion.from_dispersion(1.5, 10, 2)),
+    ('tweedie t0 as lab 1.5 10 2', 'lab', TweedieConversion.from_dispersion(1.5, 10, 2)),
+]
+
+
+@pytest.mark.parametrize('program, label, law', NAMED)
+def test_named_statement_stores_three_numbers_under_its_kind_and_name(uw, program, label, law):
+    x = uw(program)
+    assert isinstance(x, TweedieConversion)
+    assert (x.name, x._label, x.program) == ('t0', label, program)
+    assert x == law
+    spec = uw._recipes[('tweedie', 't0')].spec
+    assert [spec[k] for k in ('p', 'mean', 'dispersion')] == [law.p, law.mean, law.dispersion]
+
+
+@pytest.mark.parametrize('program, label, law', NAMED)
+def test_stored_spec_is_an_unparser_fixed_point(uw, program, label, law):
+    uw.build_many(program)
+    spec = uw._recipes[('tweedie', 't0')].spec
+    assert uw.parser.parse(uw.lexer.tokenize(spec_to_decl(spec, 'tweedie'))) == ('tweedie', 't0', spec)
+
+
+@pytest.mark.parametrize('program', ['t0', 'tweedie.t0'])
+def test_bare_name_and_reference_return_the_named_object(uw, program):
+    uw('tweedie t0 as "My law" 1.5 10 2 note{a note}')
+    x = uw(program)
+    assert isinstance(x, TweedieConversion)
+    assert (x.name, x._label) == ('t0', 'My law')
+    assert np.allclose((x.p, x.mean, x.dispersion), (1.5, 10, 2), rtol=1e-15, atol=0)
+    assert uw.recipe('t0').note == 'a note'
+
+
+def test_named_string_leads_with_the_name_and_anonymous_is_unchanged(uw):
+    plain = 'tweedie 1.5 100 2 = tweedie 1.5 100 cv 0.447214 = tweedie 10 claims sev gamma 10 cv 1, Pr(X=0) 4.53999e-05'
+    assert str(build('tweedie 1.5 100 2')) == plain
+    assert str(uw('tweedie t0 1.5 100 2')) == f't0: {plain}'
+    assert str(uw('tweedie t1 as "My law" 1.5 100 2')) == f'My law (t1): {plain}'
+    assert build('tweedie 1.5 100 2').label == 'tweedie 1.5 100 2'
+
+
+def test_conversion_is_still_an_eight_tuple(uw):
+    x = uw('tweedie t0 1.5 100 2')
+    assert len(x) == 8 and len(tuple(x)) == 8
+    assert x._fields == ('p', 'mean', 'dispersion', 'cv', 'frequency', 'sev_m', 'sev_cv', 'p0')
+    p, mean, dispersion, *_ = x
+    assert (p, mean, dispersion) == (1.5, 100, 2)
+    # equality is over the fields: two names for one law compare equal
+    assert x == uw('tweedie t1 1.5 100 2') == TweedieConversion.from_dispersion(1.5, 100, 2)
+    a = build('agg TN 10 claims sev gamma 10 cv 1 poisson')
+    assert TweedieConversion.from_dispersion(*a.as_tweedie()).p == pytest.approx(1.5)
+
+
+def test_copy_and_pickle_keep_the_name_and_label(uw):
+    import copy
+    import pickle
+    x = uw('tweedie t0 as "My law" 1.5 100 2')
+    for y in (copy.deepcopy(x), pickle.loads(pickle.dumps(x))):
+        assert (y.name, y._label) == ('t0', 'My law') and y == x
+
+
+@pytest.mark.parametrize('program', ['2 * tweedie.t0', 'tweedie.t0 + 1', 'tweedie z tweedie.t0'])
+def test_tweedie_references_take_no_arithmetic(uw, program):
+    uw('tweedie t0 1.5 10 2')
+    with pytest.raises(ValueError) as e:
+        uw(program)
+    assert hasattr(e.value, 'report')

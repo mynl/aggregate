@@ -15,7 +15,9 @@ import pytest
 import scipy.stats as ss
 
 from aggregate import build
+from aggregate.decl_writer import spec_to_decl
 from aggregate.stable import Stable
+from aggregate.underwriter import RecipeNotFound, ResolvedReference
 
 #: A grid of t including 0, where the alpha = 1 logarithm needs care.
 T = np.linspace(-3, 3, 13)
@@ -245,3 +247,172 @@ def test_statement_stores_nothing():
     assert set(build._recipes) == before
     assert len(rv) == 1 and rv[0].kind == 'conversion'
     assert isinstance(rv[0].object, Stable)
+
+
+# ----------------------------------------------------------------------
+# Named laws ([Named-Conversion-Statements], dev/done/plan-stable-expressions.md)
+# ----------------------------------------------------------------------
+
+@pytest.fixture
+def uw():
+    """A fork, so nothing declared here reaches the shared ``build``."""
+    return build.fork(name='stable-expressions')
+
+
+NAMED = [
+    ('stable x0 1.5 0', None, Stable(1.5, 0)),
+    ('stable x0 1.5 0.85 2', None, Stable(1.5, 0.85, 2)),
+    ('stable x0 1.5 1 2 -3', None, Stable(1.5, 1, 2, -3)),
+    ('stable x0 1.5 1 2 -2 s0', None, Stable(1.5, 1, 2, -2, 'S0')),
+    ('stable x0 as "My law" 1.5 0', 'My law', Stable(1.5, 0)),
+    ('stable x0 as lab 0.7 -1', 'lab', Stable(0.7, -1)),
+    ('stable x0 1000 claims sev 100 * lomax 1.5', None,
+     Stable.from_compound_pareto(1000, 1.5, 100, 200)),
+]
+
+
+@pytest.mark.parametrize('program, label, law', NAMED)
+def test_named_statement_stores_four_numbers_under_its_kind_and_name(uw, program, label, law):
+    x = uw(program)
+    assert isinstance(x, Stable)
+    assert (x.name, x._label, x.program) == ('x0', label, program)
+    assert x.label == (label or x._label_default())
+    _same_law(x, law)
+    spec = uw._recipes[('stable', 'x0')].spec
+    numbers = [spec[k] for k in ('alpha', 'beta', 'scale', 'loc')]
+    assert all(type(v) is float for v in numbers)
+    assert numbers == [x.alpha, x.beta, x.scale, x.loc]
+
+
+def test_named_statement_keeps_its_trailer(uw):
+    uw('stable x0 1.5 0 note{a note} tags{a:b} hints{log2=8}')
+    rec = uw.recipe('x0')
+    assert (rec.kind, rec.note, rec.tags) == ('stable', 'a note', ('a:b',))
+    assert rec.spec['hints'] == 'log2=8'
+
+
+def test_named_s0_agrees_with_the_anonymous_form(uw):
+    _same_law(uw('stable x0 1.5 1 2 -2 s0'), build('stable 1.5 1 2 -2 s0'), rtol=0)
+
+
+@pytest.mark.parametrize('program', ['x0', 'stable.x0'])
+def test_bare_name_and_reference_return_the_named_object(uw, program):
+    uw('stable x0 as "My law" 1.5 1 2 3')
+    x = uw(program)
+    assert isinstance(x, Stable)
+    assert (x.name, x._label) == ('x0', 'My law')
+    assert np.allclose(_params(x), (1.5, 1, 2, 3), rtol=1e-15, atol=0)
+
+
+def test_a_reference_is_an_answer_and_stores_nothing(uw):
+    uw('stable x0 1.5 0')
+    before = set(uw._recipes)
+    rv = uw.build_many('stable.x0')
+    assert len(rv) == 1 and rv[0].kind == 'conversion'
+    assert set(uw._recipes) == before
+
+
+@pytest.mark.parametrize('program', [p for p, _, _ in NAMED]
+                         + ['stable x0 1 0', 'stable x0 as "My law" 1.5 1 2 -3 note{n} tags{a:b}'])
+def test_stored_spec_is_an_unparser_fixed_point(uw, program):
+    uw.build_many(program)
+    spec = uw._recipes[('stable', 'x0')].spec
+    text = spec_to_decl(spec, 'stable')
+    assert uw.parser.parse(uw.lexer.tokenize(text)) == ('stable', 'x0', spec)
+
+
+def test_writer_omits_a_default_location_and_scale(uw):
+    uw.build_many('stable a 1.5 0.5 1 0\n\nstable b 1.5 0.5 2 0\n\nstable c 1.5 0.5 1 3')
+    render = lambda name: spec_to_decl(uw._recipes[('stable', name)].spec, 'stable')  # noqa: E731
+    assert render('a') == 'stable a 1.5 0.5'
+    assert render('b') == 'stable b 1.5 0.5 2'
+    assert render('c') == 'stable c 1.5 0.5 1 3'
+
+
+def test_to_agg_then_load_round_trips_into_a_fresh_fork(uw, tmp_path):
+    uw.build_many('stable x0 as "My law" 1.5 1 2 -3 note{n}\n\ntweedie t0 as T 1.5 10 2\n\n'
+                  'agg A dfreq [2] dsev [1]')
+    out = uw.to_agg(tmp_path / 'laws')
+    fresh = build.fork(name='fresh')
+    fresh.load(out)
+    for key in (('stable', 'x0'), ('tweedie', 't0')):
+        assert fresh._recipes[key].spec == uw._recipes[key].spec
+
+
+def test_to_decl_declares_a_named_law_again_and_is_unchanged_otherwise(uw):
+    x = uw('stable x0 as "My law" 1.5 1 2 -3')
+    assert x.to_decl() == 'stable x0 as "My law" 1.5 1 2 -3'
+    assert uw.build_many(x.to_decl())[0].spec == uw._recipes[('stable', 'x0')].spec
+    assert Stable(1.5, 1, 2, -3).to_decl() == 'stable 1.5 1 2 -3'
+
+
+def test_repr_of_a_named_law_is_constructor_valid(uw):
+    x = uw('stable x0 as "My law" 1.5 1 2 -3')
+    assert repr(x) == "Stable(alpha=1.5, beta=1, scale=2, loc=-3, name='x0', label='My law')"
+    y = eval(repr(x))
+    assert (y.name, y._label) == (x.name, x._label)
+    _same_law(y, x, rtol=0)
+
+
+def test_named_string_leads_with_the_name_and_each_spelling_builds_back(uw):
+    text = str(uw('stable x0 1.5 0'))
+    assert text == ('x0: stable 1.5 0 1 0 = stable 1.5 0 1 0 s0, mean 0, Pr(X>mean) 0.5, '
+                    'Pr(X>x) ~ 0.199471 x^-1.5, Pr(X<-x) ~ 0.199471 x^-1.5')
+    s1, s0 = text.split(': ', 1)[1].split(', ')[0].split(' = ')
+    for spelling in (s1, s0):
+        _same_law(build(spelling), Stable(1.5, 0), rtol=1e-5)
+    assert str(uw('stable y as "My law" 1.5 0')).startswith('My law (y): stable 1.5 0 1 0 =')
+
+
+def test_anonymous_statement_has_no_name_and_no_lead():
+    x = build('stable 1.5 1 2 0')
+    assert x.name is None and x._label is None and x.program == ''
+    assert x.label == 'stable 1.5 1 2 0'
+    assert str(x).startswith('stable 1.5 1 2 0 =')
+    assert repr(x) == 'Stable(alpha=1.5, beta=1, scale=2, loc=0)'
+
+
+def test_a_name_in_a_fork_is_not_visible_in_its_parent(uw):
+    child = uw.fork(name='child')
+    child('stable x0 1.5 0')
+    assert ('stable', 'x0') not in uw._recipes
+    with pytest.raises(RecipeNotFound):
+        uw('stable.x0')
+
+
+def test_preview_reports_a_reference_and_registers_nothing(uw):
+    uw('stable x0 1.5 0')
+    before = set(uw._recipes)
+    pv = uw.preview('stable.x0')
+    assert pv.resolved == (ResolvedReference('stable', 'x0', 'session'),)
+    assert set(uw._recipes) == before
+
+
+@pytest.mark.parametrize('program', ['3 * stable 1.5 0', 'x0 = stable 1.5 0',
+                                     'chfagg C stable.x0', 'agg stable.x0 dfreq [1] dsev [1]'])
+def test_named_law_refusals_are_parse_errors(uw, program):
+    uw('stable x0 1.5 0')
+    with pytest.raises(ValueError) as e:
+        uw(program)
+    assert hasattr(e.value, 'report')
+
+
+def test_reference_to_nothing_is_recipe_not_found(uw):
+    with pytest.raises(RecipeNotFound) as e:
+        uw('stable.nope')
+    assert (e.value.kind, e.value.name) == ('stable', 'nope')
+
+
+@pytest.mark.parametrize('name, psi', [
+    ('Cauchy', lambda t: -np.abs(t)),
+    ('Levy', lambda t: -np.abs(t) ** 0.5 * (1 - 1j * np.sign(t))),
+    ('Landau', lambda t: -np.abs(t) * (1 + 2j / np.pi * np.sign(t)
+                                       * np.log(np.abs(t), where=t != 0,
+                                                out=np.zeros_like(t)))),
+    ('Holtsmark', lambda t: -np.abs(t) ** 1.5),
+])
+def test_library_laws_have_the_classical_characteristic_functions(name, psi):
+    x = build(f'stable.{name}')
+    assert x.name == name
+    assert np.allclose(x.chf(T), np.exp(psi(T)), rtol=1e-12, atol=0)
+    assert isinstance(build(name), Stable)

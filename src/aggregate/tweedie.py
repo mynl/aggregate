@@ -22,6 +22,7 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.special import loggamma
 
+from ._labeled import LabeledMixin
 from .distributions import Aggregate
 from .moments import MomentWrangler
 from .underwriter import build
@@ -48,7 +49,8 @@ logger = logging.getLogger(__name__)
 TweedieParameters = namedtuple('TweedieParameters', ['p', 'mean', 'dispersion'])
 
 
-class TweedieConversion(namedtuple('TweedieConversion',
+class TweedieConversion(LabeledMixin,
+                        namedtuple('TweedieConversion',
                                    ['p', 'mean', 'dispersion', 'cv', 'frequency',
                                     'sev_m', 'sev_cv', 'p0'])):
     """Every spelling of one Tweedie distribution with ``1 < p < 2``.
@@ -56,7 +58,9 @@ class TweedieConversion(namedtuple('TweedieConversion',
     The answer to a bare ``tweedie`` DecL statement, which is a calculator
     rather than a declaration: ``build('tweedie 1.5 100 2')`` returns one of
     these and stores nothing. The three input forms of the statement map onto
-    the three constructors, and each produces the same object.
+    the three constructors, and each produces the same object. A named law,
+    ``tweedie t0 1.5 100 2``, is one of these too, stored in the recipe base and
+    referenced as ``tweedie.t0``.
 
     Attributes
     ----------
@@ -74,6 +78,12 @@ class TweedieConversion(namedtuple('TweedieConversion',
         The mean and coefficient of variation of the gamma severity.
     p0 : float
         The probability of no loss, ``exp(-frequency)``.
+    name : str or None
+        The handle of a declared law, not a tuple field, so equality, unpacking
+        and ``_fields`` ignore it: two names for one law compare equal.
+    program : str
+        The DecL statement, set when the recipe base builds a declaration, else
+        empty.
 
     Notes
     -----
@@ -104,7 +114,45 @@ class TweedieConversion(namedtuple('TweedieConversion',
     tweedie 1.5 100 2 = tweedie 1.5 100 cv 0.447214 = tweedie 10 claims sev gamma 10 cv 1, Pr(X=0) 4.53999e-05
     """
 
-    __slots__ = ()
+    #: The DecL statement; the recipe base sets this on an object it builds.
+    program = ''
+
+    def __new__(cls, *args, **kwargs):
+        """The tuple, with no name and the mixin's label state.
+
+        Notes
+        -----
+        ``_make`` and ``_replace`` go straight to ``tuple.__new__``, so an object
+        from either has no name or label state. Nothing in the library calls
+        them on this class.
+        """
+        self = super().__new__(cls, *args, **kwargs)
+        self.name = None
+        self._init_labels()
+        return self
+
+    @classmethod
+    def from_spec(cls, spec):
+        """The law a stored ``tweedie`` spec describes.
+
+        Parameters
+        ----------
+        spec : dict
+            Holds ``p``, ``mean`` and ``dispersion``, and optionally ``name``
+            and ``label``. The trailer keys are ignored.
+
+        Returns
+        -------
+        TweedieConversion
+        """
+        obj = cls.from_dispersion(spec['p'], spec['mean'], spec['dispersion'])
+        obj.name = spec.get('name')
+        obj._label = spec.get('label')
+        return obj
+
+    def _label_default(self):
+        """The short spelling, since an anonymous law has no handle to fall back on."""
+        return f'tweedie {self.p:.6g} {self.mean:.6g} {self.dispersion:.6g}'
 
     @classmethod
     def _from_series(cls, s):
@@ -186,7 +234,8 @@ class TweedieConversion(namedtuple('TweedieConversion',
 
     def __str__(self):
         g = lambda x: f'{x:.6g}'  # noqa: E731
-        return (f'tweedie {g(self.p)} {g(self.mean)} {g(self.dispersion)} = '
+        lead = f'{self._title_name}: ' if self.name else ''
+        return (f'{lead}tweedie {g(self.p)} {g(self.mean)} {g(self.dispersion)} = '
                 f'tweedie {g(self.p)} {g(self.mean)} cv {g(self.cv)} = '
                 f'tweedie {g(self.frequency)} claims sev gamma {g(self.sev_m)} '
                 f'cv {g(self.sev_cv)}, Pr(X=0) {g(self.p0)}')

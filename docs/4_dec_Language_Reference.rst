@@ -109,10 +109,10 @@ Three behaviors are worth knowing.
 
 Expressions evaluate as the program parses, so the specification carries plain numbers and the formula is not retained. The canonical text that :func:`aggregate.decl_writer.spec_to_decl` and :func:`aggregate.decl_writer.format_program` produce therefore shows the evaluated literal: the program above decompiles with ``10 claims 133333.33333333334 premium``. This is the long-standing canonical, not verbatim, contract, the same one that collapses ``exp(.5)`` to its float.
 
-Parameter Conversions (tweedie, stable)
-=======================================
+Parameter Conversions and Named Laws (tweedie, stable)
+======================================================
 
-A **conversion** is a statement that computes the equivalent spellings of one distribution and builds nothing. Like a bare expression it is an answer rather than a declaration: it has no name and no trailer, ``build`` returns the computed object directly, and nothing is stored in the recipe base.
+A **conversion** is a statement that computes the equivalent spellings of one distribution and builds nothing. Like a bare expression it is an answer rather than a declaration: it has no name and no trailer, ``build`` returns the computed object directly, and nothing is stored in the recipe base. Give the same statement a name and it becomes a declaration, as described under **Named laws** below.
 
 The ``tweedie`` statement is the ``tweedie`` clause from inside an ``agg``, standing alone. It covers the Tweedie distributions with :math:`1<p<2`, which are compound Poisson distributions with gamma severity, and accepts three input forms::
 
@@ -145,6 +145,16 @@ In S1 the characteristic function is :math:`\exp(-\gamma^\alpha|t|^\alpha(1 - i\
 The third form is the generalized central limit theorem for a compound Poisson with a Pareto tail, :math:`\Pr(X>x)=\theta^\alpha x^{-\alpha}(1+o(1))` with :math:`1<\alpha<2`. For a large expected count :math:`\lambda` the aggregate is approximately :math:`S(\alpha, 1, \gamma, \lambda\mathsf{P}X; 1)` with :math:`\gamma^\alpha=\lambda\theta^\alpha\Gamma(1-\alpha)\cos(\pi\alpha/2)`, which has exactly the compound's mean and right tail constant :math:`\lambda\theta^\alpha`. In the worked example :math:`\lambda=1000`, :math:`\theta=100` and the severity mean is 200, so :math:`\gamma=18452.7`, the S1 location is 200,000 and the right tail constant is :math:`10^6`. ``sev 100 * pareto 1.5 - 100`` is the same severity and gives the same answer. The severity must be a plain ``pareto`` or ``lomax`` with :math:`1<\alpha<2`; a shift is allowed, a reflection, mixture or splice is refused.
 
 The distribution values of a ``Stable`` (``pdf``, ``cdf``, ``ppf`` and the rest) come from ``scipy.stats.levy_stable``, which is reliable in the body and not in the far tail: with scipy 1.17.1 at :math:`\alpha=1.5`, :math:`\beta=1`, unit scale, ``ppf(1 - 1e-6)`` returns 659 rather than about 5,430, and ``sf(5430)`` returns 0 against an asymptotic :math:`9.97\times10^{-7}`. Use the tail constants there.
+
+**Named laws.** A name after the keyword stores the law in the recipe base, with an optional ``as`` label and the usual trailer::
+
+    stable x0 1.5 0                                       # the conversion forms, with a name
+    stable Limit as "Pareto book" 1000 claims sev 100 * lomax 1.5   note{GCLT limit}
+    tweedie t0 1.5 100 cv 0.447214
+
+``build`` returns the same :class:`aggregate.stable.Stable` or :class:`aggregate.tweedie.TweedieConversion`, now with a ``name``, a ``label`` and a ``program``, and its string leads with the name. The stored specification is canonical and numeric whichever form was written: the four S1 numbers for ``stable``, and :math:`p`, the mean and the dispersion for ``tweedie``, while ``program`` keeps the text. A later statement refers to the law as ``stable.x0`` or ``tweedie.t0``, the dotted form used for ``agg.X`` and ``sev.X``, and either reference alone is a statement that returns the stored law. Consequently a name may not begin ``stable.`` or ``tweedie.``. The bare name ``x0`` also works as a whole program. A name held under two kinds is ambiguous, and the error lists the dotted spellings. A ``chfagg`` does not take these references yet.
+
+``library.agg`` has four stable laws under their classical names: ``stable.Cauchy``, ``stable.Levy``, ``stable.Landau`` and ``stable.Holtsmark``.
 
 Exact Compounds (nttagg)
 ========================

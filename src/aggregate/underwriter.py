@@ -254,7 +254,7 @@ def _ceded_annual_terms_as_aggregate(name, spec):
 # portfolio. ``pnl`` / ``xpnl`` were missing before 1.0.0a227 and sorted last
 # by the 99 fallback, which was the right answer for the wrong reason and
 # gave anything reimplementing this order nothing to copy.
-_KIND_WRITE_ORDER = {'sev': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3,
+_KIND_WRITE_ORDER = {'sev': 0, 'stable': 0, 'tweedie': 0, 'distortion': 1, 'agg': 2, 'bvagg': 3,
                      'nttagg': 3, 'chfagg': 3, 'port': 4, 'pnl': 5, 'xpnl': 5}
 
 
@@ -715,9 +715,10 @@ class RecipeNotFound(KeyError):
     Notes
     -----
     Subclass of :class:`KeyError` so every existing ``except KeyError`` and
-    ``except LookupError`` site keeps its behavior: the bare-name fallback in
-    ``Underwriter._build_work``, the per-statement error row in
-    :meth:`Underwriter.interpret_file`, and the parser's own reporting. What
+    ``except LookupError`` site keeps its behavior: the per-statement error row
+    in :meth:`Underwriter.interpret_file` and the parser's own reporting. The
+    bare-name fallback in ``Underwriter._build_work`` catches this class alone,
+    so an ambiguous name raises rather than reaching the parser. What
     the named type adds is the ability to tell "that name is gone" apart from
     every other lookup failure. A multi-user host needs exactly that: a
     session whose recipe base has been evicted asks for a name it built
@@ -754,7 +755,7 @@ class Underwriter(HelpMixin):
 
     Every parsed declaration has a *kind* (one of ``'sev'``, ``'agg'``,
     ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``, ``'distortion'``,
-    ``'expr'``, or ``'conversion'``) and a *name*. Parsing produces a
+    ``'stable'``, ``'tweedie'``, ``'expr'``, or ``'conversion'``) and a *name*. Parsing produces a
     :class:`~aggregate.recipe.Recipe` holding the kind, name, dict spec, source
     program, provenance, its metadata (``note`` / ``tags`` / ``hints``,
     derived from the spec), and, once :meth:`_factory` runs, the
@@ -2096,6 +2097,17 @@ class Underwriter(HelpMixin):
             # class converts them (dev/done/plan-characteristic-function-engine.md)
             obj = AggregateCHF(**spec)
             obj.program = program
+        elif kind == 'stable':
+            # four S1 numbers, whichever form was written
+            # (dev/done/plan-stable-expressions.md)
+            from .stable import Stable
+            obj = Stable.from_spec(spec)
+            obj.program = program
+        elif kind == 'tweedie':
+            # local: aggregate.tweedie imports this module
+            from .tweedie import TweedieConversion
+            obj = TweedieConversion.from_spec(spec)
+            obj.program = program
         elif kind in ANSWER_KINDS:
             # an answer is its own object: the parser has already evaluated it,
             # so the spec is the number (``expr``) or the computed conversion
@@ -2346,7 +2358,7 @@ class Underwriter(HelpMixin):
         ----------
         kind : str
             One of ``'sev'``, ``'agg'``, ``'port'``, ``'bvagg'``, ``'pnl'``,
-            ``'xpnl'``, ``'distortion'``. Note that ``'expr'`` and
+            ``'xpnl'``, ``'distortion'``, ``'stable'``, ``'tweedie'``. Note that ``'expr'`` and
             ``'conversion'`` (``ANSWER_KINDS``) are deliberately not stored: a
             bare expression or a parameter conversion is an answer, not a
             declaration, so :meth:`_interpret_program` skips this method for it.
@@ -2546,10 +2558,15 @@ class Underwriter(HelpMixin):
         if not hits:
             raise RecipeNotFound(f'no recipe named {name!r}', name=name)
         if len(hits) > 1:
-            kinds = ', '.join(sorted(hits))
+            hits = sorted(hits)
+            # only these kinds have a dotted reference (decl.lark, BUILTIN_*)
+            dotted = [f'{k}.{name}' for k in hits
+                      if k in ('agg', 'chfagg', 'distortion', 'port', 'sev',
+                               'stable', 'tweedie')]
+            write = f'write {" or ".join(dotted)}, or ' if dotted else ''
             raise KeyError(
-                f'{name!r} is ambiguous across kinds ({kinds}); pass kind= to '
-                f'choose. Shipped library names are unique across kinds.')
+                f'{name!r} is ambiguous across kinds ({", ".join(hits)}); {write}'
+                f'pass kind= to choose. Shipped library names are unique across kinds.')
         return self._recipes[(hits[0], name)].detached()
 
     @property
@@ -2635,10 +2652,12 @@ class Underwriter(HelpMixin):
         if update is True and log2 == 0:
             log2 = self.log2
 
-        # first see if portfolio_program refers to a built-in object
+        # first see if portfolio_program refers to a built-in object. Only a
+        # miss falls through to the parser: an ambiguous name raises its own
+        # KeyError, since the parse error it would meet there hides the cause.
         try:
             answer = self[portfolio_program]
-        except (LookupError, TypeError):
+        except (RecipeNotFound, TypeError):
             logger.debug('underwriter._build_work | object not found, processing as a program.')
         else:
             logger.debug('underwriter._build_work | %s object found.', answer.kind)
@@ -2878,7 +2897,7 @@ class Underwriter(HelpMixin):
         # and build cannot disagree about what a one-word program means.
         try:
             entry = self[program]
-        except (LookupError, TypeError):
+        except (RecipeNotFound, TypeError):
             pass
         else:
             record(entry.kind, entry.name)
@@ -2966,10 +2985,13 @@ class Underwriter(HelpMixin):
 
         # The closed set of objects _factory can produce. Severity, Distortion
         # and the answers (a bare expression's number, a conversion's object,
-        # tested by kind) have no update step; everything in ``updatable`` is
-        # finished by the dispatch at the foot of the loop. Register a new
-        # output type here, in one place, and give it a branch.
-        no_update = (Severity, Distortion, numbers.Number)
+        # tested by kind) have no update step; nor has a named stable or tweedie
+        # law, which is parameters. Everything in ``updatable`` is finished by
+        # the dispatch at the foot of the loop. Register a new output type here,
+        # in one place, and give it a branch.
+        from .stable import Stable
+        from .tweedie import TweedieConversion
+        no_update = (Severity, Distortion, numbers.Number, Stable, TweedieConversion)
         updatable = (Aggregate, Portfolio, BivariateAggregate, AggregateCHF)
 
         for answer in rv:

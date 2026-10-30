@@ -1413,8 +1413,36 @@ def _render_chfagg(name: str, spec: dict, trailer: bool = True) -> _Block:
         [_render_chf_body(spec), *_render_trailer(spec, trailer)])
 
 
+def _render_stable_law(name: str, spec: dict, trailer: bool = True) -> _Block:
+    """Render a named ``stable`` law: the S1 numbers, a default location and scale omitted.
+
+    A trailing location of 0 and then a scale of 1 are left out, as
+    :func:`_render_chf_body` leaves out a unit scale and a zero shift, so
+    ``stable Cauchy 1 0`` renders as written. The text re-parses to the same
+    spec either way. ``_fmt_num`` uses ``repr``, and a negative location renders
+    glued (``stable x 1.5 1 2 -3``), which ``numberl`` takes as the number.
+    """
+    keys = ['alpha', 'beta', 'scale', 'loc']
+    if float(spec['loc']) == 0:
+        keys.pop()
+        if float(spec['scale']) == 1:
+            keys.pop()
+    return _Block(f'stable {name}{_render_label(spec.get("label"))}',
+                  [' '.join(_fmt_num(spec[k]) for k in keys),
+                   *_render_trailer(spec, trailer)])
+
+
+def _render_tweedie_law(name: str, spec: dict, trailer: bool = True) -> _Block:
+    """Render a named ``tweedie`` law, whichever form it was written in: p, mean, dispersion."""
+    return _Block(f'tweedie {name}{_render_label(spec.get("label"))}',
+                  [' '.join(_fmt_num(spec[k]) for k in ('p', 'mean', 'dispersion')),
+                   *_render_trailer(spec, trailer)])
+
+
 _KIND_RENDERERS = {
     'chfagg': _render_chfagg,
+    'stable': _render_stable_law,
+    'tweedie': _render_tweedie_law,
     'agg': lambda name, spec, trailer: _render_agg_or_pnl('agg', name, spec, trailer),
     'pnl': lambda name, spec, trailer: _render_agg_or_pnl('pnl', name, spec, trailer),
     'xpnl': lambda name, spec, trailer: _render_agg_or_pnl('xpnl', name, spec, trailer),
@@ -1530,8 +1558,8 @@ def spec_to_decl(spec: dict, kind: str = 'agg', name: str | None = None) -> str:
         ``pp.spec``. *Not* the dense ``Aggregate._spec`` constructor-argument
         dict (which is a different, defaulted shape; see the module docstring).
     kind : str, default 'agg'
-        One of ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``, ``'distortion'``
-        --- the first element of the parser's ``(kind, name, spec)`` tuple.
+        One of ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``, ``'distortion'``,
+        ``'stable'``, ``'tweedie'`` --- the first element of the parser's ``(kind, name, spec)`` tuple.
     name : str, optional
         The object name. Defaults to ``spec['name']`` when present; required for
         distortions (whose ``spec['name']`` holds the *kind*, not the object

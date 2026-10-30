@@ -49,7 +49,8 @@ class Recipe:
     ----------
     kind : str
         ``'agg'`` | ``'sev'`` | ``'port'`` | ``'distortion'`` | ``'bvagg'`` |
-        ``'pnl'`` | ``'xpnl'`` | ``'expr'`` | ``'conversion'``.
+        ``'pnl'`` | ``'xpnl'`` | ``'stable'`` | ``'tweedie'`` | ``'expr'`` |
+        ``'conversion'``.
     name : str
         The user-given name (e.g. ``'Dice'``, ``'MyBook'``).
     spec : dict

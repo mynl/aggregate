@@ -7,6 +7,25 @@ Append new entries at the top.
 
 ---
 
+## Bare variables and `=` in DecL (declined 2026-10-30)
+
+**Origin.** The design of `[Stable-Expressions]`, `dev/done/plan-stable-expressions.md`.
+
+**What was proposed.** `x0 = stable 1.5 0` and `mya = agg ...` bind a variable, and
+expressions refer to it bare: `x0 + 2 * x1 + 3`.
+
+**Why rejected.** The prefix in `stable.x0` selects the grammar production before any
+lookup, so the parse stays context free; a bare `x0 + 3` needs the symbol table during
+the parse, since `agg.X + 3` and `stable.x + 3` are different operations. The notation
+also misleads: these are laws, each occurrence an independent copy, so `x + x` is not
+`2 * x`. And `=` adds no capability over `stable x0 1.5 0`, while inviting numeric
+variables, reassignment, scoping and dependency order in a declarative language.
+
+**What we do instead.** The statement head declares the name, references stay dotted, and
+`stable z stable.x0 + 2 * stable.x1 + 3` stores a combination under a name.
+
+---
+
 ## Renormalized unit capital above the frame (declined 2026-10-19)
 
 **Origin.** #12, the far tail half of `[Unit-Capital-Above-Frame]` (was

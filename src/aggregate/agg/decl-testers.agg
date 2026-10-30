@@ -1558,3 +1558,25 @@ chfagg CFE.InvGaussMu 400 * invgauss 0.25                   note{scipy's shape m
 chfagg CFE.TweedieAt  2 * tweedie 1.5 100 2 + 10.3          note{the atom moves to 10.3, which the grid keeps as a point};
 agg CFE.UsesRef       dfreq [2] sev chfagg.CFE.Gamma          note{sev chfagg.NAME: the hygiene rule needs the hints CFE.Gamma carries};
 agg CFE.UsesSigned    dfreq [1] ssev chfagg.CFE.RefNorm       note{ssev chfagg.NAME keeps the negative atoms}
+
+
+# NL. Named stable and tweedie laws ([Named-Conversion-Statements], 1.42.0)
+# =========================================================================
+# stable and tweedie with a name, a label and a trailer, stored in the recipe
+# base under those kinds and referenced as stable.NAME and tweedie.NAME. The
+# stored spec holds the canonical numbers, so these render back in S1 and in
+# p, mean, dispersion, whichever form was written. The programs pytest builds in
+# tests/test_stable.py and tests/test_tweedie.py. See
+# dev/done/plan-stable-expressions.md.
+stable NL.X0        1.5 0                                     note{a default scale and location, omitted when rendered};
+stable NL.X1        1.5 0.85;
+stable NL.X2        1.5 -0.5;
+stable NL.Full      1.5 1 2 -3                                note{a negative location renders glued};
+stable NL.S0        1.5 1 2 -2 s0                             note{the location in S0, stored in S1};
+stable NL.Labeled as "My law" 1.5 0 note{a quoted label} tags{topic:numerics};
+stable NL.Bareword as lab 0.7 -1                              note{a bareword label};
+stable NL.Limit     1000 claims sev 100 * lomax 1.5           note{the stable limit of a Pareto book};
+stable NL.Limit2    400 claims sev 250 * lomax 1.5            note{a second book with the same tail index};
+tweedie NL.T0       1.5 10 2                                  note{p, mean, dispersion};
+tweedie NL.Cv       1.5 10 cv 0.8                             note{stored as a dispersion};
+tweedie NL.Book as "A book" 10 claims sev gamma 10 cv 1       note{the compound form};

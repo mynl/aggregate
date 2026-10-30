@@ -793,3 +793,35 @@ def test_dropped_properties_no_longer_exist():
     assert not hasattr(uw, 'site_dir')
     assert not hasattr(uw, 'case_dir')
     assert not hasattr(uw, 'template_dir')
+
+
+# ----- [Ambiguous-Bare-Name-Message], dev/done/plan-stable-expressions.md -----
+
+def test_ambiguous_bare_name_raises_its_own_message_not_a_parse_error():
+    """A name under two kinds is not a parse failure, in ``build`` or ``preview``."""
+    from aggregate.underwriter import RecipeNotFound
+    uw = global_build.fork(name='ambiguous')
+    uw('agg x 1 claims dsev [1] fixed', update=False)
+    uw('stable x 1.5 0')
+    for call in (uw, uw.preview, uw.recipe):
+        with pytest.raises(KeyError) as e:
+            call('x')
+        assert not isinstance(e.value, RecipeNotFound)
+        assert not hasattr(e.value, 'report')
+        assert e.value.args[0] == (
+            "'x' is ambiguous across kinds (agg, stable); write agg.x or stable.x, "
+            "or pass kind= to choose. Shipped library names are unique across kinds.")
+    assert uw.recipe('x', kind='stable').kind == 'stable'
+
+
+def test_ambiguous_message_offers_only_the_dotted_spellings_that_exist():
+    """``pnl``, ``bvagg`` and ``nttagg`` have no reference form; ``kind=`` still works."""
+    uw = global_build.fork(name='ambiguous')
+    uw.add_recipe('pnl', 'y', {}, '')
+    uw.add_recipe('agg', 'y', {}, '')
+    with pytest.raises(KeyError, match='write agg.y, or pass kind='):
+        uw.recipe('y')
+    uw.add_recipe('bvagg', 'z', {}, '')
+    uw.add_recipe('nttagg', 'z', {}, '')
+    with pytest.raises(KeyError, match=r'\(bvagg, nttagg\); pass kind='):
+        uw.recipe('z')

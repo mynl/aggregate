@@ -60,7 +60,7 @@ KNOWN_AMBIGUOUS = {
 
 _NAME_RE = re.compile(
     r'^\s*(?:netceded|grossceded|grossnet)?\s*'
-    r'(?:agg|sev|ssev|port|pnl|xpnl|bivariate|bv|clash|dist|distortion|chfagg)\s+(\S+)',
+    r'(?:agg|sev|ssev|port|pnl|xpnl|bivariate|bv|clash|dist|distortion|chfagg|stable|tweedie)\s+(\S+)',
     re.I,
 )
 
@@ -183,4 +183,35 @@ def test_paren_math_is_unambiguous(explicit_parser, program):
     """
     tree = explicit_parser.parse(program)
     n = sum(1 for st in tree.iter_subtrees() if st.data == '_ambig')
+    assert n == 0, f'{program!r} has {n} ambiguous span(s)'
+
+
+# [Named-Conversion-Statements] (1.42.0): a name in the head of a conversion,
+# and a whole statement that is a dotted reference, add no forest branches.
+NAMED_LAW_PROGRAMS = [
+    'stable x0 1.5 0',
+    'stable x0 1.5 0 2 -3',
+    'stable x0 1.5 1 2 -2 s0',
+    'stable s0 1.5 0',
+    'stable s0 1.5 0 s0',
+    'stable x0 as "My law" 1.5 0',
+    'stable x0 as lab 1.5 0 s1 note{n} tags{a:b} hints{log2=8}',
+    'stable x0 1000 claims sev 100 * lomax 1.5 note{n}',
+    'tweedie t0 1.5 10 2',
+    'tweedie t0 as T 1.5 10 cv 2 note{n}',
+    'tweedie t0 10 claims sev gamma 10 cv 1 tags{a:b}',
+    'stable.x0',
+    'tweedie.t0',
+    'stable 1.5 -0.5',
+    'stable 1.5 0.5 -3',
+    'stable 1000 claims sev 100 * lomax 1.5',
+    'tweedie 1.5 10 2',
+]
+
+
+@pytest.mark.parametrize('program', NAMED_LAW_PROGRAMS)
+def test_named_laws_are_unambiguous(explicit_parser, program):
+    """The name slot and the two new reference terminals stay single parse."""
+    tree = explicit_parser.parse(program)
+    n = len(list(tree.find_data('_ambig')))
     assert n == 0, f'{program!r} has {n} ambiguous span(s)'

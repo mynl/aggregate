@@ -24,6 +24,7 @@
 # Z. Aggregate and portfolio references as severities
 # NTT. Exact compounds via the number-theoretic transform (nttagg)
 # CHF. Laws from a characteristic function (chfagg)
+# SN. Named stable and tweedie laws
 #    (P..X are reserved by decl-testers.agg)
 
 
@@ -401,3 +402,24 @@ chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y,
 chfagg CHF.RefGamma     25 * gamma 4 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below}
 
 agg CHF.UsesRef         dfreq [2] sev chfagg.CHF.RefGamma note{a chfagg serving as a severity: two claims of the gamma law}
+
+
+# SN. Named stable and tweedie laws
+# The conversion statements with a name, which store their canonical numbers.
+# See dev/done/plan-stable-expressions.md.
+
+stable SN.Plain          1.5 0 note{index and skewness, unit scale, zero location}
+
+stable SN.Scaled         1.5 0.85 2 -3 note{scale and a negative location}
+
+stable SN.S0             1.5 1 2 1 s0 note{the location in S0, stored in S1}
+
+stable SN.Label as "A labeled law" 0.7 -0.5 tags{topic:numerics}
+
+stable SN.Limit          1000 claims sev 100 * lomax 1.5 note{the stable limit of a Pareto book}
+
+tweedie SN.Tweedie       1.5 10 2 note{p, mean, dispersion}
+
+tweedie SN.TweedieCv     1.5 10 cv 0.8 note{the mean and cv form, stored as a dispersion}
+
+tweedie SN.TweedieBook as Book 10 claims sev gamma 10 cv 1 note{the compound form}

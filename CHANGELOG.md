@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.42.0 - 2026-10-30
+
+**[Named-Conversion-Statements] `stable NAME ...` and `tweedie NAME ...` store a law in the recipe base, referenced as `stable.NAME` and `tweedie.NAME`.** Both take the conversion forms with an optional `as` label and the trailer, and store canonical numbers under the new kinds `stable` and `tweedie`: the S1 `alpha`, `beta`, `scale`, `loc`, and `p`, `mean`, `dispersion`. `Stable` and `TweedieConversion` gain `name`, `label`, `program` and `from_spec`, and the string of a named law leads with its name. `library.agg` gains `stable Cauchy`, `Levy`, `Landau` and `Holtsmark`. A bare name held under two kinds now raises the `KeyError` listing its dotted spellings, in `build` and `preview`, where a parse error appeared before. `TweedieConversion` no longer has `__slots__`. See `dev/done/plan-stable-expressions.md`.
+
+Breaking: the prefixes `stable.` and `tweedie.` can no longer begin a name. aggregate-api needs `[aLL-Named-Laws]`: its `test_examples` fails on the two new statement heads until then.
+
 ## 1.41.0 - 2026-10-30
 
 **[CHF-Loss-Lab-Ripple] A `chfagg` has the `sharpen` exhibit once a probe has run and a read-only `exp_premium` of 0, and a calibration on a survival function that is not positive and decreasing raises `ValueError` rather than a bare `AssertionError`.** The exhibit reads `sharpen_df`, with the score grid first under the insurer perspective and captions for a law's probe of at most two cells. `exp_premium` is `Aggregate`'s reading of an exposure stating no premium. The refusal applies to every kind and reaches `evaluate(P)` with no anchor on a ringing grid, such as `tweedie 1.5 100 2`; anchored at `p=` that law answers. All three are what the Loss Lab needs: its Sharpen leaf serves the exhibit, its Evaluate form asks for a premium when `exp_premium` is 0, and its Evaluate route turns a `ValueError` into a 400.

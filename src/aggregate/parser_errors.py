@@ -176,6 +176,8 @@ _TERMINAL_LABELS: dict[str, str] = {
     "BUILTIN_AGG": "a builtin aggregate (agg.X)",
     "BUILTIN_PORT": "a builtin portfolio (port.X)",
     "BUILTIN_CHFAGG": "a builtin characteristic function law (chfagg.X)",
+    "BUILTIN_STABLE": "a builtin stable law (stable.X)",
+    "BUILTIN_TWEEDIE": "a builtin tweedie law (tweedie.X)",
     "BUILTIN_SEV": "a builtin severity (sev.X)",
     "BUILTIN_DIST": "a builtin distortion (dist.X)",
     "NOTE": "a note clause (note{...})",

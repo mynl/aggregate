@@ -25,7 +25,8 @@ from aggregate.parser import UnderwritingLexer
 TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
 SNAPSHOT_PATH = Path(__file__).parent / "data" / "expected_specs.json"
 
-VALID_KINDS = {"agg", "sev", "port", "distortion", "expr", "nttagg", "chfagg"}
+VALID_KINDS = {"agg", "sev", "port", "distortion", "expr", "nttagg", "chfagg",
+               "stable", "tweedie"}
 
 # Sentinels used by tests/capture_spec_snapshot.py for non-JSON floats.
 POS_INF_SENTINEL = "__inf__"

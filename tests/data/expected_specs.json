@@ -6503,5 +6503,111 @@
       "note": "a chfagg serving as a severity: two claims of the gamma law",
       "hints": ""
     }
+  },
+  "stable SN.Plain          1.5 0 note{index and skewness, unit scale, zero location}": {
+    "kind": "stable",
+    "name": "SN.Plain",
+    "spec": {
+      "name": "SN.Plain",
+      "alpha": 1.5,
+      "beta": 0.0,
+      "scale": 1.0,
+      "loc": 0.0,
+      "note": "index and skewness, unit scale, zero location",
+      "hints": ""
+    }
+  },
+  "stable SN.Scaled         1.5 0.85 2 -3 note{scale and a negative location}": {
+    "kind": "stable",
+    "name": "SN.Scaled",
+    "spec": {
+      "name": "SN.Scaled",
+      "alpha": 1.5,
+      "beta": 0.85,
+      "scale": 2.0,
+      "loc": -3.0,
+      "note": "scale and a negative location",
+      "hints": ""
+    }
+  },
+  "stable SN.S0             1.5 1 2 1 s0 note{the location in S0, stored in S1}": {
+    "kind": "stable",
+    "name": "SN.S0",
+    "spec": {
+      "name": "SN.S0",
+      "alpha": 1.5,
+      "beta": 1.0,
+      "scale": 2.0,
+      "loc": 3.0000000000000004,
+      "note": "the location in S0, stored in S1",
+      "hints": ""
+    }
+  },
+  "stable SN.Label as \"A labeled law\" 0.7 -0.5 tags{topic:numerics}": {
+    "kind": "stable",
+    "name": "SN.Label",
+    "spec": {
+      "name": "SN.Label",
+      "alpha": 0.7,
+      "beta": -0.5,
+      "scale": 1.0,
+      "loc": 0.0,
+      "label": "A labeled law",
+      "note": "",
+      "hints": "",
+      "tags": [
+        "topic:numerics"
+      ]
+    }
+  },
+  "stable SN.Limit          1000 claims sev 100 * lomax 1.5 note{the stable limit of a Pareto book}": {
+    "kind": "stable",
+    "name": "SN.Limit",
+    "spec": {
+      "name": "SN.Limit",
+      "alpha": 1.5,
+      "beta": 1.0,
+      "scale": 18452.701486440274,
+      "loc": 200000.0,
+      "note": "the stable limit of a Pareto book",
+      "hints": ""
+    }
+  },
+  "tweedie SN.Tweedie       1.5 10 2 note{p, mean, dispersion}": {
+    "kind": "tweedie",
+    "name": "SN.Tweedie",
+    "spec": {
+      "name": "SN.Tweedie",
+      "p": 1.5,
+      "mean": 10.0,
+      "dispersion": 2.0,
+      "note": "p, mean, dispersion",
+      "hints": ""
+    }
+  },
+  "tweedie SN.TweedieCv     1.5 10 cv 0.8 note{the mean and cv form, stored as a dispersion}": {
+    "kind": "tweedie",
+    "name": "SN.TweedieCv",
+    "spec": {
+      "name": "SN.TweedieCv",
+      "p": 1.5,
+      "mean": 10.0,
+      "dispersion": 2.023857702507763,
+      "note": "the mean and cv form, stored as a dispersion",
+      "hints": ""
+    }
+  },
+  "tweedie SN.TweedieBook as Book 10 claims sev gamma 10 cv 1 note{the compound form}": {
+    "kind": "tweedie",
+    "name": "SN.TweedieBook",
+    "spec": {
+      "name": "SN.TweedieBook",
+      "p": 1.5,
+      "mean": 100.0,
+      "dispersion": 2.0,
+      "label": "Book",
+      "note": "the compound form",
+      "hints": ""
+    }
   }
 }

@@ -556,6 +556,12 @@ class UnderwritingTransformer(Transformer):
     def BUILTIN_SEV(self, tok):
         return str(tok)
 
+    def BUILTIN_STABLE(self, tok):
+        return str(tok)
+
+    def BUILTIN_TWEEDIE(self, tok):
+        return str(tok)
+
     def BUILTIN_DIST(self, tok):
         """Normalise ``dist.X`` and ``distortion.X`` to ``distortion.X``
         so :meth:`Underwriter._safe_lookup` finds the entry under its
@@ -1171,6 +1177,78 @@ class UnderwritingTransformer(Transformer):
         return ("conversion", "stable",
                 Stable.from_compound_pareto(float(en), alpha, theta,
                                             float(fz.mean())))
+
+    # ----- named laws ([Named-Conversion-Statements]) ------------------
+    # The conversions above with a name: each form computes the same object
+    # and stores its canonical numbers, so a stored law is the same whichever
+    # spelling was written and the text survives only in ``program``. See
+    # dev/done/plan-stable-expressions.md.
+
+    def answer_stable(self, c):
+        return c[0]
+
+    def answer_tweedie(self, c):
+        return c[0]
+
+    @staticmethod
+    def _stable_declaration(name, as_label, law, trailer):
+        """``('stable', name, spec)`` holding the four S1 numbers of ``law``."""
+        return ("stable", name, {"name": name, "alpha": float(law.alpha),
+                                 "beta": float(law.beta), "scale": float(law.scale),
+                                 "loc": float(law.loc), **as_label, **trailer})
+
+    def stable_out_numbers(self, c):
+        """``stable NAME [as LABEL] alpha beta [scale [loc]] <trailer>``."""
+        _st, name, as_label, numbers, trailer = c
+        _, _, law = self._stable_from_numbers(numbers, 'S1')
+        return self._stable_declaration(name, as_label, law, trailer)
+
+    def stable_out_param(self, c):
+        """``stable NAME [as LABEL] alpha beta [scale [loc]] s0|s1 <trailer>``."""
+        _st, name, as_label, numbers, param, trailer = c
+        _, _, law = self._stable_from_numbers(numbers, str(param))
+        return self._stable_declaration(name, as_label, law, trailer)
+
+    def stable_out_compound(self, c):
+        """``stable NAME [as LABEL] <count> claims sev <pareto or lomax> <trailer>``."""
+        st, name, as_label, en, claims, sev_word, sev, trailer = c
+        _, _, law = self.conversion_stable_compound([st, en, claims, sev_word, sev])
+        return self._stable_declaration(name, as_label, law, trailer)
+
+    def answer_stable_ref(self, c):
+        """A whole statement ``stable.NAME``: the stored law, with its name and label."""
+        from .stable import Stable
+        return ("conversion", "stable", Stable.from_spec(self.safe_lookup(str(c[0]))))
+
+    @staticmethod
+    def _tweedie_declaration(name, as_label, law, trailer):
+        """``('tweedie', name, spec)`` holding p, the mean and the dispersion of ``law``."""
+        return ("tweedie", name, {"name": name, "p": law.p, "mean": law.mean,
+                                  "dispersion": law.dispersion, **as_label, **trailer})
+
+    def tweedie_out_dispersion(self, c):
+        """``tweedie NAME [as LABEL] p mean dispersion <trailer>``."""
+        tw, name, as_label, pp, mu, sig2, trailer = c
+        _, _, law = self.conversion_tweedie_dispersion([tw, pp, mu, sig2])
+        return self._tweedie_declaration(name, as_label, law, trailer)
+
+    def tweedie_out_cv(self, c):
+        """``tweedie NAME [as LABEL] p mean cv c <trailer>``."""
+        tw, name, as_label, pp, mu, cv_word, cv, trailer = c
+        _, _, law = self.conversion_tweedie_cv([tw, pp, mu, cv_word, cv])
+        return self._tweedie_declaration(name, as_label, law, trailer)
+
+    def tweedie_out_compound(self, c):
+        """``tweedie NAME [as LABEL] <count> claims sev <gamma> <trailer>``."""
+        tw, name, as_label, en, claims, sev_word, sev, trailer = c
+        _, _, law = self.conversion_tweedie_compound([tw, en, claims, sev_word, sev])
+        return self._tweedie_declaration(name, as_label, law, trailer)
+
+    def answer_tweedie_ref(self, c):
+        """A whole statement ``tweedie.NAME``: the stored law, with its name and label."""
+        from .tweedie import TweedieConversion
+        return ("conversion", "tweedie",
+                TweedieConversion.from_spec(self.safe_lookup(str(c[0]))))
 
     def agg_body_rename(self, c):
         bagg, occ_reins, agg_reins = c
@@ -3480,7 +3558,8 @@ class UnderwritingParser:
     returned by ``UnderwritingLexer.tokenize`` (which carries the original
     text), returning a ``(kind, name, spec)`` tuple where ``kind`` is one of
     ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``, ``'pnl'``, ``'xpnl'``,
-    ``'distortion'``, ``'expr'``, or ``'conversion'``."""
+    ``'distortion'``, ``'stable'``, ``'tweedie'``, ``'expr'``, or
+    ``'conversion'``."""
 
     def __init__(self, safe_lookup_function, debug: bool = False) -> None:
         self.safe_lookup = safe_lookup_function
@@ -3499,8 +3578,8 @@ class UnderwritingParser:
         -------
         (kind, name, spec) : tuple
             ``kind`` is one of ``'agg'``, ``'sev'``, ``'port'``, ``'bvagg'``,
-            ``'pnl'``, ``'xpnl'``, ``'distortion'``, ``'expr'``,
-            ``'conversion'``; ``name`` is the object identifier; ``spec`` is
+            ``'pnl'``, ``'xpnl'``, ``'distortion'``, ``'stable'``, ``'tweedie'``,
+            ``'expr'``, ``'conversion'``; ``name`` is the object identifier; ``spec`` is
             the dictionary specification used downstream to construct the
             object. For ``'expr'`` the statement is a bare expression and
             ``spec`` is its numeric value. For ``'conversion'`` the statement

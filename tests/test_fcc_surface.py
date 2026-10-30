@@ -359,11 +359,14 @@ def test_pnl_program_falls_back_to_the_engine(pnl):
 # moments -- actual_* (theory) and est_* (realised grid)
 # ---------------------------------------------------------------------------
 
-def test_actual_and_est_families_on_aggregate_and_portfolio(agg, port):
-    for obj in (agg, port):
+def test_actual_and_est_families_on_aggregate_and_portfolio(agg, port, chf):
+    for obj in (agg, port, chf):
         assert obj.actual_sd == pytest.approx(obj.actual_m * obj.actual_cv)
         assert obj.actual_var == pytest.approx(obj.actual_sd ** 2)
         assert not hasattr(obj, 'agg_m')
+    # a chfagg's est_* family is the grid's, as on an Aggregate (1.36.0)
+    assert chf.est_var == pytest.approx(chf.est_sd ** 2)
+    assert chf.est_m == pytest.approx(chf.actual_m, rel=1e-6)
     # on a clean (gross) book the realised grid reproduces the theory; on a
     # reinsured one ``actual_*`` stays gross while ``est_*`` is the net output
     clean = build('agg FCC.Clean1 100 claims sev lognorm 100 cv 2 poisson')

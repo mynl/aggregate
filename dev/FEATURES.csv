@@ -142,16 +142,16 @@ str-narrative,elt_explanation,property,str,"Long narrative of an elt or yelt dec
 str-narrative,dsev_bucket,property,str,Scheme for placing discrete-severity atoms on the grid,Y,,,,,,,,,,,,
 str-narrative,reins_bucket,property,str,Rebucketing scheme for net/ceded distributions,Y,,,,,,,,,,,,
 str-narrative,allocation_method,property,str,Natural-allocation method: 'linear' or 'lifted',,Y,,,,,,,,,,,Portfolio-only.
-stat,actual_m,attribute,scalar,Theoretical (analytic) mean,Y,Y,,,,Y,,,,,,,"a149 [FCC-Surface-Sweep]: renamed from agg_m/agg_sd/agg_cv/agg_skew/agg_var -- actual_* (theory) vs est_* (realised grid) is now one family across the classes. On Severity these are properties off moms() (analytic, post-layer); on Agg/Port attributes set at construction. Severity has no est_* (never discretized standalone)."
-stat,actual_sd,attribute,scalar,Theoretical standard deviation,Y,Y,,,,Y,,,,,,,
-stat,actual_cv,attribute,scalar,Theoretical coefficient of variation,Y,Y,,,,Y,,,,,,,"Severity: the ACHIEVED cv; compare sev_cv, the declared one."
-stat,actual_skew,attribute,scalar,Theoretical skewness,Y,Y,,,,Y,,,,,,,
-stat,actual_var,attribute,scalar,Theoretical variance,Y,Y,,,,Y,,,,,,,
+stat,actual_m,attribute,scalar,Theoretical (analytic) mean,Y,Y,,,Y,Y,,,,,,,"a149 [FCC-Surface-Sweep]: renamed from agg_m/agg_sd/agg_cv/agg_skew/agg_var -- actual_* (theory) vs est_* (realised grid) is now one family across the classes. On Severity these are properties off moms() (analytic, post-layer); on Agg/Port attributes set at construction. Severity has no est_* (never discretized standalone)."
+stat,actual_sd,attribute,scalar,Theoretical standard deviation,Y,Y,,,Y,Y,,,,,,,
+stat,actual_cv,attribute,scalar,Theoretical coefficient of variation,Y,Y,,,Y,Y,,,,,,,"Severity: the ACHIEVED cv; compare sev_cv, the declared one."
+stat,actual_skew,attribute,scalar,Theoretical skewness,Y,Y,,,Y,Y,,,,,,,
+stat,actual_var,attribute,scalar,Theoretical variance,Y,Y,,,Y,Y,,,,,,,
 stat,est_m,attribute,scalar,Estimated (realised FFT grid) mean,Y,Y,,Y,Y,,,,,,,,"est_m/est_cv/est_sd/est_skew/est_var = empirical from the grid. a149: PnL joined the family (was mean/sd/cv/skew) -- a P&L is evaluated per-atom over the SOURCE grid, so its moments are estimates relative to the generating Aggregate."
 stat,est_cv,attribute,scalar,Estimated CV,Y,Y,,Y,Y,,,,,,,,
 stat,est_sd,attribute,scalar,Estimated SD,Y,Y,,Y,Y,,,,,,,,
 stat,est_skew,attribute,scalar,Estimated skew,Y,Y,,Y,Y,,,,,,,,
-stat,est_var,attribute,scalar,Estimated aggregate variance,Y,Y,,,,,,,,,,,
+stat,est_var,attribute,scalar,Estimated aggregate variance,Y,Y,,,Y,,,,,,,,
 stat,sev_m,attribute,scalar,Severity mean (theoretical),Y,,,,,,,,,,,,WRINKLE: Agg exposes sev_m/sev_sd/sev_skew/sev_cv; Severity itself uses sev_mean + scipy mean() (sev_cv is shared).
 stat,sev_sd,attribute,scalar,Severity standard deviation,Y,,,,,,,,,,,,
 stat,sev_cv,attribute,scalar,Severity CV,Y,,,,,Y,,,,,,,

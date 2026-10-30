@@ -66085,10 +66085,638 @@
    "body": [
     {
      "cells": [
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "freq"
+      },
+      "mean",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "sev"
+      },
+      "mean",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 3,
+       "text": "agg"
+      },
       "mean",
       {
        "raw": 100.0,
        "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 100.00000000662858,
@@ -66096,30 +66724,12 @@
       },
       {
        "raw": 6.628586568524497e-11,
-       "text": "6.628587e-11"
+       "text": "0.00000"
       }
      ]
     },
     {
-     "break_depth": 0,
-     "cells": [
-      "sd",
-      {
-       "raw": 50.0,
-       "text": "50"
-      },
-      {
-       "raw": 50.0000521378921,
-       "text": "50.00005"
-      },
-      {
-       "raw": 1.0427578418514827e-06,
-       "text": "1.042758e-06"
-      }
-     ]
-    },
-    {
-     "break_depth": 0,
+     "break_depth": 1,
      "cells": [
       "cv",
       {
@@ -66127,22 +66737,70 @@
        "text": "0.5"
       },
       {
+       "raw": 0.5,
+       "text": "0.5"
+      },
+      {
+       "raw": 0.5,
+       "text": "0.5"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "0.5000005"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 0.500000521345778,
        "text": "0.5000005"
       },
       {
        "raw": 1.0426915559857974e-06,
-       "text": "1.042692e-06"
+       "text": "0.00000"
       }
      ]
     },
     {
-     "break_depth": 0,
+     "break_depth": 1,
      "cells": [
       "skew",
       {
        "raw": 1.0,
        "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.9999969122062708,
+       "text": "0.9999969"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 0.9999969122062708,
@@ -66153,12 +66811,12 @@
         "neg"
        ],
        "raw": -3.0877937291506896e-06,
-       "text": "-3.087794e-06"
+       "text": "-0.00000"
       }
      ]
     }
    ],
-   "caption": "The theoretical mean, standard deviation, coefficient of variation and skewness from the cumulants of the law against the grid's, with the relative error between them. A theoretical moment the law does not have is infinite or undefined, and its grid value is then a statistic of the window.",
+   "caption": "Canonical moment store by component and measure across the computation views. Raw noncentral moments (ex1, ex2, ex3) are dropped from this view; the raw perspective keeps the full store.",
    "columns": [
     {
      "align": "l",
@@ -66170,6 +66828,22 @@
      },
      "key": "c0",
      "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "level": 1,
      "name": [
       "measure"
      ],
@@ -66184,23 +66858,9 @@
       "group": true,
       "kind": "gen"
      },
-     "key": "c1",
-     "name": [
-      "theoretical"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
      "key": "c2",
      "name": [
-      "grid"
+      "e0.m0"
      ],
      "raw": true
     },
@@ -66214,7 +66874,104 @@
      },
      "key": "c3",
      "name": [
-      "rel error"
+      "mixed"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "dec"
+     },
+     "key": "c10",
+     "name": [
+      "error"
      ],
      "raw": true
     }
@@ -66222,22 +66979,43 @@
    "head": [
     [
      {
+      "text": "component"
+     },
+     {
       "text": "measure"
      },
      {
-      "text": "theoretical"
+      "text": "e0.m0"
      },
      {
-      "text": "grid"
+      "text": "mixed"
      },
      {
-      "text": "rel error"
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
      }
     ]
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 1
+   "n_stub_levels": 2
   }
  ],
  "stats/insurer/BivariateAggregate": [
@@ -75157,10 +75935,890 @@
    "body": [
     {
      "cells": [
-      "mean",
+      {
+       "rowspan": 8,
+       "text": "meta"
+      },
+      "limit",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "attachment",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "el",
       {
        "raw": 100.0,
        "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "prem",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "lr",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "sevcv_param",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mix_cv",
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": 0.0,
+       "text": "0"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "wt",
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "freq"
+      },
+      "ex1",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "sev"
+      },
+      "ex1",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex2",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "cv",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "skew",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      {
+       "rowspan": 6,
+       "text": "agg"
+      },
+      "ex1",
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 100.00000000662858,
@@ -75168,30 +76826,138 @@
       },
       {
        "raw": 6.628586568524497e-11,
-       "text": "6.628587e-11"
+       "text": "6.6286e-11"
       }
      ]
     },
     {
-     "break_depth": 0,
+     "break_depth": 1,
      "cells": [
-      "sd",
+      "ex2",
       {
-       "raw": 50.0,
-       "text": "50"
+       "raw": 12500.0,
+       "text": "12,500"
       },
       {
-       "raw": 50.0000521378921,
-       "text": "50.00005"
+       "raw": 12500.0,
+       "text": "12,500"
       },
       {
-       "raw": 1.0427578418514827e-06,
-       "text": "1.042758e-06"
+       "raw": 12500.0,
+       "text": "12,500"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 12500.005215117646,
+       "text": "12,500.01"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 12500.005215117646,
+       "text": "12,500.01"
+      },
+      {
+       "raw": 4.1720941168499337e-07,
+       "text": "4.1721e-07"
       }
      ]
     },
     {
-     "break_depth": 0,
+     "break_depth": 1,
+     "cells": [
+      "ex3",
+      {
+       "raw": 1875000.0,
+       "text": "1,875,000"
+      },
+      {
+       "raw": 1875000.0,
+       "text": "1,875,000"
+      },
+      {
+       "raw": 1875000.0,
+       "text": "1,875,000"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1875001.5694453253,
+       "text": "1,875,002"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 1875001.5694453253,
+       "text": "1,875,002"
+      },
+      {
+       "raw": 8.370375068622593e-07,
+       "text": "8.3704e-07"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
+     "cells": [
+      "mean",
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.6286e-11"
+      }
+     ]
+    },
+    {
+     "break_depth": 1,
      "cells": [
       "cv",
       {
@@ -75199,22 +76965,70 @@
        "text": "0.5"
       },
       {
+       "raw": 0.5,
+       "text": "0.5"
+      },
+      {
+       "raw": 0.5,
+       "text": "0.5"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "0.5000005"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
        "raw": 0.500000521345778,
        "text": "0.5000005"
       },
       {
        "raw": 1.0426915559857974e-06,
-       "text": "1.042692e-06"
+       "text": "1.0427e-06"
       }
      ]
     },
     {
-     "break_depth": 0,
+     "break_depth": 1,
      "cells": [
       "skew",
       {
        "raw": 1.0,
        "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": 1.0,
+       "text": "1"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": 0.9999969122062708,
+       "text": "0.9999969"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
       },
       {
        "raw": 0.9999969122062708,
@@ -75225,12 +77039,12 @@
         "neg"
        ],
        "raw": -3.0877937291506896e-06,
-       "text": "-3.087794e-06"
+       "text": "-3.0878e-06"
       }
      ]
     }
    ],
-   "caption": "The theoretical mean, standard deviation, coefficient of variation and skewness from the cumulants of the law against the grid's, with the relative error between them. A theoretical moment the law does not have is infinite or undefined, and its grid value is then a statistic of the window.",
+   "caption": "Canonical moment store by component and measure: the law's raw and central moments from its cumulants in the theoretical columns, the grid's in empirical, and the relative error between them. The frequency and severity blocks are empty. A theoretical moment the law does not have is infinite or undefined, and its grid value is then a statistic of the window.",
    "columns": [
     {
      "align": "l",
@@ -75242,6 +77056,22 @@
      },
      "key": "c0",
      "level": 0,
+     "name": [
+      "component"
+     ],
+     "role": "stub",
+     "wrap": true
+    },
+    {
+     "align": "l",
+     "dtype": "string",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c1",
+     "level": 1,
      "name": [
       "measure"
      ],
@@ -75256,23 +77086,9 @@
       "group": true,
       "kind": "gen"
      },
-     "key": "c1",
-     "name": [
-      "theoretical"
-     ],
-     "raw": true
-    },
-    {
-     "align": "r",
-     "dtype": "float",
-     "format": {
-      "digits": 7,
-      "group": true,
-      "kind": "gen"
-     },
      "key": "c2",
      "name": [
-      "grid"
+      "e0.m0"
      ],
      "raw": true
     },
@@ -75286,7 +77102,104 @@
      },
      "key": "c3",
      "name": [
-      "rel error"
+      "mixed"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c4",
+     "name": [
+      "independent"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c5",
+     "name": [
+      "after_occ"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c6",
+     "name": [
+      "empirical"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c7",
+     "name": [
+      "occ_impact"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c8",
+     "name": [
+      "agg_impact"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 7,
+      "group": true,
+      "kind": "gen"
+     },
+     "key": "c9",
+     "name": [
+      "gross_empirical"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
+     "key": "c10",
+     "name": [
+      "error"
      ],
      "raw": true
     }
@@ -75294,22 +77207,43 @@
    "head": [
     [
      {
+      "text": "component"
+     },
+     {
       "text": "measure"
      },
      {
-      "text": "theoretical"
+      "text": "e0.m0"
      },
      {
-      "text": "grid"
+      "text": "mixed"
      },
      {
-      "text": "rel error"
+      "text": "independent"
+     },
+     {
+      "text": "after_occ"
+     },
+     {
+      "text": "empirical"
+     },
+     {
+      "text": "occ_impact"
+     },
+     {
+      "text": "agg_impact"
+     },
+     {
+      "text": "gross_empirical"
+     },
+     {
+      "text": "error"
      }
     ]
    ],
    "ir_version": 1,
    "n_head_levels": 1,
-   "n_stub_levels": 1
+   "n_stub_levels": 2
   }
  ],
  "stats/raw/BivariateAggregate": [
@@ -85868,6 +87802,74 @@
    "body": [
     {
      "cells": [
+      "Freq",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
       "Agg",
       {
        "raw": 100.00000000662858,
@@ -85897,10 +87899,13 @@
        "raw": 251.25,
        "text": "251.25"
       }
+     ],
+     "flags": [
+      "total"
      ]
     }
    ],
-   "caption": "Headline moments and key percentiles of the law, read off the grid the characteristic function was inverted onto. One row: a law computed this way has no count and no severity. Percentiles are exact grid values; a moment the law does not have reads as a statistic of the window.",
+   "caption": "Headline moments and key percentiles of the law, read off the grid the characteristic function was inverted onto. The Freq and Sev rows are empty: a law computed this way has no count and no severity. Percentiles are exact grid values; a moment the law does not have reads as a statistic of the window.",
    "columns": [
     {
      "align": "l",
@@ -88956,6 +90961,74 @@
    "body": [
     {
      "cells": [
+      "Freq",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
       "Agg",
       {
        "raw": 100.00000000662858,
@@ -88988,7 +91061,7 @@
      ]
     }
    ],
-   "caption": "Headline moments and key percentiles of the law, read off the grid the characteristic function was inverted onto. One row: a law computed this way has no count and no severity. Percentiles are exact grid values; a moment the law does not have reads as a statistic of the window.",
+   "caption": "Headline moments and key percentiles of the law, read off the grid the characteristic function was inverted onto. The Freq and Sev rows are empty: a law computed this way has no count and no severity. Percentiles are exact grid values; a moment the law does not have reads as a statistic of the window.",
    "columns": [
     {
      "align": "l",
@@ -109791,139 +111864,119 @@
    "body": [
     {
      "cells": [
-      "total mass",
+      "Freq",
       {
-       "raw": 0.9999999999999999,
-       "text": "1"
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      {
+       "raw": 100.0,
+       "text": "100.00"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100.00"
+      },
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.6286e-11"
+      },
+      {
+       "raw": 0.5,
+       "text": "50.0%"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "50.0%"
+      },
+      {
+       "raw": 1.0426915559857974e-06,
+       "text": "1.0427e-06"
       },
       {
        "raw": 1.0,
-       "text": "1"
-      },
-      "ok",
-      "sum of the masses on the grid; an untilted grid wraps everything in"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "most negative bucket",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -4.94911030153632e-12,
-       "text": "-4.94911e-12"
+       "text": "1.000"
       },
       {
-       "raw": 0.0,
-       "text": "0"
-      },
-      "flag",
-      "a negative mass is frequency truncation ringing"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "outside mass",
-      {
-       "raw": 1.009844839661362e-12,
-       "text": "1.00984e-12"
-      },
-      {
-       "raw": 9.99999999995449e-06,
-       "text": "1e-05"
-      },
-      "ok",
-      "the mass outside the window, which wraps in (a Chernoff bound on a light tail)"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "truncation error",
-      {
-       "raw": 1.0265774225551347e-10,
-       "text": "1.02658e-10"
-      },
-      {
-       "raw": 1e-06,
-       "text": "1e-06"
-      },
-      "ok",
-      "|phi(pi / bs)|, the characteristic function at the highest frequency kept"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "buckets per scale",
-      {
-       "raw": 200.0,
-       "text": "200"
-      },
-      {
-       "raw": 10.0,
-       "text": "10"
-      },
-      "ok",
-      "body scale over bs; a coarse grid loses the body"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "mean rel error",
-      {
-       "raw": 6.628586568524497e-11,
-       "text": "6.62859e-11"
-      },
-      {
-       "raw": 0.0001,
-       "text": "0.0001"
-      },
-      "ok",
-      "grid mean against the theoretical"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "cv rel error",
-      {
-       "raw": 1.0426915559857974e-06,
-       "text": "1.04269e-06"
-      },
-      {
-       "raw": 0.0001,
-       "text": "0.0001"
-      },
-      "ok",
-      "grid cv against the theoretical"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "skew rel error",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -3.0877937291506896e-06,
-       "text": "-3.08779e-06"
-      },
-      {
-       "raw": 0.0001,
-       "text": "0.0001"
-      },
-      "ok",
-      "grid skew against the theoretical"
+       "raw": 0.9999969122062708,
+       "text": "1.000"
+      }
      ]
     }
    ],
-   "caption": "Checks on the grid: the total mass against what the window should hold, the most negative bucket, the mass outside the window against the budget, the modeled edge error and the tilt of a heavy-tailed law, the frequency truncation, the buckets per body scale, and each finite moment's relative error. A flagged coverage row carries the grid hint that would cover.",
+   "caption": "Moment validation: the law's theoretical mean (EX), CV or SD and skewness (Sk) from its cumulants against the grid's (Est), with the noise-aware relative error (Err). The Freq and Sev rows are empty. The checks on the inversion itself (coverage, edge error, truncation, resolution) are rows of info.",
    "columns": [
     {
      "align": "l",
@@ -109931,7 +111984,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "check"
+      "X"
      ],
      "role": "stub",
      "wrap": true
@@ -109940,12 +111993,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 6,
-      "kind": "gen"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c1",
      "name": [
-      "value"
+      "EX"
      ],
      "raw": true
     },
@@ -109953,50 +112007,125 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 6,
-      "kind": "gen"
+      "digits": 2,
+      "group": true,
+      "kind": "dec"
      },
      "key": "c2",
      "name": [
-      "target"
+      "Est EX"
      ],
      "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
      "key": "c3",
      "name": [
-      "status"
+      "Err EX"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
      "key": "c4",
      "name": [
-      "note"
+      "CV"
      ],
-     "wrap": true
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
+     "key": "c6",
+     "name": [
+      "Err CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c7",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "dec"
+     },
+     "key": "c8",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
     }
    ],
    "head": [
     [
      {
-      "text": "check"
+      "text": "X"
      },
      {
-      "text": "value"
+      "text": "EX"
      },
      {
-      "text": "target"
+      "text": "Est EX"
      },
      {
-      "text": "status"
+      "text": "Err EX"
      },
      {
-      "text": "note"
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
      }
     ]
    ],
@@ -113667,139 +115796,119 @@
    "body": [
     {
      "cells": [
-      "total mass",
+      "Freq",
       {
-       "raw": 0.9999999999999999,
-       "text": "1"
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Sev",
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      },
+      {
+       "raw": null,
+       "text": "\u2014"
+      }
+     ]
+    },
+    {
+     "break_depth": 0,
+     "cells": [
+      "Agg",
+      {
+       "raw": 100.0,
+       "text": "100"
+      },
+      {
+       "raw": 100.00000000662858,
+       "text": "100"
+      },
+      {
+       "raw": 6.628586568524497e-11,
+       "text": "6.6286e-11"
+      },
+      {
+       "raw": 0.5,
+       "text": "50.0%"
+      },
+      {
+       "raw": 0.500000521345778,
+       "text": "50.0%"
+      },
+      {
+       "raw": 1.0426915559857974e-06,
+       "text": "1.0427e-06"
       },
       {
        "raw": 1.0,
        "text": "1"
       },
-      "ok",
-      "sum of the masses on the grid; an untilted grid wraps everything in"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "most negative bucket",
       {
-       "flags": [
-        "neg"
-       ],
-       "raw": -4.94911030153632e-12,
-       "text": "-4.94911e-12"
-      },
-      {
-       "raw": 0.0,
-       "text": "0"
-      },
-      "flag",
-      "a negative mass is frequency truncation ringing"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "outside mass",
-      {
-       "raw": 1.009844839661362e-12,
-       "text": "1.00984e-12"
-      },
-      {
-       "raw": 9.99999999995449e-06,
-       "text": "1e-05"
-      },
-      "ok",
-      "the mass outside the window, which wraps in (a Chernoff bound on a light tail)"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "truncation error",
-      {
-       "raw": 1.0265774225551347e-10,
-       "text": "1.02658e-10"
-      },
-      {
-       "raw": 1e-06,
-       "text": "1e-06"
-      },
-      "ok",
-      "|phi(pi / bs)|, the characteristic function at the highest frequency kept"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "buckets per scale",
-      {
-       "raw": 200.0,
-       "text": "200"
-      },
-      {
-       "raw": 10.0,
-       "text": "10"
-      },
-      "ok",
-      "body scale over bs; a coarse grid loses the body"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "mean rel error",
-      {
-       "raw": 6.628586568524497e-11,
-       "text": "6.62859e-11"
-      },
-      {
-       "raw": 0.0001,
-       "text": "0.0001"
-      },
-      "ok",
-      "grid mean against the theoretical"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "cv rel error",
-      {
-       "raw": 1.0426915559857974e-06,
-       "text": "1.04269e-06"
-      },
-      {
-       "raw": 0.0001,
-       "text": "0.0001"
-      },
-      "ok",
-      "grid cv against the theoretical"
-     ]
-    },
-    {
-     "break_depth": 0,
-     "cells": [
-      "skew rel error",
-      {
-       "flags": [
-        "neg"
-       ],
-       "raw": -3.0877937291506896e-06,
-       "text": "-3.08779e-06"
-      },
-      {
-       "raw": 0.0001,
-       "text": "0.0001"
-      },
-      "ok",
-      "grid skew against the theoretical"
+       "raw": 0.9999969122062708,
+       "text": "1"
+      }
      ]
     }
    ],
-   "caption": "Checks on the grid: the total mass against what the window should hold, the most negative bucket, the mass outside the window against the budget, the modeled edge error and the tilt of a heavy-tailed law, the frequency truncation, the buckets per body scale, and each finite moment's relative error. A flagged coverage row carries the grid hint that would cover.",
+   "caption": "Moment validation: the law's theoretical mean (EX), CV or SD and skewness (Sk) from its cumulants against the grid's (Est), with the noise-aware relative error (Err). The Freq and Sev rows are empty. The checks on the inversion itself (coverage, edge error, truncation, resolution) are rows of info.",
    "columns": [
     {
      "align": "l",
@@ -113807,7 +115916,7 @@
      "key": "c0",
      "level": 0,
      "name": [
-      "check"
+      "X"
      ],
      "role": "stub",
      "wrap": true
@@ -113816,12 +115925,13 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 6,
+      "digits": 7,
+      "group": true,
       "kind": "gen"
      },
      "key": "c1",
      "name": [
-      "value"
+      "EX"
      ],
      "raw": true
     },
@@ -113829,50 +115939,125 @@
      "align": "r",
      "dtype": "float",
      "format": {
-      "digits": 6,
+      "digits": 7,
+      "group": true,
       "kind": "gen"
      },
      "key": "c2",
      "name": [
-      "target"
+      "Est EX"
      ],
      "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
      "key": "c3",
      "name": [
-      "status"
+      "Err EX"
      ],
-     "wrap": true
+     "raw": true
     },
     {
-     "align": "l",
-     "dtype": "string",
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
      "key": "c4",
      "name": [
-      "note"
+      "CV"
      ],
-     "wrap": true
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 1,
+      "kind": "pct"
+     },
+     "key": "c5",
+     "name": [
+      "Est CV"
+     ],
+     "raw": true,
+     "tag": "ratio"
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 5,
+      "kind": "gen"
+     },
+     "key": "c6",
+     "name": [
+      "Err CV"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c7",
+     "name": [
+      "Sk"
+     ],
+     "raw": true
+    },
+    {
+     "align": "r",
+     "dtype": "float",
+     "format": {
+      "digits": 3,
+      "kind": "gen"
+     },
+     "key": "c8",
+     "name": [
+      "Est Sk"
+     ],
+     "raw": true
     }
    ],
    "head": [
     [
      {
-      "text": "check"
+      "text": "X"
      },
      {
-      "text": "value"
+      "text": "EX"
      },
      {
-      "text": "target"
+      "text": "Est EX"
      },
      {
-      "text": "status"
+      "text": "Err EX"
      },
      {
-      "text": "note"
+      "text": "CV"
+     },
+     {
+      "text": "Est CV"
+     },
+     {
+      "text": "Err CV"
+     },
+     {
+      "text": "Sk"
+     },
+     {
+      "text": "Est Sk"
      }
     ]
    ],

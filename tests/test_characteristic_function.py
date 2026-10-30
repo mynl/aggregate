@@ -103,7 +103,7 @@ def test_light_tailed_families_against_scipy_at_the_default_grid(family, kw):
     assert np.max(np.abs(c.agg_density - exact)) < 1e-9
     assert abs(c.total_mass - 1) < 1e-9
     assert c.validation_description == 'not unreasonable'
-    assert abs(c.est_m - c.agg_m) < 1e-6 * max(1.0, abs(c.agg_m))
+    assert abs(c.est_m - c.actual_m) < 1e-6 * max(1.0, abs(c.actual_m))
 
 
 def test_cv_forms_are_the_same_laws():
@@ -122,7 +122,7 @@ def test_gamma_shape_one_is_truncation_limited_and_flagged():
     c = AggregateCHF('E', 'gamma', shape=1, scale=25)
     c.update()
     assert c.truncation_error > 1e-6
-    assert c.validation_df.loc['truncation error', 'status'] == 'flag'
+    assert c._checks_frame().loc['truncation error', 'status'] == 'flag'
     assert 'truncation error' in c.validation_description
     exact = _reference_masses(c.family.reference, c.xs, c.bs)
     assert np.max(np.abs(c.agg_density - exact)) < 1e-4
@@ -211,8 +211,8 @@ def test_rule_a_sizes_an_untilted_stable_window_from_the_power_tail():
     assert c.x_min < 0 and c.x_min % c.bs == 0
     assert abs(c.total_mass - 1) < 1e-9
     assert np.all(c.agg_density > -1e-12)
-    assert c.agg_m == 0 and not np.isfinite(c.agg_cv)
-    assert c.stats_df.loc['cv', 'theoretical'] != c.stats_df.loc['cv', 'theoretical']  # nan
+    assert c.actual_m == 0 and not np.isfinite(c.actual_cv)
+    assert c.stats_df.loc[('agg', 'cv'), 'mixed'] != c.stats_df.loc[('agg', 'cv'), 'mixed']  # nan
 
 
 def test_from_family_accepts_a_stable_object():
@@ -259,12 +259,12 @@ def test_frames_carry_the_aggregate_columns(gamma_chf):
     assert c.density_df.index.name == 'loss'
     a = build('agg G dfreq [1] sev 25 * gamma 4', log2=14)
     assert list(c.summary_df.columns) == list(a.summary_df.columns)
-    assert list(c.summary_df.index) == ['Agg']
+    assert list(c.summary_df.index) == ['Freq', 'Sev', 'Agg']
     assert list(c.tail_df.columns) == list(a.tail_df.columns)
     assert list(c.tail_df.index) == list(a.tail_df.index)
-    assert list(c.stats_df.index) == ['mean', 'sd', 'cv', 'skew']
-    assert set(c.validation_df['status']) <= {'ok', 'flag'}
-    assert c.validation_df.loc['mean rel error', 'status'] == 'ok'
+    assert c.stats_df.index.equals(a.stats_df.index)
+    assert set(c._checks_frame()['status']) <= {'ok', 'flag'}
+    assert c._checks_frame().loc['mean rel error', 'status'] == 'ok'
     assert c.validation_description == 'not unreasonable'
     assert 'ok' in c.validation_explanation
     assert c.summary_df.loc['Agg', 'Mean'] == pytest.approx(100)
@@ -273,7 +273,7 @@ def test_frames_carry_the_aggregate_columns(gamma_chf):
 def test_info_repr_and_html(gamma_chf):
     c = gamma_chf
     info = c.info
-    assert info.startswith('chfagg object name')
+    assert info.startswith('aggregate object name')
     assert '25 * gamma 4' in info
     assert "AggregateCHF('G': '25 * gamma 4', log2 14" in repr(c)
     html = c._repr_html_()
@@ -330,10 +330,10 @@ def test_recommended_grid_resolves_the_body():
     assert 30 / bs >= 10
     assert log2 < 16
     c.update(log2=log2, bs=bs)
-    assert c.validation_df.loc['buckets per scale', 'status'] == 'ok'
+    assert c._checks_frame().loc['buckets per scale', 'status'] == 'ok'
     coarse = AggregateCHF('N', 'norm', mean=100, sd=30)
     coarse.update(log2=6)
-    assert coarse.validation_df.loc['buckets per scale', 'status'] == 'flag'
+    assert coarse._checks_frame().loc['buckets per scale', 'status'] == 'flag'
 
 
 def test_update_ignores_other_hint_keys_with_a_warning(caplog):
@@ -445,7 +445,7 @@ def test_one_sided_tilting_reproduces_the_measured_table(alpha, log2):
     assert c.bs <= cap
     if alpha < 1.2:
         assert c.bs == cap                                    # the cap binds
-        assert c.validation_df.loc['outside mass', 'status'] == 'flag'
+        assert c._checks_frame().loc['outside mass', 'status'] == 'flag'
 
 
 def test_levy_law_is_exact_at_alpha_one_half():
@@ -479,7 +479,7 @@ def test_beta_minus_one_is_the_reflection():
     k = np.arange(10, n - 2, 997)
     x = b.xs[k]
     assert np.max(np.abs(b.cdf(x) - a.sf(-x - h))) < 1e-8
-    assert b.agg_m == -1 and b.support == (-np.inf, np.inf)
+    assert b.actual_m == -1 and b.support == (-np.inf, np.inf)
 
 
 def test_closure_under_addition_untilted():
@@ -533,7 +533,7 @@ def test_split_law_grid_window_places_the_window_by_the_crop():
 def test_tilted_validation_rows_and_info():
     c = AggregateCHF('S', 'stable', alpha=1.0, beta=1)
     c.update(log2=14)
-    v = c.validation_df
+    v = c._checks_frame()
     assert v.loc['total mass', 'target'] == pytest.approx(1 - c.outside_above)
     assert v.loc['total mass', 'status'] == 'ok'
     assert v.loc['outside mass', 'status'] == 'flag'
@@ -625,7 +625,7 @@ def test_two_sided_tilting_reproduces_the_measured_table(alpha, beta):
     c = _two_sided_check(alpha, beta, 16, 6)
     assert c.bs <= c._bucket_cap(two_sided=True)
     if alpha < 1.2:
-        assert c.validation_df.loc['outside mass', 'status'] == 'flag'
+        assert c._checks_frame().loc['outside mass', 'status'] == 'flag'
 
 
 def test_two_sided_untilted_wraps():
@@ -647,8 +647,8 @@ def test_two_sided_number_tilts_both_halves_and_info_shows_the_transfer():
     assert c.tilt == (6.0, 6.0)
     assert c.transfer_sigma > 0
     assert 'transfer sigma' in c.info
-    assert c.validation_df.loc['transfer sigma', 'value'] == c.transfer_sigma
-    assert c.validation_df.loc['tilt', 'note'].startswith('e-folds')
+    assert c._checks_frame().loc['transfer sigma', 'value'] == c.transfer_sigma
+    assert c._checks_frame().loc['tilt', 'note'].startswith('e-folds')
 
 
 # ----------------------------------------------------------------------
@@ -773,7 +773,7 @@ def test_tweedie_normal_gamma_inverse_gaussian_members(p, mean, dispersion):
     c = build(f'chfagg T tweedie {p} {mean} {dispersion}')
     _against_reference(c, 1e-9)
     assert c.validation_description == 'not unreasonable'
-    assert c.agg_m == mean and c.family.moments[1] == pytest.approx(dispersion * mean ** p)
+    assert c.actual_m == mean and c.family.moments[1] == pytest.approx(dispersion * mean ** p)
 
 
 def test_tweedie_compound_member_against_the_compound_engine_and_the_series():
@@ -801,7 +801,7 @@ def test_tweedie_compound_member_against_the_compound_engine_and_the_series():
 def test_tweedie_stable_members_match_their_moments(p, mean, dispersion):
     c = build(f'chfagg T tweedie {p} {mean} {dispersion}')
     assert abs(c.est_m - mean) < 1e-6 * mean
-    assert abs(c.est_cv - c.agg_cv) < 1e-4 * c.agg_cv
+    assert abs(c.est_cv - c.actual_cv) < 1e-4 * c.actual_cv
     assert c.family.reference is None
     assert c.family.tilt_side is None and c.tilt == (0.0, 0.0)
 
@@ -848,7 +848,7 @@ def test_variance_gamma_laplace_special_case_and_cumulants():
     d = build('chfagg V variancegamma 0.2 0.5 -0.1')
     mean, var, skew = d.family.moments
     assert (mean, var) == (-0.1, pytest.approx(0.04 + 0.5 * 0.01))
-    assert abs(d.est_m - mean) < 1e-6 and abs(d.est_cv - d.agg_cv) < 1e-5 and abs(d.est_skew - skew) < 1e-3
+    assert abs(d.est_m - mean) < 1e-6 and abs(d.est_cv - d.actual_cv) < 1e-5 and abs(d.est_skew - skew) < 1e-3
     assert d.family.reference is None
 
 
@@ -873,7 +873,7 @@ def test_tempered_stable_cumulants():
 def test_untilted_window_balances_truncation_against_coverage():
     """A Tweedie with p > 2 and a small tilt cannot have both at log2 16; the rule picks the balance and both rows flag."""
     c = build('chfagg T tweedie 2.5 100 2')
-    v = c.validation_df
+    v = c._checks_frame()
     assert v.loc['truncation error', 'status'] == 'flag'
     assert v.loc['outside mass', 'status'] == 'flag'
     assert 'wraps in' in v.loc['outside mass', 'note'] or 'hints{' in v.loc['outside mass', 'note']
@@ -1213,3 +1213,78 @@ def test_a_glued_minus_is_a_sign_and_a_spaced_minus_is_a_shift(underwriter):
     assert spec['shape'] == 4 and spec['chf_loc'] == -10
     with pytest.raises(ValueError, match="glued to a number is its sign; a shift is written with a space, '- 10'"):
         _parse(underwriter, 'chfagg G 25 * gamma 4 -10')
+
+
+# ----------------------------------------------------------------------
+# [CHF-Aggregate-Frames]: the moment store, summary and validation frames
+# ----------------------------------------------------------------------
+
+#: chfagg laws and the Aggregate whose frames they must match in shape: an
+#: unsigned compound for the unsigned law, a signed one for the signed laws.
+FRAME_PAIRS = [
+    ('chfagg F.G 25 * gamma 4', 'agg F.A dfreq [1] sev 25 * gamma 4'),
+    ('chfagg F.N 30 * norm + 100', 'agg F.S dfreq [1] ssev 30 * norm + 100'),
+    ('chfagg F.S 2 * stable 1.5 1 + 10', 'agg F.S dfreq [1] ssev 30 * norm + 100'),
+    ('chfagg F.T stable 1.5 0.5', 'agg F.S dfreq [1] ssev 30 * norm + 100'),
+]
+
+
+@pytest.mark.parametrize('chf_program, agg_program', FRAME_PAIRS)
+@pytest.mark.parametrize('update', [False, True])
+def test_frames_have_the_aggregate_shapes(chf_program, agg_program, update):
+    c = build(chf_program, update=update)
+    a = build(agg_program, update=update, log2=10)
+    for frame in ('summary_df', 'validation_df', 'stats_df'):
+        cf, af = getattr(c, frame), getattr(a, frame)
+        assert cf.index.equals(af.index), frame
+        assert list(cf.columns) == list(af.columns), frame
+        assert cf.index.names == af.index.names, frame
+    assert c.summary_df.loc[['Freq', 'Sev']].isna().all().all()
+    assert c.stats_df.loc[['freq', 'sev']].isna().all().all()
+    assert c.stats_df.dtypes.unique().tolist() == [np.dtype(float)]
+
+
+def test_the_store_feeds_the_accessors():
+    for program in ('chfagg S.G 25 * gamma 4', 'chfagg S.S 2 * stable 1.5 1 + 10', 'chfagg S.T stable 1.5 0.5'):
+        c = build(program)
+        st = c.stats_df
+        assert st.loc[('agg', 'mean'), 'mixed'] == c.actual_m
+        assert st.loc[('agg', 'mean'), 'empirical'] == c.est_m
+        assert st.loc[('agg', 'mean'), 'gross_empirical'] == c.est_m
+        assert st.loc[('meta', 'limit'), 'mixed'] == np.inf and st.loc[('meta', 'wt'), 'mixed'] == 1
+        assert np.isnan(st.loc[('meta', 'lr'), 'mixed']) and np.isnan(st.loc[('meta', 'sevcv_param'), 'mixed'])
+        assert c.validation_df.loc['Agg', 'EX'] == pytest.approx(c.actual_m)
+    s = build('chfagg S.S 2 * stable 1.5 1 + 10')
+    assert s.stats_df.loc[('agg', 'ex2'), 'mixed'] == np.inf and s.stats_df.loc[('agg', 'ex3'), 'mixed'] == np.inf
+    assert s.stats_df.loc[('agg', 'cv'), 'mixed'] == np.inf and np.isnan(s.stats_df.loc[('agg', 'cv'), 'error'])
+    assert np.isnan(s.validation_df.loc['Agg', 'Err SD'])
+    assert s.validation_df.loc['Agg', 'Err EX'] == pytest.approx(-5.3e-3, rel=0.01)
+
+
+def test_info_has_aggregates_rows_then_the_inversion_block():
+    from aggregate.constants import INFO_LABEL_WIDTH
+    a = build('agg I.A dfreq [1] sev 25 * gamma 4', log2=10)
+
+    def labels(info):
+        return [ln[:INFO_LABEL_WIDTH].strip() for ln in info.splitlines()]
+
+    agg_labels = labels(a.info)
+    head = agg_labels[:agg_labels.index('validation') + 1]
+    root = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg'
+    lines = [ln.rstrip().rstrip(';') for ln in (root / '_test_suite.agg').read_text(encoding='utf-8').splitlines()
+             if ln.startswith('chfagg ')]
+    for program in lines:
+        c = build(program)
+        info = c.info
+        lab = labels(info)
+        assert lab[:len(head)] == head, program
+        assert lab[-5:] == agg_labels[-5:], program
+        rows = dict(zip(lab, (ln[INFO_LABEL_WIDTH:].strip() for ln in info.splitlines())))
+        checks = c._checks_frame()
+        for name in ('total mass', 'most negative bucket', 'truncation error', 'buckets per scale'):
+            assert rows[name] != 'n/a', (program, name)
+        assert rows['outside mass'].startswith(f'{checks.loc["outside mass", "value"]:.3g}') \
+            if 'outside mass' in checks.index else True
+        n_ok = int((checks.drop([i for i in checks.index if i.startswith(('mean', 'cv', 'skew'))])['status']
+                    == 'ok').sum())
+        assert rows['checks'].startswith(f'{n_ok} ok'), program

@@ -35,6 +35,8 @@ rule C uses a given ``bs`` and ``log2``.
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 import math
 
@@ -45,8 +47,8 @@ from scipy.optimize import minimize_scalar
 from scipy.special import gamma as gamma_function
 from scipy.special import zeta as hurwitz_zeta
 
-from ._aggregate import (SUMMARY_PERCENTILES, _summary_pct_label,
-                         return_period_frame)
+from ._aggregate import (_STATS_ROW_INDEX, SUMMARY_PERCENTILES, Aggregate,
+                         _summary_pct_label, return_period_frame)
 from ._bucket_window import BUCKET_SIZING_P
 from ._grid_distribution import GridDistribution
 from ._help import HelpMixin
@@ -134,6 +136,14 @@ _ROUNDOFF_LOG = 52 * math.log(2)
 
 #: Modeled worst relative bucket error above which the edge error row is flagged.
 EDGE_ERROR_FLAG = 1e-3
+
+#: The moment store's columns, ``Aggregate.stats_df``'s
+#: ([CHF-Aggregate-Frames]).
+STATS_COLUMNS = ['e0.m0', 'mixed', 'independent', 'after_occ', 'empirical',
+                 'occ_impact', 'agg_impact', 'gross_empirical', 'error']
+
+#: The six measures of a moment store block.
+_MEASURES = ('ex1', 'ex2', 'ex3', 'mean', 'cv', 'skew')
 
 
 # ======================================================================
@@ -1559,7 +1569,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
     >>> from aggregate.characteristic_function import AggregateCHF
     >>> a = AggregateCHF('G', 'gamma', shape=4, scale=25)
     >>> a.update(log2=12)
-    >>> round(a.est_m, 6), round(a.agg_m, 6)
+    >>> round(a.est_m, 6), round(a.actual_m, 6)
     (100.0, 100.0)
     """
 
@@ -1569,21 +1579,29 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.name = name
         if isinstance(family, Family):
             fam = family
+            spec = {'family': fam.to_decl() or fam.name}
         else:
             fam = make_family(family, form, **parameters)
+            spec = {'family': family, 'form': form, **parameters}
         self.chf_scale = float(chf_scale)
         self.chf_loc = float(chf_loc)
         if (self.chf_scale, self.chf_loc) != (1.0, 0.0):
             fam = FamilyAffine(fam, self.chf_scale, self.chf_loc)
+            spec.update(chf_scale=self.chf_scale, chf_loc=self.chf_loc)
         self.family = fam
         self._init_labels(label=label, label_map=label_map)
         self.note = note
         self.tags = tuple(tags) if tags else ()
         self.hints = hints
+        #: the constructor's arguments, the DecL spec when built from DecL
+        self._spec = {'name': name, **spec, 'note': note, 'tags': list(self.tags),
+                      'hints': hints, 'label': label}
         #: an explicit grid left edge, set by :meth:`from_chf`; ``None`` means
         #: the left edge comes from the window rule
         self._x_min_fixed = None
         self._reset_grid()
+        #: the moment store, ``Aggregate.stats_df``'s rows and columns
+        self.stats_df = self._theoretical_stats_df()
 
     def _reset_grid(self):
         self.log2 = 0
@@ -2245,6 +2263,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self.truncation_error = float(abs(self.family.chf(np.array([np.pi / h]))[0]))
         self._gd = None
         self._density_df = None
+        self._write_empirical_moments()
 
     @property
     def outside_mass(self):
@@ -2394,25 +2413,101 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                                               kind=kind, names=names)
 
     # ---- moments ----------------------------------------------------------
+    def _theoretical_moments(self):
+        r"""``(ex1, ex2, ex3, mean, cv, skew)`` of the law, the six measures of a moment store block.
+
+        Notes
+        -----
+        From the family's mean :math:`m`, variance :math:`v` and skewness
+        :math:`k`: :math:`\mathsf{P}X^2 = v + m^2` and
+        :math:`\mathsf{P}X^3 = k v^{3/2} + 3mv + m^3`. A law with no variance
+        has :math:`\mathsf{P}X^2 = \infty` and :math:`\mathsf{P}X^3` of the
+        sign of its heavy tail, undefined with two, the conventions the store
+        uses for a power-law severity; its CV is infinite at a finite nonzero
+        mean. The CV is blank (``nan``) at a mean indistinguishable from 0,
+        as :meth:`aggregate.Aggregate._cv_or_nan` has it.
+        """
+        mean, var, skew = (float(v) for v in self.family.moments)
+        if np.isfinite(var):
+            sd = math.sqrt(max(var, 0.0))
+            ex2 = var + mean ** 2
+            ex3 = skew * sd ** 3 + 3 * mean * var + mean ** 3
+            cv = Aggregate._cv_or_nan(mean, sd)
+        else:
+            ex2 = np.inf if var == np.inf else np.nan
+            ex3 = {'right': np.inf, 'left': -np.inf}.get(self.family.tilt_side, np.nan)
+            cv = np.inf if (np.isfinite(mean) and mean != 0) else np.nan
+        return mean, ex2, ex3, mean, cv, skew
+
+    def _theoretical_stats_df(self):
+        """The moment store before :meth:`update`: the law's moments in the theoretical columns.
+
+        Rows ``_STATS_ROW_INDEX`` and columns ``Aggregate.stats_df``'s. The
+        ``agg`` block holds the law in ``e0.m0``, ``mixed`` and
+        ``independent``; ``meta`` holds what a one-component ``Aggregate``
+        with no premium and no limit has, with ``lr`` and ``sevcv_param``
+        ``nan``; the ``freq`` and ``sev`` blocks and the reinsurance columns
+        stay ``nan``, as on an ``Aggregate`` with no reinsurance.
+        """
+        df = pd.DataFrame(np.nan, index=_STATS_ROW_INDEX, columns=STATS_COLUMNS)
+        th = self._theoretical_moments()
+        meta = {'limit': np.inf, 'attachment': 0.0, 'el': th[3], 'prem': 0.0,
+                'mix_cv': 0.0, 'wt': 1.0}
+        for col in ('e0.m0', 'mixed', 'independent'):
+            for measure, value in meta.items():
+                df.loc[('meta', measure), col] = value
+            for measure, value in zip(_MEASURES, th):
+                df.loc[('agg', measure), col] = value
+        return df
+
+    def _write_empirical_moments(self):
+        """Write the grid's moments into ``empirical`` and ``gross_empirical`` and refresh ``error``.
+
+        ``error`` is the noise-aware relative error of ``gross_empirical``
+        against ``mixed``, as on ``Aggregate``, and ``nan`` where the
+        theoretical value is not finite: the grid value is then a statistic of
+        the window.
+        """
+        df = self.stats_df
+        x, p = self.xs, self.agg_density
+        m, sd, skew = self._grid_moments()
+        with np.errstate(over='ignore', invalid='ignore'):
+            raw = (m, float(np.sum(x ** 2 * p)), float(np.sum(x ** 3 * p)))
+        emp = (*raw, m, Aggregate._cv_or_nan(m, sd), skew)
+        for col in ('empirical', 'gross_empirical'):
+            for measure, value in zip(_MEASURES, emp):
+                df.loc[('agg', measure), col] = value
+        th, gr = df['mixed'], df['gross_empirical']
+        ok = np.isfinite(th) & np.isfinite(gr)
+        err = pd.Series(np.nan, index=df.index)
+        err[ok] = _noise_aware_rel_error(gr[ok], th[ok])
+        df['error'] = err
+
     @property
-    def agg_m(self):
+    def actual_m(self):
         """The theoretical mean, ``inf`` or ``nan`` where it does not exist."""
-        return float(self.family.moments[0])
+        return float(self.stats_df.loc[('agg', 'mean'), 'mixed'])
 
     @property
-    def agg_cv(self):
+    def actual_cv(self):
         """The theoretical coefficient of variation, ``inf`` or ``nan`` where it does not exist."""
-        mean, var, _ = self.family.moments
-        if not np.isfinite(var):
-            return float(var) if np.isfinite(mean) else np.nan
-        if mean == 0:
-            return np.nan
-        return float(np.sqrt(var) / mean)
+        return float(self.stats_df.loc[('agg', 'cv'), 'mixed'])
 
     @property
-    def agg_skew(self):
+    def actual_skew(self):
         """The theoretical skewness, ``nan`` where it does not exist."""
-        return float(self.family.moments[2])
+        return float(self.stats_df.loc[('agg', 'skew'), 'mixed'])
+
+    @property
+    def actual_var(self):
+        """The theoretical variance, ``inf`` where it does not exist."""
+        return float(self.family.moments[1])
+
+    @property
+    def actual_sd(self):
+        """The theoretical standard deviation, ``inf`` where it does not exist."""
+        v = self.actual_var
+        return math.sqrt(max(v, 0.0)) if np.isfinite(v) else v
 
     def _grid_moments(self):
         """``(mean, sd, skew)`` of the window's masses, no renormalization."""
@@ -2437,10 +2532,15 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return self._grid_moments()[1]
 
     @property
+    def est_var(self):
+        """The grid variance."""
+        return self._grid_moments()[1] ** 2
+
+    @property
     def est_cv(self):
-        """The grid coefficient of variation, ``nan`` at mean zero."""
+        """The grid coefficient of variation, ``nan`` at a mean indistinguishable from 0 (``Aggregate._cv_or_nan``)."""
         m, sd, _ = self._grid_moments()
-        return sd / m if m != 0 else np.nan
+        return Aggregate._cv_or_nan(m, sd)
 
     @property
     def est_skew(self):
@@ -2478,17 +2578,25 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
 
     @property
     def summary_df(self):
-        """Moments and key percentiles, one ``Agg`` row with ``Aggregate.summary_df``'s columns."""
+        """Moments and key percentiles in ``Aggregate.summary_df``'s shape: rows ``Freq``, ``Sev``, ``Agg``.
+
+        Columns ``Mean | SD | CV | Skew | P01 | Median | P99``. The ``Freq``
+        and ``Sev`` rows are ``nan``, a law computed from its characteristic
+        function having neither. The ``Agg`` row holds the grid's moments and
+        percentiles after :meth:`update` and the theoretical moments before,
+        with ``CV`` through :meth:`aggregate.Aggregate._cv_or_nan`, blank at a
+        mean indistinguishable from 0.
+        """
         updated = self.agg_density is not None
         if updated:
             m, sd, skew = self._grid_moments()
         else:
-            m, var, skew = self.family.moments
-            sd = np.sqrt(var) if np.isfinite(var) else np.nan
-        with np.errstate(divide='ignore', invalid='ignore'):
-            cv = sd / m if (m != 0 and np.isfinite(m)) else np.nan
-        df = pd.DataFrame({'Mean': [m], 'SD': [sd], 'CV': [cv], 'Skew': [skew]},
-                          index=['Agg'])
+            m, sd, skew = self.actual_m, self.actual_sd, self.actual_skew
+        nan3 = [np.nan] * 3
+        df = pd.DataFrame({'Mean': [np.nan, np.nan, m], 'SD': [np.nan, np.nan, sd],
+                           'CV': [*nan3[:2], Aggregate._cv_or_nan(m, sd)],
+                           'Skew': [np.nan, np.nan, skew]},
+                          index=['Freq', 'Sev', 'Agg'])
         df.index.name = 'X'
         pcols = [_summary_pct_label(p) for p in SUMMARY_PERCENTILES]
         for pc in pcols:
@@ -2511,33 +2619,6 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         if self.agg_density is None:
             return None
         return return_period_frame(self.q, self.tvar, self.est_m, periods)
-
-    @property
-    def stats_df(self):
-        """Theoretical against grid moments, one block.
-
-        Index ``mean``, ``sd``, ``cv``, ``skew``; columns ``theoretical``,
-        ``grid``, ``rel error``. A theoretical moment that does not exist is
-        ``inf`` or ``nan`` and its error is ``nan``: the grid value is then a
-        window statistic.
-        """
-        mean, var, skew = self.family.moments
-        sd = np.sqrt(var) if np.isfinite(var) else var
-        with np.errstate(divide='ignore', invalid='ignore'):
-            cv = sd / mean if (np.isfinite(mean) and mean != 0) else np.nan
-        th = [mean, sd, cv, skew]
-        if self.agg_density is not None:
-            m, s, k = self._grid_moments()
-            with np.errstate(divide='ignore', invalid='ignore'):
-                gr = [m, s, s / m if m != 0 else np.nan, k]
-        else:
-            gr = [np.nan] * 4
-        err = [float(_noise_aware_rel_error(g, t))
-               if np.isfinite(t) and np.isfinite(g) else np.nan
-               for t, g in zip(th, gr)]
-        df = pd.DataFrame({'theoretical': th, 'grid': gr, 'rel error': err},
-                          index=pd.Index(['mean', 'sd', 'cv', 'skew'], name='measure'))
-        return df
 
     def _validation_rows(self):
         """The validation checks as ``(name, value, target, flagged, note)`` tuples."""
@@ -2592,7 +2673,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                      'body scale over bs; a coarse grid loses the body'))
         st = self.stats_df
         for measure in ('mean', 'cv', 'skew'):
-            t, g, e = st.loc[measure]
+            t, g, e = (float(st.loc[('agg', measure), c]) for c in ('mixed', 'empirical', 'error'))
             if np.isfinite(t):
                 rows.append((f'{measure} rel error', e, eps, abs(e) > eps,
                              f'grid {measure} against the theoretical'))
@@ -2601,22 +2682,70 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                              'not finite: window statistic'))
         return rows
 
-    @property
-    def validation_df(self):
-        """The validation checks, one row each.
+    def _checks_frame(self):
+        """The checks on the inversion and the moments, one row each: ``value``, ``target``, ``status``, ``note``.
 
-        Columns ``value``, ``target``, ``status`` (``ok`` or ``flag``) and
-        ``note``; rows total mass, most negative bucket, truncation error,
-        buckets per scale, and each moment's relative error, or the grid
-        value marked ``not finite: window statistic`` where the law has no
-        such moment.
+        Private: the frame the checks of :meth:`_validation_rows` make, which
+        ``info`` and :attr:`validation_explanation` write out in words.
         """
         rows = self._validation_rows()
-        df = pd.DataFrame(
+        return pd.DataFrame(
             {'value': [r[1] for r in rows], 'target': [r[2] for r in rows],
              'status': ['flag' if r[3] else 'ok' for r in rows],
              'note': [r[4] for r in rows]},
             index=pd.Index([r[0] for r in rows], name='check'))
+
+    def _checks_text(self):
+        """``8 ok`` or ``7 ok, 1 flag: outside mass, use hints{...}``: the inversion checks counted, each flag named."""
+        rows = [r for r in self._validation_rows() if not r[0].startswith(('mean', 'cv', 'skew'))]
+        n_ok = sum(1 for r in rows if not r[3])
+        flags = [r for r in rows if r[3]]
+        out = f'{n_ok} ok'
+        if flags:
+            named = [f'{r[0]}, {r[4]}' if r[4].startswith(('use hints', 'coverage needs'))
+                     else r[0] for r in flags]
+            out += f", {len(flags)} flag{'s' if len(flags) > 1 else ''}: {'; '.join(named)}"
+        return out
+
+    @property
+    def validation_df(self):
+        """Moment validation in ``Aggregate.validation_df``'s shape: rows ``Freq``, ``Sev``, ``Agg``.
+
+        Before :meth:`update` the columns are ``EX | CV | Sk``, the law's;
+        after it ``EX | Est EX | Err EX | CV | Est CV | Err CV | Sk | Est Sk``,
+        ``Err`` the noise-aware relative error of the grid's value against the
+        law's, ``nan`` where the law's is not finite (a window statistic). The
+        ``SD`` trio replaces ``CV`` for a signed law, one whose support reaches
+        below 0, as ``Aggregate._signed`` decides it. The ``Freq`` and ``Sev``
+        rows are ``nan``. Read off :attr:`stats_df`; the checks on the
+        inversion itself (coverage, edge error, truncation, resolution) are
+        rows of :attr:`info`.
+        """
+        st, emp = self.stats_df['mixed'], self.stats_df['empirical']
+        spread = 'SD' if self.family.support[0] < 0 else 'CV'
+        nan2 = [np.nan, np.nan]
+        th_spread = self.actual_sd if spread == 'SD' else st[('agg', 'cv')]
+        df = pd.DataFrame({'EX': [*nan2, st[('agg', 'mean')]],
+                           spread: [*nan2, th_spread],
+                           'Sk': [*nan2, st[('agg', 'skew')]]},
+                          index=['Freq', 'Sev', 'Agg'], dtype=float)
+        df.index.name = 'X'
+        if self.agg_density is not None:
+            est = {'EX': emp[('agg', 'mean')], 'CV': emp[('agg', 'cv')],
+                   'SD': self.est_sd, 'Sk': emp[('agg', 'skew')]}
+            for c in ('EX', spread, 'Sk'):
+                df[f'Est {c}'] = [*nan2, est[c]]
+            for c in ('EX', spread):
+                th, e = df[c], df[f'Est {c}']
+                ok = np.isfinite(th) & np.isfinite(e)
+                err = pd.Series(np.nan, index=df.index)
+                err[ok] = _noise_aware_rel_error(e[ok], th[ok])
+                df[f'Err {c}'] = err
+            df = df[['EX', 'Est EX', 'Err EX', spread, f'Est {spread}',
+                     f'Err {spread}', 'Sk', 'Est Sk']]
+        for c in df.columns:
+            if not c.startswith('Err '):
+                df[c] = _snap_noise(df[c])
         return df
 
     @property
@@ -2640,38 +2769,84 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         return ' '.join(parts)
 
     # ---- display ----------------------------------------------------------
+    def _spec_hash(self):
+        """Display-only 8-hex id of the constructor's spec, as ``Aggregate._spec_hash``."""
+        blob = json.dumps(self._spec, sort_keys=True, default=str)
+        return hashlib.md5(blob.encode('utf-8')).hexdigest()[:8].upper()
+
+    def _tail_info_rows(self):
+        """The three tail lines of :attr:`info`, ``(label, value)``."""
+        return [('frequency tail', INFO_NA), ('severity tail', INFO_NA),
+                ('aggregate tail', INFO_NA)]
+
     @property
     def info(self):
-        """Fixed-layout multi-line summary string."""
+        """Fixed-layout multi-line summary string, ``Aggregate.info``'s rows then the inversion's.
+
+        ``Aggregate``'s rows in its order, ``n/a`` where a law with no count,
+        severity, loss table, premium or cession has nothing to say; then the
+        characteristic function block (family, parameters, support, scale,
+        the mass on the grid and outside it, the tilt, the edge and
+        truncation errors, the transfer sigma, the most negative bucket, the
+        buckets per scale, and ``checks``, the inversion checks counted with
+        each flag named); then the tail lines, ``bounded`` and ``id``. Every
+        row is present before :meth:`update`, reading ``n/a`` where there is
+        no grid.
+        """
         fam = self.family
         updated = self.agg_density is not None
         lo, hi = fam.support
-        mean, var, _ = fam.moments
+        na = INFO_NA
+
+        def g3(x):
+            return f'{x:.3g}' if updated and np.isfinite(x) else na
+
+        bss = ((f'{self.bs:.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}')
+               if updated else na)
         rows = [
-            ('chfagg object name', self.name),
-            ('family', fam.name),
-            ('parameters', fam.to_decl() or INFO_NA),
-            ('support', f'{lo:,.6g} to {hi:,.6g}'),
-            ('E[X]', f'{mean:,.6g}' if np.isfinite(mean) else str(mean)),
-            ('scale', f'{fam.scale:,.6g}' if np.isfinite(fam.scale) else INFO_NA),
-            ('bs', (f'{self.bs:,.6g}' if self.bs >= 1 else f'1/{1 / self.bs:,.0f}')
-             if updated else INFO_NA),
-            ('log2', self.log2 if updated else INFO_NA),
-            ('x_min', f'{self.x_min:,.6g}' if updated else INFO_NA),
-            ('x_max', f'{self.x_max:,.6g}' if updated else INFO_NA),
-            ('total mass', f'{self.total_mass:.6g}' if updated else INFO_NA),
-            ('expected loss', f'{self.est_m:,.6g}' if updated else INFO_NA),
-            ('truncation error', f'{self.truncation_error:.3g}' if updated else INFO_NA),
-            ('tilt', f'({self.tilt[0]:.3g}, {self.tilt[1]:.3g})' if updated else INFO_NA),
-            ('theta', f'({self.tilt_theta[0]:.3g}, {self.tilt_theta[1]:.3g})'
-             if updated else INFO_NA),
-            ('outside mass', f'{self.outside_mass:.3g}' if updated else INFO_NA),
-            ('edge error', f'{self.edge_error:.3g}'
-             if updated and np.isfinite(self.edge_error) else INFO_NA),
-            ('transfer sigma', f'{self.transfer_sigma:.3g}'
-             if updated and self.transfer_sigma else INFO_NA),
+            ('aggregate object name', self.name),
+            ('value_type', 'loss'),
+            ('claim count', na),
+            ('frequency distribution', na),
+            ('severity distribution', na),
+            ('loss table', na),
+            ('approximate', 'exact'),
+            ('bs', bss),
+            ('log2', self.log2 if updated else na),
+            ('padding', na),
+            ('sev_calc', na),
+            ('dsev_bucket', na),
+            ('normalize', False if updated else na),
+            ('x_min', f'{self.x_min:,.6g}' if updated else na),
+            ('x_max', f'{self.x_max:,.6g}' if updated else na),
+            ('premium', na),
+            ('expected loss', f'{self.est_m:,.6g}' if updated else na),
+            ('loss ratio', na),
+            ('P(X=0)', f'{self.pmf(0.0):.6g}' if updated else na),
+            ('validation_eps', get_settings().validation.eps),
+            ('reinsurance', 'none'),
+            ('occurrence reinsurance', 'no reinsurance'),
+            ('aggregate reinsurance', 'no reinsurance'),
             ('validation', self.validation_description),
+            ('family', fam.name),
+            ('parameters', fam.to_decl() or na),
+            ('support', f'{lo:,.6g} to {hi:,.6g}'),
+            ('scale', f'{fam.scale:,.6g}' if np.isfinite(fam.scale) else na),
+            ('total mass', f'{self.total_mass:.6g}' if updated else na),
+            ('outside mass', f'{self.outside_mass:.3g}, below {self.outside_below:.3g}, '
+             f'above {self.outside_above:.3g}' if updated else na),
+            ('tilt', f'({self.tilt[0]:.3g}, {self.tilt[1]:.3g})' if updated else na),
+            ('theta', f'({self.tilt_theta[0]:.3g}, {self.tilt_theta[1]:.3g})'
+             if updated else na),
+            ('edge error', g3(self.edge_error)),
+            ('truncation error', g3(self.truncation_error)),
+            ('transfer sigma', g3(self.transfer_sigma) if self.transfer_sigma else na),
+            ('most negative bucket', g3(float(np.min(self.agg_density))) if updated else na),
+            ('buckets per scale', g3(fam.scale / self.bs) if updated else na),
+            ('checks', self._checks_text() if updated else na),
+            *self._tail_info_rows(),
             ('bounded', self.bounded),
+            ('id', self._spec_hash()),
         ]
         return '\n'.join(info_row(label, value) for label, value in rows)
 

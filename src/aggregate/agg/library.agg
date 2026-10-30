@@ -1579,7 +1579,7 @@ nttagg ExactDiceOfDice
 
 chfagg StableLaw
   2 * stable 1.5 1
-  note{A totally skewed stable law with index 1.5, the limit of a Pareto book, computed by inverting its characteristic function along a shifted contour so the heavy tail does not wrap. Read sf for survival probabilities far past where scipy returns zero, outside_above for the mass beyond the window, and validation_df for the tilt and the edge error. The hint tilt=False shows the untilted wrap.}
+  note{A totally skewed stable law with index 1.5, the limit of a Pareto book, computed by inverting its characteristic function along a shifted contour so the heavy tail does not wrap. Read sf for survival probabilities far past where scipy returns zero, outside_above for the mass beyond the window, and info for the tilt and the edge error. The hint tilt=False shows the untilted wrap.}
   tags{topic:numerics, role:intermediate};
 
 agg RawLognorm

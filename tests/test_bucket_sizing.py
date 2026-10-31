@@ -23,6 +23,7 @@ import warnings
 
 import numpy as np
 import pytest
+import scipy.stats as ss
 
 from aggregate import build
 from aggregate._bucket_window import _need_log2
@@ -185,6 +186,98 @@ def test_window_severity_overflow_falls_back():
     assert not bool(approx._bs_window_df.loc['windowed', 'selected'])
     assert approx.x_min == 0.0
     assert approx.est_m == pytest.approx(approx.actual_m, rel=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# [Window-Holds-Severity]: a grid at a lattice bucket spans the claim as well as
+# the band. See dev/done/plan-lattice-grid-sizing.md.
+# ---------------------------------------------------------------------------
+
+def _nonzero(ob):
+    p = ob.density_df.p_total
+    return p[p > 1e-12]
+
+
+def test_window_grows_log2_to_hold_a_claim():
+    """The band is 59 wide, log2 6 at bs 1, and a claim of 1001 needs log2 10.
+
+    At 1.45.0 the guard rejected the row instead, and the sizer fell to bs 2 from
+    0, which split the atom at 1001 and tripled the variance.
+    """
+    a = build('agg WH.T 100 claims dsev [1000 1001] fixed')
+    row = a.bs_window_df.loc['windowed']
+    assert bool(row['selected']) and bool(row['applies'])
+    assert (a.bs, a.log2, row['log2']) == (1, 10, 10)
+    assert float(a.density_df.index[0]) == 99640       # the balance step, f = 0.4
+    xs = np.arange(100000, 100101)
+    law = ss.binom(100, 0.5).pmf(xs - 100000)
+    p = a.density_df.p_total
+    assert np.allclose(p.reindex(xs).fillna(0).to_numpy(), law, rtol=0, atol=1e-13)
+    assert p.sum() == pytest.approx(1.0, abs=1e-12)
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_window_may_grow_past_the_cap_by_the_window_growth_only():
+    """Step 1 at log2 13 grows to 14. With no lattice the row cannot hold the claim."""
+    a = build('agg WH.U 100 claims dsev [10002 10007] fixed', log2=13)
+    assert (a.bs, a.log2) == (1, 14)
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_window_needing_more_than_the_growth_is_not_on_the_lattice():
+    a = build('agg WH.Over 100 claims dsev [10002 10007] fixed', log2=9)
+    assert a.bs > 1
+    assert 'fails' in a.validation_description
+
+
+def test_no_window_under_an_aggregate_cover():
+    """It cedes 2 always; from a window starting at 12 it returned 12 with no flag."""
+    a = build('agg WH.Cover 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4')
+    assert 'windowed' not in a.bs_window_df.index
+    assert a.x_min == 0.0
+    law = _nonzero(a)
+    assert list(law.index) == [2]
+    assert law.iloc[0] == pytest.approx(1.0, abs=1e-12)
+
+
+def test_a_row_from_zero_holds_the_claim_too():
+    a = build('agg WH.Rare 0.01 claims dsev [1000] poisson')
+    assert a.bs * (1 << a.log2) > 1000
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_a_signed_claim_is_held_from_its_lower_endpoint():
+    a = build('agg WH.Signed 1 claim dsev [-5 -4] fixed')
+    assert a.bs * (1 << a.log2) > 5
+    law = _nonzero(a)
+    assert list(law.index) == [-5, -4]
+    assert np.allclose(law, 0.5)
+
+
+def test_no_lattice_keeps_the_guard():
+    """A continuous severity has no bucket the window must keep (author ruling 2026-10-31)."""
+    a = build('agg WH.Thin 1 claim sev lognorm 10 cv .09 fixed')
+    row = a.bs_window_df.loc['windowed']
+    assert not bool(row['applies']) and not bool(row['selected'])
+    assert 'sev_hull=' in row['note']
+    assert a.x_min == 0.0
+
+
+@pytest.mark.parametrize('program, hull', [
+    ('agg WH.H1 1 claim dsev [1000 2000] fixed', (1000, 2000)),
+    ('agg WH.H2 1 claim 1500 xs 250 dsev [1000 2000 3000] fixed', (750, 1500)),
+    ('agg WH.H3 1 claim dsev [-5 -4] fixed', (-5, -4)),
+    ('agg WH.H4 1 claim dsev [1000 2000] occurrence net of 500 xs 250 fixed', (1000, 2000)),
+])
+def test_severity_hull_of_atoms_is_the_gross_after_any_layer(program, hull):
+    assert build(program)._severity_hull(1 - 1e-12) == hull
+
+
+def test_severity_hull_of_a_continuous_severity_is_the_estimate():
+    a = build('agg WH.H5 10 claims sev gamma 10 cv 1 poisson')
+    lo, hi = a._severity_hull(1 - 1e-12)
+    assert lo == 0.0
+    assert hi == a._severity_high_estimate(1 - 1e-12)
 
 
 def test_window_occ_reins_not_windowed():

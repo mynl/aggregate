@@ -420,3 +420,44 @@ Gate: the first tier 3 run failed one test, `test_mv_explain_flags_clipped_book`
 `Unable to allocate 4.00 GiB`, a test whose own grid is 64x64. That is the memory pressure the
 comment at the head of `test_bivariate.py` describes. It passed alone, and the full rerun was green
 (7710 passed, 1 skipped).
+
+### `[Window-Holds-Severity]`, 1.46.0
+
+Sweep, every Aggregate set at the plan's figure, no silent wrong answer anywhere; the Portfolio sets
+have not moved, as the step expects:
+
+| Set | exact | WRONG flagged | infeasible flagged | no lattice |
+|:--|--:|--:|--:|--:|
+| A fixed plain | 224 | 0 | 0 | 0 |
+| B dfreq plain | 185 | 0 | 7 | 0 |
+| C poisson plain | 104 | 0 | 8 | 0 |
+| D occurrence reins | 76 | 3 | 1 | 0 |
+| E aggregate reins | 56 | 2 | 0 | 2 |
+| F layered dsev | 50 | 0 | 0 | 0 |
+| G port one unit | 67 | 12 | 1 | 0 |
+| H port two units | 37 | 13 | 10 | 0 |
+| all | 799 | 30 | 27 | 2 |
+
+`T` builds at `bs` 1, `log2` 10 from 99,640, total variation 6e-15 against the binomial; its
+`windowed` row has `log2` 10. `3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4` returns 2 with
+probability 1.
+
+Census: of 688 programs one grid moved, `DISC.RoundedProbs`, from `bs` 2, `log2` 16 to `bs` 1, `log2`
+10. No grid grew. The continuous books the guard rejects keep their grids, as ruling 8 intends.
+
+Divergences:
+
+- **`_size` reads `hold` from the enclosing `bs_window`, where the step passes an argument through
+  `_row`.** The `sbj`, snap and ELT callers of `_size` hold it with no change of their own, and no
+  call site can forget it.
+- **The guard stays and reads the hull,** per ruling 8. `applies` is `sev_reach < extent` for every
+  row, which a lattice row satisfies by construction, since `_need_log2(R, b)` gives `N * b >= R +
+  b`. The note holds `sev_hull=...` as the step specifies.
+- **`max(span, hold)` in the coarsening branch,** which the step leaves implicit. With only `span`
+  a lattice too fine for the cap would coarsen to a bucket that still cannot hold the claim.
+
+Finding for `[Validation-Verdict]`, not fixed here: `DISC.RoundedProbs` now has the exact law and
+reads `fails agg skew`, empirical skew -0.040 against -0.021. Its sd agrees to 1e-6. The third raw
+moment at a mean of 100,000 is about 1e15, so rounding of about 60 ulps moves the third central
+moment, which is -14, by that much. `T` escapes only because its theoretical skew is 0, and the test
+is skipped then.

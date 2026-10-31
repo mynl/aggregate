@@ -1002,6 +1002,15 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     lattice_fit = None if _atoms is None else _dyadic_lattice_step(_atoms)
     lattice, lattice_residual = (lattice_fit if lattice_fit is not None
                                  else (None, np.nan))
+    # What a single claim needs of the grid, once. The severity is discretized
+    # on ``2**log2`` points whatever the output origin, so a grid at a lattice
+    # bucket has to span the severity as well as the aggregate band. ``hold`` is
+    # 0 with no lattice: there the row keeps the severity-fit guard below, whose
+    # fallback is the 0-based grid, since a continuous severity has no bucket
+    # the window must keep.
+    hull_lo, hull_hi = agg._severity_hull(p)
+    sev_reach = max(hull_hi, 0.0) - min(hull_lo, 0.0)
+    hold = sev_reach if lattice is not None and np.isfinite(sev_reach) else 0.0
 
     def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None,
               nice=True):
@@ -1055,6 +1064,12 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         atoms). Only the exact step may grow: the nice divisor is held to the
         cap, so ``log2`` never grows just to make ``bs`` nicer. Only coarsen
         if even ``grow_cap`` is too small.
+
+        Every ``need`` holds two things, the window and, with a lattice, the
+        width ``hold`` of the severity's hull with 0, the author's rule of
+        2026-10-31. A concentrated book makes the second the larger: ``100
+        claims dsev [1000 1001] fixed`` has a band 59 wide that fits ``log2`` 6
+        at ``bs`` 1, and a claim of 1001 that needs ``log2`` 10.
         """
         use_origin = signed or force_origin
         W = max(x_hi - x_lo, 0.0)
@@ -1065,12 +1080,12 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
         if bs_in <= 0 and lattice_bs is not None and nice:
             for b in _lattice_candidates(lattice_bs):
                 x0 = _origin(b)
-                need = _need_log2(x_hi - x0, b)
+                need = max(_need_log2(x_hi - x0, b), _need_log2(hold, b))
                 if need <= log2:
                     return x0, float(b), int(min(log2, max(need, 1)))
             h = float(lattice_bs)
             x0 = _origin(h)
-            need = _need_log2(x_hi - x0, h)
+            need = max(_need_log2(x_hi - x0, h), _need_log2(hold, h))
             if grow_cap is not None and need <= grow_cap:
                 return x0, h, int(need)
             # no candidate fits: no lattice, the resolution estimate below
@@ -1093,7 +1108,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             # ``dev/done/plan-signed-bounded-window-overflow.md``.
             l2 = log2
         else:
-            need = _need_log2(span, bs)
+            need = max(_need_log2(span, bs), _need_log2(hold, bs))
             if need <= log2:
                 # at least 1 (>= 2 buckets) so a degenerate / point-mass window
                 # never collapses to a single bucket.
@@ -1110,7 +1125,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                 # coarsening divides by ``N0 - 1``. Dividing by ``N0`` is
                 # what let the realized extent land exactly on the support
                 # top, deleting the last half bucket of mass.
-                bs = round_bucket(span / max(N0 - 1, 1))
+                bs = round_bucket(max(span, hold) / max(N0 - 1, 1))
                 x0 = float(np.floor(x_lo / bs) * bs) if use_origin else 0.0
                 l2 = log2
             else:
@@ -1232,8 +1247,10 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     #   - no *occurrence* reinsurance: the occ-reins severity rebucketing and
     #     ``reins_density_df`` carry the severity on the *output* grid
     #     (``xs == xs_sev``), which windowing breaks (the output window sits
-    #     far above the severity grid). Aggregate reinsurance is fine -- it
-    #     operates on the aggregate, on the windowed ``xs``/``x_min``.
+    #     far above the severity grid);
+    #   - no *aggregate* reinsurance: the ceded amount can sit below the
+    #     window, so it wraps. ``3 claims dsev [8 10] fixed aggregate ceded to
+    #     2 xs 4`` cedes 2 always, and from a window starting at 12 returned 12.
     #   - the book is **concentrated** -- the tail report's conservative
     #     ``concentrated`` flag (``actual_cv < CONCENTRATION_CV``, i.e. ~0.1),
     #     the single source of truth (item 5). This replaces the looser
@@ -1256,6 +1273,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     conc_flag, _conc_cv = _tail.concentration(m, sd)
     if (x_min_in is None and not signed
             and agg.occ_reins is None
+            and not agg.agg_reins
             and np.isfinite(sd) and sd > 0
             and bool(conc_flag)):
         try:
@@ -1288,15 +1306,17 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                      f' / hi 1-1e-{WINDOW_NINES if is_loss else WINDOW_NINES_TRIM}',
                      'two-sided window, benign FFT wrap',
                      force_origin=True, grow_cap=log2 + WINDOW_LOG2_GROWTH)
-            # Severity-fit guard: the severity discretizes on [0, N*bs]; a
-            # single occurrence must fit the windowed extent or its mass
-            # overflows (the fixed-1 / approximate trap). Record the row
-            # either way (inspectable) but mark it inapplicable -> not
-            # selected -> quiet fall back to the 0-based grid.
+            # Severity-fit guard: the severity discretizes on the row's N
+            # points; a single occurrence must fit the windowed extent or its
+            # mass overflows (the fixed-1 / approximate trap). A row with a
+            # lattice was sized by ``_size`` to hold the hull, so this rejects
+            # nothing there. With no lattice it is what keeps a heavy severity
+            # off the window. Record the row either way (inspectable) but mark
+            # it inapplicable -> not selected -> quiet fall back to the 0-based
+            # grid.
             extent = float((1 << int(r['log2'])) * r['bs'])
-            sev_hi = agg._severity_high_estimate(p)
-            r['applies'] = bool(np.isfinite(sev_hi) and sev_hi < extent)
-            r['note'] += f'; sev_hi={sev_hi:.6g}, extent={extent:.6g}'
+            r['applies'] = bool(np.isfinite(sev_reach) and sev_reach < extent)
+            r['note'] += f'; sev_hull={sev_reach:.6g}, extent={extent:.6g}'
             if floored_up:
                 r['note'] += '; upper floored by sbj'
             rows['windowed'] = r
@@ -1308,9 +1328,9 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                 # invariant). Discoverability only -- expected, not defective.
                 logger.info(
                     '%s: mass band clears 0 (w_lo=%.6g) but severity '
-                    'overflows the window (sev_hi=%.6g >= extent=%.6g); '
+                    'overflows the window (sev_hull=%.6g >= extent=%.6g); '
                     'keeping the 0-based grid (heavy-severity, non-windowable).',
-                    agg.name, w_lo, sev_hi, extent)
+                    agg.name, w_lo, sev_reach, extent)
 
     # ---- selection (D1/D2) ------------------------------------------
     # bounded_small is selected a bit permissively -- it is a hard support

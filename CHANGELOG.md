@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.46.0 - 2026-10-31
+
+**[Window-Holds-Severity] A grid at a lattice bucket spans a claim as well as the aggregate band, and a book under an aggregate cover is not windowed.** `100 claims dsev [1000 1001] fixed` moves from `bs` 2, `log2` 16 from 0, which split the atom at 1001 and read `fails sev cv, agg cv`, to `bs` 1, `log2` 10 from 99,640 with the exact law. `3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4` moves from returning 12 to returning 2. On the study's Aggregates there are no silent wrong answers left. A severity with no lattice sizes as before, and the `windowed` row's note now holds `sev_hull=`, the new `Aggregate._severity_hull`, in place of `sev_hi=`.
+
 ## 1.45.0 - 2026-10-31
 
 **[Lattice-Views] A discrete severity's lattice step is taken over every view it has: gross after any layer, ceded and net of each occurrence layer, and an aggregate cover's points.** The new `Aggregate._severity_views()` feeds `_severity_atoms`, so `_severity_lattice`, `_pooled_lattice` and `sharpen` follow. Reinsured and layered discrete programs that returned the right mean and the wrong law now return the right law: `1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` moves from `bs` 1000 with outcomes 0, 1000, 2000 to `bs` 50 with 250, 500, 1500. On the study's 858 programs, silent wrong answers fall from 68 to 5. Grids and numbers move on 13 of the 688 shipped corpus programs, all reinsured, layered or signed; a share off the dyadic lattice, such as `30% po` of integers, now has no lattice and takes the continuous estimator.

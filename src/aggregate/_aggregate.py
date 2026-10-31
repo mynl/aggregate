@@ -7104,16 +7104,50 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         fit = None if atoms is None else _dyadic_lattice_step(atoms)
         return None if fit is None else fit[0]
 
+    def _severity_hull(self, p):
+        """The lower and upper reach of one claim: what the severity grid must span.
+
+        Parameters
+        ----------
+        p : float
+            Coverage for the estimates a severity with no atoms needs (e.g.
+            ``1 - 1e-12``).
+
+        Returns
+        -------
+        (float, float)
+            ``(lo, hi)``. With every component discrete, the smallest and
+            largest gross atom after any layer. Otherwise
+            :meth:`_severity_high_estimate` and, for a signed severity,
+            :meth:`_severity_low_estimate` at the matching lower tail.
+
+        Notes
+        -----
+        The severity is discretized on ``xs_sev = (arange(N) - i0) * bs`` with
+        physical 0 at index ``i0`` (:meth:`_severity_negative_buckets`), whatever
+        the output origin. So ``N * bs`` must span ``max(hi, 0) - min(lo, 0)``,
+        the width of the hull of the support and 0. It is the gross hull even
+        under reinsurance, since the ceded and net are computed from the gross
+        severity on the same grid.
+        """
+        gross = self._gross_severity_atoms()
+        if gross is not None:
+            return float(gross.min()), float(gross.max())
+        return (float(self._severity_low_estimate(1.0 - p)),
+                float(self._severity_high_estimate(p)))
+
     def _severity_high_estimate(self, p):
         """Upper extent (~``p`` quantile) of the per-occurrence severity mixture.
 
-        Used by ``_bs_window``'s ``windowed`` guard. The windowed method only
-        relabels the finished *aggregate*; the severity is still discretised on
-        ``xs_sev = [0, N*bs]`` (physical 0 at index 0). So windowing is valid
-        only when a single severity fits in the windowed grid extent -- true for
-        a genuine compound (many small claims summing far above 0), false for a
-        ``fixed``-1 / ``approximate`` object whose one severity already sits at
-        the aggregate mean.
+        Used by ``_bs_window``'s ``windowed`` guard, through
+        :meth:`_severity_hull`. The windowed method only relabels the finished
+        *aggregate*; the severity is still discretized on ``xs_sev = (arange(N) -
+        i0) * bs``, physical 0 at index ``i0`` (0 for the nonnegative severities
+        the windowed row admits). So windowing is valid only when a single
+        severity fits in the grid extent ``N * bs``: true for a genuine compound
+        (many small claims summing far above 0), false for a ``fixed``-1 /
+        ``approximate`` object whose one severity already sits at the aggregate
+        mean.
 
         Parameters
         ----------

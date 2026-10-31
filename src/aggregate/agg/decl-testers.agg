@@ -1550,7 +1550,18 @@ agg LV.Cover 3 claims dsev [8 10] fixed aggregate net of 3 xs 1000000           
 agg LV.Share 3 claims dsev [7 11 13] occurrence net of 30% po 5 xs 3 fixed        note{no dyadic lattice, so the continuous estimator};
 agg LV.Fix dfreq [4] dsev [1:20] occurrence net of 6 xs 6                         note{the exact row holds the gross up to 80};
 agg LV.Tight dfreq [10] dsev [1999 2000] occurrence net of 1990 xs 5              note{at log2 12 the gross cannot fit, the net can};
-port LV.Port agg LV.U1 1 claim dsev [1000 2000] occurrence net of 1000 xs 250 fixed agg LV.U2 1 claim dsev [1000 2000] fixed   note{pooled views, step 250}
+port LV.Port agg LV.U1 1 claim dsev [1000 2000] occurrence net of 1000 xs 250 fixed agg LV.U2 1 claim dsev [1000 2000] fixed   note{pooled views, step 250};
+
+# WH. A grid at a lattice bucket holds the claim ([Window-Holds-Severity], 1.46.0)
+# ================================================================================
+# The need is the larger of the aggregate band and the width of the severity's
+# hull with 0. No window under an aggregate cover. See tests/test_bucket_sizing.py.
+agg WH.T 100 claims dsev [1000 1001] fixed                                        note{bs 1, log2 10, from 99640, exact};
+agg WH.U 100 claims dsev [10002 10007] fixed                                      note{at log2 13 grows to 14, the window growth};
+agg WH.Cover 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4                 note{cedes 2 always, from 0};
+agg WH.Rare 0.01 claims dsev [1000] poisson                                       note{a row from 0 holds the claim};
+agg WH.Signed 1 claim dsev [-5 -4] fixed                                          note{held from its lower endpoint};
+agg WH.Thin 1 claim sev lognorm 10 cv .09 fixed                                   note{no lattice: the guard rejects the window}
 
 
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)

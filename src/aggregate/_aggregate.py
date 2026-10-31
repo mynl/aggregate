@@ -59,6 +59,7 @@ from ._bucket_window import (
     WINDOW_NINES, WINDOW_LOG2_GROWTH, WINDOW_NINES_TRIM, WINDOW_PAD_SKEW,
     WINDOW_SLACK_THICK, BUCKET_SIZING_P, SBJ_TAIL_FLOOR,
     _estimate_agg_percentile, estimate_agg_window, bs_describe, bs_explain,
+    _need_log2,
 )
 from . import _bucket_window
 from ._validation import (VALIDATION_NOISE, DEFICIT_MATERIALITY,
@@ -7002,30 +7003,88 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _reinsurance.reins_after_label(self)
 
-    def _severity_atoms(self):
-        """Every atom of every severity component, pooled, or ``None``.
+    def _gross_severity_atoms(self):
+        """Per claim gross atoms of every component after its layer, or ``None``.
 
         Returns
         -------
         ndarray or None
-            The concatenated ``support_atoms`` of the components, or ``None``
-            when there is no component or any component is not discrete.
+            The pooled :meth:`Severity._layered_atoms`, or ``None`` when there
+            is no component or any component is not discrete.
         """
-        atoms = []
-        for s in (self.sevs if self.sevs is not None else []):
-            a = getattr(s, 'support_atoms', None)
-            if a is None:
-                return None
-            atoms.append(np.asarray(a, dtype=float))
-        if not atoms:
+        atoms = [s._layered_atoms()
+                 for s in (self.sevs if self.sevs is not None else [])]
+        if not atoms or any(a is None for a in atoms):
             return None
         return np.concatenate(atoms)
+
+    def _severity_views(self):
+        """The atoms of every view the grid must keep on its lattice, or ``None``.
+
+        Returns
+        -------
+        ndarray or None
+            Pooled: the gross atoms after any layer; the ceded and the net of
+            each occurrence layer ``(share, y, a)`` in ``occ_reins``; and for
+            each aggregate cover ``(share, y, a)`` in ``agg_reins`` the points
+            ``share * gross``, ``share * a`` and ``share * y``. ``None`` when
+            there is no component or any component is not discrete.
+
+        Notes
+        -----
+        A bucket on the lattice of the unlayered gross atoms is not enough. The
+        grid carries the net and the ceded as well, and each of those is a
+        different function of the atoms: net of ``1500 xs 250`` on ``[1000 2000
+        3000]`` is 250, 500 or 1500, which a bucket of 1000 returns as 0, 1000 or
+        2000 with the right mean and the wrong law. The step of this pool is the
+        dyadic gcd of every view, so each of them lands on grid points.
+
+        The ceded of an aggregate cover is ``share`` times a point of the
+        aggregate lattice, ``share * a`` or ``share * (a + y)``, less
+        ``share * a``, so ``share * gross``, ``share * a`` and ``share * y``
+        generate its lattice. The latter two are reduced modulo the largest
+        gross atom, which leaves the generated lattice unchanged when ``share *
+        gross`` is on it and stops a cover far above the law from widening the
+        search, whose depth is relative to the largest point in the pool.
+        """
+        gross = self._gross_severity_atoms()
+        if gross is None:
+            return None
+        pool = [gross]
+        if self.occ_reins:
+            ceded = np.zeros_like(gross)
+            for share, y, a in self.occ_reins:
+                layer = share * np.minimum(np.maximum(gross - a, 0.0), y)
+                ceded = ceded + layer
+                pool.append(layer)
+            pool.append(gross - ceded)
+        top = float(np.max(np.abs(gross)))
+        if self.agg_reins and top > 0:
+            for share, y, a in self.agg_reins:
+                pool.append(share * gross)
+                for point in (share * a, share * y if np.isfinite(y) else 0.0):
+                    residue = float(np.remainder(point, top))
+                    if residue > 0:
+                        pool.append(np.array([residue]))
+        return np.concatenate(pool)
+
+    def _severity_atoms(self):
+        """The atoms the lattice is taken over: :meth:`_severity_views`.
+
+        Returns
+        -------
+        ndarray or None
+            The pooled atoms of every view, or ``None`` when there is no
+            component or any component is not discrete.
+        """
+        return self._severity_views()
 
     def _severity_lattice(self):
         """Dyadic lattice step of the severity, or ``None`` if not on a lattice.
 
         The step ``h`` of :func:`~aggregate.utilities._dyadic_lattice_step` over
-        the pooled atoms. An aggregate of lattice-valued severities is itself on
+        the pooled atoms of every view (:meth:`_severity_views`). An aggregate
+        of lattice-valued severities is itself on
         that lattice **regardless of the frequency** (Poisson x ``dsev [1:10]``
         is integer-valued, Poisson x ``dsev [0.25 1.75]`` lives on quarters), so
         the window estimator can pick a coarse, exact ``bs`` from
@@ -7287,15 +7346,19 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         n_comp = max(len(sevs), 1)
         return float(min(en * sf / n_comp, 1.0))
 
-    def _exact_discrete_window(self):
+    def _exact_discrete_window(self, log2=None):
         """Exact aggregate support for a fully-discrete ``dfreq``/``fixed`` x ``dsev``.
+
+        ``log2`` is the bucket-count cap, which decides whether the gross
+        support fits and so which view the window is of; see Notes. ``None``
+        takes the support of the view ``density_df.p_total`` holds.
 
         Returns ``(A_min, A_max, bs_lattice, logp_lo, logp_hi)`` when the
         frequency is discrete-finite (``dfreq`` -> ``empirical``, or ``fixed``)
-        **and** the severity atoms, pooled across components, sit on a dyadic
-        lattice (:func:`~aggregate.utilities._dyadic_lattice_step`); otherwise
-        ``None``. The aggregate then takes values exactly on the lattice and
-        its support is finite and exactly computable.
+        **and** the atoms of every view (:meth:`_severity_views`) sit on a
+        dyadic lattice (:func:`~aggregate.utilities._dyadic_lattice_step`);
+        otherwise ``None``. The aggregate then takes values exactly on the
+        lattice and its support is finite and exactly computable.
 
         Notes
         -----
@@ -7308,6 +7371,17 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         - ``A_min = min(N_max·s_min, N_min·s_min)`` symmetrically; include ``0``
           if ``0`` is a count atom.
 
+        **Which view.** Under occurrence reinsurance the object holds the gross
+        aggregate as well as the net or ceded one it outputs: the subject
+        validation and ``reins_density_df`` read it. So the atoms are the gross
+        after any layer whenever that support fits ``log2`` at the step. When it
+        does not, the atoms are those of the view ``density_df.p_total`` sums,
+        which keeps the output exact on a grid the gross overruns, and the
+        verdict then reports the subject's wrap. Either way ``A_max`` is floored
+        at the width of the hull of the gross atoms and 0: the severity is
+        discretized gross on the same ``2**log2`` points and reinsured afterward,
+        so the grid must span a gross claim whatever the view.
+
         ``bs_lattice`` is the lattice step ``h`` (3 for atoms ``[3 6 9]``, 0.25
         for ``[0.25 0.5 1.75]``). The sizer picks the bucket from it by
         :func:`~aggregate.utilities._lattice_candidates`, so a fixed and a
@@ -7317,8 +7391,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         **Corner reachability (``logp_lo`` / ``logp_hi``).** The exact support is
         only a trustworthy grid extent if the aggregate can *attain* its
-        extremes. A non-zero corner ``B = N_ach·s_ext`` is reached only when the
-        realized count is exactly ``N_ach`` **and** every one of those claims
+        extremes. The reading is taken on the unlayered gross atoms, whatever
+        view the support is of. A non-zero corner ``B = N_ach·s_ext`` is reached
+        only when the realized count is exactly ``N_ach`` **and** every one of those claims
         lands on the extreme atom ``s_ext``, so
 
         .. math::
@@ -7366,17 +7441,34 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         def _allint(x):
             return bool(np.allclose(x, np.round(x), atol=1e-9))
 
-        fit = _dyadic_lattice_step(s_all)
+        fit = _dyadic_lattice_step(self._severity_views())
         if not (_allint(n_atoms) and fit is not None):
             return None
         h = fit[0]
-        s_min, s_max = float(s_all.min()), float(s_all.max())
         n_min, n_max = float(n_atoms.min()), float(n_atoms.max())
-        hi = max(n_max * s_max, n_min * s_max)
-        lo = min(n_max * s_min, n_min * s_min)
-        if has_zero:
-            hi = max(hi, 0.0)
-            lo = min(lo, 0.0)
+
+        def _support(s_lo, s_hi):
+            """Exact aggregate support of per claim atoms in ``[s_lo, s_hi]``."""
+            a_hi = max(n_max * s_hi, n_min * s_hi)
+            a_lo = min(n_max * s_lo, n_min * s_lo)
+            if has_zero:
+                a_hi = max(a_hi, 0.0)
+                a_lo = min(a_lo, 0.0)
+            return a_lo, a_hi
+
+        gross = self._gross_severity_atoms()
+        view_lo, view_hi = _support(float(gross.min()), float(gross.max()))
+        if self.occ_reins and (log2 is None
+                               or _need_log2(view_hi - min(view_lo, 0.0), h) > log2):
+            ceded = sum(share * np.minimum(np.maximum(gross - a, 0.0), y)
+                        for share, y, a in self.occ_reins)
+            summed = ceded if self.occ_kind == 'ceded to' else gross - ceded
+            view_lo, view_hi = _support(float(summed.min()), float(summed.max()))
+        view_hi = max(view_hi, max(float(gross.max()), 0.0)
+                      - min(float(gross.min()), 0.0))
+
+        s_min, s_max = float(s_all.min()), float(s_all.max())
+        lo, hi = _support(s_min, s_max)
 
         # ---- corner reachability (log10 probabilities) ------------------
         def _freq_logp(n):
@@ -7409,7 +7501,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         n_lo = n_max if s_min <= 0 else n_min   # count realizing A_min
         logp_hi = _corner_logp(hi, s_max, n_hi)
         logp_lo = _corner_logp(lo, s_min, n_lo)
-        return float(lo), float(hi), float(h), float(logp_lo), float(logp_hi)
+        return (float(view_lo), float(view_hi), float(h), float(logp_lo),
+                float(logp_hi))
 
     def _bounded_severity_window(self, p):
         """Window for a bounded severity with a (possibly small) claim count.

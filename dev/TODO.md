@@ -64,10 +64,8 @@
   fixed-count units, and large reinsured books that need a windowed grid
   (`[Windowed-Reinsured-Book]`, `dev/done/plan-lattice-grid-sizing.md`). The verdict
   flags all of them as failing.
-- **[Layered-Dsev-Lattice]**: the lattice pool uses the unlayered
-  `support_atoms`, so a layered `dsev` with an attachment off the lattice sizes
-  on the wrong step (`Frees2018a.Revised` sat at `bs` 6 with values 2, 8, 20).
-  Pool attachments and limits into the atoms.
+- **[Layered-Dsev-Lattice]**: done at 1.45.0 as `[Lattice-Views]`,
+  `dev/done/plan-lattice-grid-sizing.md`.
 
 - **[Padding-Discard-Measurement]**: have `utilities.ift` report the
   probability its slice to the grid discards, and pass that to

@@ -1179,7 +1179,7 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                           '3-moment MoM window')
 
     # ---- exact_discrete ---------------------------------------------
-    ed = agg._exact_discrete_window()
+    ed = agg._exact_discrete_window(log2)
     if ed is not None:
         a_lo, a_hi, bs_lat, logp_lo, logp_hi = ed
         r = _row(a_lo, a_hi, bs_lat, 'exact', 'dfreq/fixed x dsev on a lattice')

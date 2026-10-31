@@ -2383,6 +2383,39 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
                  self._reflect_shift, self.sev_lb, self.sev_ub),
             stacklevel=3)
 
+    def _layered_atoms(self):
+        """The atoms of a discrete severity after its layer, or ``None`` if not discrete.
+
+        Returns
+        -------
+        ndarray or None
+            ``support_atoms``, stored before the layer, mapped through the
+            payment ``min(x - a, y)`` (or the retention payment of a franchise
+            or disappearing deductible). ``None`` when the severity has no
+            atoms.
+
+        Notes
+        -----
+        A conditional layer drops the atoms at or below the attachment and an
+        unconditional one (``!``) sends them to 0. A signed severity has identity
+        layering (:meth:`_drop_layer_clause`), so it falls through unchanged,
+        negative atoms included.
+        """
+        atoms = getattr(self, 'support_atoms', None)
+        if atoms is None:
+            return None
+        x = np.asarray(atoms, dtype=float)
+        att, lim = float(self.attachment), float(self.limit)
+        end = float(self.retention_end)
+        if att == 0 and not lim < x.max() and not np.isfinite(end):
+            return x
+        above = x > att
+        paid = (_retention_payment(x[above], att, end, lim) if np.isfinite(end)
+                else np.minimum(x[above] - att, lim))
+        if len(paid) == 0 or (not self.conditional and not above.all()):
+            paid = np.append(paid, 0.0)
+        return paid
+
     def _drop_layer_clause(self):
         """Drop a layer clause a signed severity cannot use, and say so.
 

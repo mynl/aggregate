@@ -180,6 +180,107 @@ def test_a_lattice_too_fine_for_the_cap_is_no_lattice():
     assert 'too fine for the log2 cap' in row['note']
 
 
+# --------------------------------------------- [Lattice-Views]: every view on the grid
+
+def _law(ob):
+    """The nonzero outcomes of ``p_total``."""
+    p = ob.density_df.p_total
+    return p[p > 1e-12]
+
+
+def test_net_of_an_occurrence_layer_is_on_the_grid():
+    """Net is 250, 500 or 1500. On the gross step of 1000 it was 0, 1000 or 2000."""
+    a = build('agg LV.Net 1 claims dsev [1000 2000 3000] '
+              'occurrence net of 1500 xs 250 fixed')
+    # the step of the views is 250; the nice divisor of 250 is 50
+    assert a._severity_lattice() == 250
+    assert a.bs == 50
+    law = _law(a)
+    assert list(law.index) == [250, 500, 1500]
+    assert np.allclose(law, 1 / 3)
+
+
+def test_ceded_to_an_occurrence_layer_is_on_the_grid():
+    a = build('agg LV.Ceded 1 claims dsev [1000 2000 3000] '
+              'occurrence ceded to 1500 xs 250 fixed')
+    law = _law(a)
+    assert list(law.index) == [750, 1500]
+    assert np.allclose(law, [1 / 3, 2 / 3])
+
+
+def test_a_layered_dsev_is_on_the_step_of_its_payments():
+    """``Frees2018a.Revised`` sat at bs 6 with payments 2, 8 and 20 ([Layered-Dsev-Lattice])."""
+    a = build('agg LV.Layer 1 claim 1500 xs 250 dsev [1000 2000 3000] fixed')
+    assert a._severity_lattice() == 750
+    law = _law(a)
+    assert list(law.index) == [750, 1500]
+    assert np.allclose(law, [1 / 3, 2 / 3])
+
+
+@pytest.mark.parametrize('layer, kept', [
+    ('', [1, 4, 8]),
+    ('5 xs 3', [1, 5]),
+    ('2 xs 3', [1, 2]),
+])
+def test_conditional_layer_atoms(layer, kept):
+    a = build(f'agg LV.Atoms 1 claim {layer} dsev [1 4 8] fixed')
+    assert sorted(a.sevs[0]._layered_atoms()) == kept
+
+
+def test_unconditional_layer_keeps_the_zero_atom():
+    a = build('agg LV.Bang 1 claim 5 xs 3 dsev [1 4 8] ! fixed')
+    assert sorted(a.sevs[0]._layered_atoms()) == [0, 1, 5]
+
+
+def test_a_franchise_layer_pays_the_loss():
+    a = build('agg LV.Franchise 1 claim 100 xs 3 franchise dsev [1 4 8] fixed')
+    assert sorted(a.sevs[0]._layered_atoms()) == [4, 8]
+
+
+def test_the_views_pool_each_layer_and_the_net():
+    a = build('agg LV.Pool 1 claim dsev [1000 2000] occurrence net of 50% po 500 xs 250 fixed')
+    pool = set(a._severity_views())
+    # gross, the 50% layer, and the net of it
+    assert {1000, 2000, 250, 750, 1750} <= pool
+
+
+def test_a_cover_attachment_widens_the_lattice_not_the_search():
+    """The attachment and limit enter reduced modulo the largest gross atom."""
+    a = build('agg LV.Cover 3 claims dsev [8 10] fixed aggregate net of 3 xs 1000000')
+    assert a._severity_lattice() == 1
+    assert max(a._severity_views()) == 10
+
+
+def test_a_share_off_the_dyadic_lattice_leaves_no_lattice():
+    a = build('agg LV.Share 3 claims dsev [7 11 13] occurrence net of 30% po 5 xs 3 fixed')
+    assert a._severity_lattice() is None
+    assert 'exact_discrete' not in a.bs_window_df.index
+
+
+def test_the_exact_row_holds_the_gross_when_it_fits():
+    """Sized on its net support, 56, the gross up to 80 wrapped at log2 6, and the verdict said so."""
+    a = build('agg LV.Fix dfreq [4] dsev [1:20] occurrence net of 6 xs 6')
+    row = a.bs_window_df.loc['exact_discrete']
+    assert row['x_max'] == 80 and row['log2'] == 7
+    assert 'subject fails' not in a.validation_description
+
+
+def test_the_exact_row_falls_back_to_the_view_when_the_gross_cannot_fit():
+    """Gross needs log2 15 at bs 1, net (9 or 10 a claim) needs 7, and a claim of 2000 needs 11."""
+    a = build('agg LV.Tight dfreq [10] dsev [1999 2000] occurrence net of 1990 xs 5', log2=12)
+    row = a.bs_window_df.loc['exact_discrete']
+    assert row['x_max'] == 2000                      # the gross hull, above the net support
+    assert (a.bs, a.log2) == (1, 11)
+    law = _law(a)
+    assert law.index.min() == 90 and law.index.max() == 100
+
+
+def test_a_portfolio_pools_its_units_views():
+    p = build('port LV.Port agg LV.U1 1 claim dsev [1000 2000] occurrence net of 1000 xs 250 fixed '
+              'agg LV.U2 1 claim dsev [1000 2000] fixed')
+    assert _bucket_is_exact(p, 250) == (True, 250.0)
+
+
 # ------------------------------------------------------- sharpen and Portfolios
 
 def test_portfolio_lattice_is_the_pooled_step():

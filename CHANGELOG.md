@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.45.0 - 2026-10-31
+
+**[Lattice-Views] A discrete severity's lattice step is taken over every view it has: gross after any layer, ceded and net of each occurrence layer, and an aggregate cover's points.** The new `Aggregate._severity_views()` feeds `_severity_atoms`, so `_severity_lattice`, `_pooled_lattice` and `sharpen` follow. Reinsured and layered discrete programs that returned the right mean and the wrong law now return the right law: `1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` moves from `bs` 1000 with outcomes 0, 1000, 2000 to `bs` 50 with 250, 500, 1500. On the study's 858 programs, silent wrong answers fall from 68 to 5. Grids and numbers move on 13 of the 688 shipped corpus programs, all reinsured, layered or signed; a share off the dyadic lattice, such as `30% po` of integers, now has no lattice and takes the continuous estimator.
+
 ## 1.44.0 - 2026-10-31
 
 **[Dsev-Probability-Normalization] `dsev` and `xps` probabilities must sum to 1.** DecL refuses a sum outside a relative 1e-5 with a `ValueError` giving the sum, so `dsev [1 2] [0.3 0.3]`, which built before, now stops. A sum inside that tolerance is normalized at construction, so `100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed` moves from sd 13.29 and skew -42.6 to the correct 8.749 and -0.0213. `format_program` still shows the probabilities as written. A direct `Severity('dhistogram', ...)` outside the tolerance logs an error and keeps its sum, as before, which is the route a reference with `hints{normalize=False}` uses.

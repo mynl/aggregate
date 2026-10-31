@@ -1534,6 +1534,24 @@ bivariate FLB.BVQuarter dfreq [1 2] [.5 .5] dbvsev [0 0.25 0.75] [0 1 2]        
 bivariate FLB.BVDecimal dfreq [1 2] [.5 .5] dbvsev [0 0.1 0.2] [0 1 2]          note{decimal axis free and scattered, margins match};
 bivariate FLB.BVNoisy dfreq [1 2] [.5 .5] dbvsev [0 0.1 0.3000001] [0 1 2]      note{a float gcd near 1e-7 through 1.25.0}
 
+# LV. The lattice of every view ([Lattice-Views], 1.45.0)
+# =======================================================
+# The step is taken over the gross atoms after any layer, the ceded and net of
+# each occurrence layer, and an aggregate cover's points, so each view lands on
+# grid points. See tests/test_lattice_bucket.py and
+# dev/done/plan-lattice-grid-sizing.md.
+agg LV.Net 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed     note{net 250, 500, 1500, step 250, nice bs 50};
+agg LV.Ceded 1 claims dsev [1000 2000 3000] occurrence ceded to 1500 xs 250 fixed note{ceded 750, 1500};
+agg LV.Layer 1 claim 1500 xs 250 dsev [1000 2000 3000] fixed                      note{payments 750, 1500};
+agg LV.Bang 1 claim 5 xs 3 dsev [1 4 8] ! fixed                                   note{an unconditional layer keeps the zero atom};
+agg LV.Franchise 1 claim 100 xs 3 franchise dsev [1 4 8] fixed                    note{a franchise pays the whole loss};
+agg LV.Pool 1 claim dsev [1000 2000] occurrence net of 50% po 500 xs 250 fixed    note{the layer and the net both pool};
+agg LV.Cover 3 claims dsev [8 10] fixed aggregate net of 3 xs 1000000             note{a far cover widens the lattice, not the search};
+agg LV.Share 3 claims dsev [7 11 13] occurrence net of 30% po 5 xs 3 fixed        note{no dyadic lattice, so the continuous estimator};
+agg LV.Fix dfreq [4] dsev [1:20] occurrence net of 6 xs 6                         note{the exact row holds the gross up to 80};
+agg LV.Tight dfreq [10] dsev [1999 2000] occurrence net of 1990 xs 5              note{at log2 12 the gross cannot fit, the net can};
+port LV.Port agg LV.U1 1 claim dsev [1000 2000] occurrence net of 1000 xs 250 fixed agg LV.U2 1 claim dsev [1000 2000] fixed   note{pooled views, step 250}
+
 
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)
 # ============================================================

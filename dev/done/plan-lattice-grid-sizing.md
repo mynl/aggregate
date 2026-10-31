@@ -371,3 +371,52 @@ Divergences:
   `test_poisson_die_tall_grid_matches_theory` (empirical skew off by 7e-4 at `log2` 20) and eight
   exhibit snapshots in their last digits. Leaving summation rounding alone keeps a program with
   correct probabilities byte-identical, so no snapshot moves.
+
+Corpus census (687 `agg` and `port` programs from the four shipped corpora): no grid moved.
+
+### `[Lattice-Views]`, 1.45.0
+
+Sweep, exactly the plan's `[views]` row in every set:
+
+| Set | exact | WRONG flagged | WRONG silent | infeasible flagged | no lattice |
+|:--|--:|--:|--:|--:|--:|
+| A fixed plain | 213 | 11 | 0 | 0 | 0 |
+| B dfreq plain | 185 | 0 | 0 | 7 | 0 |
+| C poisson plain | 104 | 0 | 0 | 8 | 0 |
+| D occurrence reins | 76 | 3 | 0 | 1 | 0 |
+| E aggregate reins | 51 | 2 | 5 | 0 | 2 |
+| F layered dsev | 49 | 1 | 0 | 0 | 0 |
+| G port one unit | 67 | 12 | 0 | 1 | 0 |
+| H port two units | 37 | 13 | 0 | 10 | 0 |
+| all | 782 | 42 | 5 | 27 | 2 |
+
+Census: 13 of 688 grids moved and every verdict is the same or better. `Z.Ref.UsesSigned` and
+`ASV.UsesSigned` go from `fails pmf deficit 1` to `not unreasonable` at `log2` 16, because the
+floor makes the grid span the claim. `CFE.UsesSigned` grows from 12 to 13. `CS.Atomic` takes `bs` 1,
+`log2` 10 for 10, 6, because `3 xs 6` on tens is off the gross step. `J.Re04` and `J.Re08` take `bs`
+1/16 at the cap for 1, 12, because their `50% po` layers make quarters of odd atoms. `J.Re18a` and
+`b`, `LT.Y3` and the reinsured `DP.Discrete` halve the bucket and add one to `log2`. `PnL.DLay` and
+`PA.Vector`, which are signed, add one to `log2` for the floor. `DISC.Layer` shrinks from 5 to 4.
+
+Divergences:
+
+- **The exact row holds the gross when it fits, and the view only when it does not.** The step
+  takes the support of the summed view. That gave `BV.Fix` (`dfreq [4] dsev [1:20] occurrence net
+  of 6 xs 6`) `log2` 6 for a net support of 56, while the gross up to 80 wrapped, so the subject
+  moments and `reins_density_df` were wrong and the verdict turned to `subject fails agg mean`.
+  The study could not see it, since it compares `p_total` only. `_exact_discrete_window` now takes
+  `log2`, sizes on the gross support when that fits at the step, and falls back to the view
+  otherwise. The sweep is unchanged at 782, since those programs fit either way or need the view.
+- **`bs` is 50, not 250, for the first acceptance example.** The step of the views is 250, and
+  `_lattice_candidates` takes its largest ladder divisor first, per ruling 5. `log2` is 6 and the
+  law is the plan's: 250, 500 and 1500 at 1/3 each.
+- **No probabilities in the views.** The step's bullet gives a layered `dsev` its conditional
+  probabilities, as the prototype computed them; nothing reads them, since the reachability guard
+  keeps its reading on the unlayered atoms. `Severity._layered_atoms` returns atoms only.
+- **Layer forms the prototype skipped:** `_layered_atoms` also handles an unconditional layer (`!`,
+  atoms at or below the attachment go to 0) and a franchise or disappearing deductible.
+
+Gate: the first tier 3 run failed one test, `test_mv_explain_flags_clipped_book`, with
+`Unable to allocate 4.00 GiB`, a test whose own grid is 64x64. That is the memory pressure the
+comment at the head of `test_bivariate.py` describes. It passed alone, and the full rerun was green
+(7710 passed, 1 skipped).

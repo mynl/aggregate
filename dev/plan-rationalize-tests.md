@@ -6,7 +6,7 @@ corpora only (no bump; the author commits), the third removes a public name and 
 Agreed by the author on 2026-10-30 (`D:\Projects\Using\bugs\aggregate-review-answers-1.43.qmd`,
 item 4: "new programs go in `decl-testers.agg` from today; retire the scaffold alongside the
 oracle work"). The oracle itself is `[Correctness-Oracle]`, the last step of
-`dev/plan-lattice-grid-sizing.md`, and is in place before this plan runs. It runs last of the
+`dev/done/plan-lattice-grid-sizing.md`, and is in place before this plan runs. It runs last of the
 pre-2.0 plans, after `[Severity-Parameter-Count]`, which rewrites five lines of the scaffold and
 regenerates its snapshot.
 

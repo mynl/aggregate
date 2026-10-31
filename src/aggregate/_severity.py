@@ -3046,7 +3046,21 @@ class SeverityCantor(Severity):
 
 
 def _broadcast_histogram_xs_ps(sev_name, sev_xs, sev_ps):
-    """Broadcast histogram xs / ps inputs into matched arrays.
+    """Broadcast histogram xs / ps inputs into matched arrays, normalizing ps.
+
+    Parameters
+    ----------
+    sev_name : str
+        The severity kind, for messages.
+    sev_xs, sev_ps : array-like
+        Outcomes (bucket edges for ``chistogram``) and their probabilities.
+
+    Returns
+    -------
+    (xs, ps) : tuple of np.ndarray
+        Aligned arrays. ``ps`` is normalized when its sum is within
+        ``np.isclose`` of 1 but further from it than summation rounding can
+        explain, and is otherwise as given.
 
     Notes
     -----
@@ -3055,6 +3069,29 @@ def _broadcast_histogram_xs_ps(sev_name, sev_xs, sev_ps):
     broadcast attempt is suppressed for that case so the raw arrays pass
     through unchanged. For ``dhistogram`` and ``fixed`` the broadcast
     succeeds and produces aligned arrays.
+
+    **Why normalize.** The severity moments are sums over ``ps`` and the
+    discretized density is normalized, so a sum short of 1 gives two laws: the
+    moments treat the shortfall as an atom at 0 that the density does not have.
+    A rounding-sized gap is enough to matter, because the aggregate variance is
+    a small difference of large terms. Probabilities printed to six digits leave
+    1e-6 on ``100 claims dsev [999 1000 1001]``, which takes the aggregate sd
+    from 8.75 to 13.29, the skewness from -0.02 to -42.6, and the sizing window
+    with them.
+
+    **Why not always.** Adding ``n`` floats is accurate to about ``n`` units in
+    the last place, so ``[1/6] * 6``, which sums to ``1 - 1.1e-16``, already
+    sums to 1 as far as the arithmetic can tell. Dividing by that sum changes no
+    moment and moves every probability by an ulp, which shakes the rounding
+    noise of the FFT: on ``10 claims dsev [1:6] poisson`` at ``log2`` 20 it
+    moved the empirical skewness by 7e-4. Such a sum is left alone, so a program
+    whose probabilities are right gets the same bits as before.
+
+    **Outside the tolerance** DecL refuses at parse time
+    (:meth:`~aggregate.parser.UnderwritingTransformer._histogram_probs`), so a
+    sum far from 1 reaches this function only from a direct ``Severity`` call or
+    from a reference whose source has ``hints{normalize=False}``, whose deficit
+    is deliberate and is kept (:func:`_dhistogram_from_object`).
     """
     try:
         xs, ps = np.broadcast_arrays(np.array(sev_xs), np.array(sev_ps))
@@ -3064,10 +3101,13 @@ def _broadcast_histogram_xs_ps(sev_name, sev_xs, sev_ps):
                 f'Severity._build | {sev_name} sev_xs and sev_ps cannot be broadcast.')
         xs = np.array(sev_xs)
         ps = np.array(sev_ps)
-    if not np.isclose(np.sum(ps), 1.0):
+    total = np.sum(ps)
+    if not np.isclose(total, 1.0):
         logger.error(
             f'Severity._build | {sev_name} histogram severity with probs do not '
-            f'sum to 1, {np.sum(ps)}')
+            f'sum to 1, {total}')
+    elif abs(total - 1.0) > ps.size * np.finfo(float).eps:
+        ps = ps / total
     return xs, ps
 
 

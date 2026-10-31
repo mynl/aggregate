@@ -153,3 +153,56 @@ def test_dice_aggregate_exact_severity_moments():
 def test_layered_dsev_aggregate_builds():
     a = build("agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed")
     assert a is not None and a.actual_m > 0
+
+
+# ----------------------------------------------------------------------
+# [Dsev-Probability-Normalization]: one law for the moments and the density
+# ----------------------------------------------------------------------
+def test_rounded_probabilities_give_the_moments_of_the_law_they_round():
+    """A 1e-6 shortfall is not an atom at 0: it took the sd to 13.29, the skew to -42.6."""
+    a = build("agg DISC.RoundedProbs 100 claims dsev [999 1000 1001] "
+              "[0.333333 0.222222 0.444444] fixed")
+    exact = build("agg DISC.FullProbs 100 claims dsev [999 1000 1001] "
+                  f"[{1 / 3!r} {2 / 9!r} {4 / 9!r}] fixed")
+    assert a.actual_sd == pytest.approx(8.749, abs=1e-3)
+    assert a.actual_skew == pytest.approx(-0.0217, abs=1e-3)
+    assert a.actual_sd == pytest.approx(exact.actual_sd, rel=1e-5)
+    assert a.actual_skew == pytest.approx(exact.actual_skew, rel=1e-4)
+
+
+def test_constructor_normalizes_a_sum_inside_the_tolerance():
+    s = Severity(sev_name="dhistogram", sev_xs=[1.0, 2.0], sev_ps=[0.4999999, 0.5])
+    assert s.moms()[0] == pytest.approx(1.5, rel=1e-6)
+    assert float(s.fz.cdf(2.0)) == pytest.approx(1.0, abs=1e-15)
+    # what was written is kept, so a reprint shows it
+    assert float(np.sum(s.sev_ps)) < 1.0
+
+
+def test_summation_rounding_is_not_a_deficit():
+    """``[1/6] * 6`` sums to ``1 - 1.1e-16``: the probabilities keep their bits."""
+    ps = np.array([1 / 6] * 6)
+    assert np.sum(ps) != 1.0
+    s = Severity(sev_name="dhistogram", sev_xs=np.arange(1.0, 7.0), sev_ps=ps)
+    assert np.array_equal(s.fz.pk, ps)
+
+
+@pytest.mark.parametrize("program", [
+    "agg DISC.Short 2 claims dsev [1 2] [0.3 0.3] fixed",
+    "agg DISC.Over 2 claims dsev [1 2] [0.7 0.7] fixed",
+    "agg DISC.Broadcast 2 claims dsev [1 2 3] [0.5] fixed",
+    "agg DISC.Xps 2 claims sev dhistogram xps [1 2] [0.3 0.3] fixed",
+    "agg DISC.Cont 2 claims sev chistogram xps [0 1 2] [0.3 0.3] fixed",
+])
+def test_decl_refuses_a_sum_outside_the_tolerance(program):
+    with pytest.raises(ValueError, match="probabilities sum to"):
+        build(program)
+
+
+def test_refusal_gives_the_sum():
+    with pytest.raises(ValueError, match="sum to 0.6;"):
+        build("agg DISC.Short 2 claims dsev [1 2] [0.3 0.3] fixed")
+
+
+def test_default_probabilities_and_thirds_are_not_refused():
+    assert build("agg DISC.Uniform 2 claims dsev [1 2 3] fixed").sevs[0].moms()[0] == 2.0
+    build("agg DISC.Thirds 2 claims dsev [1 2 3] [1/3 1/3 1/3] fixed")

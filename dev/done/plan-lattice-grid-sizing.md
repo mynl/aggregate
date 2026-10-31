@@ -50,15 +50,24 @@ Author, 2026-10-31, recorded in the note's Decisions section:
    to a multiple of it and shrink `log2` by the ratio while **both** the aggregate band and the
    severity hull still fit.
 
-Proposed in drafting, to confirm at review:
+Proposed in drafting and ruled by the author at review, 2026-10-31. These override the step text
+below wherever the two differ:
 
-6. **`dsev` probabilities are normalized at construction.** Within the tolerance `np.isclose`
-   applies today (relative 1e-5) silently; outside it normalized with a `UserWarning` where
-   today `logger.error` is the only trace. No raise: the `nttagg` parser already demands an
-   exact sum for its own exact arithmetic (`parser.py` 2883), and a sloppy `[.3 .3 .3]` in an
-   `agg` should build.
-7. **`LATTICE_DEPTH` follows the cap.** `_dyadic_lattice_step(atoms, depth=log2)` from the
-   sizer; the module constant remains the default for callers without a cap.
+6. **`dsev` probabilities are normalized at construction inside the tolerance `np.isclose`
+   applies (relative 1e-5), and refused outside it.** The proposal was a `UserWarning` and no
+   raise; the ruling is the note's raise. `dsev [1 2] [0.3 0.3]` stops the build.
+7. **`LATTICE_DEPTH` follows the cap upward only:**
+   `_dyadic_lattice_step(atoms, depth=max(LATTICE_DEPTH, log2))`. The proposal was `depth=log2`,
+   which at a low cap loses the lattice of `dsev [10002 10007]` (step 1 at `log2` 13), so no exact
+   grid and no warning. `bivariate.py` already uses the `max` form.
+8. **`hold` applies to rows with a lattice only; the severity-fit guard stays for the rest.** The
+   plan's route dropped the guard for every row, and with no lattice the free-bucket branch
+   coarsens on the band span alone: `agg A 5000 claims sev lognorm 100 cv 2 poisson approximate
+   sgamma` kept `bs` 4, `log2` 16, held no claim, and returned mass 0 with a 39% mean error when
+   forced. The study could not see this, since all its programs are discrete. The 13 corpus
+   programs the guard rejects today (`E.TSev00` to `03`, the `APX` and `Approximate` books,
+   `G.Splice09`, `HINT.Frac`) keep their grids, and `test_window_severity_overflow_falls_back`
+   stays.
 
 ## Current behavior and why it is wrong
 
@@ -317,5 +326,48 @@ to rerun" block records that the tests are the maintained version.
 
 ## Execution log
 
-(filled at execution: version per step, the sweep and comparison tables after each bump,
-divergences from the steps above)
+Started 2026-10-31 from `063442c` at 1.43.1. Review measurements: the baseline reproduces the
+plan's figures (699, 62, 68, 27, 2; one-unit 117 same grid, 550 agree). `sweep.py` and
+`port_vs_agg.py` overwrite the tracked `res_base.pkl` and `pva_base.pkl`, so each rerun below is
+followed by `git checkout` of those two files: they stay the 1.43.1 frames the note quotes.
+
+Divergences decided at review, before any step ran:
+
+- **`T`'s origin is 99,640, not 99,543.** The balance step uses `window_pad_skew` 0.1, so
+  `f = 0.4`; the prototype used `1/2`. Same law, and the acceptance number changes, not the code.
+- **The cover example moves to `[Window-Holds-Severity]`.** `3 claims dsev [8 10] fixed aggregate
+  ceded to 2 xs 4` cannot pass at `[Lattice-Views]`, because the gate on the windowed row lands one
+  step later; the `[views]` sweep row was measured without that gate.
+- **A signed one-unit book takes the unit's grid too.** The step specifies non-signed, its
+  acceptance requires all 718 on the same grid, and signed books differ today
+  (`dfreq [1:3] dsev [-5 -4]` is `log2` 4 alone and 6 as a Portfolio).
+- **`dev/lattice-study/oracle.py` changes at `[Lattice-Infeasible-Warning]`:** it counts the new
+  class as warned and calls `reset_warn_once` per program. Without the reset the `(name, step,
+  log2)` key silences every repeat of the name `X`, and the 27 cannot class as warned.
+
+### `[Dsev-Probability-Normalization]`, 1.44.0
+
+Sweep unchanged at 699, 62, 68, 27, 2; one-unit unchanged at 117 and 550, as the step expects.
+`agg X 100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed` has sd 8.74890 and skew
+-0.02128, identical to the same program at full precision.
+
+Divergences:
+
+- **The raise lives in the DecL parser, not the constructor** (`UnderwritingTransformer._histogram_probs`,
+  beside the `nttagg` and `dwait` checks). `_resolve_sev_ref` passes a reference whose source has
+  `hints{normalize=False}` through the same `Severity` constructor with a deliberate deficit, and
+  `test_normalize_false_on_the_inner_keeps_the_deficit` pins that. Telling the two apart in the
+  constructor would need a new keyword through `Aggregate`, `Severity` and the spec. So a direct
+  `Severity('dhistogram', ...)` outside the tolerance still logs an error and keeps its sum, as it
+  does today; every DecL `dsev` and `xps` is refused.
+- **`chistogram` is covered as well as `dhistogram`,** through `xps` and the shared helper, as the
+  step specifies. No shipped program or test is refused: the scan of every `.agg` line (1,195) and
+  every literal `dsev [...] [...]` in `tests`, `docs` and `src` found none outside the tolerance.
+- **`self.sev_ps` keeps what was written;** only the local `ps` in `_build` is normalized, so
+  `format_program` still shows the probabilities as given.
+- **A sum within `n * eps` of 1 is not normalized,** where the step normalizes everything inside
+  the tolerance. The first gate failed on this: `[1/6] * 6` sums to `1 - 1.1e-16`, dividing moved
+  every probability by an ulp, and that shook the FFT's rounding noise, which failed
+  `test_poisson_die_tall_grid_matches_theory` (empirical skew off by 7e-4 at `log2` 20) and eight
+  exhibit snapshots in their last digits. Leaving summation rounding alone keeps a program with
+  correct probabilities byte-identical, so no snapshot moves.

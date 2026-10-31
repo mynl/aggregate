@@ -397,7 +397,11 @@ agg DISC.Layer 3 claims 5 xs 3 dsev [1 4 8] [.5 .3 .2] fixed;
 # a build/update kwarg -- not DecL syntax) splits each atom's mass across its
 # two bracketing buckets to preserve the mean exactly; `'nearest'` snaps and
 # biases by <= bs/2. See tests/test_dsev_bucket.py.
-agg DISC.OffGrid dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2]
+agg DISC.OffGrid dfreq [1] dsev [0.3 1.7 2.4] [.5 .3 .2];
+# Probabilities printed to six digits sum to 1 - 1e-6, inside the tolerance, and
+# are normalized at construction ([Dsev-Probability-Normalization]). A sum outside
+# it, such as `dsev [1 2] [0.3 0.3]`, is refused at parse time, so it has no line here.
+agg DISC.RoundedProbs 100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed;
 
 # ============================================================
 # TAIL. Ordered tail-thickness classification (1.0.0a29)

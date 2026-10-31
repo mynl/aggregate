@@ -2810,14 +2810,58 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         ids = c[0]
         return {"sev_name": ids, "sev_scale": 1.0}
 
+    @staticmethod
+    def _histogram_probs(clause, outcomes, probs):
+        """The probabilities of a ``dsev`` or ``xps`` clause, refused unless they sum to 1.
+
+        Parameters
+        ----------
+        clause : str
+            The clause, for the message.
+        outcomes : array-like
+            The outcomes, for the uniform default and a broadcast length.
+        probs : array-like
+            The probabilities as written; empty means uniform.
+
+        Returns
+        -------
+        array-like
+            ``probs`` unchanged, or the uniform weights.
+
+        Raises
+        ------
+        ValueError
+            If the sum is outside ``np.isclose`` of 1.
+
+        Notes
+        -----
+        ``Severity`` normalizes a sum inside the tolerance at construction, so
+        ``format_program`` still shows what was written. Printed probabilities
+        such as ``[0.333333 0.222222 0.444444]`` therefore build. Outside the
+        tolerance the list is a different law from any the author could have
+        meant, and silently rescaling it would hide that. The exact-arithmetic
+        ``nttagg`` is stricter still; see :meth:`_ntt_clause`.
+        """
+        if len(probs) == 0:
+            return np.ones_like(outcomes) / len(outcomes)
+        ps = np.asarray(probs, dtype=float)
+        # a single probability broadcasts across every outcome
+        total = (float(ps[0]) * len(outcomes) if ps.size == 1
+                 else float(ps.sum()))
+        if not np.isclose(total, 1.0):
+            raise ValueError(
+                f'{clause} probabilities sum to {total:.8g}; they must sum to '
+                f'1, to within a relative 1e-5.')
+        return probs
+
     def xps(self, c):
         _xps, doutcomes, dprobs = c
-        ps = np.ones_like(doutcomes) / len(doutcomes) if len(dprobs) == 0 else dprobs
+        ps = self._histogram_probs('xps', doutcomes, dprobs)
         return {"sev_xs": doutcomes, "sev_ps": ps}
 
     def dsev_main(self, c):
         _dsev, doutcomes, dprobs = c
-        ps = np.ones_like(doutcomes) / len(doutcomes) if len(dprobs) == 0 else dprobs
+        ps = self._histogram_probs('dsev', doutcomes, dprobs)
         return {"sev_name": "dhistogram", "sev_xs": doutcomes, "sev_ps": ps}
 
     def dsev_unconditional(self, c):

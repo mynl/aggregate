@@ -62,7 +62,7 @@
 - **[Signed-And-Mixed-Book-Windows]**: after 2.0, with `[Signed-Portfolio-Origin]`:
   the signed window, a book mixing light and thick units, two-unit books of
   fixed-count units, and large reinsured books that need a windowed grid
-  (`[Windowed-Reinsured-Book]`, `dev/plan-lattice-grid-sizing.md`). The verdict
+  (`[Windowed-Reinsured-Book]`, `dev/done/plan-lattice-grid-sizing.md`). The verdict
   flags all of them as failing.
 - **[Layered-Dsev-Lattice]**: the lattice pool uses the unlayered
   `support_atoms`, so a layered `dsev` with an attachment off the lattice sizes

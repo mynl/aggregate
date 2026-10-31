@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.44.0 - 2026-10-31
+
+**[Dsev-Probability-Normalization] `dsev` and `xps` probabilities must sum to 1.** DecL refuses a sum outside a relative 1e-5 with a `ValueError` giving the sum, so `dsev [1 2] [0.3 0.3]`, which built before, now stops. A sum inside that tolerance is normalized at construction, so `100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed` moves from sd 13.29 and skew -42.6 to the correct 8.749 and -0.0213. `format_program` still shows the probabilities as written. A direct `Severity('dhistogram', ...)` outside the tolerance logs an error and keeps its sum, as before, which is the route a reference with `hints{normalize=False}` uses.
+
 ## 1.43.1 - 2026-10-30
 
 **[Long-DecL-Lists] A DecL list of any length parses: `UnderwritingTransformer` derives from `lark.visitors.Transformer_NonRecursive`.** A `dsev` vector of about 500 numbers, or a list of comparable length under any other left recursive rule such as inline `elt` rows, raised `RecursionError`. A vector of 40,000 numbers now parses in about 8 seconds. Specs and results are unchanged.

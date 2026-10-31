@@ -6,7 +6,7 @@ they expose, and the rule a plan should implement. Nothing in the repository cha
 note and the study scripts under `dev/lattice-study/`. It supersedes the TODO entry
 `[Layered-Dsev-Lattice]` and, from `D:\Projects\Using\bugs\aggregate-review-answers-1.43.qmd`,
 item 1 and the items `[Portfolio-Window-Severity-Reach]` and `[Aggregate-Ceded-At-Limit]`
-merged into it there. The plan is `dev/plan-lattice-grid-sizing.md` (2026-10-31).
+merged into it there. The plan is `dev/done/plan-lattice-grid-sizing.md` (2026-10-31).
 
 ## The question
 

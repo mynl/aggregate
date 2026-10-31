@@ -59,6 +59,11 @@
   fixed-count units realize -1750 at width 512 and hold 17.7% of the mass.
   Lattice books are sized from the realized origin since 1.25.0; books
   without a lattice still fail. Wants its own plan (ruled 2026-10-28).
+- **[Signed-And-Mixed-Book-Windows]**: after 2.0, with `[Signed-Portfolio-Origin]`:
+  the signed window, a book mixing light and thick units, two-unit books of
+  fixed-count units, and large reinsured books that need a windowed grid
+  (`[Windowed-Reinsured-Book]`, `dev/plan-lattice-grid-sizing.md`). The verdict
+  flags all of them as failing.
 - **[Layered-Dsev-Lattice]**: the lattice pool uses the unlayered
   `support_atoms`, so a layered `dsev` with an attachment off the lattice sizes
   on the wrong step (`Frees2018a.Revised` sat at `bs` 6 with values 2, 8, 20).
@@ -124,8 +129,8 @@
 - **[Esscher-Exponential-Premium]**: the one classical premium principle the
   distortions do not subsume; today only in a `pedagogy.py` figure.
 - **[Distortion-Production-vs-Research]**: separate the production distortions
-  from the research zoo (CLL, CLin, LEP, LY) in the docs, perhaps in the
-  namespace.
+  from the research zoo (CLL, CLin, LEP, LY) with a docs heading, no namespace
+  (ruled 2026-10-30). In `dev/plan-pre-release-housekeeping.md`.
 - **[Two-Surfaces-Blessed-Path]**: document the blessed path per task: DecL to
   construct, objects to analyze.
 
@@ -181,7 +186,13 @@
   `dev/done/plan-stable-expressions.md`.
 - **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`;
   `pedagogy.similar_risks_example` raises `TypeError`, passing arguments that
-  `Portfolio.plot` and `Bounds.plot_envelope` do not take.
+  `Portfolio.plot` and `Bounds.plot_envelope` do not take (the second part is in
+  `dev/plan-pre-release-housekeeping.md`).
+- **[Library-Items-Raised-By-API]**: after 2.0. `chart_envelope` resamples with no
+  seed, so its document hash changes (`charts/_emit_bounds.py`); `Recipe.decl` is
+  empty for `minimum` and `mixture`; `format_program`'s fallback collapses a
+  program onto one line; the Portfolio density chart has no `full_range`
+  (`charts/_emit_portfolio.py`). The API's TODO can tick its other four.
 - **[Display-Surface-Punchups]**: `_repr_html_` is on the five first-class
   classes only; `_html_info_blob` is on `Aggregate` alone (a fourth mixin?);
   the P&L builders' `label=name` would render `'PL (PL)'`.
@@ -216,3 +227,8 @@
 `[Joint-Padding-Window-Tradeoff]`, `[Multi-Window-Splice-Conditional]`,
 `[Data-To-Dsev-Preprocessors]` (its ELT and YELT limb is `[DecL-Loss-Tables]`), `[Parameter-Risk-Predictive]`,
 `[Individual-Risk-Model-Census]`.
+
+**[Repair-Link]** (pended by the author, 2026-10-30): a `(Repair)` link on the
+aLL status strip that rewrites the DecL in the editor and rebuilds, offered only
+after the rewrite has built and passed. Three cases: a failed grid, a refused
+spelling, a typing error.

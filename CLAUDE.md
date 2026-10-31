@@ -210,6 +210,10 @@ All authored documents — Quarto `.qmd` pages and any future artifact that supp
 - Cite inline with `@Key` / `[@Key; @Key2]`; pages that cite end with a `## References` heading over an empty `::: {#refs}` div.
 - House anchors: `Mildenhall2022` (Similar Risks Have Similar Prices, IME), `Mildenhall2022a` (*Pricing Insurance Risk*, with Major), `Major2026` (*Introduction to Capital Modeling and Portfolio Management*, CAS), `Grubel1999`/`Grubel2000` (FFT compound distributions), `Klugman2012` (*Loss Models*), `Heckman1983`, `Panjer1981`, `Wang1995`/`Wang1996` (distortions).
 
+## Using pages
+
+The Using aggregate website, `D:/Projects/Using/aggregate` (also reached as `hacks/using`), holds one short page per feature, and a plan that adds something a user calls finishes with one (section 8 of the `execute-plan` skill). **Before writing or editing a page, read `D:/Projects/Using/CLAUDE.md` and `D:/Settings/Claude/write-like-steve.md`.** They govern the page, its build and its commit. Render with `D:/Projects/Using/refresh.ps1 aggregate <feature>`; a deploy is a separate step, left to the author. The site's environment installs this tree editable, so a render includes uncommitted work here.
+
 ## Testing
 
 The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. The DecL corpora live in `src/aggregate/agg/`: `_test_suite.agg` and `_test_suite2.agg` (the SLY-parity scaffold, still load-bearing for eleven test files — see `[Scaffold-Retirement]` in `dev/TODO.md`), plus the shipped `library.agg` and `decl-testers.agg`. Each line of `_test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:

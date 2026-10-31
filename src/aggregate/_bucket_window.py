@@ -1745,7 +1745,7 @@ def port_single_big_jump_window(port, p_star):
 
 
 def _port_lattice_bucket(port, log2, signed, windowed, x_lo, x_hi,
-                         x_min_ks, x_max_ks):
+                         x_min_ks, x_max_ks, reach):
     """The Portfolio grid from the units' pooled lattice, or ``None``.
 
     Parameters
@@ -1761,6 +1761,9 @@ def _port_lattice_bucket(port, log2, signed, windowed, x_lo, x_hi,
         The Portfolio window.
     x_min_ks, x_max_ks : list of float
         The units' selected windows from the phase 1 pre-pass.
+    reach : float
+        The largest unit severity hull, which ``N * bs`` must span in every
+        regime, whatever the grid's origin.
 
     Returns
     -------
@@ -1786,29 +1789,43 @@ def _port_lattice_bucket(port, log2, signed, windowed, x_lo, x_hi,
     floor and flooring is monotone), so the realized grid top is at or above
     the estimate's. Each unit's own grid must also hold its window, the wrap
     safety the resolution formula floors its span for.
+
+    A non-signed book that fits nothing at ``x_hi`` is tried once more at the
+    sum of the units' window tops, before the lattice is given up. Each unit's
+    window covers its own mass, so their sum bounds the independent total, and
+    the three-moment fit behind ``x_hi`` can overstate a discrete total badly:
+    254,705 on ``1 claims 1500 xs 0 dsev [500 1000 2000] fixed`` with ``dfreq
+    [1:100] dsev [1000 1001]``, whose support ends at 101,587. Measured from the
+    fit that book needs ``log2`` 18 at the step of 1 where 17 holds it. It is a
+    second attempt, not a tighter first one, so a book that fits keeps the room
+    the fit gives it: a continuous approximation drawn on a discrete book's grid
+    has a tail that needs it.
     """
     fit = _pooled_lattice(port.agg_list)
     if fit is None:
         return None
     h, residual = fit
-    for b in _lattice_candidates(h):
-        if signed:
-            lows = [float(np.floor(s / b) * b) for s in x_min_ks]
-            origin = float(sum(min(v, 0.0) for v in lows))
-            # never less than the window itself, the plan's wrap-safe span
-            need = max([_need_log2(x_hi - min(origin, x_lo), b)]
-                       + [_need_log2(t - v, b) for v, t in zip(lows, x_max_ks)])
-            x_min = float(np.floor(x_lo / b) * b)
-        elif windowed:
-            x_min = float(np.floor(x_lo / b) * b)
-            need = _need_log2(x_hi - x_min, b)
-        else:
-            x_min = 0.0
-            need = _need_log2(x_hi, b)
-        if need <= log2:
-            port._bs_lattice = dict(h=float(h), residual=float(residual),
-                                    bs=float(b))
-            return float(b), int(min(log2, max(need, 1))), x_min
+    tops = [x_hi] if signed else [x_hi, min(x_hi, float(sum(x_max_ks)))]
+    for top in tops:
+        for b in _lattice_candidates(h):
+            if signed:
+                lows = [float(np.floor(s / b) * b) for s in x_min_ks]
+                origin = float(sum(min(v, 0.0) for v in lows))
+                # never less than the window itself, the plan's wrap-safe span
+                need = max([_need_log2(x_hi - min(origin, x_lo), b)]
+                           + [_need_log2(t - v, b) for v, t in zip(lows, x_max_ks)])
+                x_min = float(np.floor(x_lo / b) * b)
+            elif windowed:
+                x_min = float(np.floor(x_lo / b) * b)
+                need = _need_log2(top - x_min, b)
+            else:
+                x_min = 0.0
+                need = _need_log2(top, b)
+            need = max(need, _need_log2(reach, b))
+            if need <= log2:
+                port._bs_lattice = dict(h=float(h), residual=float(residual),
+                                        bs=float(b))
+                return float(b), int(min(log2, max(need, 1))), x_min
     return None
 
 
@@ -1869,6 +1886,18 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     regime, signed included, measured from the origin ``update`` will realize.
     The units' separately chosen buckets are not combined.
 
+    **One unit.** A book of one unit takes that unit's ``(bs, log2, x_min)``
+    verbatim, signed or not: it adds nothing to the mathematics, so
+    ``port P agg A ...`` and ``agg A ...`` are the same law on the same grid.
+
+    **The severity hull.** Every unit's severity is discretized on ``2**log2``
+    points whatever the grid's origin, so a lattice grid and a windowed grid must
+    span the largest unit hull as well as the total's band. ``port P agg A dfreq
+    [1] dsev [3]`` otherwise takes a grid of width 2 from 3, which cannot hold the
+    claim, and loses all its mass. A book with a reinsured unit is not windowed:
+    the occurrence machinery carries the severity on the output grid, and a ceded
+    aggregate can sit below the window.
+
     Parameters
     ----------
     log2 : int
@@ -1905,10 +1934,12 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     # combine is entitled to.
     rows = []
     bs_ks, x_min_ks, x_max_ks, W_ks = [], [], [], []
+    unit_grid = None
     with warn_once_isolated(), warnings.catch_warnings():
         warnings.simplefilter('ignore', DefectiveDistributionWarning)
         for a in port.agg_list:
             bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
+            unit_grid = (float(bs_k), int(l2_k), float(x_min_k))
             wdf = a._bs_window_df
             sel = wdf[wdf['selected']].iloc[0] if 'selected' in wdf.columns \
                 else wdf.loc['used']
@@ -1961,8 +1992,14 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     # Concentration gate (same source as Aggregate._bs_window): only a
     # genuinely concentrated total that clears 0 is windowed (Plan B).
     conc_flag, _conc_cv = _tail.concentration(m, sd)
+    reach = 0.0
+    for a in port.agg_list:
+        hull_lo, hull_hi = a._severity_hull(p_star)
+        reach = max(reach, max(hull_hi, 0.0) - min(hull_lo, 0.0))
     window_nonsigned = (not signed and bs_in <= 0 and bool(conc_flag)
-                        and x_lo_raw > 0)
+                        and x_lo_raw > 0 and np.isfinite(reach)
+                        and not any(a.occ_reins or a.agg_reins
+                                    for a in port.agg_list))
 
     # ---- bs: carry raw, round once ------------------------------------
     resolution = min(bs_ks) if bs_ks else 1.0
@@ -1974,9 +2011,23 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
         x_lo = 0.0                               # 0-based (Plan A)
     W_ext = max(x_hi - x_lo, 0.0)
     port._bs_lattice = None
+    if bs_in <= 0 and len(port.agg_list) == 1:
+        bs, log2_out, x_min = unit_grid
+        port._bs_raw = None                      # the unit's, not rounded here
+        fit = _pooled_lattice(port.agg_list)
+        if fit is not None and _integer_ratio(fit[0], bs):
+            port._bs_lattice = dict(h=float(fit[0]), residual=float(fit[1]),
+                                    bs=float(bs))
+        cand = dict(mm=(mm_lo, mm_hi), rms=(rms_lo, rms_hi),
+                    sbj=(sbj_lo, sbj_hi),
+                    sum=(min(x_lo, 0.0), W_sum + min(x_lo, 0.0)))
+        port._build_bs_window_df(rows, bs, log2_out, x_min, cand,
+                                 resolution, W_ext)
+        port._bs_window_df.loc['used', 'note'] += "; one unit, the unit's grid"
+        return bs, log2_out, x_min
     lattice_pick = (None if bs_in > 0 else
                     _port_lattice_bucket(port, log2, signed, window_nonsigned,
-                                         x_lo, x_hi, x_min_ks, x_max_ks))
+                                         x_lo, x_hi, x_min_ks, x_max_ks, reach))
     if lattice_pick is not None:
         # Every unit is discrete on one pooled dyadic lattice: the rule picks
         # the bucket and log2 shrinks to the need, signed books included.
@@ -2003,6 +2054,10 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
             # ``max_k W_k / N`` (the MM span is usually wider, but guard the
             # one-dominant-unit case).
             span = max(span, (max(W_ks) if W_ks else 0.0) / max(N_cap - 1, 1))
+        elif window_nonsigned:
+            # The window must span a claim. A heavy severity on a thin total
+            # otherwise overruns the N buckets and its mass is lost.
+            span = max(span, reach / max(N_cap - 1, 1))
         raw = float(max(resolution, span))
         port._bs_raw = raw                       # for the bs_explanation narrative
         bs = round_bucket(raw)
@@ -2018,7 +2073,7 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
         else:
             need = (int(np.ceil(np.log2((x_hi - x_min) / bs + 1.0)))
                     if x_hi > x_min else 1)
-            log2_out = min(log2, max(need, 1))
+            log2_out = min(log2, max(need, _need_log2(reach, bs), 1))
     else:
         x_min = 0.0
         if bs_in > 0:

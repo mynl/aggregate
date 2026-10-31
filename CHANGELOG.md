@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.47.0 - 2026-10-31
+
+**[Portfolio-Follows-Unit-Grid] A one-unit Portfolio takes its unit's grid verbatim, and a larger book's grid holds its largest severity.** `port P agg A dfreq [1] dsev [3]` moves from `bs` 1, `log2` 1, mass 0 and `fails pmf deficit 1` to `bs` 1, `log2` 2 and the exact law, the same object as `agg A dfreq [1] dsev [3]`, and this holds for signed, reinsured and continuous units. A book with a reinsured unit is no longer windowed. A lattice book that fits nothing at the moment fit is tried again at the sum of its unit windows before the lattice is given up. Grids move on 3 of the 699 shipped corpus programs, all one-unit Portfolios, none larger.
+
 ## 1.46.0 - 2026-10-31
 
 **[Window-Holds-Severity] A grid at a lattice bucket spans a claim as well as the aggregate band, and a book under an aggregate cover is not windowed.** `100 claims dsev [1000 1001] fixed` moves from `bs` 2, `log2` 16 from 0, which split the atom at 1001 and read `fails sev cv, agg cv`, to `bs` 1, `log2` 10 from 99,640 with the exact law. `3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4` moves from returning 12 to returning 2. On the study's Aggregates there are no silent wrong answers left. A severity with no lattice sizes as before, and the `windowed` row's note now holds `sev_hull=`, the new `Aggregate._severity_hull`, in place of `sev_hi=`.

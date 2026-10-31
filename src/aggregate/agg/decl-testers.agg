@@ -1561,7 +1561,16 @@ agg WH.U 100 claims dsev [10002 10007] fixed                                    
 agg WH.Cover 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4                 note{cedes 2 always, from 0};
 agg WH.Rare 0.01 claims dsev [1000] poisson                                       note{a row from 0 holds the claim};
 agg WH.Signed 1 claim dsev [-5 -4] fixed                                          note{held from its lower endpoint};
-agg WH.Thin 1 claim sev lognorm 10 cv .09 fixed                                   note{no lattice: the guard rejects the window}
+agg WH.Thin 1 claim sev lognorm 10 cv .09 fixed                                   note{no lattice: the guard rejects the window};
+
+# PF. A Portfolio follows its units' grids ([Portfolio-Follows-Unit-Grid], 1.47.0)
+# ================================================================================
+# One unit takes the unit's grid verbatim. Several units hold the largest severity
+# hull, and do not window with a reinsured unit. See tests/test_bucket_sizing.py.
+port PF.P agg PF.A1 dfreq [1] dsev [3]                                            note{bs 1, log2 2, the unit's grid};
+port PF.Two agg PF.A2 100 claims dsev [1000 1001] fixed agg PF.B2 100 claims dsev [1000 1001] fixed   note{bs 1, log2 10, windowed};
+port PF.Re agg PF.A3 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4 agg PF.B3 3 claims dsev [8 10] fixed   note{a reinsured unit: from 0};
+port PF.Top agg PF.A4 1 claims 1500 xs 0 dsev [500 1000 2000] fixed agg PF.B4 dfreq [1:100] dsev [1000 1001]   note{at log2 17 the step fits, measured to the sum of the unit windows}
 
 
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)

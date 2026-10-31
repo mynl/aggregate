@@ -2779,9 +2779,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         signed = self._signed()
         self._combine_x_min = None
         if signed:
-            bs, log2, _x_min_est = self._bs_window(log2, bs, bucket_sizing_p)
+            pinned = bs != 0
+            bs, log2, x_min_est = self._bs_window(log2, bs, bucket_sizing_p)
             self.log2 = log2
             self.bs = bs
+            # One unit takes the unit's grid verbatim, origin included.
+            if not pinned and len(self.agg_list) == 1:
+                self._combine_x_min = float(x_min_est)
         elif bs == 0:
             # Non-signed auto-size: Portfolio MM bulk + SBJ look-through
             # (best_window), which shrinks log2 to just hold the extent -- a tiny
@@ -2872,7 +2876,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             # windows). Windowed non-signed (Plan B): the Portfolio MM windowed
             # origin from best_window (each unit sits at its own 0-origin; the
             # *total* mass is what clears 0). Snapped to bs.
-            if signed:
+            if self._combine_x_min is None:
                 x_min_tot = float(min(sum(x_mins), min(x_mins)))
             else:
                 x_min_tot = float(self._combine_x_min)

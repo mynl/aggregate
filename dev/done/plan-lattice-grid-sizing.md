@@ -461,3 +461,54 @@ reads `fails agg skew`, empirical skew -0.040 against -0.021. Its sd agrees to 1
 moment at a mean of 100,000 is about 1e15, so rounding of about 60 ulps moves the third central
 moment, which is -14, by that much. `T` escapes only because its theoretical skew is 0, and the test
 is skipped then.
+
+### `[Portfolio-Follows-Unit-Grid]`, 1.47.0
+
+Sweep, better than the plan's figures of 817, 12 and set H 45:
+
+| Set | exact | exact, beyond spec | WRONG flagged | infeasible flagged | no lattice |
+|:--|--:|--:|--:|--:|--:|
+| A fixed plain | 224 | 0 | 0 | 0 | 0 |
+| B dfreq plain | 185 | 0 | 0 | 7 | 0 |
+| C poisson plain | 104 | 0 | 0 | 8 | 0 |
+| D occurrence reins | 76 | 0 | 3 | 1 | 0 |
+| E aggregate reins | 56 | 0 | 2 | 0 | 2 |
+| F layered dsev | 50 | 0 | 0 | 0 | 0 |
+| G port one unit | 79 | 0 | 0 | 1 | 0 |
+| H port two units | 48 | 1 | 2 | 9 | 0 |
+| all | 822 | 1 | 7 | 26 | 2 |
+
+No silent wrong answer. `port_vs_agg.py base`: 718 of 718 on the same grid, 718 agree below 1e-9.
+`cure.py base`: 27 of 27 exact at the oracle's `log2`. `port P agg A dfreq [1] dsev [3]` builds at
+`bs` 1, `log2` 2 with all its mass at 3.
+
+The seven left are five Aggregates that need a window and carry reinsurance
+(`[Windowed-Reinsured-Book]`, as the plan expects) and two two-unit books with a reinsured unit,
+the same case. All are flagged. The prototype's other five, the one-unit twins and the book at
+`bs` 0.5, are cured.
+
+Census: 3 of 699 grids moved, all one-unit Portfolios, and no `log2` grew. Verdicts are unchanged.
+`N3.OneDice` goes from `log2` 7 to 6, and `N3.Unb` and `AE.Trailer.Port` halve `bs` to 1/32 at the
+cap. No exhibit snapshot moved.
+
+Divergences:
+
+- **The one-unit branch is in `port_best_window`, not `Portfolio.update`.** Phase 1 already has the
+  unit's `(bs, log2, x_min)`, so it is one branch before the lattice walk, and `best_window` called
+  directly gives the same answer. `_build_bs_window_df` still runs, with `one unit, the unit's grid`
+  on the `used` row.
+- **A signed one-unit book takes the unit's grid too,** as decided at review. `update` sets
+  `_combine_x_min` from it, and the roll path uses that in place of `min(sum, min)`.
+- **The lattice walk has a second attempt, at the sum of the unit window tops,** for a non-signed
+  book that fits nothing at `x_hi`. The plan expected the hull alone to cure the five two-unit
+  books; it did not. Their window top is the three-moment fit on the total, 254,705 for a support
+  ending at 101,587, so at the oracle's `log2` the step still did not fit. The sum of the unit tops
+  bounds an independent sum, and it is the bound the `sum` row already reports. It is a second
+  attempt, because using it first moved 20 corpus grids and 29 exhibit snapshots: `EX.RePort` went
+  to 16 buckets, and a continuous approximation drawn on that grid lost its tail (mean 27.500 to
+  27.466). This is narrower than the width-combine the plan rejects under Alternatives: it enters
+  only the lattice walk, and only when the walk would otherwise give up.
+- **The resolution branch holds the hull only for a windowed book,** where the step does not limit
+  it. A book from 0 reaches `x_hi` already, and holding a continuous hull there would move
+  continuous grids with no oracle to measure them, against the reasoning of ruling 8. A non-finite
+  hull does not window. The signed span is untouched.

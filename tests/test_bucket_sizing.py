@@ -810,6 +810,110 @@ def test_1p_windowed_nonsigned_plan_b():
     assert rel < 1e-5, f'kappa invariance broken on windowed grid: rel={rel:.2e}'
 
 
+# ---------------------------------------------------------------------------
+# [Portfolio-Follows-Unit-Grid]: one unit takes the unit's grid; several units
+# hold the largest hull. See dev/done/plan-lattice-grid-sizing.md.
+# ---------------------------------------------------------------------------
+
+def test_one_unit_book_holds_its_claim():
+    """It took the nice divisor 1 of the step 3 at log2 1, and lost all its mass."""
+    p = build('port PF.P agg PF.A dfreq [1] dsev [3]')
+    assert (p.bs, p.log2) == (1, 2)
+    law = _nonzero(p)
+    assert list(law.index) == [3]
+    assert law.iloc[0] == pytest.approx(1.0, abs=1e-12)
+    assert p.validation_description == 'not unreasonable'
+
+
+@pytest.mark.parametrize('unit', [
+    'dfreq [1] dsev [3]',                                            # from 0
+    '100 claims dsev [1000 1001] fixed',                             # windowed
+    '1 claim dsev [-5 -4] fixed',                                    # signed
+    'dfreq [1:3] dsev [-5 -4]',                                      # signed, several outcomes
+    '10 claims dsev [-1.75 0.25 0.5] fixed',                         # signed fractions
+    '3 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed',
+    '3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4',
+    '10 claims sev gamma 100 cv 1 poisson',                          # continuous
+    '100000 claims sev lognorm 100 cv 0.5 poisson',                  # continuous, windowed
+    '5000 claims sev lognorm 100 cv 2 poisson approximate sgamma',   # the guard rejects
+])
+def test_one_unit_book_is_the_unit_on_the_same_grid(unit):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        a = build(f'agg PF.U {unit}')
+        p = build(f'port PF.Port agg PF.U {unit}')
+    assert (p.bs, p.log2) == (a.bs, a.log2)
+    assert float(p.density_df.index[0]) == float(a.density_df.index[0])
+    assert np.allclose(p.density_df.p_total.to_numpy(), a.density_df.p_total.to_numpy(),
+                       rtol=0, atol=1e-9)
+
+
+def test_one_unit_book_reports_its_source():
+    p = build('port PF.Rep agg PF.A dfreq [1] dsev [3]')
+    assert "one unit, the unit's grid" in p.bs_window_df.loc['used', 'note']
+    assert p._bs_lattice == dict(h=3.0, residual=0.0, bs=1.0)
+    assert 'lattice of 3' in p.bs_explanation
+    assert 'PF.A' in p.bs_window_df.index
+
+
+def test_one_unit_book_honors_a_pinned_bucket():
+    p = build('port PF.Pin agg PF.A dfreq [1] dsev [3]', bs=1 / 4)
+    assert p.bs == 1 / 4
+
+
+def test_a_windowed_book_of_several_units_holds_the_largest_claim():
+    """The total's band is about 85 wide; a claim of 1001 needs log2 10 at bs 1."""
+    p = build('port PF.Two agg PF.A 100 claims dsev [1000 1001] fixed '
+              'agg PF.B 100 claims dsev [1000 1001] fixed')
+    assert p.bs == 1 and p.log2 == 10
+    assert float(p.density_df.index[0]) > 0
+    xs = np.arange(200000, 200201)
+    law = ss.binom(200, 0.5).pmf(xs - 200000)
+    got = p.density_df.p_total.reindex(xs).fillna(0).to_numpy()
+    assert np.allclose(got, law, rtol=0, atol=1e-13)
+
+
+def test_a_book_with_a_reinsured_unit_is_not_windowed():
+    """A ceded aggregate of 2 would wrap from a window far above it."""
+    p = build('port PF.Re agg PF.A 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4 '
+              'agg PF.B 3 claims dsev [8 10] fixed')
+    assert p._combine_x_min is None
+    assert float(p.density_df.index[0]) == 0.0
+    # the total is 2 plus the second unit, 24 to 30 in steps of 2
+    assert list(_nonzero(p).index) == [26, 28, 30, 32]
+
+
+def test_a_continuous_windowed_book_holds_a_heavy_claim():
+    """Each fitted severity sits at its unit's mean, which the band alone cannot hold."""
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        p = build('port PF.Heavy '
+                  'agg PF.A 5000 claims sev lognorm 100 cv 2 poisson approximate sgamma '
+                  'agg PF.B 5000 claims sev lognorm 100 cv 2 poisson approximate sgamma')
+    assert float(p.density_df.p_total.sum()) == pytest.approx(1.0, abs=1e-6)
+    assert p.est_m == pytest.approx(p.actual_m, rel=1e-3)
+
+
+def test_lattice_walk_measures_to_the_sum_of_the_unit_windows():
+    """The fit on the total reaches 254,705 and the support ends at 101,587."""
+    p = build('port PF.Top agg PF.A 1 claims 1500 xs 0 dsev [500 1000 2000] fixed '
+              'agg PF.B dfreq [1:100] dsev [1000 1001]', log2=17)
+    assert (p.bs, p.log2) == (1, 17)
+    assert float(p.bs_window_df.loc['mm', 'x_max']) > 2e5
+    assert 'fails' not in p.validation_description
+
+
+def test_a_book_that_fits_keeps_the_room_the_moment_fit_gives_it():
+    """The sum of the unit windows is a second attempt, not a tighter first one.
+
+    Measured first to the sum, this book took 16 buckets and a continuous
+    approximation drawn on that grid lost its tail.
+    """
+    p = build('port PF.Room agg PF.A dfreq [1 2] dsev [10 20 30] occurrence net of 10 xs 10 '
+              'agg PF.B 1 claim dsev [5 10] fixed')
+    assert (p.bs, p.log2) == (5, 6)
+
+
 def test_1p_ordinary_nonsigned_stays_zero_based():
     """A non-concentrated non-signed book keeps the 0-based grid (Plan A).
 

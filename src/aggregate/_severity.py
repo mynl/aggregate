@@ -255,7 +255,9 @@ def _partial_e(sev_name, fz, a, n):
     if sev_name not in _ANALYTIC_KINDS:
         raise NotImplementedError(f'{sev_name} NYI for analytic moments')
 
-    if a == 0:
+    # every kind here lives on [0, inf), so nothing lies at or below 0. A negative
+    # ``a`` arrives from an attachment below the shift of X + b.
+    if a <= 0:
         return [0] * (n+1) # for k in range(n+1)]
 
     if sev_name == 'lognorm':
@@ -787,10 +789,13 @@ def _layered_lev(severity, t):
     of the layer ``min(t, (X - a)+)``; index 1 of its answer is the first
     moment (index 0 is the zeroth). The conditional adjustment is deliberately
     NOT applied: every caller here uses this inside a ratio, where a common
-    ``pattach`` divisor cancels.
+    ``pattach`` divisor cancels. A shifted law is given to it without its shift
+    (:meth:`Severity._law_without_shift`), since :func:`_partial_e` would take
+    the shift for part of the mean.
     """
-    return float(_moms_analytic(severity.fz, min(t, severity.limit),
-                                severity.attachment, 1)[1])
+    fz, shift = severity._law_without_shift()
+    return float(_moms_analytic(fz, min(t, severity.limit),
+                                severity.attachment - shift, 1)[1])
 
 
 def size_biased_cdf(severity, t):
@@ -932,6 +937,13 @@ def feasible_bucket(severity, delta):
     disappearing deductible (finite ``retention_end``) also returns ``None``:
     :func:`_layered_lev` is the ordinary layer's, and the payment there is a
     different function of the loss.
+
+    A shifted law goes through :func:`_layered_lev`, which removes the shift.
+    All of its mean lies above the shift, so ``bs_max`` is about twice the shift
+    and the top is what binds: ``100 * lognorm 3 + 1000`` needs ``log2`` 25, and
+    ``100 * gamma 2 + 10000`` a ``log2`` below 0. Only the bottom bucket and the
+    top are considered, so with a narrow law far from 0 the reading is optimistic
+    about ``bs``. It can miss an infeasible grid, and does not invent one.
     """
     if np.isfinite(getattr(severity, 'retention_end', np.inf)):
         return None
@@ -1605,21 +1617,23 @@ def make_layer_retention_isf(attachment, retention_end, limit, pattach,
     return actual_decorator
 
 
-def _moms_retention(difference, excess, sf, attachment, retention_end, limit, n):
-    """Raw moments ``E[g(X)^m]``, ``m = 0..n``, unconditional (not divided by ``S(d1)``).
+def _moms_retention(excess, sf, attachment, retention_end, limit, n, shift=0.0):
+    """Raw moments ``E[g(X + b)^m]``, ``m = 0..n``, unconditional (not divided by ``S(d1)``).
 
     Parameters
     ----------
-    difference : callable
-        ``difference(a, d)`` returns ``[E[X^j; a < X <= d] for j in 0..n]``.
     excess : callable
-        ``excess(a, w)`` returns ``[E[(X - a)^m; a < X <= a + w] for m in 0..n]``.
+        ``excess(a, w)`` returns ``[E[(X - a)^m; a < X <= a + w] for m in 0..n]``
+        on the law of ``X``, without its shift.
     sf : callable
-        Ground-up survival function.
+        Survival function of ``X``.
     attachment, retention_end, limit : float
-        ``d1``, a finite ``d2 >= d1``, and the largest payment ``y``.
+        ``d1``, a finite ``d2 >= d1``, and the largest payment ``y``, all on
+        the ground-up loss ``X + b``.
     n : int
         Highest moment.
+    shift : float
+        The shift ``b``, 0 for an unshifted law.
 
     Returns
     -------
@@ -1628,36 +1642,40 @@ def _moms_retention(difference, excess, sf, attachment, retention_end, limit, n)
 
     Notes
     -----
-    With ``PE_j(t) = E[X^j; X <= t]``, ``k = d2 / (d2 - d1)`` and ``D`` the
-    detachment of :func:`_retention_detachment`,
+    With loss ``L = X + b``, ``k = d2 / (d2 - d1)`` and ``D`` the detachment of
+    :func:`_retention_detachment`,
 
     .. math::
 
-        E[g(X)^m] = k^m \\sum_j \\binom{m}{j} (-d_1)^{m-j}
-                    (PE_j(\\min(d_2, D)) - PE_j(d_1))
-                    + PE_m(D) - PE_m(d_2) + y^m S(D),
+        E[g(L)^m] = k^m E[(L - d_1)^m; d_1 < L \\le \\min(d_2, D)]
+                    + \\sum_j \\binom{m}{j} d_2^{m-j} E[(L - d_2)^j; d_2 < L \\le D]
+                    + y^m P(L > D),
 
     where the identity term is present only when ``D > d2``. The three terms
     are the ramp on ``(d1, min(d2, D)]``, the identity piece on ``(d2, D]``
     and the mass at the limit. The ramp is absent for the franchise
     (``d2 = d1``). An infinite limit drops the mass term and treats the
-    identity piece as the tail of ``E[X^m]``.
+    identity piece as the tail of ``E[L^m]``.
 
-    The ramp and the identity piece take the same care as an ordinary layer,
-    through ``excess`` and ``difference``: the sum above and the difference
-    ``PE_m(D) - PE_m(d2)`` cancel in the far tail as :func:`_moms_analytic`
-    would (:func:`_excess_moments`).
+    Both expectations are of an excess, so each is ``excess`` at the attachment
+    moved down by the shift, and takes the same care as an ordinary layer
+    (:func:`_excess_moments`). The identity piece is written about ``d2`` for
+    the same reason: every term is positive, so nothing cancels, however large
+    the shift. A negative ``d1 - b``, an attachment below the shift, is the
+    same expression.
     """
     d1, d2, y = attachment, retention_end, limit
     det = _retention_detachment(d1, d2, y)
     ramp_end = min(d2, det)
-    ramp = excess(d1, ramp_end - d1) if d2 > d1 else None
-    ident = difference(d2, det) if det > d2 else None
+    ramp = excess(d1 - shift, ramp_end - d1) if d2 > d1 else None
+    ident = excess(d2 - shift, det - d2) if det > d2 else None
     out = np.zeros(n + 1)
     for m in range(n + 1):
         ramp_m = (d2 / (d2 - d1)) ** m * ramp[m] if ramp is not None else 0.0
-        ident_m = ident[m] if ident is not None else 0.0
-        mass = y ** m * float(sf(det)) if np.isfinite(y) else 0.0
+        # d2 = 0 keeps only j = m: 0 * inf would be nan where a moment is infinite
+        ident_m = (sum(binom(m, j) * d2 ** (m - j) * ident[j] for j in range(m + 1)
+                       if d2 > 0 or j == m) if ident is not None else 0.0)
+        mass = y ** m * float(sf(det - shift)) if np.isfinite(y) else 0.0
         out[m] = ramp_m + ident_m + mass
     return out
 
@@ -1823,7 +1841,7 @@ def _mean_to_scale(sev_name, shape, mean, loc=0):
     return scale, gen(shape, scale=scale, loc=loc)
 
 
-def _safe_integrate(f, lower, upper, level, sev_name=''):
+def _safe_integrate(f, lower, upper, level, sev_name='', **tolerance):
     """Integrate ``f`` over ``[lower, upper]`` with scipy.integrate.quad.
 
     Parameters
@@ -1837,6 +1855,9 @@ def _safe_integrate(f, lower, upper, level, sev_name=''):
         n=1, 1e-4 for n>=2) and for diagnostic logging.
     sev_name : str
         Severity name, included in log messages.
+    **tolerance
+        ``limit``, ``epsabs`` or ``epsrel`` passed to ``quad``, in place of
+        the defaults above.
 
     Returns
     -------
@@ -1850,6 +1871,7 @@ def _safe_integrate(f, lower, upper, level, sev_name=''):
     handle integrands that misbehave near zero.
     """
     argkw = dict(limit=100, epsrel=1e-6 if level == 1 else 1e-4, full_output=1)
+    argkw.update(tolerance)
     ex = quad(f, lower, upper, **argkw)
     if len(ex) == 4 or ex[0] == np.inf:
         msg = ex[-1].replace("\n", " ") if ex[-1] == str else "no message"
@@ -2008,6 +2030,114 @@ def _numerical_moms(severity):
         ex3a /= severity.pattach
 
     return ex1a, ex2a, ex3a
+
+
+def _excess_moments_quantile(fz, a, width, n, sev_name=''):
+    r"""``P[(X-a)^m; a < X <= a + width]``, ``m = 0..n``, by quantile quadrature.
+
+    Parameters
+    ----------
+    fz : scipy.stats frozen distribution
+        The law of ``X``, without its shift. It may have support below 0.
+    a : float
+        Attachment on ``X``; negative when the attachment is below the shift.
+    width : float
+        Layer width; may be ``np.inf``.
+    n : int
+        Highest power required, at most 3.
+    sev_name : str
+        Severity name, included in log messages.
+
+    Returns
+    -------
+    numpy.ndarray
+        Length ``n + 1``. ``np.nan`` signals an unreliable integral, ``np.inf``
+        a moment that does not exist.
+
+    Notes
+    -----
+    With :math:`q` the survival quantile function of :math:`X` and
+    :math:`c = \max(a, 0)`, the integrals are
+    :math:`I_k = \int_{S(a + y)}^{S(a)} (q(p) - c)^k\,dp` and
+
+    .. math::
+
+        \mathsf P[(X-a)^m; a < X \le a + y]
+            = \sum_{k=0}^{m}\binom{m}{k}(c - a)^{m-k} I_k.
+
+    At :math:`a \ge 0` only :math:`k = m` survives: the integrand is positive
+    and needs no attachment subtracted later, so a thin layer does not cancel
+    and a relative tolerance controls the answer. At :math:`a < 0` the
+    distance :math:`-a` to the shift stays out of the integrand, which is the
+    point of removing it, and :math:`I_k` may be near 0 (the mean of a ``norm``
+    with no location), so the absolute tolerance is set from the spread of the
+    law. :math:`-a` enters the sum exactly and only rounding remains, about
+    :math:`\epsilon (a / \sigma)^3` in a skewness.
+
+    The tolerance is tighter than :func:`_safe_integrate`'s default, which
+    leaves a skewness of ``100 * invgamma 5`` about 6e-5 out. It roughly doubles
+    the evaluations, to between 800 and 3,000 of ``isf``.
+    """
+    upper = float(fz.sf(a))
+    lower = float(fz.sf(a + width)) if np.isfinite(width) else 0.0
+    out = np.zeros(n + 1)
+    if upper <= lower:
+        return out
+    out[0] = upper - lower
+    if np.isfinite(width):
+        exists = [True] * n
+    else:
+        exists = [not (np.isinf(v) or np.isnan(v)) for v in fz.stats('mvs')][:n]
+    c = max(a, 0.0)
+    spread = abs(float(fz.isf(0.25)) - float(fz.isf(0.75)))
+    integrals = [out[0]]
+    reliable = True
+    for k in range(1, n + 1):
+        if not (reliable and exists[k - 1]):
+            integrals.append(np.nan)
+            reliable = False
+            continue
+        size = 0.0 if a >= 0 else out[0] * spread ** k
+        val, err = _safe_integrate(lambda p, _k=k: (fz.isf(p) - c) ** _k,
+                                   lower, upper, k, sev_name, limit=200,
+                                   epsabs=1e-10 * size, epsrel=1e-10)
+        reliable = err <= 1e-3 * max(abs(val), size)
+        integrals.append(val if reliable else np.nan)
+    for m in range(1, n + 1):
+        out[m] = (np.inf if not exists[m - 1] else
+                  sum(binom(m, k) * (c - a) ** (m - k) * integrals[k]
+                      for k in range(m + 1)))
+    return out
+
+
+def _numerical_moms_shifted(severity):
+    """Numerical moments of a shifted law, with the shift out of the integrand.
+
+    Parameters
+    ----------
+    severity : Severity
+        A severity with a ``fz0``, of a kind with no closed form.
+
+    Returns
+    -------
+    (m1, m2, m3) : tuple of float
+        As :func:`_numerical_moms`.
+
+    Notes
+    -----
+    Integrating ``isf ** k`` with the shift inside it, then differencing, is a
+    subtraction of numbers of size ``b ** k`` under a relative tolerance of 1e-4:
+    ``100 * weibull_min 2 + 100000`` had a skewness of 2,602. See
+    :func:`_excess_moments_quantile`, which does the work.
+    """
+    a = severity.attachment - severity._shift
+    y = severity.limit
+    moments = _excess_moments_quantile(severity.fz0, a, y, 3, severity.sev_name)[1:]
+    if np.isfinite(y):
+        moments = moments + y ** np.arange(1, 4) * float(severity.fz0.sf(a + y))
+    if severity.conditional:
+        moments = moments / severity.pattach
+    return tuple(float(v) for v in moments)
 
 
 class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
@@ -2248,6 +2378,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         # ``_build`` may also set ``self.signed`` (a discrete severity that
         # finds negative atoms is signed regardless of the constructor flag).
         self._build()
+        # Before the splice and reflection below mutate ``self.fz``.
+        self.fz0, self._shift = self._unshifted_law()
 
         # ---- shared post-build steps -------------------------------------
         # Order is load-bearing: splice (lb/ub) modifies the underlying
@@ -3007,15 +3139,29 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
            the trivial ``[0, inf]``, return those values immediately.
         2. **Analytic shortcut.** For the kinds of :data:`_ANALYTIC_KINDS`
            (``lognorm``, ``gamma``, ``pareto``, ``expon``, ``lomax`` and
-           ``beta``) with no shift or truncation, or a ``pareto`` shifted by
-           ``-scale`` (a Lomax), delegate to :func:`_moms_analytic`, which
-           computes layered moments in closed form via partial expected
+           ``beta``) with no truncation, delegate to :func:`_moms_analytic`,
+           which computes layered moments in closed form via partial expected
            values; see :meth:`_uses_closed_form_moments`. Defensive
            ``np.inf`` overrides are applied when the underlying moment does
            not formally exist (e.g. pareto shape <= 1).
         3. **Numerical fallback** :func:`_numerical_moms` integrates the
            survival quantile function over the layer interval and applies
            the attachment/detachment/conditional adjustments.
+
+        A shifted law ``X + b`` has the moments of ``X``, exactly, with the
+        shift applied after, so paths 2 and 3 work on ``X`` (``fz0``). A layer
+        ``y xs a`` on ``X + b`` is the layer ``y xs (a - b)`` on ``X``, and at
+        ``a < b`` every loss on ``X >= 0`` attaches, which the same expression
+        covers. The closed form stays in use and the shift never enters a
+        partial expectation or an integrand. Rounding limits what is left: a
+        skewness computed from raw moments loses about
+        :math:`\\epsilon (b / \\sigma)^3`.
+
+        Out of scope, each keeping its own path: splices (:meth:`_apply_lb_ub`,
+        quadrature on the spliced law), reflected clamped laws
+        (:meth:`_apply_reflect`), signed severities (:meth:`_apply_signed`,
+        scipy's own moments), ``cantor`` (its own ``_build``),
+        :class:`SeverityElt` and :class:`SeverityCopy`.
 
         Returns
         -------
@@ -3069,7 +3215,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         # 2. Closed-form via partial expected values for the supported kinds.
         if self._uses_closed_form_moments():
             logger.info('Analytic moments')
-            ma = _moms_analytic(self.fz, self.limit, self.attachment, 3)
+            fz, shift = self._law_without_shift()
+            ma = _moms_analytic(fz, self.limit, self.attachment - shift, 3)
             ex1a, ex2a, ex3a = ma[1:]
             # Defensive: when there is no upper limit, override with inf
             # for moments that the underlying RV does not have (e.g. pareto
@@ -3091,6 +3238,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
 
         # 3. Numerical fallback for everything else (scipy zoo minus the
         #    analytic kinds, plus any histogram with a layer).
+        if self.fz0 is not None:
+            return _numerical_moms_shifted(self)
         return _numerical_moms(self)
 
     def _uses_closed_form_moments(self):
@@ -3100,8 +3249,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         -------
         bool
             True for a kind of :data:`_ANALYTIC_KINDS`, unreflected, with no
-            splice, and either no shift or a ``pareto`` shifted by
-            ``-scale``.
+            splice. A shift does not matter: the closed form is given the law
+            without it (:meth:`_law_without_shift`).
 
         Notes
         -----
@@ -3110,20 +3259,56 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         other clause here and would be handed the UNREFLECTED closed form. A
         reflected law has no partial-expected-value shortcut, so it belongs on
         the numerical path.
-
-        The one shift admitted is ``sev s * pareto a - s``, the Lomax
-        written as a shifted Pareto, so it and ``sev s * lomax a`` take the
-        same path; :func:`_partial_e` sends both to :func:`_partial_e_lomax`.
         """
         if not (isinstance(self.sev_name, str)
                 and self.sev_name in _ANALYTIC_KINDS):
             return False
-        lomax_shift = (self.sev_name == 'pareto'
-                       and self.sev_loc == -self.sev_scale)
         return (not self.sev_reflect
-                and (self.sev_loc == 0 or lomax_shift)
                 and self.sev_lb == 0
                 and self.sev_ub == np.inf)
+
+    def _unshifted_law(self):
+        """The law of ``X`` in the severity ``X + b``, and the shift ``b``.
+
+        Returns
+        -------
+        (fz0, shift) : tuple
+            A frozen law with no location and the location removed, or
+            ``(None, 0.0)`` when there is nothing to remove.
+
+        Notes
+        -----
+        The shift is taken from the frozen law rather than ``sev_loc``, which
+        ``_build`` does not always use: a ``beta`` from a mean and cv is built
+        at location 0 whatever ``sev_loc`` is, and a law with no shape takes
+        its mean as its location.
+
+        ``(None, 0.0)`` for the laws whose moments are out of scope here: a
+        spliced, reflected or signed law, and any kind but ``scipy``, including
+        ``cantor``. Also for ``s * pareto a - s``, the Lomax written as a shifted
+        Pareto, which :func:`_partial_e` already computes without a reduction,
+        so it and ``s * lomax a`` keep the same path.
+        """
+        if (self.sev_kind != 'scipy' or self.sev_reflect or self.signed
+                or self.sev_lb != 0 or self.sev_ub != np.inf):
+            return None, 0.0
+        kwds = dict(self.fz.kwds)
+        shift = float(kwds.pop('loc', 0.0))
+        if shift == 0 or (self.sev_name == 'pareto' and shift == -kwds.get('scale', 1.0)):
+            return None, 0.0
+        return self.fz.dist(*self.fz.args, **kwds), shift
+
+    def _law_without_shift(self):
+        """The law to compute a layer on, and the amount to move the layer by.
+
+        Returns
+        -------
+        (fz, shift) : tuple
+            ``(fz0, shift)`` for a shifted law and ``(fz, 0.0)`` otherwise, so a
+            layer at ``attachment`` on the severity is a layer at
+            ``attachment - shift`` on ``fz``.
+        """
+        return (self.fz, 0.0) if self.fz0 is None else (self.fz0, self._shift)
 
     def _retention_moms(self):
         """First three moments of the payment under a finite retention end.
@@ -3136,31 +3321,31 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         Notes
         -----
         A discrete law sums ``g(x)^m`` over its atoms exactly. Otherwise the
-        moments come from :func:`_moms_retention` on partial expectations:
+        moments come from :func:`_moms_retention`, on the law without its shift:
         closed form for the kinds of :data:`_ANALYTIC_KINDS`, under the same
         conditions as the ordinary analytic path in :meth:`moms`
-        (:meth:`_uses_closed_form_moments`), and :func:`_partial_e_numeric` on
-        the (spliced) law for everything else.
+        (:meth:`_uses_closed_form_moments`), quantile quadrature for any other
+        shifted law, and :func:`_partial_e_numeric` on the (spliced) law for
+        everything else.
         """
         a, r, y = self.attachment, self.retention_end, self._exp_limit
         if isinstance(self.fz, _DiscreteRV):
             g = _retention_payment(self.fz.xk, a, r, y)
             raw = [float(np.sum(g ** m * self.fz.pk)) for m in (1, 2, 3)]
         else:
+            fz, shift = self._law_without_shift()
             if self._uses_closed_form_moments():
-                def difference(lo, hi):
-                    return _partial_e_difference(self.sev_name, self.fz, lo, hi, 3)
-
                 def excess(lo, width):
-                    return _excess_moments(self.sev_name, self.fz, lo, width, 3)
+                    return _excess_moments(self.sev_name, fz, lo, width, 3)
+            elif self.fz0 is not None:
+                def excess(lo, width):
+                    return _excess_moments_quantile(fz, lo, width, 3, self.sev_name)
             else:
-                def difference(lo, hi):
-                    return (np.asarray(_partial_e_numeric(self.fz, hi, 3), dtype=float)
-                            - np.asarray(_partial_e_numeric(self.fz, lo, 3), dtype=float))
-
                 def excess(lo, width):
-                    return _expand_about_attachment(difference(lo, lo + width), lo, 3)
-            raw = list(_moms_retention(difference, excess, self.fz.sf, a, r, y, 3)[1:])
+                    difference = (np.asarray(_partial_e_numeric(fz, lo + width, 3), dtype=float)
+                                  - np.asarray(_partial_e_numeric(fz, lo, 3), dtype=float))
+                    return _expand_about_attachment(difference, lo, 3)
+            raw = list(_moms_retention(excess, fz.sf, a, r, y, 3, shift)[1:])
         if self.conditional:
             if self.pattach == 0:
                 return 0.0, 0.0, 0.0

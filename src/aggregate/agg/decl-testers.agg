@@ -1597,7 +1597,27 @@ agg LO.Net 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed   
 # tests/test_layer_tail_moments.py.
 agg LM.Far 1 claim 10 xs 1e5 sev 100 * lognorm 1 fixed                            note{a / y = 1e4, a thin layer; second moment below 100, third positive};
 agg LM.Near 1 claim 10 xs 1000 sev lognorm 1 fixed                                note{a / y = 100, also thin};
-agg LM.Vanishing 1 claim 100 xs 1000 to 1100 disappearing sev lognorm 1 fixed     note{the third moment was -6.48e6, it is 953,304}
+agg LM.Vanishing 1 claim 100 xs 1000 to 1100 disappearing sev lognorm 1 fixed     note{the third moment was -6.48e6, it is 953,304};
+
+# SM. Shifted severities, moments without the shift ([Shift-Removed-Moments], 1.50.0)
+# ====================================================================================
+# The skewness is the skewness of the law, and the grid does not move. See
+# tests/test_shifted_severity_moments.py and tests/test_feasibility.py.
+agg SM.Gamma 1 claim sev 100 * gamma 2 + 10000 fixed                          note{skewness 1.41421, was 1.387};
+agg SM.GammaFar 1 claim sev 100 * gamma 2 + 1000000 fixed                     note{skewness 1.41430 at the rounding limit, was nan};
+agg SM.Lognorm 1 claim sev 100 * lognorm 1 + 10000 fixed                      note{skewness 6.18488};
+agg SM.Weibull 1 claim sev 100 * weibull_min 2 + 100000 fixed                 note{no closed form; skewness 0.63111, was 2,602};
+agg SM.Beta 1 claim sev 100 * beta 2 3 + 10000 fixed                          note{skewness 0.28571, was 21.98};
+agg SM.Invgamma 1 claim sev 100 * invgamma 5 + 10000 fixed                    note{skewness 3.46410, was -12.68};
+agg SM.Gumbel 1 claim sev 100 * gumbel_r + 10000 fixed                        note{support below 0; skewness 1.13955};
+agg SM.Norm 1 claim sev 100 * norm + 10000 fixed                              note{support below 0; skewness 0, was 0.963};
+agg SM.Clamp 1 claim sev 30 * norm + 100 fixed                                note{clamped at 0, mean 100.0034};
+agg SM.Above 1 claim 200 xs 1100 sev 100 * gamma 2 + 1000 fixed               note{a layer above the shift};
+agg SM.Below 1 claim 800 xs 500 sev 100 * gamma 2 + 1000 fixed                note{attaches below the shift, reaches into the law};
+agg SM.Constant 1 claim 300 xs 500 sev 100 * gamma 2 + 1000 fixed             note{every loss pays the limit};
+agg SM.Far 1 claim 100 xs 100000 sev 100 * lognorm 1 + 10000 fixed            note{moving the shift out moves the attachment into the tail};
+agg SM.Thick 5 claims sev 100 * lognorm 3 + 1000 poisson                      note{needs log2 25: InfeasibleGridWarning};
+agg SM.Medium 5 claims sev 100 * lognorm 2 + 1000 poisson                     note{needs log2 12, and warned when read as unshifted}
 
 
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)

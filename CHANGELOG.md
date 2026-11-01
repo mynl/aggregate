@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.50.0 - 2026-11-01
+
+**[Shift-Removed-Moments] A shifted severity `c * law + b` has the moments of the law, with the shift applied after.** Numbers move: `100 * gamma 2 + 10000` has skewness 1.41421, was 1.387; `+ 1000000` 1.41430, was `nan`; `100 * weibull_min 2 + 100000` 0.63111, was 2,602; `100 * norm + 500` a mean of 500.00000535, was 499.99995. Of the 30 shifted programs measured, 13 failed and 6 had a `nan` skewness; 26 now read `not unreasonable` and none is `nan`. The four that fail are at a shift of 1,000,000, the rounding limit of about epsilon `(b / sd)^3`. No `bs` or `log2` moves on any of the 327 corpus programs, and two false failures clear. A layer, franchise or disappearing deductible on a shifted law takes the same route. `feasible_bucket` and `size_biased_cdf` no longer read a shifted law as an unshifted one, so `InfeasibleGridWarning` moves: `100 * lognorm 2 + 1000` stops warning and `100 * lognorm 3 + 1000` still warns. New attribute: `Severity.fz0`, the law without its shift, or `None`. Splices, reflected and signed laws, `cantor`, `SeverityElt` and `SeverityCopy` keep their own paths.
+
 ## 1.49.0 - 2026-11-01
 
 **[Analytic-Layer-Tail-Cancellation] Layer moments on `lognorm`, `gamma`, `expon`, `pareto`, `lomax` and `beta` are right wherever the layer attaches.** Numbers move: `10 xs 1000` on `lognorm 1` goes from conditional moments 9.64, 111.2 and -14,784 to 9.657, 95.44 and 948.8, and `10 xs 1e5` on `100 * lognorm 1` from 8.28, 171,386 and -1.7e10 to 9.996, 99.95 and 999.5 and now reads `not unreasonable`. A far-tail franchise or disappearing deductible gets the same fix (`100 xs 1000 to 1100 disappearing` on `lognorm 1`: third moment -6.48e6 to 953,304). A layer at or below the median with attachment up to 16 times its width is unchanged to the bit. Thin layers move below the median as well (third moment by 1e-8 at attachment 17 times the width, 4e-3 at 1,000 times), and other layers past it by up to 6e-9 for a survival probability of at least 1e-3. `moms()` with a zero limit returns zeros rather than raising.

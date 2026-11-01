@@ -82,6 +82,17 @@
   `xsden_to_mwrangler` as the deficit in place of the raw-sum shortfall. Retires
   the 1e-12 relocation gate and fixes `J.Re14` at tall grids and
   `Bruno2006.B7`, the residual of `[Moment-Deficit-Genuine-Only]`.
+- **[Beta-Mean-Cv-Shift]**: `sev 100 * beta .5 cv .3 + 10` builds at location 0,
+  mean 50 where 60 is right, with only a printed target warning. The `beta` mean
+  and cv branch of `SeverityScipy._build` ignores `sev_loc`.
+- **[Numerical-Layer-Thin]**: `_numerical_moms` still expands about the attachment,
+  so a thin layer on an unshifted law with no closed form loses digits (`10 xs 1e5`
+  on `100 * weibull_min 0.5`: third moment off by 3e-7). Shifted laws already use
+  `_excess_moments_quantile`, which integrates the excess.
+- **[Shifted-Severity-Window]**: a narrow law far from 0 is sized from 0, so
+  `10 claims sev 100 * gamma 2 + 1000000 poisson` gets `bs` 800 against a severity
+  sd of 141 and a true `fails sev mean, agg mean`. These are real failures, not the
+  false ones `[Shift-Removed-Moments]` cleared. A window is the likely route, unmeasured.
 
 ## Tests
 
@@ -98,6 +109,10 @@
   Deferred because every unlimited lomax with shape up to about 2.5 in
   `library.agg` then raises `InfeasibleGridWarning` at log2 16 (shape 2.5 needs
   17.0, 1.8 needs 24.8). Measurements in `dev/done/plan-beta-lomax-exact.md`.
+- **[Feasibility-Splice]**: `feasible_bucket` ignores a splice and returns the
+  unspliced law's reading, so `sev 100 * lognorm 3 splice [50 5000]`, a bounded law,
+  needs `log2` 32.68 and reads `grid infeasible for this severity`. It should
+  decline, as it does for a reflected law.
 
 ## Grammar, parser and unparser
 

@@ -247,3 +247,81 @@ Divergences from the step as written:
   is discarded, so per `test-tiers` it takes an `np.errstate` guard and a Notes paragraph. No
   number moves. The `nan` starts well above rounding (at a skewness of 1e-13 too); that fallback is
   unchanged here and is not a finding about grids.
+
+Gate at 1.49.0: `uv run pytest -m 'slow or not slow' -W error::RuntimeWarning`, 10,118 passed, 1
+skipped.
+
+**`[Shift-Removed-Moments]`, 1.50.0.**
+
+| Severity | Skewness | Exact | Error | Variance |
+|:--|--:|--:|--:|--:|
+| `100 * gamma 2 + 10000` | 1.4142136 | 1.414214 | 0 | 20,000 |
+| `100 * gamma 2 + 100000` | 1.4142136 | 1.414214 | 0 | 20,000 |
+| `100 * gamma 2 + 1000000` | 1.4143041 | 1.414214 | 9.1e-5 | 20,000 |
+| `100 * lognorm 1 + 10000` | 6.1848771 | 6.184877 | 2.6e-11 | 46,707.74 |
+| `100 * weibull_min 2 + 10000` | 0.6311107 | 0.631111 | 5.6e-10 | 2,146.018 |
+| `100 * weibull_min 2 + 100000` | 0.6311121 | 0.631111 | 1.4e-6 | 2,146.018 |
+| `100 * beta 2 3 + 10000` | 0.2857143 | 0.285714 | 8.7e-9 | 400 |
+| `100 * invgamma 5 + 10000` | 3.4641019 | 3.464102 | 2.7e-7 | 208.333 |
+| `100 * gumbel_r + 10000` | 1.1395471 | 1.139547 | 1.4e-10 | 16,449.34 |
+| `100 * norm + 10000` | 0 | 0 | 0 | 10,000 |
+
+Of the 30 programs, 26 read `not unreasonable` and no skewness is `nan`. The four at the rounding
+limit, each `fails sev cv, agg cv`: `100 * weibull_min 2 + 1000000` (skewness 0.63604),
+`100 * expon + 1000000` (2.00013), `100 * beta 2 3 + 1000000` (0.25600) and
+`100 * invgamma 5 + 1000000` (3.40535). The seven layers agree with quadrature on the third moment
+to 2.0e-15 and all read `not unreasonable`. `30 * norm + 100` has `sev_m` 100.00336, which keeps the
+100.0034 of the plan (the exact value is $100\Phi(10/3) + 30\phi(10/3)$, and the old 100.00336178
+was the less accurate). `bs` and `log2` hold on the six sample programs.
+
+The corpora, every single line `agg` in `library.agg`, `_test_suite.agg` and `decl-testers.agg`,
+1.48.1 against this version, 327 programs: no grid moves. Two verdicts move, both false failures
+clearing (`D.Sev04`, `APX.Norm`), taking the count of failures from 34 to 32. Twelve feasibility
+readings move, all shifted laws. Thirteen moments move beyond 1e-9, each toward the exact value:
+`D.Sev04` (`100 * norm + 500`) has mean 500.00000535 against the exact $500\Phi(5) + 100\phi(5)$,
+was 499.99995, and `APX.AggReins` has skewness 1.118034, $\sqrt{1.25}$, was 1.118122.
+
+Moments of a shifted closed-form law cost about 12 ms to build and take, and of one with no closed
+form 30 to 80 ms, roughly twice what they cost when they were wrong (2,500 evaluations of `isf`
+against 1,200).
+
+Divergences from the step as written:
+
+- **No `_moms_shifted`.** The three cases of step 2 are one call:
+  `_moms_analytic(fz0, y, a - b, n)`. With $a' < 0$, $X \ge 0$ makes the lower partial expectations 0
+  up to $-a'$, and the expansion about $a'$ has only positive terms, so $y \le d$ gives $y^m$ and
+  $y > d$ gives the author's binomial, which `test_binomial_expansion_of_the_method` confirms to
+  1e-12. `Severity._law_without_shift` returns the law and the amount to move the layer by.
+- **`fz0` is `None` for `s * pareto a - s`**, which `sev_loc != 0` would catch. It keeps its path, so
+  it agrees with `s * lomax a` as before.
+- **The shift is taken from the frozen law, not `sev_loc`.** The `beta` mean and cv branch of `_build`
+  ignores `sev_loc`, and with the gate open `sev_loc` would have shifted a law built at 0. See
+  `[Beta-Mean-Cv-Shift]` below.
+- **`_numerical_moms` is left verbatim, and shifted laws go to a new `_numerical_moms_shifted`.**
+  Item 3 specifies "integrate the unshifted `isf` and expand". At $a' < 0$ that holds. At $a' \ge 0$
+  the excess $(q - a')^m$ is integrated directly, since the integrand is then positive and a thin layer
+  cannot cancel: `10 xs 101000` on `100 * weibull_min 0.5 + 1000` is good to 2e-16.
+- **The tolerance is 1e-10, not `_safe_integrate`'s default.** At 1e-4 the unshifted integrals leave
+  `100 * invgamma 5 + 10000` 6.4e-5 from the exact skewness, outside the plan's 1e-6. `_safe_integrate`
+  takes optional tolerances. Its relative acceptance test would have rejected the mean of an unshifted
+  `norm`, which is 0, and returned `nan`, so at $a' < 0$ the test is against the spread of the law.
+- **The acceptance on `100 * weibull_min 2 + 100000` is 1e-5, not 1e-6.** The sd is 46, so
+  $\epsilon (b/\sigma)^3$ is 1.1e-6. The plan allows for this at a shift of 1e6 on the gamma and not
+  here, and 1.4e-6 is the same limit. The other nine meet the plan's figures.
+- **`feasible_bucket` computes rather than declines**, by ruling 2, and `tests/test_feasibility.py`
+  tests the values.
+- **The conditional divisor stays `self.pattach`.** It is `fz.sf(a)`, and `fz0.sf(a')` is the same
+  number, so there was nothing to change.
+- **`_moms_retention` writes the identity piece about $d_2$**, and takes `excess` alone, dropping the
+  `difference` argument 1.49.0 gave it. The shift then enters only as the attachment moved down, and
+  all terms are positive.
+
+Left alone and put on `dev/TODO.md`, none from this plan: `[Beta-Mean-Cv-Shift]` and
+`[Feasibility-Splice]` measure the same on 1.48.1, `[Numerical-Layer-Thin]` is in the verbatim
+`_numerical_moms`, and `[Shifted-Severity-Window]` gives the same verdicts at 1.49.0.
+
+No Using page. The plan adds nothing a user calls: `fz0` is the one new name, on the same footing as
+`fz`, and everything else is a corrected number.
+
+Gate at 1.50.0: `uv run pytest -m 'slow or not slow' -W error::RuntimeWarning`, 10,265 passed, 1
+skipped.

@@ -23,7 +23,8 @@ import pytest
 from aggregate import build
 from aggregate._bucket_window import (FEASIBILITY_SLACK, grid_is_infeasible,
                                       severity_feasibility)
-from aggregate._severity import feasible_bucket, size_biased_cdf
+from aggregate._severity import (Severity, _layered_lev, feasible_bucket,
+                                 size_biased_cdf)
 from aggregate.constants import (InfeasibleGridWarning, Validation,
                                  reset_warn_once)
 
@@ -292,6 +293,51 @@ def test_a_different_grid_is_a_different_warning():
         build(CAT, log2=16)
     with pytest.warns(InfeasibleGridWarning):
         build(CAT, log2=18)
+
+
+# ---------------------------------------------------------------------------
+# A shifted law ([Shift-Removed-Moments])
+# ---------------------------------------------------------------------------
+
+def test_a_shifted_law_is_not_read_as_an_unshifted_one():
+    """It was read as an unshifted gamma of scale 5,100: 13,189.6 and 0.3127."""
+    sev = Severity('gamma', sev_a=2, sev_scale=100, sev_loc=10000)
+    assert _layered_lev(sev, 10000) == pytest.approx(10000)
+    assert size_biased_cdf(sev, 10000) == 0
+    assert _layered_lev(sev, np.inf) == pytest.approx(10200)
+
+
+@pytest.mark.parametrize('kind, shape, shift, log2_required, reach', [
+    ('gamma', 2.0, 10000, -0.83, 1.126e4),
+    ('lognorm', 1.0, 10000, -0.36, 1.554e4),
+    ('lognorm', 2.0, 1000, 12.06, 8.544e6),
+    ('lognorm', 3.0, 1000, 25.39, 8.795e10),
+])
+def test_feasibility_of_a_shifted_law(kind, shape, shift, log2_required, reach):
+    """All of the mean lies above the shift, so ``bs_max`` is twice it and the top binds."""
+    sev = Severity(kind, sev_a=shape, sev_scale=100, sev_loc=shift)
+    bs_max, top = feasible_bucket(sev, 1e-4)
+    assert bs_max == pytest.approx(2 * shift, rel=1e-3)
+    assert top == pytest.approx(reach, rel=1e-3)
+    assert np.log2(top / bs_max) == pytest.approx(log2_required, abs=0.01)
+
+
+def test_a_thick_shifted_law_still_warns():
+    """A decline would have silenced this: the grid really is infeasible."""
+    reset_warn_once()
+    with pytest.warns(InfeasibleGridWarning) as rec:
+        a = build('agg SM.Thick 5 claims sev 100 * lognorm 3 + 1000 poisson')
+    assert 'log2 = 25' in str(rec[0].message)
+    assert grid_is_infeasible(a._bs_feasibility)
+
+
+def test_a_shifted_law_no_longer_warns_for_the_law_it_is_not():
+    """Read as unshifted this needed log2 21.45 and warned at 16."""
+    reset_warn_once()
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', InfeasibleGridWarning)
+        a = build('agg SM.Medium 5 claims sev 100 * lognorm 2 + 1000 poisson')
+    assert not grid_is_infeasible(a._bs_feasibility)
 
 
 def test_the_flag_joins_the_severity_row_of_an_exhibit():

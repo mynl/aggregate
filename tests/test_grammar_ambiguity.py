@@ -105,8 +105,9 @@ def test_no_new_grammar_ambiguities(explicit_parser):
         try:
             tree = explicit_parser.parse(statement)
         except Exception:
-            # decl-testers.agg carries intentional parser-error fixtures
-            # (section X); an unparseable statement cannot be ambiguous.
+            # An unparseable statement cannot be ambiguous; every shipped corpus
+            # parses, and test_decl_parser and test_decl_unparser report one that
+            # stops.
             continue
         n = sum(1 for st in tree.iter_subtrees() if st.data == '_ambig')
         if n:

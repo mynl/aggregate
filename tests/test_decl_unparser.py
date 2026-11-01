@@ -4,14 +4,14 @@ The unparser is the structural inverse of the parser. Its contract (see
 ``dev/done/plan-decl-unparser.md`` and the ``decl_writer`` module docstring) is
 **idempotence one step removed**: with ``f = spec_to_decl``,
 ``f(f(f(x))) == f(x)``. Concretely, for every program in the reference corpus
-(``_test_suite.agg`` + ``_test_suite2.agg`` + ``decl-testers.agg``):
+(``_CORPUS_FILES``):
 
 * **idempotence** --- rendering the spec, re-parsing, and rendering again yields
   byte-identical text (the universal gate); and
 * **fidelity** --- the re-parsed spec equals the original under a
   numpy/inf/object-aware comparator (holds for every line except a handful of
   genuinely lossy constructs whose first-parse spec is not a canonical fixed
-  point --- e.g. ``tweedie``, which bypasses the ``sev_weighted`` defaults).
+  point: ``_FIDELITY_EXEMPT``).
 
 A bare ``spec0 == spec1`` would raise on the ndarrays the specs carry (the same
 array-truthiness trap fixed in hygiene-3), so the comparator below is explicit.
@@ -33,36 +33,35 @@ from aggregate.parser import UnderwritingLexer
 # ----------------------------------------------------------------------
 
 _AGG_DIR = Path(aggregate.__file__).parent / 'agg'
-_CORPUS_FILES = ['_test_suite.agg', '_test_suite2.agg', 'decl-testers.agg']
+# ``library.agg`` is here for the grammar rules ``decl-testers.agg`` leaves to it
+# (``tower``, ``sev_builtin``, ``freq_mixed_two``, ...), which no other file
+# round-trips.
+_CORPUS_FILES = ['_test_suite.agg', '_test_suite2.agg', 'decl-testers.agg', 'library.agg']
 
 # Genuinely lossy / non-canonical-spec constructs: idempotence holds but the
-# first parse's spec is not a fixed point, so fidelity is exempt. Empty since
-# 1.0.0a231, when the tweedie clause (its only member: it discarded its note and
-# baked a CP-gamma spec that bypassed the sev_weighted defaults) started
-# round-tripping through the ``_tweedie`` provenance key.
-_FIDELITY_EXEMPT: set[str] = set()
+# first parse's spec is not a fixed point, so fidelity is exempt. These six are
+# a pnl or xpnl on a named engine reference: the parser keeps the referenced
+# recipe's note as ``engine_note``, presentation metadata the underwriter strips
+# before build, and the canonical form inlines the engine with nowhere to write
+# it. [Unparser-Reference-Gaps] holds the wider family; ``UNPARSER_EXEMPT`` in
+# ``test_agg_libraries.py`` lists them for the same cause.
+_FIDELITY_EXEMPT: set[str] = {
+    'Capstone.XOL.PnL', 'Capstone.PnL', 'Capstone.Capped',
+    'SwingRatedAggCover', 'RetroRatedAccount', 'SlidingScaleCommission',
+}
 
 # The corpus programs reference builtins the corpus itself defines (``sev.One``
-# from ``_test_suite.agg``, the ``agg.ASV.*`` severity references in
-# ``decl-testers.agg``), so parse against an underwriter that carries the WHOLE
-# corpus, not the module-level ``build`` singleton -- ``build`` defaults to the
-# curated ``library``, which has none of them.
+# and the ``agg.ASV.*`` severity references in ``decl-testers.agg``,
+# ``sev.UnitSeverity`` in ``library.agg``), so parse against an underwriter that
+# carries the WHOLE corpus, not the module-level ``build`` singleton, which holds
+# only the curated ``library``.
 #
-# Preloaded line by line rather than through ``databases=`` because
-# ``decl-testers.agg`` deliberately does not load clean: its section X is
-# intentional parse-error fixtures. Failures are swallowed here exactly as in
-# ``conftest.underwriter``, so they surface as the individual test failures they
-# are meant to be. File order is definition-before-use, and the three files have
-# no ``(kind, name)`` collisions between them, so nothing shadows anything.
-# Preloaded LAZILY, on first use: parsing the corpus costs about 11 seconds, and
-# an import-time preload pays that in every xdist worker whether or not the
-# worker got any of these tests. ``Underwriter(databases=…)`` is lazy for the
-# same reason, but cannot be used here: ``decl-testers.agg`` deliberately does
-# not load clean (its section X is intentional parse-error fixtures) and
-# ``load`` aborts on the first error. Failures are swallowed exactly as in
-# ``conftest.underwriter``, so they surface as the individual test failures they
-# are meant to be. File order is definition-before-use, and the three files have
-# no ``(kind, name)`` collisions between them, so nothing shadows anything.
+# Preloaded LAZILY, on first use: an import-time preload pays for parsing the
+# corpus in every xdist worker whether or not the worker got any of these tests.
+# Line by line rather than through ``databases=``, because ``load`` aborts on the
+# first error and a program that stops parsing should surface as its own failed
+# case. File order is definition-before-use, and the files have no
+# ``(kind, name)`` collisions between them, so nothing shadows anything.
 _uw = Underwriter()
 _uw_ready = False
 

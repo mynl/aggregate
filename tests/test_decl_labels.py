@@ -7,7 +7,7 @@ legs). No computed value changes -- labels land in dict keys, column headers, an
 repr / exhibit titles. See ``dev/plan-decl-labels.md``.
 
 The DecL programs here are mirrored in ``src/aggregate/agg/decl-testers.agg``
-section Y (this module is the canonical source).
+section LB (this module is the canonical source).
 """
 import pytest
 

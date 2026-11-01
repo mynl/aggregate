@@ -15,9 +15,10 @@ This is the lasting net that lets the temporary ``_test_suite`` /
 ``_test_suite2`` migration scaffolding (and its SLY snapshot) retire before
 beta: the user-facing library carries its own coverage here.
 
-``decl-testers.agg`` is deliberately excluded -- it is the language-stress
-corpus and includes intentional parser-error fixtures (section X), so it must
-not load clean; it is exercised by ``test_decl_unparser`` and the mirrored
+``decl-testers.agg`` is deliberately excluded: it is the language-stress corpus
+and reuses names across kinds, so the invariants here do not apply to it. It
+loads clean, since its parser-error fixtures (section X) are commented out, and
+it is exercised by ``test_decl_parser``, ``test_decl_unparser`` and the mirrored
 pytest cases.
 """
 from collections import Counter

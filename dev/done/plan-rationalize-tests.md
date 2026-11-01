@@ -159,4 +159,17 @@ the wheel is 27 KB smaller.
 
 ## Execution log
 
-(filled at execution)
+Executed 2026-11-01 against 1.60.1 (`7b03e388`), 17 versions after the draft. **Ruling, 2026-11-01:** Claude commits and pushes all three steps. The draft left the first two for the author, but the third step's bump deletes what they migrate away from, so it could not land until they were committed.
+
+**The review, against 1.60.1.** The premises hold: `[Correctness-Oracle]` landed at 1.48.1 and `[Severity-Parameter-Count]` at 1.51.0, the six rules and their scaffold line numbers are as the table states, and the API, PMIR and the Using site use none of the removed names. A sequential parse and a fully loaded underwriter give the same spec for every statement, so no statement depends on load order. Line numbers elsewhere have moved (sections Y and Z of `decl-testers.agg` are now at 195 and 774, 223 and 800; `test_characteristic_function.py` 1371 is 1400), and every named symbol still exists.
+
+### `[Decl-Testers-Coverage]`
+
+Acceptance measured: every rule of `_test_suite.agg` is exercised by `decl-testers.agg` or `library.agg`, and the list of rules only the scaffold exercises is empty. `decl-testers.agg` has 647 statements and 276 rules. Fast suite: 9026 passed, 3 skipped.
+
+Divergences:
+
+- **The later Y and Z are named for their programs.** The plan asked only that the later pair be renamed. They become `LB` and `IG`, the prefixes their programs already carry, and `test_decl_labels.py` follows.
+- **Section headings lose their dashes**, since the Contents list is generated from them and the list now names all 71 sections.
+- **The library round trip is 198 faithful, 2 skipped, 6 exempt, not 206.** `Capstone.XOL.PnL`, `Capstone.PnL`, `Capstone.Capped`, `SwingRatedAggCover`, `RetroRatedAccount` and `SlidingScaleCommission` are a pnl or xpnl on a named engine. The parser keeps the referenced recipe's note as `engine_note`, the underwriter strips it before build, and the canonical form inlines the engine with nowhere to write it. All six stay idempotent. They go in `_FIDELITY_EXEMPT`, which had been empty since 1.0.0a231, since this step changes tests only, and `[Unparser-Reference-Gaps]` records the loss.
+- **The rule census has moved a little.** Five, not seven, rules are exercised by the scaffold and `library.agg` but not `decl-testers.agg`, since later programs picked up `layers_xs_disappearing` and `layers_xs_franchise`.

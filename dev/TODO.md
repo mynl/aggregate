@@ -131,7 +131,10 @@
   plus the `decl_writer` round trip, the reference regen and the corpora.
 - **[Unparser-Reference-Gaps]**: shrink `UNPARSER_EXEMPT` in
   `tests/test_agg_libraries.py`, the `library.agg` entries `decl_writer`
-  cannot render back as written.
+  cannot render back as written. Six of them (`_FIDELITY_EXEMPT` in
+  `tests/test_decl_unparser.py`) also lose `engine_note` on the round trip: a
+  pnl or xpnl on a named engine keeps the referenced recipe's note, and the
+  inlined engine has nowhere to write it.
 
 ## P&L and bivariate
 

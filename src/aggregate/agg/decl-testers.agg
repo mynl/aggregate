@@ -16,9 +16,6 @@
 # ``tests/`` tree (the Python module is the canonical source). When you add a
 # pytest case with a DecL program, append it here under the matching section.
 #
-# Letter prefixes P..X continue the A..O of `_test_suite.agg`, so the two do
-# not collide if loaded together.
-#
 # DecL syntax reminders honoured here:
 #   * ``port`` definitions are single-line (sub-agg clauses inlined).
 #   * the trailer clauses ``note{...}`` / ``tags{...}`` / ``hints{...}`` are
@@ -27,18 +24,80 @@
 
 # Contents
 #
-# P. Baseline harness — Aggregate regression cases   (tests/baseline/corpus.py)
-# Q. Baseline harness — Portfolio regression cases   (tests/baseline/corpus.py)
-# R. PEG regression — two-unit lognorm + gamma mix   (tests/peg.py)
-# S. Bounds regression — bounded BDD portfolio       (tests/test_bounds.py)
+# P. Baseline harness: Aggregate regression cases    (tests/baseline/corpus.py)
+# Q. Baseline harness: Portfolio regression cases    (tests/baseline/corpus.py)
+# R. PEG regression: two-unit portfolio              (tests/peg.py)
+# S. Bounds regression: BDD portfolio                (tests/test_bounds.py)
 # T. Splice / layered-severity regressions           (tests/test_splice_suite.py)
-# U. Validation regressions — symmetric & low-skew   (tests/test_validation.py)
+# U. Validation regressions: symmetric & low-skew    (tests/test_validation.py)
 # V. Underwriter / build smoke fixtures              (tests/test_underwriter.py)
 # W. Distortion DecL constructors                    (tests/test_distortion_construction.py)
 # X. Parser-error fixtures (intentional typos)       (tests/test_parser_errors_integration.py)
+# Y. Reinsurance reporting regressions
+# Z. Bivariate (joint ceded, net) occurrence reinsurance
+# MV. The bivariate keyword: copula-coupled aggregates (1.0.0a24)
+# GH. Exponential-tilting pedagogy (Grübel-Hermesmeier, 1.0.0a46)
+# APX. Method-of-moments approximation keyword (1.0.0a47)
+# BKT. Portfolio combine grid: best_window (1.0.0a49)
+# WIN. Non-zero aggregate output window: windowed sizing (1.0.0a51)
+# SBJ. Single-big-jump extent floor: heavy / signed sevs (1.0.0a59)
+# USE. Tail-report-driven bucket selection (1.0.0a64)
+# SPK. Single placement keyword: what retiring 'so' freed (1.0.0a249)
+# DW. decl_writer unparser coverage (1.0.0a53)
+# UD. Unit-density accessors (numerics-1)
+# SC. Signed / payoff distortion calibration (1.0.0a99)
+# EV. Margin acceptability: evaluate solves rho_g(margin) = 0
+# UM. DecL unary minus on a severity (1.0.0a109)
+# EXP. P&L gross expenses + ceded premium / commission (Phase 1)
+# LB. DecL labels & expense grouping                 (tests/test_decl_labels.py)
+# IG. Reins economics on a plain agg (ignored + warned)
+# AA. The pnl/xpnl composition matrix ([One-Classifier-Fix])
+# AB. Renewal wait-clause frequencies ([Renewal-Frequency-Wait-Clause])
+# AC. Zero-truncated / zero-modified frequency ([ZT-ZM-Frequency-Fix])
+# AD. Eventual-ruin solvers ([Ruin-Wiener-Hopf])
+# AE. Trailer attachment ([Recipe-Library])
+# AF. tags{...} ([Recipe-Library])
+# AG. note/tags/hints bodies are free text (1.0.0a177)
+# AH. OEP curve fixtures ([OEP-Curve], 1.0.0a180)
+# AI. Layer peeling ([Layer-Peeling-Shorthand], 1.0.0a183)
+# SH. Sharpen: the (bs, log2) neighbourhood probe (1.0.0a192)
+# EX. Exhibits module fixtures (1.0.0a200)
+# CH. Chart IR emitter fixtures (1.0.0a212)
+# DP. Derived programs: the text that reproduces an object you arrived at
+# WP. Warning-policy fixtures (1.0.0a219)
+# PT. Type-I Pareto fixtures (1.0.0a221)
+# RV. Reinsurance pricing views (1.0.0a223)
+# RS. Reflected severity as an ordinary loss (1.0.0a230)
+# PR. Pricing result objects (1.0.0a259)
+# UA. The p = 1 asset anchor guard (1.0.0a260)
+# EA. The evaluation asset anchor (1.0.0a261)
+# FYI. Informational premium on the claims / loss heads (1.0.0a266)
+# PA. Full arithmetic inside parentheses (1.0.0a268)
+# DRV. Derived premium (1.0.0a270)
+# ASV. An agg or port as a severity (1.0.0a291)
+# MXT. Mixture component thinning (1.0.0a316)
+# CAN. Cantor severity regressions (1.0.0a347)
+# TW. Tower loss window fixtures (1.0.0a352)
+# MD. Empirical-moment deficit regressions           (tests/test_moment_deficit.py)
+# NTA. Exact arithmetic in nttagg probabilities ([NTT-Rational-Arithmetic], 1.4.0)
+# OAT. Annual terms on an occurrence layer ([Occurrence-Annual-Terms], 1.8.0)
+# LT. Event and year loss tables ([DecL-Loss-Tables], 1.12.0)
+# TWS. The coefficient of variation form of the tweedie clause ([Tweedie-Statement], 1.22.0)
+# FLB. Dyadic lattice buckets ([Fractional-Lattice-Bucket], 1.24.0)
+# LV. The lattice of every view ([Lattice-Views], 1.45.0)
+# WH. A grid at a lattice bucket holds the claim ([Window-Holds-Severity], 1.46.0)
+# PF. A Portfolio follows its units' grids ([Portfolio-Follows-Unit-Grid], 1.47.0)
+# LW. A lattice the cap cannot hold ([Lattice-Infeasible-Warning], 1.48.0)
+# LO. The programs that started the lattice study ([Correctness-Oracle], 1.48.1)
+# LM. Layer moments on a closed-form law, wherever the layer attaches ([Analytic-Layer-Tail-Cancellation], 1.49.0)
+# SP. Severity numbers a family can take ([Severity-Parameter-Count], 1.51.0)
+# SM. Shifted severities, moments without the shift ([Shift-Removed-Moments], 1.50.0)
+# CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)
+# NL. Named stable and tweedie laws ([Named-Conversion-Statements], 1.42.0)
+# TS. Programs moved from the SLY-parity scaffold ([Scaffold-Retirement])
 
 
-# P. Baseline harness — Aggregate regression cases
+# P. Baseline harness: Aggregate regression cases
 # ================================================
 # Pinned grids and snapshots in tests/baseline/data/. Each case targets a
 # specific path through the FFT pipeline; together they fence the v1.0
@@ -54,7 +113,7 @@ agg P.Def.Pareto   1 claim sev 1000 * pareto 1.5 - 1000 fixed                   
 agg P.Mix         [10 20] claims [100 400] xs 0 sev lognorm [20 40 100] cv [.5 .6 .7] wts=3 mixed gamma .2                note{bounded mixture, mixed gamma frequency}
 
 
-# Q. Baseline harness — Portfolio regression cases
+# Q. Baseline harness: Portfolio regression cases
 # ================================================
 # Three portfolios cover (i) unbounded gamma/lognorm with fixed-1 frequency,
 # (ii) bounded beta mixture, (iii) bounded discrete (Bodoff). Used to pin
@@ -65,7 +124,7 @@ port Q.Port.Bounded agg A dfreq [1:3] sev 500 * beta 5 2 agg B dfreq [1:5] sev 8
 port Q.Port.Bodoff  agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fixed agg quake 1 claim sev dhistogram xps [0, 100] [0.95, 0.05] fixed
 
 
-# R. PEG regression — two-unit portfolio
+# R. PEG regression: two-unit portfolio
 # ======================================
 # The calibrate-distortions / pricing-pipeline regression fixture
 # (tests/peg.py). Exercises a limit-and-attachment severity, a three-component
@@ -76,7 +135,7 @@ port Q.Port.Bodoff  agg wind 1 claim sev dhistogram xps [0, 99] [0.80, 0.20] fix
 port R.PEG agg A 100 claims 50 xs 0 sev lognorm [30 50 100] cv [0.1 .6 1.8] wts [.5 .25 .25] mixed gamma .25 agg B 150 claims 100 xs 0 sev lognorm [30 50 100] cv [0.1 .6 1.8] wts [.5 .25 .25] mixed gamma .35
 
 
-# S. Bounds regression — BDD portfolio
+# S. Bounds regression: BDD portfolio
 # ====================================
 # Bounded beta severities, fixed-1 frequency: a finite-support portfolio
 # where the closed-form anchor (premium = TVaR_0.5(total) → p_star = 0.5)
@@ -98,7 +157,7 @@ agg T.SpliceLayer02 1 claim 2 xs 8 sev 10 * uniform + 5 splice [8 12] fixed     
 agg T.SpliceUnbounded 5 claims sev lognorm 40 cv .65 splice [1 100] poisson                   note{splice on unbounded base; window must be finite}
 
 
-# U. Validation regressions — symmetric & low-skew
+# U. Validation regressions: symmetric & low-skew
 # ================================================
 # Symmetric distributions whose analytic skew is exactly 0. The validation
 # code must not flag empirical skew dust as a CV/skew failure
@@ -182,7 +241,7 @@ dist W.tas as "My PH" ph 0.7
 # These lines DO NOT parse — they exercise the error-report pipeline
 # (tests/test_parser_errors_integration.py, tests/test_parser_errors.py).
 # Excluded from the read-database loaders (they would log a parse error).
-# Listed for reference only; commented so test_suite parsers skip them.
+# Listed for reference only; commented so the parsers skip them.
 #
 # agg X.Typo01 100 claims sev lognorm 100 cv 2 mixd poisson 0.5     note{"mixd" -> "mixed"; UnexpectedCharacters; suggestion in report}
 # agg X.Typo02 100 claims sev lognorm 100 cv 2 + +                  note{stray punctuation; UnexpectedToken}
@@ -482,7 +541,7 @@ agg APX.AggReins 100 claim sev lognorm 100 cv 2 poisson aggregate net of 100 xs 
 pnl APX.PnL 600000 prem less agg APX.PnL_e 5000 claim sev lognorm 100 cv 2 poisson approximate sgamma
 
 # ============================================================
-# BKT. Portfolio combine grid -- best_window (1.0.0a49)
+# BKT. Portfolio combine grid: best_window (1.0.0a49)
 # ============================================================
 # Resolution + span combine: bs = round_bucket(max(min_k bs_k, W_tot / N)),
 # replacing the legacy root-sum-square `best_bucket` (which coarsened with unit
@@ -495,7 +554,7 @@ port BucketTinyDisc agg D1 dfreq[2] dsev[1 2] agg D2 dfreq[3] dsev[1 2 3];
 port BucketFat agg F1 100 claims sev lognorm 100 cv 2 poisson agg F2 80 claims sev lognorm 120 cv 1.5 poisson
 
 # ============================================================
-# WIN. Non-zero aggregate output window -- windowed sizing (1.0.0a51)
+# WIN. Non-zero aggregate output window: windowed sizing (1.0.0a51)
 # ============================================================
 # A concentrated aggregate (actual_cv < 1/z, mass band clears 0) is computed on a
 # two-sided window far from 0 via benign FFT wrap: bs sizes off the band width,
@@ -507,7 +566,7 @@ agg Window 10000000 claims dsev [1 2] poisson;
 agg WinCts 100000 claims sev lognorm 100 cv 0.5 poisson
 
 # ============================================================
-# SBJ. Single-big-jump extent floor -- heavy / signed sevs (1.0.0a59)
+# SBJ. Single-big-jump extent floor: heavy / signed sevs (1.0.0a59)
 # ============================================================
 # The 3-moment MoM window is blind to a tail the first three moments miss. The
 # extent (not the resolution) is floored by one big claim on a typical bulk:
@@ -771,7 +830,7 @@ pnl VR.Corridor 10000 premium less agg VR.Corridor_e 10000 prem at 85% lr sev lo
 pnl VR.Retro retro basic 3000 lcm 1.1 min 3500 max 8000 premium less agg VR.Retro_e 1000 loss sev lognorm 100 cv 2 poisson                                                          note{retro: stochastic gross premium of net account loss}
 
 # ============================================================
-# Y. DecL labels & expense grouping                  (tests/test_decl_labels.py)
+# LB. DecL labels & expense grouping                 (tests/test_decl_labels.py)
 # ============================================================
 # The `as` display-label clause: a bareword skips the quote tax, a "quoted"
 # label carries spaces. `name` stays the identity handle; the label is
@@ -797,7 +856,7 @@ agg LB.SevClause 100 claims sev lognorm 100 cv 2 as "ISO ME B" poisson          
 agg LB.AllInterior 10000 premium as GWP at 0.65 lr 1000 xs 500 as "Layer 1" sev lognorm 100 cv 2 as "ISO" poisson      note{all three interior labels combine};
 
 # ============================================================
-# Z. Reins economics on a plain agg (ignored + warned)
+# IG. Reins economics on a plain agg (ignored + warned)
 #                                   (tests/test_agg_ignored_clauses.py)
 # ============================================================
 # [Reins-Economics-On-Agg-Ignore-Warn]: a pure aggregate accepts every
@@ -1738,3 +1797,50 @@ stable NL.Combo     stable.NL.X0 + 2 * stable.NL.X1 + 3       note{the three ope
 stable NL.Net as Net stable.NL.Limit - stable.NL.Limit2       note{two limit laws, a long and a short position};
 stable NL.Copies    3 @ stable.NL.X1                          note{three independent copies};
 stable NL.Copy      stable.NL.X0                              note{a copy under another name};
+
+
+# TS. Programs moved from the SLY-parity scaffold ([Scaffold-Retirement])
+# ========================================================================
+# The statements of the scaffold no other corpus replaced when it retired. Names
+# are unchanged because tests address them: `agg.J.Re14`, and `CHF.VG` in
+# KNOWN_AMBIGUOUS of tests/test_grammar_ambiguity.py.
+#
+# The only exercise of numbers_range_step, ntt_doutcomes_range_step, ntt_multiply
+# and stable_shift_down.
+agg O.Logo 1 claim [10:250:10] xs 0 sev lognorm 100 cv 1 fixed;
+nttagg NTT.Stepped as "Even Counts" dfreq [2:10:2] dsev [5] [1/1] note{range-with-step outcomes, degenerate severity, display label};
+nttagg NTT.Arithmetic dfreq [1:3] dsev [1:3] [1/2 (1/2-1/(13*11*(19**3))) (1/(13*11*(19**3)))] note{exact arithmetic inside parentheses};
+stable SN.Plain          1.5 0 note{index and skewness, unit scale, zero location};
+stable SN.Copies as "Three copies" 3 @ stable.SN.Plain - 1;
+
+# The recipes tests/test_moment_deficit.py builds by name, and the severity one
+# of them refers to.
+sev One dsev [1];
+agg Cb.Freq12.IG           10 claims sev.One mixed ig .65;
+agg Cc.Freq24.Binomial    4 claims dsev [1] binomial 0.6 zm .5 !     note{Cannot make p0 smaller than the natural p};
+agg J.Re14  1000 prem at .5 lr sev lognorm 10 cv [.2 .35 .5] wts=3 occurrence ceded to .5 xs .5 and .5 po 1.0 xs 1.0 and 25% po 3.0 xs 2.0       mixed gamma 0.5  aggregate ceded to 1.5 xs 1.5 and 5.0 po 10.0 xs 12.5;
+
+# The chfagg statements tests/test_characteristic_function.py builds. CHF.StableS0
+# and CHF.TweedieCV are the only exercise of chf_stable_param and chf_tweedie_cv.
+chfagg CHF.Stable       2 * stable 1.5 1 note{a totally skewed stable law, tilted};
+chfagg CHF.StableS0     2 * stable 1.5 1 s0 - 2 note{the same law written in S0};
+chfagg CHF.Wrap         stable 0.7 1 hints{tilt=False} note{the same law untilted, wrapping, for teaching};
+chfagg CHF.TwoSided     stable 1.5 0.5 hints{tilt=8} note{two heavy tails, split, both halves tilted by 8 e-folds};
+chfagg CHF.Gamma        25 * gamma 4 note{the compound engine's 25 * gamma 4 severity, computed directly};
+chfagg CHF.GammaCV      gamma 100 cv 0.5 hints{log2=14} note{the mean and cv form, with a grid hint};
+chfagg CHF.Normal as "Signed" 30 * norm + 100 note{a signed window, with a display label};
+chfagg CHF.InvGauss     400 * invgauss 0.25 tags{topic:numerics} note{inverse Gaussian with mean 100 and shape 400};
+chfagg CHF.Tweedie      tweedie 1.5 100 2 note{the compound Poisson gamma member, with its atom at 0 split out};
+chfagg CHF.TweedieCV    tweedie 2.5 100 cv 0.5 note{a positive extreme stable member, tilted by its own theta};
+chfagg CHF.NIG          3 * norminvgauss 6 1.5 + 1 note{normal inverse Gaussian: scipy's shapes a b, scaled and shifted};
+chfagg CHF.VG           variancegamma 0.2 0.5 -0.1 note{variance gamma: sigma nu theta};
+chfagg CHF.CGMY         temperedstable 1 5 10 0.5 note{tempered stable: C G M Y, a location written + mu};
+chfagg CHF.RefGamma     25 * gamma 4 hints{log2=12; bs=1/4} note{a law pinned to its grid, for the reference below};
+
+# The four measure-zero splices of tests/test_splice_suite.py: the window lies
+# outside the support, so each parses and then raises at construction. Commented
+# like section X, and the test holds them inline.
+# sev G.Splice02  10 * uniform + 5 splice [1   2]  note{error in plot}
+# sev G.Splice05  10 * uniform + 5 splice [20 30]  note{error in plot}
+# agg G.Splice07  1  claim          sev 10 * uniform + 5 splice [1  2] fixed note{error in plot}
+# agg G.Splice10  1  claim          sev 10 * uniform + 5 splice [20 30] fixed note{error in plot}

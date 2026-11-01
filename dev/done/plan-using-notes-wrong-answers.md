@@ -112,6 +112,8 @@ warning and an axis-0 window no wider than before; the unlimited program keeps i
 guard test (`tests/test_bivariate.py` 1050 to 1060) still fires on its own fixture; a limited
 component test is added beside 1025 to 1047.
 
+> **Superseded by the author's ruling of 2026-11-01; see the execution log.** The formula and the change below were not implemented. The return period landed as $1/(1 - P_N(F(x)))$, on a redrawn curve, with no IR change.
+
 **5. The structure chart's occurrence return period is annual.** `charts/_emit_structure.py`:
 the occurrence Lee curve is `p_sev_gross` (637 to 646) and the return-period axis is
 `reciprocal_of` the probability axis under the document's `return_period_map = 'complement'`
@@ -189,3 +191,45 @@ The `features.rst` "before" comes from re-applying the old filter to the new ver
 
 - **The plan overstates "every capped call is affected".** A risk that saturates at or below the reference has no tied vertex above it, so its bound does not move. The examples on the Using `pricing-bounds` page are of this kind and keep their numbers (14.098, 18.497, 3.810, 11.811).
 - **`uniform` as Y has the same missing segment.** It supplies no breakpoints, so no vertex sits above a discrete X's saturation: on the hand X, `PricingBounds(X, {'U': 'uniform'}).bounds(1.5)` is `[0.625, 0.625]` where the exact upper is 0.75. Recorded as `[Pricing-Bounds-Callable-Y]` in `dev/TODO.md`.
+
+### 1.53.0 `[Reinsurance-Bivariate-Structure-Numbers]`, 2026-11-01
+
+**Rulings by the author, 2026-11-01, asked at review.**
+
+- **The occurrence return period is the annual maximum, on a redrawn curve.** The plan's formula, $1/(n\,S(x))$, is a claim rate. The review's "1.2-year event" and the Using page are $1/P(\text{largest claim in a year} > x)$, and the plan's statement that `utilities.oep` is "the Poisson form of the same quantity" is false. The two read alike (1.21 and 1.22) only because they came from different books: on the page's book at 250 the rate is 0.58 and the annual maximum 1.22, and on `RPT` at 250 they are 1.21 and 1.78. Three routes were offered: the annual maximum on a redrawn curve, the claim rate as planned, and the annual maximum in Poisson form through the plan's per-axis map. The first was ruled.
+- **The refusal covers the whole aggregate program.** The plan refuses `cede` beside `pc` on one layer. A `cede` on another aggregate layer is dropped the same way, by `slide` as well as by `pc`: 3,443.66 with or without `cede 10%` on the first layer, with `c_agg` 50 in `economics`.
+
+**Formula, step 5 as ruled.** With $N$ independent claims of distribution $F$, the largest is at most $x$ with probability $P_N(F(x))$, for $P_N$ the frequency pgf, and a year with no claim has a largest claim of zero. The return period of $x$ is $1/(1 - P_N(F(x)))$ years, which is $1/(1 - e^{-nS(x)})$ for Poisson. The largest claim above $x$ implies the total above $x$, so this return period is never shorter than the gross aggregate's at the same $x$. It is at least $1/(1 - P_N(0))$, so at least one year.
+
+**Change, step 5 as ruled.** `_lee_series` draws the occurrence stage from `_largest_claim_mass`, and the document's existing 'complement' map gives the reciprocal. No field, map or renderer changes, `CHART_IR_VERSION` stays 4, and the API needs no chore: its renderer draws the new curve as it stands. A reader sees two changes: the series name is `Largest gross claim in a year`, was `Gross claim`, and `occ_p` is labeled `Annual non-exceeding probability`. The cost the ruling accepted: the probability axis of that panel is annual too, so the area under the curve is no longer per-claim layer loss.
+
+**Names.** New private `_largest_claim_mass` and `STAGE_PROBABILITY` in `charts/_emit_structure.py`. No public name changed. The plan's `scale=n` collided with `ChartAxis.scale`; the ruling removed the field.
+
+**Recorded numbers.**
+
+| Quantity | Before | After |
+|:--|--:|--:|
+| `cede 10% pc 25% after 10%`, `deposit 1500`, `est_m` | 3,940.306, same as `pc` alone | `ValueError` |
+| `cede` alone, `corridor` beside `cede`, for comparison | 4,088.699, 3,864.104 | unchanged |
+| Occurrence `cede` beside aggregate `pc`, the effect of `cede` | +50 | +50 |
+| `MV.IndepLimited`, sizing marginal mean, against analytic 484.738 | 625.03 | 484.7 |
+| `MV.IndepLimited`, axis 0 top, `bs`, buckets | 20,470, 10, 2,048 | 2,046, 2, 1,024 |
+| `MV.IndepLimited`, realized marginal mean | 484.750 | 484.745 |
+| `MV.IndepExcess`, realized marginal mean, against analytic 581.652 | 580.661 | 581.493 |
+| Unlimited program, axis 0 top, `bs`, buckets | 20,470, 10, 2,048 | unchanged |
+| `RPT`, return period at 250 and 500 | 12.10, 46.71 per claim | 1.78, 5.19 years |
+| The Using page's book, return period at 250, 500, 1,000 | 11.57, 29.07, 87.61 per claim | 1.22, 2.01, 4.90 years |
+
+**Divergences.**
+
+- **Step 5 follows the ruling, not the plan**, as above. The API `dev/TODO.md` chore and the per-axis map under "Not in this plan" are void.
+- **The refusal has a second check**, in `_split_reins`, for the other layers; the one the plan names sits with the slide check in `reins_clause`, which the plan cites at 2348 to 2409 and now sits at 2390 to 2453. The `slide` refusal widened with it.
+- **The refused lines in `decl-testers.agg` are three**, the plan's plus `slide` and the other layer.
+- **The `MV.Indep` programs in the plan are named `MV.IndepLimited` and `MV.IndepExcess`** in `decl-testers.agg`. The excess case is an addition, since the plan's example attaches at 0.
+- **The zero-modified test uses `zm 0.2 !`.** The pgf takes `base_mean`, not `n`. Without `!` the count of 10 is the realized mean and the base mean is 12.5; with it the base mean is 10 and the realized mean 8.
+
+- **Two render baselines moved, which the plan did not list.** `test_chartdoc_matches_baseline` failed on `structure` and `structure_log`, as it should. Rendered to scratch first: `distortion`, `agg` and `matrix` are identical, and in both structure pictures only the occurrence Lee panel differs (its curve and its axis label). The two images were looked at and regenerated with `--regen`. They are the author's approved pictures, so they are for the author to confirm.
+
+**Gates.** `uv run pytest -m 'slow or not slow'` and the same with `-W error::RuntimeWarning`, in `.venv`: the first run failed only on the two baselines above; after regenerating them, 10,432 passed, 1 skipped (`plotly` not installed), each in about 2:50. `tests/capture_spec_snapshot.py` reran with no change to `expected_specs.json`.
+
+**Findings, not fixed.** The stale open item in `D:/Projects/Using/CLAUDE.md` (dated 2026-10-30) still reports the `PricingBounds` and `convex_distortion` defects as open, and `dev/issues-arising-from-using-notes.md` lists items 1, 2, 3 and 6 as open.

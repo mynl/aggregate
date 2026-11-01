@@ -424,9 +424,9 @@ Panel by panel
      - every layer boundary, labeled, on the loss axis; repeated ``faint`` on the Lee panel under ``lee=True``
      - log y, the reading a geometrically layered program needs. Panel ``kind`` is ``'tower'``, the one kind that is not ``xy``
    * - ``structure`` / occ_lee, agg_lee
-     - ``occ_p`` or ``agg_p``, Non-exceeding probability, each paired with its own return-period axis
+     - ``occ_p``, Annual non-exceeding probability, or ``agg_p``, Non-exceeding probability, each paired with its own return-period axis
      - the stage's loss axis, shared with that stage's tower, which is the point of the panel
-     - one curve, the quantile function of the distribution the tower is read against: role ``gross`` on the occurrence stage, role ``subject`` on the aggregate stage. Present only under ``lee=True``, which requires the realized grid
+     - one curve, a quantile function read in years: the largest gross claim in a year on the occurrence stage, role ``gross``, and the subject aggregate on the aggregate stage, role ``subject``. Present only under ``lee=True``, which requires the realized grid
      - the layer boundaries again, ``faint``
      - as the tower's loss axis declares, plus the return-period pairing
 

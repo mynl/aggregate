@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.53.0 - 2026-11-01
+
+**[Reinsurance-Bivariate-Structure-Numbers] A fixed commission beside `pc` or `slide` is refused, a bivariate axis is sized on the marginal after its layer, and the occurrence return period on the structure chart is annual.** Numbers move. `chart_structure(lee=True)` draws the occurrence stage as the largest gross claim in a year, $P(M \le x) = P_N(F(x))$, so its return period is $1/(1 - P_N(F(x)))$ years for every count family: on 20 Poisson claims an attachment reading 11.6 now reads 1.22. The series is now `Largest gross claim in a year` and `occ_p` is `Annual non-exceeding probability`; `CHART_IR_VERSION` stays 4, the API needs no change, and the `structure` and `structure_log` render baselines move. A limited bivariate component no longer warns of a mean mismatch, and its grid is finer: `100 xs 0` on `MV.Indep` has axis 0 to 2,046 at `bs` 2, was 20,470 at `bs` 10; the unlimited program's grid is unchanged.
+
+**Breaking.** `cede` beside `pc` raises at parse time, and so does a `cede` on another layer of an aggregate program carrying `pc` or `slide`. These programs parsed and dropped the commission with no flag. A `cede` on the occurrence stage, or beside `corridor` or `swing`, is unaffected.
+
 ## 1.52.0 - 2026-11-01
 
 **[Bounds-Envelopes] `PricingBounds` keeps the vertical segment where the reference saturates, and `convex_distortion` returns the upper concave envelope with no mass at zero.** Numbers move. A `PricingBounds` risk that saturates above the reference, usual with a finite cap, has a higher upper bound: `[0.75, 0.75]` becomes `[0.75, 1.25]` on the smallest example, and 126.11 becomes 152.58 on a capped book at `P = 1.2 E`; lower bounds do not move, and `curve_df` gains the tied rows. `convex_distortion` on (0, 0), (1/2, 0.8), (1, 1) has mass 0, was 0.3, and $g(1/4) = 0.4$, was 0.55; a point below the envelope no longer moves the curve. The false mass also leaves `Bounds.min_envelope`, `bagged_distortion` and `convex_example` (`bond` 0.0031 and `cat` 0.0230, both now 0). A point outside the unit square now raises `ValueError`, and collinear points return the identity rather than a Qhull error.

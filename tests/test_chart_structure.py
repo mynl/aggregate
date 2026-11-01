@@ -14,6 +14,7 @@ premium clauses for want of a premium context to resolve them against.
 import json
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from aggregate import build
@@ -459,6 +460,78 @@ def test_the_aggregate_lee_curve_is_the_subject_not_the_gross(program):
         start, step, count = curve.y_lattice
         outcome = (start + step * (count - 1),)
     assert outcome[-1] == pytest.approx(top, rel=1e-9)
+
+
+# The occurrence curve is the largest claim in a year: P(M <= x) = P_N(F(x)). Each
+# case gives its count's pgf in closed form, written out here independently of
+# Frequency.freq_pgf, in terms of S = 1 - F(x). 'zm' is the case that tells the
+# base mean of 10 from the realized mean of about 8.
+_RPT = 'agg CS.RPT{name} 10 claims 1000 xs 0 sev lognorm 100 cv 1.5 occurrence net of 750 xs 250 {count}'
+_ANNUAL_EXCEEDANCE = {
+    'poisson': lambda S: -np.expm1(-10 * S),
+    'mixed gamma 0.7': lambda S: 1 - (1 + 0.49 * 10 * S) ** (-1 / 0.49),
+    'fixed': lambda S: 1 - (1 - S) ** 10,
+    'binomial 0.5': lambda S: 1 - (1 - 0.5 * S) ** 20,
+    'poisson zm 0.2 !': lambda S: 0.8 * -np.expm1(-10 * S) / -np.expm1(-10.0),
+}
+
+
+def _occurrence_return_period(doc, x):
+    """The return period the document gives a loss of ``x`` on the occurrence panel."""
+    curve, = [s for s in doc.series if s.panel_id == 'occ_lee']
+    y = np.asarray(curve.y_values, dtype=float)
+    p = np.asarray(curve.x_values, dtype=float)
+    assert doc.meta['return_period_map'] == 'complement'
+    return 1 / (1 - p[np.searchsorted(y, x)])
+
+
+def _severity_survival(agg, x):
+    df = agg.reins_density_df
+    return float(df['p_sev_gross'][df['loss'] > x].sum())
+
+
+@pytest.mark.parametrize('name, count', [
+    (str(i), c) for i, c in enumerate(_ANNUAL_EXCEEDANCE)])
+@pytest.mark.parametrize('x', [250, 500])
+def test_the_occurrence_return_period_is_annual(name, count, x):
+    agg = build(_RPT.format(name=name, count=count))
+    doc = build_chart_doc(agg, 'structure', lee=True)
+    exceedance = _ANNUAL_EXCEEDANCE[count](_severity_survival(agg, x))
+    assert _occurrence_return_period(doc, x) == pytest.approx(1 / exceedance, rel=1e-6)
+
+
+def test_the_occurrence_return_period_at_the_attachment():
+    """The numbers themselves: 12.1 claims between exceedances, 1.78 years."""
+    agg = build(_RPT.format(name='Numbers', count='poisson'))
+    doc = build_chart_doc(agg, 'structure', lee=True)
+    assert 1 / _severity_survival(agg, 250) == pytest.approx(12.10, abs=0.01)
+    assert _occurrence_return_period(doc, 250) == pytest.approx(1.78, abs=0.01)
+    assert _occurrence_return_period(doc, 500) == pytest.approx(5.19, abs=0.01)
+
+
+def test_the_occurrence_return_period_starts_at_one_year_or_more():
+    """A probability cannot exceed one, so the reading cannot run below a year."""
+    agg = build(_RPT.format(name='Floor', count='mixed gamma 0.7'))
+    curve, = [s for s in build_chart_doc(agg, 'structure', lee=True).series
+              if s.panel_id == 'occ_lee']
+    p = np.asarray(curve.x_values, dtype=float)
+    assert p.min() >= 0 and p.max() <= 1 + 1e-12
+    # the first point is the probability of no claim above the bottom of the grid
+    assert p[0] >= float(agg.frequency.freq_pgf(agg.base_mean, np.zeros(1))[0])
+
+
+@pytest.mark.parametrize('count', ['poisson', 'mixed gamma 0.7'])
+def test_the_largest_claim_is_never_likelier_than_the_total(count):
+    """The largest claim above x implies the total above x, so at one x the
+    occurrence return period is at least the gross aggregate's."""
+    agg = build(_RPT.format(name=count.split()[0], count=count))
+    curve, = [s for s in build_chart_doc(agg, 'structure', lee=True).series
+              if s.panel_id == 'occ_lee']
+    df = agg.reins_density_df
+    annual = pd.Series(np.asarray(curve.x_values, dtype=float),
+                       index=np.asarray(curve.y_values, dtype=float))
+    total = df.set_index('loss')['p_agg_gross'].cumsum().reindex(annual.index)
+    assert (annual - total >= -1e-9).all()
 
 
 def test_lee_panels_share_the_towers_loss_axis(net_of):

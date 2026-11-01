@@ -3265,7 +3265,9 @@ Variable rating (a118, a119, a120)
 Five features, all now expressible in DecL: **swing** (``swing basic B lcm L min
 m max M``), **slide** (a sliding commission), **pc** (profit commission),
 **corridor** (a retained corridor inside the layer), and **retro**. Each makes
-the ceded premium, or the effective recovery, a function of the loss.
+the ceded premium, or the effective recovery, a function of the loss. **slide**
+and **pc** replace the fixed commission across their aggregate program, so a
+``cede`` on any layer of it is refused.
 
 .. ipython:: python
 

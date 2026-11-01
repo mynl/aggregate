@@ -194,6 +194,7 @@ agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 po 300 xs 
 port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson;
 port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lognorm 50 cv 1 poisson
 
+agg CS.RPT 10 claims 1000 xs 0 sev lognorm 100 cv 1.5 occurrence net of 750 xs 250 poisson   note{structure chart: the occurrence return period at 250 is 1.78 years};
 
 # Z. Bivariate (joint ceded, net) occurrence reinsurance
 # ======================================================
@@ -314,6 +315,8 @@ bivariate MV.Gumbel 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2
 bivariate MV.ClaytonMixed 25 claims agg Wind dfreq [0 1] [.3 .7] sev lognorm 40 cv 1.2 agg Flood dfreq [0 1] [.5 .5] sev lognorm 60 cv 1.5 copula clayton 0.3 mixed gamma .2;
 bivariate MV.Normal 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula normal 0.5;
 bivariate MV.Indep 25 claims agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson;
+bivariate MV.IndepLimited 25 claims agg A dfreq [0 1] [.5 .5] 100 xs 0 sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson   note{a limited component: its axis is sized on the marginal after the layer};
+bivariate MV.IndepExcess 25 claims agg A dfreq [0 1] [.5 .5] 100 xs 50 sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson   note{an excess component: its axis is sized on the marginal after the layer};
 # netceded MODE: the joint occurrence law of one reinsured aggregate (same object
 # as Aggregate.occ_bivariate()). Body is an ordinary agg carrying occurrence
 # reinsurance. The three view-pair prefixes name the (x, y) axes x-then-y:
@@ -728,6 +731,11 @@ pnl VR.Swing    10000 premium less agg VR.Swing_e 10000 prem at 85% lr sev logno
 pnl VR.Slide    10000 premium less agg VR.Slide_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 slide 45% at 60% and 25% at 70% and 19% at 80%      note{slide: stochastic ceding commission of ceded LR};
 pnl VR.PC       10000 premium less agg VR.PC_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 pc 25% after 10%                                    note{profit commission of ceded LR};
 pnl VR.Corridor 10000 premium less agg VR.Corridor_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 corridor 50% po 30% xs 20%                          note{corridor: cedant retains a ceded-LR band};
+# Refused at parse time: pc and slide replace the fixed commission across their
+# aggregate program, so a cede on the same layer or another would not be booked.
+#   pnl VR.CedePC 10000 premium less agg VR.CedePC_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 cede 10% pc 25% after 10%
+#   pnl VR.CedeSlide 10000 premium less agg VR.CedeSlide_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 cede 20% slide 45% at 60% and 25% at 70%
+#   pnl VR.CedeOtherLayer 10000 premium less agg VR.CedeOtherLayer_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 1000 xs 3000 deposit 500 cede 10% and 5000 xs 4000 deposit 1500 pc 25% after 10%
 # retro is the account-level rating clause: it replaces the fixed `<n> premium`
 # head with `retro <collar> premium`, varying the GROSS premium as a collared
 # affine map of net account loss (no inuring reinsurance in the 1-D case). Collar

@@ -279,6 +279,47 @@ def test_slide_with_cede_rejected():
         build(_HEAD + 'deposit 1500 cede 20% slide 45% at 60% and 25% at 70%')
 
 
+def test_pc_with_cede_rejected():
+    with pytest.raises(ValueError, match="'pc' replaces the fixed 'cede' "
+                                         "commission; give one or the other"):
+        build(_HEAD + 'deposit 1500 cede 10% pc 25% after 10%')
+
+
+# Two aggregate layers: the fixed commission on the first, the feature on the
+# second. The builders give a commission feature the whole program's commission
+# line, so the first layer's commission used to be recorded and never booked.
+_TWO_LAYERS = ('pnl V2 10000 premium less agg V2_e 10000 prem at 85% lr '
+               'sev lognorm 50 cv 3 poisson aggregate net of ')
+
+
+@pytest.mark.parametrize('feat, clause', [
+    ('pc', 'pc 25% after 10%'),
+    ('slide', 'slide 45% at 60% and 25% at 70%')])
+def test_cede_on_another_layer_of_a_commission_feature_rejected(feat, clause):
+    with pytest.raises(ValueError, match=f"'{feat}' replaces the fixed 'cede' "
+                                         "commission across its aggregate program"):
+        build(_TWO_LAYERS + '1000 xs 3000 deposit 500 cede 10% and '
+              f'5000 xs 4000 deposit 1500 {clause}')
+
+
+def test_corridor_books_a_cede_on_another_layer():
+    """A corridor shapes the recovery, so the fixed commission still books."""
+    layer = '5000 xs 4000 deposit 1500 corridor 50% po 30% xs 20%'
+    without = build(_TWO_LAYERS + f'1000 xs 3000 deposit 500 and {layer}')
+    booked = build(_TWO_LAYERS + f'1000 xs 3000 deposit 500 cede 10% and {layer}')
+    assert booked.est_m - without.est_m == pytest.approx(50, abs=1e-6)
+
+
+def test_occurrence_cede_books_beside_an_aggregate_pc():
+    """The refusal is per stage: an occurrence commission is on another line."""
+    head = ('pnl V3 10000 premium less agg V3_e 10000 prem at 85% lr '
+            'sev lognorm 50 cv 3 occurrence net of 500 xs 500 deposit 500')
+    tail = (' poisson aggregate net of 3000 xs 2000 deposit 500 '
+            'pc 25% after 10%')
+    assert (build(head + ' cede 10%' + tail).est_m - build(head + tail).est_m
+            == pytest.approx(50, abs=1e-6))
+
+
 def test_ratio_feature_without_premium_rejected():
     with pytest.raises(ValueError, match='ceded loss ratio'):
         build(_HEAD + 'pc 25% after 10%')

@@ -1047,6 +1047,32 @@ def test_bv_poisson_outer_control_unchanged():
     assert float(mv.axis_xs[0][-1]) >= 10
 
 
+_MV_LAYERED = ('bivariate MV.Indep{name} 25 claims agg A dfreq [0 1] [.5 .5] {layer} '
+               'sev lognorm 50 cv 1.5 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 '
+               'poisson')
+
+
+@pytest.mark.parametrize('name, layer, mean', [('Limited', '100 xs 0', 484.738),
+                                               ('Excess', '100 xs 50', 581.652)])
+def test_bv_limited_component_is_sized_on_its_layer(name, layer, mean):
+    """The axis is measured on the marginal after its layer, the law the joint
+    runs on, so sizing and the analytic moments agree and the guard stays quiet.
+    Sized on the unlimited severity (mean 625) the axis was as wide as the
+    unlimited program's and the guard fired on a disagreement of its own making."""
+    with warn_once_isolated(), warnings.catch_warnings():
+        warnings.simplefilter('error', DefectiveDistributionWarning)
+        mv = build(_MV_LAYERED.format(name=name, layer=layer))
+    assert mv._marginal_moments(0)[0] == pytest.approx(mean, abs=1e-3)
+    sizing = mv._standalone_marginal(0)
+    sizing.update(log2=12)
+    ser = sizing.density_df.p_total
+    assert float(ser.index.values @ ser.values) == pytest.approx(mean, rel=1e-3)
+    assert mv.marginal(0).mean() == pytest.approx(mean, rel=1e-3)
+
+    unlimited = build(_MV_LAYERED.format(name='Unlimited', layer=''))
+    assert float(mv.axis_xs[0][-1]) < float(unlimited.axis_xs[0][-1])
+
+
 def test_bv_marginal_mean_guard_fires(monkeypatch):
     """A measurement marginal that disagrees with the analytic mean warns
     loudly from _measure_marginal_window instead of shipping a clipped grid."""

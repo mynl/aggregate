@@ -2222,6 +2222,14 @@ class UnderwritingTransformer(Transformer_NonRecursive):
                     f"DecL: at most one variable-rating feature per program "
                     f"(decision 0: no stacking); found {len(present)}.")
             idx, (feat, params) = present[0]
+            # The P&L builders give a commission feature the whole aggregate
+            # program's commission line, so a 'cede' on any layer of it, not
+            # only the decorated one, would be recorded and never booked.
+            if feat in ('slide', 'pc') and any(x is not None for x in cede):
+                raise ValueError(
+                    f"DecL: '{feat}' replaces the fixed 'cede' commission across "
+                    "its aggregate program, so a 'cede' on another layer would "
+                    "not be booked; give one or the other.")
             out[f"{which}_reins_{feat}"] = params
             out[f"{which}_reins_{feat}_layer"] = idx
         n_reinst = sum(1 for r in reinst if r is not None)
@@ -2444,9 +2452,9 @@ class UnderwritingTransformer(Transformer_NonRecursive):
                         f"DecL: '{feat}' reads the ceded loss ratio and needs a "
                         "ceded-premium clause (deposit / rol / rate) for the "
                         "denominator.")
-                if feat == 'slide' and cede is not None:
+                if feat in ('slide', 'pc') and cede is not None:
                     raise ValueError(
-                        "DecL: 'slide' replaces the fixed 'cede' commission; give "
+                        f"DecL: '{feat}' replaces the fixed 'cede' commission; give "
                         "one or the other.")
         return (layer, premium, cede, reinst, variable, label, annual)
 

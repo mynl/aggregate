@@ -19,8 +19,10 @@ Two of the baselines have moved deliberately, and both are recorded in
   generated after the author reviewed it.
 * ``structure`` (``[Tower-Renderer]``) had no compositor either: the chart
   is new at 1.0.0a350 and the tower panel kind is new with it, so the
-  baseline is the approved picture from the start. It moved once, at
-  1.0.0a352, when the loss axis learned to reach the policy limit.
+  baseline is the approved picture from the start. It moved at 1.0.0a352,
+  when the loss axis learned to reach the policy limit, and at 1.53.0, when
+  the occurrence Lee curve became the largest claim in a year, by the
+  author's ruling recorded in ``dev/done/plan-using-notes-wrong-answers.md``.
 * ``matrix`` (``[Matrix-Panel]``) is a hand built document, not one any
   library object emits: the panel kind exists for plugins, and the renderer
   landed at 1.0.0a379 with its structure pinned by

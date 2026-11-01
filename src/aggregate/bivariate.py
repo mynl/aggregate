@@ -1597,11 +1597,18 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         degenerate (``dfreq [n]``); otherwise it is mean-exact and
         variance-understated, which the analytic mean guard in
         :meth:`_measure_marginal_window` watches.
+
+        The unit's layer travels with its severity, because the joint runs on
+        the severity after the layer and :meth:`_marginal_moments` reports it.
+        Sizing on the unlimited severity gives an axis too wide and a mean the
+        guard then reports as a disagreement.
         """
         from .distributions import Aggregate
 
         spec = {k: v for k, v in self._unit_specs[i].items()
-                if k.startswith('sev_') or k in ('name', 'note')}
+                if k.startswith('sev_')
+                or k in ('name', 'note', 'exp_limit', 'exp_attachment',
+                         'exp_retention_end')}
         spec['exp_en'] = float(self.en) * float(self.units[i].n)
         freq_kwargs = dict(self._freq_kwargs)
         if freq_kwargs.get('freq_name') == 'empirical':

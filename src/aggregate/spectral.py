@@ -538,6 +538,29 @@ def bitvar_ra(probs, x, p0, p1, w):
 # Base Distortion class: registry, factory dispatch, and shared methods.
 # ---------------------------------------------------------------------------
 
+def _root_of_variance(var):
+    """Standard deviation from a closed-form variance, for ``_describe_closed_form``.
+
+    Parameters
+    ----------
+    var : float
+        The variance of ``D_g``.
+
+    Returns
+    -------
+    float
+        Its square root, or ``nan`` when it is negative.
+
+    Notes
+    -----
+    A premium below expected loss calibrates ``ccoc`` to a negative return. Then
+    ``g`` falls below 0 for small ``s``, ``D_g`` is not a distribution and its
+    moment formula can give a negative variance. A Python float raises that to
+    the power 1/2 as a complex number, which no comparison downstream accepts.
+    """
+    return var ** 0.5 if var >= 0 else np.nan
+
+
 class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     """
     Base class for distortion functions.
@@ -2364,7 +2387,7 @@ class CCoCDistortion(Distortion):
         m2 = c / 3.0
         m3 = c / 4.0
         var = m2 - m1 * m1
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
         skew = m3_central / std ** 3 if std > 0 else np.nan
@@ -2461,7 +2484,7 @@ class PHDistortion(Distortion):
         m2 = a / (a + 2.0)
         m3 = a / (a + 3.0)
         var = m2 - m1 * m1
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
         skew = m3_central / std ** 3 if std > 0 else np.nan
@@ -2639,16 +2662,22 @@ class DualDistortion(Distortion):
         ``log(1 - S)`` is masked to 0 wherever ``S == 1`` to avoid the
         log-singularity contaminating the derivative; on that region
         ``(1 - S)^ρ = 0`` so the derivative contribution is zero anyway.
+
+        A premium below expected loss has no solution. The iteration reaches
+        ``ρ < 0`` on its way to finding that, where ``0 ** ρ`` at ``S == 1`` is
+        infinite. The failed solve is the answer, so the arithmetic is allowed
+        to overflow.
         """
         with np.errstate(divide='ignore', invalid='ignore'):
             lS = -np.log(1 - S)
         lS[S == 1] = 0
 
         def f(rho):
-            temp = (1 - S) ** rho
-            trho = 1 - temp
-            ex = self._quad(trho, dx)
-            ex_prime = self._quad(temp * lS, dx)
+            with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+                temp = (1 - S) ** rho
+                trho = 1 - temp
+                ex = self._quad(trho, dx)
+                ex_prime = self._quad(temp * lS, dx)
             return ex - premium_target, ex_prime
 
         shape, fx = self._newton_iterate(f, self._calibration_init_shape)
@@ -2665,7 +2694,7 @@ class DualDistortion(Distortion):
         m2 = 2.0 / ((b + 1.0) * (b + 2.0))
         m3 = 6.0 / ((b + 1.0) * (b + 2.0) * (b + 3.0))
         var = m2 - m1 * m1
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
         skew = m3_central / std ** 3 if std > 0 else np.nan
@@ -2793,7 +2822,7 @@ class TVaRDistortion(Distortion):
         m2 = q * q / 3.0
         m3 = q ** 3 / 4.0
         var = m2 - m1 * m1
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
         skew = m3_central / std ** 3 if std > 0 else np.nan
@@ -2950,7 +2979,7 @@ class BiTVaRDistortion(Distortion):
         m2 = (1.0 - w) * m2a + w * m2b
         m3 = (1.0 - w) * m3a + w * m3b
         var = m2 - m1 * m1
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
         skew = m3_central / std ** 3 if std > 0 else np.nan
@@ -3142,7 +3171,7 @@ class WtdTVaRDistortion(Distortion):
         m2 = float(np.sum(wts * q * q / 3.0))
         m3 = float(np.sum(wts * q ** 3 / 4.0))
         var = m2 - m1 * m1
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
         skew = m3_central / std ** 3 if std > 0 else np.nan
@@ -3584,7 +3613,7 @@ class BetaDistortion(Distortion):
         m1, var, skew, _ = z.stats(moments='mvsk')
         m1 = float(m1)
         var = float(var)
-        std = var ** 0.5
+        std = _root_of_variance(var)
         cv = std / m1 if m1 > 0 else np.nan
         # int g(x) dx = 1 - mean of Beta(a, b) = b / (a + b)
         int_g = float(self._b) / (float(self._a) + float(self._b))

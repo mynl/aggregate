@@ -22,7 +22,7 @@ import numpy as np
 import pytest
 from scipy.integrate import quad
 
-from aggregate import Distortion
+from aggregate import Distortion, build
 from aggregate.spectral import (
     PHDistortion, WangDistortion, DualDistortion, TVaRDistortion,
     CCoCDistortion, BiTVaRDistortion, WtdTVaRDistortion,
@@ -159,6 +159,24 @@ def test_gini_p_is_twice_the_area_above_the_diagonal(name, make):
     d = make()
     area = quad(lambda s: float(d.g(np.float64(s))), 0, 1, limit=500)[0]
     assert d.gini_p == pytest.approx(2 * area - 1, abs=1e-8), name
+
+
+@pytest.mark.parametrize('coc', [-0.2, -0.5, -0.9])
+def test_gini_p_of_a_ccoc_with_a_negative_return(coc):
+    """A premium below expected loss calibrates ``ccoc`` to ``r < 0``.
+
+    ``g`` is then not a distortion, and the moment formula gives a negative
+    variance, whose root must not reach ``gini_p`` as a complex number.
+    """
+    d = Distortion('ccoc', r=coc)
+    assert d.gini_p == pytest.approx(coc / (1 + coc))
+    assert d.summary_df is not None and d.stats_df is not None
+
+
+def test_calibrating_below_expected_loss_reports_gini_p():
+    book = build('agg GP.Below 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson')
+    result = book.calibrate_distortions(coc=-0.5, p=0.99)
+    assert result.distortion_df.loc['ccoc', 'gini_p'] == pytest.approx(-1)
 
 
 def test_gini_p_follows_a_recalibrated_shape():

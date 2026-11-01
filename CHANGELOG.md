@@ -20,9 +20,13 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.60.1 - 2026-11-01
+
+**[Gini-P-Negative-Return] `gini_p`, and so `calibrate_distortions`, works on a `ccoc` with a negative return, which 1.59.0 broke.** A premium below expected loss calibrates `ccoc` to `r < 0`, and from 1.59.0 `calibrate_distortions(coc=-0.5, p=0.99)` raised `TypeError` from a complex standard deviation. `gini_p` is `r / (1 + r)` again, -1 here. `stats_df` on such a distortion also stops raising, and a negative closed-form variance gives a `nan` standard deviation. The `dual` calibration at such a premium, which has no solution and gives a `nan` row, no longer emits a `RuntimeWarning`. No other number moves.
+
 ## 1.60.0 - 2026-11-01
 
-**[Using-Notes-Messages] Message text loses its dashes, internal labels and history; `grossnet` and `grossceded` refusals use their own word.** No number moves. Every raised, warned, logged and explanation string reads without a dash as punctuation, including `bs_explain`, `tail_explanation`, the P&L construction explanation and `IgnoredDecLClauseWarning`, whose text now reads `V1: ignoring the aad clause: a plain 'agg' ...`. Refusals drop `[reins-premium]`, `[reins-single-layer]`, `[reins-one-clause]`, `decision 0` and `the engine ceiling`, and a reinstated or annual-term layer on a tower now reads `Write one occurrence layer`. `p=1 does not name an asset level` is now `p=1 does not fix an asset level`, and `unit rows carry different rates` is now `have`. Code matching these strings needs the new text. Docstrings corrected: `PnL.tvar` is the upper tail, the `_pricing` module has `calibrate_distortions`. Docs corrected: the Bounds classes are top-level names, and `so` and `of` are not `po` synonyms.
+**[Using-Notes-Messages] Message text loses its dashes, internal labels and history; `grossnet` and `grossceded` refusals use their own word.** No number moves. No raised, warned, logged or explanation string holds a dash as punctuation, including `bs_explain`, `tail_explanation`, the P&L construction explanation and `IgnoredDecLClauseWarning`, whose text is now `V1: ignoring the aad clause: a plain 'agg' ...`. Refusals drop `[reins-premium]`, `[reins-single-layer]`, `[reins-one-clause]`, `decision 0` and `the engine ceiling`, and the refusal of a reinstated or annual-term layer on a tower now gives the remedy `Write one occurrence layer`. `p=1 does not name an asset level` is now `p=1 does not fix an asset level`, and `unit rows carry different rates` is now `have`. Code matching these strings needs the new text. Docstrings corrected: `PnL.tvar` is the upper tail, the `_pricing` module has `calibrate_distortions`. Docs corrected: the Bounds classes are top-level names, and `so` and `of` are not `po` synonyms.
 
 ## 1.59.0 - 2026-11-01
 

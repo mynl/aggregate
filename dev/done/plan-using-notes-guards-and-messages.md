@@ -233,6 +233,25 @@ Executed 2026-11-01 from 1.58.0. Item numbers below are those of `[Using-Notes-G
 - **Exhibit snapshot.** The `bs_window` note text is pinned in four entries of `tests/data/exhibit_snapshots.json`, which the plan did not list. `capture_exhibit_snapshots.py` moved those four and also twelve `raw` values in the last bit, which `_assert_snapshot_close` tolerates by design, so the file was restored and only the text edited.
 - **Left alone, for the author.** Bracketed design labels remain in the P&L construction explanations, such as `[Decision-Kappa-Shared-Source-Rule]` and `[Layer-Peeling-Shorthand]`. They are explanation text rather than refusals and the plan's list stops at the four refusal labels, but a reader sees them.
 
+### `[Gini-P-Negative-Return]`, 1.60.1: a regression from 1.59.0, found by the API's suite
+
+The plan's `gini_p` property routes the closed form through `_describe_closed_form`, which also computes moments. A premium below expected loss calibrates `ccoc` to `r < 0`, so `d < 0`, `g` is not a distortion, the variance formula goes negative, and `var ** 0.5` on a Python float returns a complex number, which `std > 0` then refuses with a `TypeError`. The old attribute was just `d`, so this path worked until 1.59.0. Tiers 2 and 3 and the `RuntimeWarning` gate were all green, because no library test calibrated to a negative `coc`; `aggregate-api`'s `test_a_gross_premium_target_calibrates_its_technical_premium` did. The fix is `_root_of_variance`, used at all seven variance roots in `spectral.py`, with tests on the constructor and through `calibrate_distortions`. A sweep of 44 shapes for the five families, in and out of range, found `gini_p` equal to the 1.58.0 assignment everywhere. `summary_df` still raises on a negative `ph` or `dual` shape, as it did at 1.58.0, from `g(0)` with a negative power; that shape is not a distortion and is left alone, while `stats_df` on it now works where 1.58.0 raised.
+
+The new calibration test then failed the `RuntimeWarning` gate on `DualDistortion.calibrate`, which raises 0 to a negative power on its way to a failed solve. The warning and the table are the same at 1.58.0, so it is an existing finding that no test had reached, not a regression. The solve's arithmetic is guarded with `np.errstate` and a `Notes` paragraph, as `test-tiers` directs for a result that is discarded, and the `nan` row does not move.
+
 ### Ripple to the API
 
-`aggregate_api/routes/objects.py` `split_statements` catches `AssertionError` from `preprocess` and raises `unbalanced [ ] in this program`; its docstring has the catch going when the library raises a `ValueError` with an `ErrorReport`, which this bump does. `tests/test_multi_statement.py::test_an_unbalanced_bracket_is_a_422_not_a_500` pins the `AssertionError`. No grammar keyword is new, so `decl-keywords.json` does not move.
+Measured on `aggregate-api`'s suite against 1.60.0, run read-only: 761 passed, 3 failed. One failure was the regression above, cleared by 1.60.1. The other two are this ripple, and the API owes both, since this plan does not edit that repository.
+
+- `aggregate_api/routes/objects.py` `split_program` catches `AssertionError` from `preprocess` and raises `unbalanced [ ] in this program`; its docstring has the catch going when the library raises a `ValueError` with an `ErrorReport`, which 1.59.0 does. The catch is now dead code. The library's `ValueError` takes the same route out of `split_program`, so the build route still returns 422 (`except ValueError` at `objects.py` 1765), now with the position.
+- `tests/test_multi_statement.py::test_an_unbalanced_bracket_is_a_422_not_a_500` pins the `AssertionError` and `unbalanced`, and `test_collapse_never_joins_statements` pins `unbalanced`.
+
+No grammar keyword is new, so `decl-keywords.json` does not move.
+
+### Using pages
+
+No new page: the plan changes existing surfaces, so ten pages in `D:/Projects/Using/aggregate` change, each run and rendered with its sentences checked against the output, and nothing is uploaded: `distortions` (`as`, keyword-only `ccoc`, `gini_p` for every family), `help` (`values` calls nothing, the located errors for a family and a bracket), `price` (`a=`, `ccoc` at a finite level, the refusals), `allocation-bounds` (`port.price(a=a)`), `pk-wh`, `occurrence-re`, `swing-rating`, `severity-parameters`, `bivariates` and `zm-zt` (their refusals).
+
+Pages whose source did not change hold the old message text in their last render, among them `reinstatements`, `grossnet` and the variable-feature pages, and they will pick up the new text at their next forced render. They were left alone because a forced render would also bring the seven `ValidationWarning` pages named at the end of `plan-validation-verdict.md` to a head, which is the author's call.
+
+On the pinned `dbvsev` refusal the library first warns that the grid is short, from `_size_axes`, and then refuses, from `_form_severity_matrix`. It is harmless and left as it is; the `bivariates` page silences the warning in its refused block.

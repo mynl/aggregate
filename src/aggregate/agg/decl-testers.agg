@@ -194,7 +194,6 @@ agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 po 300 xs 
 port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson;
 port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lognorm 50 cv 1 poisson
 
-agg CS.RPT 10 claims 1000 xs 0 sev lognorm 100 cv 1.5 occurrence net of 750 xs 250 poisson   note{structure chart: the occurrence return period at 250 is 1.78 years};
 
 # Z. Bivariate (joint ceded, net) occurrence reinsurance
 # ======================================================

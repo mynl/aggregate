@@ -38,7 +38,7 @@ Bugs found writing the `Using` Series
    - Pinning `bs` together with a per-axis `log2` can lose nearly all the mass.
    - A ragged `dbvsev` matrix gives a raw numpy error.
    - Refusing `grossnet` on an aggregate with no occurrence reinsurance names `netceded` in the message.
-6. **The structure chart's return-period axis counts per claim, not per year.** The 250 attachment shows 11.6 on the axis but is a 1.2-year event.
+6. **Withdrawn 2026-11-01, not a defect: the structure chart's occurrence return-period axis counts per claim.** The 250 attachment shows 11.6, one claim in 11.6. Occurrence cover is conditional on a claim, so the axis does not depend on the claim count (author's ruling, `dev/done/plan-using-notes-wrong-answers.md`).
 7. **Smaller items:**
    - `cede` is refused with `swing`, which may not be intended, and swing gets a different default step label from a fixed premium.
    - A `po` share above 100% is accepted silently, and the `po` hint is wrong for amounts of 1 or more.

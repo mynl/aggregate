@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.54.0 - 2026-11-01
+
+**[Structure-Occurrence-Lee-Per-Claim] The occurrence curve on the structure chart is the per-claim severity again, reversing that part of 1.53.0.** Numbers move back. `chart_structure(lee=True)` gives a return period in claims that does not depend on the claim count: 11.6 at 250 on the Using page's book, was 1.22 years. The series is `Gross claim`, `occ_p` is `Non-exceeding probability`, and the `structure` and `structure_log` render baselines return to their earlier images. The `cede` refusal and the bivariate axis sizing of 1.53.0 stand.
+
 ## 1.53.0 - 2026-11-01
 
 **[Reinsurance-Bivariate-Structure-Numbers] A fixed commission beside `pc` or `slide` is refused, a bivariate axis is sized on the marginal after its layer, and the occurrence return period on the structure chart is annual.** Numbers move. `chart_structure(lee=True)` draws the occurrence stage as the largest gross claim in a year, $P(M \le x) = P_N(F(x))$, so its return period is $1/(1 - P_N(F(x)))$ years for every count family: on 20 Poisson claims an attachment reading 11.6 now reads 1.22. The series is now `Largest gross claim in a year` and `occ_p` is `Annual non-exceeding probability`; `CHART_IR_VERSION` stays 4, the API needs no change, and the `structure` and `structure_log` render baselines move. A limited bivariate component no longer warns of a mean mismatch, and its grid is finer: `100 xs 0` on `MV.Indep` has axis 0 to 2,046 at `bs` 2, was 20,470 at `bs` 10; the unlimited program's grid is unchanged.

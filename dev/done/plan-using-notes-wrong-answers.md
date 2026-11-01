@@ -20,6 +20,8 @@ Five functions return a wrong number with no flag today. After this plan:
 | Bivariate axis sizing with a limited component | the axis is sized on the unlimited marginal, mean 625 against 484.7, with a misleading warning | sized on the marginal after its layer; no warning |
 | Structure chart return period, occurrence stage | $1/S(x)$ per claim: 12.1 at an attachment that is a 1.21-year event | $1/(n\,S(x))$, the annual occurrence exceedance |
 
+> **The last row is withdrawn.** The per-claim return period is correct, so that row was not a wrong number. It was changed at 1.53.0 and restored at 1.54.0; see the execution log.
+
 ## Steps
 
 ### `[Bounds-Envelopes]`
@@ -112,7 +114,7 @@ warning and an axis-0 window no wider than before; the unlimited program keeps i
 guard test (`tests/test_bivariate.py` 1050 to 1060) still fires on its own fixture; a limited
 component test is added beside 1025 to 1047.
 
-> **Superseded by the author's ruling of 2026-11-01; see the execution log.** The formula and the change below were not implemented. The return period landed as $1/(1 - P_N(F(x)))$, on a redrawn curve, with no IR change.
+> **Withdrawn; see the execution log at 1.54.0.** The formula and the change below were not implemented. The return period landed at 1.53.0 as $1/(1 - P_N(F(x)))$, on a redrawn curve, and the author reversed it at 1.54.0: the occurrence curve is the per-claim severity.
 
 **5. The structure chart's occurrence return period is annual.** `charts/_emit_structure.py`:
 the occurrence Lee curve is `p_sev_gross` (637 to 646) and the return-period axis is
@@ -233,3 +235,20 @@ The `features.rst` "before" comes from re-applying the old filter to the new ver
 **Gates.** `uv run pytest -m 'slow or not slow'` and the same with `-W error::RuntimeWarning`, in `.venv`: the first run failed only on the two baselines above; after regenerating them, 10,432 passed, 1 skipped (`plotly` not installed), each in about 2:50. `tests/capture_spec_snapshot.py` reran with no change to `expected_specs.json`.
 
 **Findings, not fixed.** The stale open item in `D:/Projects/Using/CLAUDE.md` (dated 2026-10-30) still reports the `PricingBounds` and `convex_distortion` defects as open, and `dev/issues-arising-from-using-notes.md` lists items 1, 2, 3 and 6 as open.
+
+**Using pages.** `structure-chart` states the annual return period and links to `oep`, whose text already separates the two readings. `profit-commission` and `sliding-scale` show the new refusals. Committed in `D:/Projects/Using`, and rendered at `ab8156f` with `pricing-bounds` and `bounds`, whose quoted numbers do not move. The site is not deployed.
+
+### 1.54.0 `[Structure-Occurrence-Lee-Per-Claim]`, 2026-11-01
+
+**Ruling by the author, 2026-11-01, after 1.53.0 landed.** Step 5 was wrong, and the per-claim axis was never a defect. Occurrence reinsurance is conditional on a claim, and cover is bought on $p$ percent of claims, not years, so the curve is the quantile function of the severity and the answer is independent of the claim count. The annual maximum may be valid for cat, but it is not standard and is not used for most lines. The review at 1.53.0 offered three annual forms and recommended one, and all three shared the premise that should have been questioned.
+
+**Change.** Restored from `f084348`: `charts/_emit_structure.py`, `tests/test_chart_structure.py`, `tests/test_chartdoc_render.py`, the `structure` and `structure_log` baselines, and the `structure` row of `pipeline-exhibits-and-charts.rst`. `CS.RPT` is removed from `decl-testers.agg`. Item 6 of `dev/issues-arising-from-using-notes.md` is withdrawn. The `structure-chart` Using page is restored from the commit before `5f3f34d`. The `cede` refusal and the bivariate axis sizing stand, with their pages and tests.
+
+| Quantity | 1.53.0 | 1.54.0 |
+|:--|--:|--:|
+| The Using page's book, return period at 250, 500, 1,000 | 1.22, 2.01, 4.90 years | 11.57, 29.07, 87.61 claims |
+| Series name, `occ_p` label | `Largest gross claim in a year`, `Annual non-exceeding probability` | `Gross claim`, `Non-exceeding probability` |
+
+**Divergences.** Two additions beyond the restored state, so the same change is not made again from the same note: a `Notes` paragraph in `_lee_series` and `test_the_occurrence_return_period_does_not_depend_on_the_claim_count`.
+
+**Gates.** `uv run pytest -m 'slow or not slow' -W error::RuntimeWarning`, in `.venv`: 10,420 passed, 1 skipped (`plotly` not installed), in 2:41, against the restored baselines with no regeneration.

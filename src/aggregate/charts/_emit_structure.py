@@ -105,8 +105,6 @@ STAGES = ('occ', 'agg')
 #: Human names for the two stages, used in panel titles and axis labels.
 STAGE_TITLE = {'occ': 'Per occurrence', 'agg': 'In the aggregate'}
 STAGE_LOSS = {'occ': 'Loss per claim', 'agg': 'Aggregate loss'}
-STAGE_PROBABILITY = {'occ': 'Annual non-exceeding probability',
-                     'agg': 'Non-exceeding probability'}
 
 chart_structure = _emitter_base('structure')
 
@@ -636,58 +634,23 @@ def _gross_block(agg, stats, stage, panel_id, top, support_hi=np.inf):
 
 # ---------------------------------------------------------------------- emit
 
-def _largest_claim_mass(agg, severity_mass):
-    """The mass of the largest gross claim in a year, on the severity's grid.
-
-    Parameters
-    ----------
-    agg : Aggregate
-        Supplies the frequency, so the result is right for every count family.
-    severity_mass : ndarray
-        The per-claim mass on the grid, ``p_sev_gross``.
-
-    Returns
-    -------
-    ndarray
-        The mass of the annual maximum at each grid point.
+def _lee_series(agg, stage, panel_id):
+    """The quantile curve of a stage's reference distribution, as a series.
 
     Notes
     -----
-    With ``N`` independent claims of distribution ``F`` the largest is at most
-    ``x`` with probability ``P_N(F(x))``, for ``P_N`` the frequency pgf, and a
-    year with no claim has a largest claim of zero. So ``1 - P_N(F(x))`` is the
-    annual occurrence exceedance probability, and the document's 'complement'
-    map turns this curve into its reciprocal, the return period in years. The
-    Poisson case is ``1 - exp(-n S(x))``, as in :func:`aggregate.utilities.oep`.
-
-    Beside the aggregate panel the two readings are commensurate: the largest
-    claim exceeding ``x`` implies the year's total does, so the occurrence
-    return period is never the shorter at one ``x``. The claim rate
-    ``1 / (n S(x))`` does not have this property: it depends on the count only
-    through its mean, and it runs below one year wherever claims above ``x`` are
-    expected more than once a year.
-    """
-    cdf = np.clip(np.cumsum(severity_mass), 0.0, 1.0)
-    # base_mean is the mean the pgf consumes, which differs from n on a
-    # zero-modified count.
-    annual = np.real(agg.frequency.freq_pgf(agg.base_mean, cdf))
-    return np.diff(annual, prepend=0.0)
-
-
-def _lee_series(agg, stage, panel_id):
-    """The quantile curve one stage's boundaries are read against, as a series.
-
-    The occurrence stage draws the largest gross claim in a year
-    (:func:`_largest_claim_mass`), and the aggregate stage the subject
-    aggregate, so the probability and the return period on both are annual.
+    The occurrence stage is the per-claim severity, so its return period counts
+    claims and does not depend on the claim count. Occurrence cover is
+    conditional on a claim: it is bought to cover a percentage of claims, not of
+    years. The annual maximum, ``P_N(F(x))``, was drawn here at 1.53.0 and removed
+    at 1.54.0 by the author's ruling, recorded in
+    ``dev/done/plan-using-notes-wrong-answers.md``.
     """
     df = agg.reins_density_df
-    if stage == 'occ':
-        mass = _largest_claim_mass(agg, df['p_sev_gross'].to_numpy(dtype=float))
-    else:
-        mass = df['p_agg_subject'].to_numpy(dtype=float)
-    p, outcome = quantile_curve(df['loss'].to_numpy(dtype=float), mass)
-    name = 'Largest gross claim in a year' if stage == 'occ' else 'Subject'
+    column = 'p_sev_gross' if stage == 'occ' else 'p_agg_subject'
+    p, outcome = quantile_curve(df['loss'].to_numpy(dtype=float),
+                                df[column].to_numpy(dtype=float))
+    name = 'Gross claim' if stage == 'occ' else 'Subject'
     return ChartSeries(name=name, role='gross' if stage == 'occ' else 'subject',
                        panel_id=panel_id, x=tuple(float(v) for v in p),
                        **lattice_payload(outcome, agg.bs, 'y'))
@@ -709,10 +672,9 @@ def _structure(obj, annotate=DEFAULT_ANNOTATE, lee=False):
         rather than blanked, so one tuple serves an un-updated object, a
         built one and a priced one. Pass ``()`` for bare rectangles.
     lee : bool
-        Also emit, beside each tower, a quantile curve sharing its loss
-        axis, so every boundary reads off as an annual return period: the
-        largest gross claim in a year beside the occurrence tower, the
-        subject aggregate beside the aggregate tower. Requires a built
+        Also emit, beside each tower, the quantile curve of the
+        distribution that tower is read against, sharing its loss axis, so
+        every boundary reads off as a return period. Requires a built
         object.
 
     Returns
@@ -808,7 +770,7 @@ def _structure(obj, annotate=DEFAULT_ANNOTATE, lee=False):
             lee_id = f'{stage}_lee'
             p_id = f'{stage}_p'
             axes.append(ChartAxis(
-                id=p_id, label=STAGE_PROBABILITY[stage], unit='probability',
+                id=p_id, label='Non-exceeding probability', unit='probability',
                 suggested_range=(0.0, 1.0)))
             axes.append(ChartAxis(
                 id=f'{stage}_rp', label='Return period', unit='return_period',

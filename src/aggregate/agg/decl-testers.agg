@@ -114,6 +114,16 @@ agg U.CededConstant 3 claims dsev [100 200] occurrence ceded to 10 xs 10 fixed  
 agg U.NetConstant   2 claims dsev [300 700] fixed aggregate net of 1500 xs 250                   note{a constant net, its one amount off bs 100};
 port U.ReinsBook agg A 3 claims dsev [100 200] occurrence ceded to 10 xs 10 fixed agg B 2 claims dsev [1 2 3] fixed;
 port U.ReinsBookOverrun agg A 1 claim dsev [2 3] occurrence net of 1 xs 1 fixed agg B 1 claim dsev [2 3] fixed;
+# A skewness of rounding is not failed, and a real skewness far from zero spread is kept.
+agg U.NormShift    1 claim sev 100 * norm + 1000 fixed                                           note{analytic skew 0 from a symmetric law};
+agg U.NormCV       1 claim sev norm 1000 cv 0.1 fixed                                            note{the same law through mean cv};
+agg U.NearSym      1 claims dsev [115 120 125] fixed                                             note{third central moment is rounding};
+agg U.FarGamma     1 claim sev 100 * gamma 2 + 1000000 fixed                                     note{skewness 1.414 survives the floor};
+# nan analytic moments that are facts about the law, and one that is a defect (forced in the test).
+agg U.ZeroMean     1 claim dsev [-1 1] fixed                                                     note{cv undefined at a zero mean};
+agg U.FixedPoint   3 claims dsev [2] fixed                                                       note{skew undefined at a zero variance};
+agg U.NoVariance   1 claim sev 100 * lomax 1.5 fixed hints{bs=1; log2=16}                        note{ex2 infinite, cv inf, skew nan};
+agg U.ForcedVar    1 claim sev lognorm 2 cv 0.5 fixed                                            note{Severity.moms forced inconsistent in the test};
 
 
 # V. Underwriter / build smoke fixtures

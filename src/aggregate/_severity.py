@@ -17,7 +17,7 @@ from scipy.optimize import NoConvergence  # noqa
 from ._help import HelpMixin
 from .constants import (FIG_H, FIG_W, INFO_NA, IgnoredDecLClauseWarning,
                         ReflectedSeverityClampWarning, info_row, warn_once)
-from .moments import VALIDATION_NOISE
+from .moments import VALIDATION_NOISE, third_central_moment
 from ._grid_distribution import GridDistribution
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
@@ -2584,7 +2584,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             sd = np.sqrt(var)
             cv = sd / ex1 if ex1 else np.nan
             if np.isfinite(ex3) and np.isfinite(sd) and sd > 0:
-                skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
+                skew = third_central_moment(ex1, ex2, ex3) / sd ** 3
             else:
                 skew = np.inf if not np.isfinite(ex3) else np.nan
         return float(ex1), float(var), float(sd), float(cv), float(skew)
@@ -3182,7 +3182,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         """Mean, variance, skew of the layered severity (from ``moms``)."""
         ex1, ex2, ex3 = self.moms()
         var = ex2 - ex1 ** 2
-        skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / var ** 1.5
+        skew = third_central_moment(ex1, ex2, ex3) / var ** 1.5
         return np.array([ex1, var, skew, np.nan])
 
     @lru_cache

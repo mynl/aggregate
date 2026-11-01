@@ -300,3 +300,56 @@ Ripple, not done here: `validationState` in `V:/dev/aggregate-api/web/src/main.j
 unreasonable` grades `warn`. Every clean reinsured object in aLL turns the strip amber until that is
 changed, and the API's editable install picks this up at once. The fix is to grade the clauses after
 the prefix, `s.split(';')`, ok when each is `not unreasonable`, bad when any names the mean.
+
+### `[Verdict-Moment-Floors]`, 1.57.0
+
+`100 * norm + 1000` and `norm 1000 cv 0.1` read `not unreasonable`, which they already did at 1.54.0. A
+program forced to a negative variance reads `analytic cv, skew undefined; not unreasonable` with
+`passes` false. The symmetric-die and symmetric-portfolio tests pass unchanged, and
+`tests/test_moments.py` 190 to 197 keeps its `nan`.
+
+The sweep is what this step moved. Of the 822 exact laws, 49 read a failing verdict before it and 8 now:
+four `100 claims dsev [1000 1001 1002] ... occurrence net of 500 xs 0 fixed`, whose gross overruns a grid
+the net fits, two two-unit books reading `fails pmf deficit`, and two reinsured books that read `grid
+infeasible` with an exact output. No exact law fails its view. These eight are what the next step's
+warning says of an exact law, and the verdict is right about the subject in each.
+
+Divergences:
+
+- **Two floors on the skewness numerator, not one.** The plan's one floor sets the numerator to 0 at
+  `VALIDATION_NOISE` of the terms. Measured against exact rationals, that loses good numbers:
+  `DISC.RoundedProbs` has a numerator of -14.25 against a true -14.54 at 2.4e-15 of the terms, a skewness
+  good to 2%, and `100 * gamma 2 + 1000000` has 1.4143 at 6.7e-13. Pure rounding measures about 1e-16.
+  So `third_central_moment` zeroes below 1e-15 only, and `skewness_is_testable` stops the test at the
+  plan's `VALIDATION_NOISE`: the grid's own skewness has a noise of about 2e-15 of the terms, so a 1% test
+  needs about 100 times that. The verdicts are the plan's and the reported numbers keep their digits.
+  `tests/test_discrete_severity.py` pins `actual_skew` at -0.0217 and failed on the plan's form.
+- **The test skip applies at every gate,** the Aggregate, the Portfolio, the characteristic function, the
+  reinsured view and `validation_score_terms`, so that a score of 1 stays the pass boundary. The plan
+  names the first and third and the score under item 3.
+- **The `nan` rule is narrower than written.** "Theoretical `nan` while the empirical is finite" reads 11
+  moments on 5 corpus programs, every one a fact about the law: a zero mean (`BasicRandomWalk`, `PnL.Sym`,
+  `SH.Sym`), a zero variance (`FixedFrequency`), and `inf - inf` from an infinite moment
+  (`HeavyTailValidation`, `Schaller2008.SchallerTemnov`). The flag is set only for a negative variance or
+  a `nan` raw moment, with no infinite raw moment. The plan's `inf` carve-out is the same reasoning.
+- **`passes` is false for `ANALYTIC_UNDEFINED`,** where the plan says both "treats it as INFEASIBLE is
+  treated", which passes, and "`passes` is false". The acceptance and "the warning is the channel" under
+  "Not in this plan" decide it, since the warning fires only when `passes` is false. It renders outside
+  the `fails` list as INFEASIBLE does.
+- **A law computed from its characteristic function does not set `ANALYTIC_UNDEFINED`.** Its docstrings
+  define `nan` there as a moment the law lacks.
+- **`WindowedSimple` leaves `VALIDATION_BASELINE`:** skewness 3.6e-4 at a mean of 1.5e7, analytic 3.607e-4,
+  grid 3.859e-4.
+- **`Severity._stats` is at `_severity.py` 3181,** and the plan's lines 2601 to 2606 are now
+  `_actual_moments`. Both take the floor.
+- **Two regenerated artifacts, which the plan's file list omits.** Each was read before it was accepted.
+  `tests/data/exhibit_snapshots.json`: 33 fields, 25 of them analytic skewness dust going to 0 on
+  `stats` and `reins` for `Portfolio` and `ReinsAggregate`, its text and `neg` flag with it, and 8 raw
+  values on `economic_tail/raw/Tower` by one ulp. The Tower cell reads the same with the floor off and on, so that
+  is earlier drift, hidden by a tolerant test since the file was last written at 1.39.0.
+  `tests/baseline`: `Port.Bounded__stats_df` row 13, 1.3e-14 to 0, and the manifest.
+
+The floor moves no grid: 1,690 programs built with the floor off and on have the same `bs` and `log2`.
+Three sweep programs at a CV near 1e-5, such as `1000 claims dsev [10002 10007] [2/3 1/3] fixed`, move in
+realized CV by up to 5e-5 relative, probably because the window origin reads the analytic skewness and the
+rounding of the FFT changes with it, which I did not confirm.

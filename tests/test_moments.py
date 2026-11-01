@@ -23,6 +23,8 @@ from aggregate.moments import (
     xsden_to_mwrangler,
     xsden_to_meancv,
     xsden_to_meancvskew,
+    skewness_is_testable,
+    third_central_moment,
     _noise_aware_rel_error,
     _snap_noise,
 )
@@ -195,6 +197,38 @@ def test_materially_negative_variance_is_still_reported(caplog):
             m, cv, skew = _MCVSK(2.0, 1.0, 1.0)
     assert "weird var < 0" in caplog.text
     assert np.isnan(cv) and np.isnan(skew)
+
+
+@pytest.mark.parametrize("mean", [1.0, 1e3, 1e5, 1e8])
+def test_a_skewness_of_rounding_is_exactly_zero(mean):
+    """A symmetric law at a mean far above its spread reaches the numerator as cancellation."""
+    sd = 1e-3 * mean
+    ex1, ex2 = mean, mean ** 2 + sd ** 2
+    ex3 = mean ** 3 + 3 * mean * sd ** 2
+    m, cv, skew = _MCVSK(ex1, ex2, ex3 * (1 + 2.3e-16))
+    assert skew == 0.0
+    assert cv == pytest.approx(1e-3, rel=1e-6)
+
+
+def _shifted_gamma_raw(shift):
+    """The raw moments of ``100 * gamma 2 + shift``."""
+    m1, m2, m3 = 200.0, 60000.0, 2.4e7
+    return (m1 + shift, m2 + 2 * m1 * shift + shift ** 2,
+            m3 + 3 * m2 * shift + 3 * m1 * shift ** 2 + shift ** 3)
+
+
+@pytest.mark.parametrize("shift", [1e4, 1e6])
+def test_a_real_skewness_survives_the_floor(shift):
+    assert _MCVSK(*_shifted_gamma_raw(shift))[2] == pytest.approx(2 ** 0.5, abs=2e-3)
+
+
+def test_the_skewness_test_stops_well_above_the_rounding_floor():
+    """A far shift keeps a good number the grid cannot be held to at the tolerance."""
+    assert skewness_is_testable(*_shifted_gamma_raw(1e4))
+    assert not skewness_is_testable(*_shifted_gamma_raw(1e6))
+    assert third_central_moment(*_shifted_gamma_raw(1e6)) != 0
+    # raw moments that are not finite belong to the tests' own gates
+    assert skewness_is_testable(1.0, np.inf, np.inf)
 
 
 def test_degenerate_severity_builds_without_a_nan_cv():

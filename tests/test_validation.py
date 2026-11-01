@@ -240,6 +240,78 @@ def test_a_book_that_overruns_its_grid_fails_on_the_total():
 
 
 # ---------------------------------------------------------------------------
+# [Verdict-Moment-Floors]: rounding is not a skewness, and a nan is not a pass
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('program', [
+    'agg U.NormShift 1 claim sev 100 * norm + 1000 fixed',
+    'agg U.NormCV 1 claim sev norm 1000 cv 0.1 fixed',
+    'agg U.NearSym 1 claims dsev [115 120 125] fixed',
+])
+def test_a_skewness_of_rounding_does_not_fail(program):
+    a = build(program)
+    assert a.validation_description == 'not unreasonable'
+    assert float(a.stats_df['mixed'][('sev', 'skew')]) == 0.0
+
+
+def test_a_real_skewness_survives_the_floor_at_a_far_shift():
+    """Skewness 1.414 at a CV of 1.4e-4 has a numerator of 7e-13 of the terms subtracted."""
+    a = build('agg U.FarGamma 1 claim sev 100 * gamma 2 + 1000000 fixed')
+    assert float(a.stats_df['mixed'][('sev', 'skew')]) == pytest.approx(np.sqrt(2), abs=2e-4)
+    assert a.validation_description == 'not unreasonable'
+    assert np.isnan(_validation.validation_score_terms(a)['u_sev_skew'])
+
+
+def test_a_skewness_the_grid_cannot_be_held_to_is_reported_and_not_tested():
+    """An exact law whose grid skewness is -0.040 against a true -0.022, from rounding at a mean of 1e5."""
+    a = build('agg DISC.RoundedProbs 100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed')
+    assert a.validation_description == 'not unreasonable'
+    assert float(a.stats_df['mixed'][('agg', 'skew')]) == pytest.approx(-0.0213, abs=1e-3)
+    assert float(a.stats_df['empirical'][('agg', 'skew')]) == pytest.approx(-0.040, abs=2e-3)
+    assert np.isnan(_validation.validation_score_terms(a)['u_agg_skew'])
+
+
+@pytest.mark.parametrize('program, kwargs, measure', [
+    ('agg U.ZeroMean 1 claim dsev [-1 1] fixed', {}, 'cv'),
+    ('agg U.FixedPoint 3 claims dsev [2] fixed', {}, 'skew'),
+    ('agg U.NoVariance 1 claim sev 100 * lomax 1.5 fixed hints{bs=1; log2=16}', {}, 'skew'),
+])
+def test_a_nan_that_is_a_fact_about_the_law_is_not_flagged(program, kwargs, measure):
+    a = build(program, **kwargs)
+    assert np.isnan(float(a.stats_df['mixed'][('agg', measure)]))
+    assert not a.valid & Validation.ANALYTIC_UNDEFINED
+    assert 'undefined' not in a.validation_description
+
+
+def _forced_negative_variance(monkeypatch):
+    """Raw moments that cannot belong to a law, the ``tests/test_moments.py`` fixture."""
+    from aggregate._severity import Severity
+    monkeypatch.setattr(Severity, 'moms', lambda self: (2.0, 1.0, 1.0))
+    return build('agg U.ForcedVar 1 claim sev lognorm 2 cv 0.5 fixed', bs=1 / 64, log2=12)
+
+
+def test_a_negative_analytic_variance_is_reported_and_does_not_pass(monkeypatch):
+    a = _forced_negative_variance(monkeypatch)
+    assert a.validation_description == 'analytic cv, skew undefined; not unreasonable'
+    assert a.valid == Validation.ANALYTIC_UNDEFINED
+    assert not a.valid.passes
+    assert 'could not be computed' in a.validation_explanation
+
+
+def test_a_book_reports_a_unit_with_an_undefined_analytic_moment(monkeypatch):
+    from aggregate._severity import Severity
+    monkeypatch.setattr(Severity, 'moms', lambda self: (2.0, 1.0, 1.0))
+    p = build('port U.ForcedBook agg U.ForcedVar 1 claim sev lognorm 2 cv 0.5 fixed', bs=1 / 64, log2=12)
+    assert p.valid & Validation.ANALYTIC_UNDEFINED and not p.valid.passes
+    assert p.validation_description.startswith('analytic cv, skew undefined; ')
+
+
+def test_undefined_needs_no_measures_to_render():
+    assert (_validation.explain_validation(Validation.ANALYTIC_UNDEFINED)
+            == 'analytic moments undefined; not unreasonable')
+
+
+# ---------------------------------------------------------------------------
 # [Aliasing-Direct-Measure]: the ALIASING flag measures the convolution step
 # ---------------------------------------------------------------------------
 # Through 1.0.0a310 the flag was a ratio of the aggregate mean error to the

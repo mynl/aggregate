@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.57.0 - 2026-11-01
+
+**[Verdict-Moment-Floors] A skewness of rounding is not failed, and an analytic moment the library could not compute is reported.** New `moments.third_central_moment` and `moments.skewness_is_testable`, and new flag `Validation.ANALYTIC_UNDEFINED`, read as `analytic cv, skew undefined; not unreasonable` with `passes` false. Numbers move only where the third central moment is within 1e-15 of the terms subtracted, where it is now 0: `1000 claims dsev [999 1000 1001] fixed` had a skewness of 0.015 and `100 * gamma 2 + 100000000` one of 94.9, and no grid moves on 1,690 programs. Below 1e-12 the skewness stays reported and is not tested, so `1 claims dsev [115 120 125] fixed` and `DISC.RoundedProbs` read `not unreasonable`, and `WindowedSimple` leaves the known failures. A `nan` from a zero mean, a zero variance or an infinite moment is not flagged.
+
 ## 1.56.0 - 2026-11-01
 
 **[Verdict-Reinsured-Views] The verdict checks the reinsured view against the exact image of the subject on its grid, and `Validation.passes` stops treating reinsurance as a pass.** Every reinsured verdict changes: a clean one reads `reinsurance; subject not unreasonable; net not unreasonable`, was `reinsurance; subject not unreasonable`, and `agg X 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` at `bs` 1000 reads `reinsurance; subject not unreasonable; net fails sev cv, agg cv`. New flag `Validation.VIEW`, and `explain_validation` takes `view=`. `passes` is now false for a failing subject or view, so seven library entries move into the known failures, among them `CommAuto.Exposure` and `USXOLTower`. A Portfolio with a reinsured unit checks its total against the sum of its units' cumulants instead of skipping it. No number moves.

@@ -14,11 +14,89 @@ logger = logging.getLogger(__name__)
 # Absolute dust floor, resolved once per session from aggregate.config.
 VALIDATION_NOISE = get_settings().validation.noise
 
+# Cancellation floor on the third central moment, relative to the terms subtracted.
+# Below it the numerator is rounding and is 0. See :func:`third_central_moment`.
+SKEWNESS_ROUNDING = VALIDATION_NOISE / 1000
+
 __all__ = [
     'MomentAggregator', 'MomentWrangler',
     'xsden_to_mwrangler',
     'xsden_to_meancv', 'xsden_to_meancvskew',
 ]
+
+
+def _third_central_and_scale(ex1, ex2, ex3):
+    r"""``(third, scale)``: :math:`e_3 - 3 e_1 e_2 + 2 e_1^3` and the size of the terms subtracted."""
+    with np.errstate(invalid='ignore', over='ignore'):
+        return (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3,
+                abs(ex3) + 3 * abs(ex1 * ex2) + 2 * abs(ex1) ** 3)
+
+
+def third_central_moment(ex1, ex2, ex3):
+    r"""The third central moment from raw moments, 0 when it is only rounding of the terms.
+
+    Parameters
+    ----------
+    ex1, ex2, ex3 : float
+        The raw moments.
+
+    Returns
+    -------
+    float
+
+    Notes
+    -----
+    :math:`\kappa_3 = e_3 - 3 e_1 e_2 + 2 e_1^3` subtracts numbers that are equal
+    when the law is symmetric about a mean large against its spread, the same
+    mechanism as the variance floor in
+    :meth:`MomentAggregator.static_moments_to_mcvsk`. Against
+    :math:`s_3 = |e_3| + 3|e_1 e_2| + 2|e_1|^3`, a numerator that is pure rounding
+    measures about 1e-16: 1,000 claims of a symmetric ``dsev [999 1000 1001]`` gives
+    256 where the truth is 0, and a skewness of 0.015. A numerator that still
+    carries the moment starts not far above: 100 claims of the asymmetric form gives
+    -14.25 against a true -14.54, at 2.4e-15, a reported skewness good to 2%.
+
+    :data:`SKEWNESS_ROUNDING`, 1e-15, separates the two, and below it the numerator
+    is exactly 0. This is deliberately not the floor on testing the skewness, which
+    is far higher: see :func:`skewness_is_testable`.
+    """
+    third, scale = _third_central_and_scale(ex1, ex2, ex3)
+    if np.isfinite(third) and abs(third) <= SKEWNESS_ROUNDING * scale:
+        return 0.0
+    return third
+
+
+def skewness_is_testable(ex1, ex2, ex3):
+    r"""Whether a skewness from these raw moments can be held to the validation tolerance.
+
+    Parameters
+    ----------
+    ex1, ex2, ex3 : float
+        The analytic raw moments.
+
+    Returns
+    -------
+    bool
+        False when the third central moment is within ``VALIDATION_NOISE`` of the
+        terms subtracted. True for raw moments that are not finite, which the
+        tests' own finiteness gates handle.
+
+    Notes
+    -----
+    The grid computes its skewness from its own raw moments, with a noise of about
+    2e-15 of the terms: 100 claims of ``dsev [999 1000 1001]`` reads -0.040 on the
+    grid against a true -0.022, on an exact law. Matching a skewness to the 1% the
+    test asks (``100 eps``) therefore needs a numerator about 100 times that noise,
+    so below 1e-12 a failure says nothing about the grid and the test is skipped.
+
+    The analytic skewness stays reported. It has a far lower noise than the test can
+    use: ``100 * gamma 2 + 1000000`` has a ratio of 7e-13 and a skewness of 1.4143,
+    good to 6e-5, which a single floor at 1e-12 would set to 0. For skewness
+    :math:`\gamma` and CV :math:`c` the ratio is about :math:`\gamma c^3 / 6`, so the
+    skip applies where :math:`c` is below about 1e-4, a mean large against its spread.
+    """
+    third, scale = _third_central_and_scale(ex1, ex2, ex3)
+    return not (np.isfinite(third) and abs(third) <= VALIDATION_NOISE * scale)
 
 
 class MomentAggregator:
@@ -380,7 +458,8 @@ class MomentAggregator:
         variance of order 1 and far too tight for one whose moments are of
         order 5e7: a point mass at 6961.69 gave ``var = -3.7e-08``, one
         machine epsilon in relative terms, and produced ``sqrt`` of a
-        negative number and a ``nan`` CV and skewness.
+        negative number and a ``nan`` CV and skewness. The skewness numerator has
+        its own floor, :func:`third_central_moment`.
         """
         m = ex1
         with np.errstate(invalid='ignore'):
@@ -409,7 +488,7 @@ class MomentAggregator:
             skew = np.nan
         else:
             with np.errstate(invalid='ignore'):
-                skew = (ex3 - 3 * ex1 * ex2 + 2 * ex1 ** 3) / sd ** 3
+                skew = third_central_moment(ex1, ex2, ex3) / sd ** 3
         return m, cv, skew
 
     @staticmethod

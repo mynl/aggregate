@@ -221,6 +221,10 @@ class Validation(Flag):
     (``[CHF-Validation-Verdict]``, 1.37.0). ``VIEW`` says the moment flags set
     beside it include a failure of the reinsured view the object reports, against
     the exact image of the subject on its grid, rather than only of the subject.
+    ``ANALYTIC_UNDEFINED`` says an analytic CV or skewness is ``nan`` through a
+    defect of its computation, a negative variance or a ``nan`` raw moment, so that
+    moment was not compared. It sits outside the ``fails`` list, since nothing about
+    the grid failed, and :attr:`passes` is false, since nothing vouched for it.
     """
 
     NOT_UNREASONABLE = 0
@@ -237,6 +241,7 @@ class Validation(Flag):
     INFEASIBLE = auto()
     TRUNCATION = auto()
     VIEW = auto()
+    ANALYTIC_UNDEFINED = auto()
 
     @property
     def passes(self):

@@ -174,7 +174,9 @@ VALIDATION_BASELINE = {
     # THE SHIPPED LIBRARY NOW HAS NO ALIASING ENTRY AT ALL, which is worth a
     # deliberate decision rather than a silent gap.
     'WindowedContinuous': 'SEV_CV',
-    'WindowedSimple': 'AGG_SKEW',
+    # ``WindowedSimple`` left at 1.57.0: 10,000,000 claims of ``dsev [1 2]`` have a
+    # skewness of 3.6e-4 at a mean of 1.5e7, and the grid's 3.859e-4 is rounding of
+    # raw moments, so that skewness is below what the test can be held to.
     # A signed reflection: the FFT skew of a reflected lognormal is the
     # hardest of the six moments to reproduce and the only one that misses.
     'SignedPremiumMinusLoss': 'AGG_SKEW',

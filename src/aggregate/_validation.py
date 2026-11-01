@@ -10,7 +10,7 @@ import pandas as pd
 
 from .constants import Validation
 from .config import get_settings
-from .moments import MomentAggregator, _noise_aware_rel_error
+from .moments import MomentAggregator, _noise_aware_rel_error, skewness_is_testable
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +155,7 @@ def _failure_parts(rv, deficit, subject):
     return parts
 
 
-def explain_validation(rv, deficit=None, subject='severity', view=None):
+def explain_validation(rv, deficit=None, subject='severity', view=None, undefined=None):
     """
     Explain the validation result rv.
     Don't over report: if you fail CV don't need to be told you fail Skew too.
@@ -184,6 +184,9 @@ def explain_validation(rv, deficit=None, subject='severity', view=None):
         same moment. ``word`` is ``net``, ``ceded`` or ``output``. Without it the
         reinsured message cannot attribute the flags: the marker alone gives the
         subject's status when ``VIEW`` is clear, and ``subject or view`` when set.
+    undefined : sequence of str, optional
+        The analytic moments behind ``ANALYTIC_UNDEFINED``, ``('cv', 'skew')``,
+        for the clause ``analytic cv, skew undefined``.
     """
     if rv == Validation.NOT_UNREASONABLE:
         return "not unreasonable"
@@ -206,12 +209,61 @@ def explain_validation(rv, deficit=None, subject='severity', view=None):
     # reading about the grid, not a failure: an infeasible object whose
     # moments hold still reads "not unreasonable" after the clause, and one
     # whose moments fail is told why they did. Same idiom as ``reinsurance``.
+    # ANALYTIC_UNDEFINED sits outside it for the same reason: it is a fault of the
+    # analytic side, and what the grid did is reported after it.
+    if rv & Validation.ANALYTIC_UNDEFINED:
+        out = f"analytic {', '.join(undefined) if undefined else 'moments'} undefined; {out}"
     if rv & Validation.INFEASIBLE:
         return f'grid infeasible for this {subject}; {out}'
     return out
 
 
-def _view_moment_flags(comp, exact, realized, eps):
+def _skew_testable(theory, comp):
+    """:func:`~aggregate.moments.skewness_is_testable` on the ``comp`` row of an analytic ``stats_df`` column."""
+    return skewness_is_testable(*(float(theory[(comp, k)]) for k in ('ex1', 'ex2', 'ex3')))
+
+
+def _undefined_analytic_moments(theory, realized, comp):
+    """The measures of ``comp`` whose analytic value is ``nan`` through a defect of its computation.
+
+    Parameters
+    ----------
+    theory, realized : pandas.Series
+        The analytic and the grid's columns of ``stats_df``.
+    comp : str
+        ``'sev'`` or ``'agg'``.
+
+    Returns
+    -------
+    list of str
+        A subset of ``['cv', 'skew']``.
+
+    Notes
+    -----
+    A ``nan`` is usually a fact about the law, and the moment test rightly skips
+    it. A CV is undefined at a zero mean, and a skewness at a zero variance (a fixed
+    count of a fixed severity), and both follow ``inf - inf`` from an infinite raw
+    moment (a Pareto with no variance). What is left is a defect: a negative variance
+    from raw moments that are mutually inconsistent, or a ``nan`` raw moment. There
+    the library failed to compute a moment the law has, and the test would otherwise
+    skip it as it skips one the law lacks, with only a ``logger.error`` to say so.
+    """
+    e1, e2, e3 = (float(theory[(comp, k)]) for k in ('ex1', 'ex2', 'ex3'))
+    if np.isinf([e1, e2, e3]).any():
+        return []
+    var = e2 - e1 * e1
+    degenerate = np.isfinite(var) and abs(var) <= VALIDATION_NOISE * max(abs(e2), e1 * e1)
+    out = []
+    if (np.isnan(float(theory[(comp, 'cv')])) and np.isfinite(float(realized[(comp, 'cv')]))
+            and e1 != 0):
+        out.append('cv')
+    if (np.isnan(float(theory[(comp, 'skew')])) and np.isfinite(float(realized[(comp, 'skew')]))
+            and not degenerate):
+        out.append('skew')
+    return out
+
+
+def _view_moment_flags(comp, exact, realized, eps, skew_testable=True):
     """The moment flags of one component of a reinsured view, realized against exact.
 
     Parameters
@@ -224,6 +276,8 @@ def _view_moment_flags(comp, exact, realized, eps):
         The realized ``(mean, cv, skew)``.
     eps : float
         The object's ``validation_eps``.
+    skew_testable : bool, default True
+        :func:`~aggregate.moments.skewness_is_testable` on the exact raw moments.
 
     Returns
     -------
@@ -253,7 +307,7 @@ def _view_moment_flags(comp, exact, realized, eps):
                 rv |= cv_flag
         elif not np.isclose(est_cv, cv, rtol=10 * eps, atol=VALIDATION_NOISE):
             rv |= cv_flag
-    if (np.isfinite(skew) and abs(skew) > VALIDATION_NOISE and np.isfinite(est_skew)
+    if (np.isfinite(skew) and abs(skew) > VALIDATION_NOISE and np.isfinite(est_skew) and skew_testable
             and not np.isclose(est_skew, skew, rtol=100 * eps, atol=VALIDATION_NOISE)):
         rv |= skew_flag
     return rv
@@ -304,7 +358,8 @@ def _book_view_flags(port):
     emp = port.stats_df['empirical']
     return _view_moment_flags(
         'agg', exact, tuple(float(emp[('agg', m)]) for m in ('mean', 'cv', 'skew')),
-        float(port.validation_eps))
+        float(port.validation_eps),
+        skewness_is_testable(k1, k2 + k1 * k1, k3 + 3 * k1 * k2 + k1 ** 3))
 
 
 def _book_aliasing(port):
@@ -470,9 +525,18 @@ def valid_aggregate(agg):
         theo = float(mixed[(comp, 'skew')])
         est = float(emp[(comp, 'skew')])
         if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                and _skew_testable(mixed, comp)
                 and not np.isclose(est, theo, rtol=100 * eps, atol=VALIDATION_NOISE)):
             logger.info('FAIL: %s skew error > eps', comp)
             rv |= flag
+
+    # A ``nan`` the gates above skip because the computation failed, rather than
+    # because the law lacks the moment.
+    undefined = {m for comp in ('sev', 'agg') for m in _undefined_analytic_moments(mixed, emp, comp)}
+    agg._undefined_moments = sorted(undefined)
+    if undefined:
+        logger.info('READING: analytic %s undefined', agg._undefined_moments)
+        rv |= Validation.ANALYTIC_UNDEFINED
 
     # Defective: the realized law does not sum to 1, so mass ran off the top
     # of the grid. Recorded at every size (by ``update_work``, or by the
@@ -514,7 +578,8 @@ def valid_aggregate(agg):
         view_flags = Validation.NOT_UNREASONABLE
         for comp, raw, realized in reins_realized_bases(agg):
             view_flags |= _view_moment_flags(
-                comp, MomentAggregator.static_moments_to_mcvsk(*raw), realized, eps)
+                comp, MomentAggregator.static_moments_to_mcvsk(*raw), realized, eps,
+                skewness_is_testable(*raw))
         agg._view_reading = (agg._reins_after_label().lower(), rv, view_flags)
         rv |= Validation.REINSURANCE | view_flags
         if view_flags:
@@ -590,11 +655,13 @@ def valid_portfolio(port):
     # The units' subject and view failures stay apart, as on a unit, so that the
     # book's verdict can report them apart.
     subject_flags = view_flags = Validation.NOT_UNREASONABLE
+    undefined = set()
     for a in port.agg_list:
         r = a.valid
         if not r.passes:
             logger.info(f'Aggregate {a.name} fails validation')
         rv |= r
+        undefined.update(getattr(a, '_undefined_moments', ()))
         reading = getattr(a, '_view_reading', None)
         if reading is None:
             subject_flags |= r
@@ -602,6 +669,7 @@ def valid_portfolio(port):
             subject_flags |= reading[1]
             view_flags |= reading[2]
     reinsured = bool(rv & Validation.REINSURANCE)
+    port._undefined_moments = sorted(undefined)
 
     def book_reading():
         return (port._reins_after_label().lower(), subject_flags | defective,
@@ -664,9 +732,15 @@ def valid_portfolio(port):
         theo = float(total[(comp, 'skew')])
         est = float(emp[(comp, 'skew')])
         if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                and _skew_testable(total, comp)
                 and not np.isclose(est, theo, rtol=100 * eps, atol=VALIDATION_NOISE)):
             logger.info('FAIL: Portfolio %s skew error > eps', comp)
             rv |= flag
+
+    undefined = {m for comp in ('sev', 'agg') for m in _undefined_analytic_moments(total, emp, comp)}
+    port._undefined_moments = sorted(undefined)
+    if undefined:
+        rv |= Validation.ANALYTIC_UNDEFINED
 
     rv |= defective
     if rv == Validation.NOT_UNREASONABLE:
@@ -733,6 +807,7 @@ def valid_characteristic_function(obj):
     for measure, flag, mult in (('cv', Validation.AGG_CV, 10), ('skew', Validation.AGG_SKEW, 100)):
         theo, est = float(mixed[('agg', measure)]), float(emp[('agg', measure)])
         if (np.isfinite(theo) and abs(theo) > VALIDATION_NOISE and np.isfinite(est)
+                and (measure != 'skew' or _skew_testable(mixed, 'agg'))
                 and not np.isclose(est, theo, rtol=mult * eps, atol=VALIDATION_NOISE)):
             rv |= flag
     obj._deficit = pmf_deficit(obj)
@@ -831,7 +906,8 @@ def validation_score_terms(obj):
     for key, mult in SCORE_TERMS:
         name = f'u_{key[0]}_{key[1]}'
         t = float(theo.get(key, np.nan))
-        if not (np.isfinite(t) and abs(t) > VALIDATION_NOISE):
+        if not (np.isfinite(t) and abs(t) > VALIDATION_NOISE
+                and (key[1] != 'skew' or _skew_testable(theo, key[0]))):
             terms[name] = np.nan
             continue
         e = float(err.get(key, np.nan))
@@ -919,7 +995,8 @@ def validation_description(obj):
     rv = obj.valid
     return explain_validation(rv, getattr(obj, '_deficit', None),
                               subject=_infeasible_subject(obj),
-                              view=getattr(obj, '_view_reading', None))
+                              view=getattr(obj, '_view_reading', None),
+                              undefined=getattr(obj, '_undefined_moments', None))
 
 
 def validation_opening(short, eps, components='severity and for the aggregate'):
@@ -967,7 +1044,8 @@ def validation_explanation(obj):
     rv = obj.valid
     short = explain_validation(rv, getattr(obj, '_deficit', None),
                                subject=_infeasible_subject(obj),
-                               view=getattr(obj, '_view_reading', None))
+                               view=getattr(obj, '_view_reading', None),
+                               undefined=getattr(obj, '_undefined_moments', None))
     if rv & Validation.NOT_UPDATED:
         return ('Not validated: the object has not been updated, so there is no '
                 'realized grid to compare the analytic moments against. Call '
@@ -1023,6 +1101,11 @@ def validation_explanation(obj):
                    'distribution is not the distribution of the cession, whatever '
                    'its mean. A bucket that the net and ceded amounts land on '
                    'removes the error.')
+    if rv & Validation.ANALYTIC_UNDEFINED:
+        out.append('An analytic moment could not be computed: the raw moments are '
+                   'mutually inconsistent, with a negative variance or a nan, usually '
+                   'from numerical integration. That moment was not compared with the '
+                   'grid, so nothing vouches for it, whatever the verdict on the rest.')
     if rv == Validation.NOT_UNREASONABLE:
         out.append('Nothing failed, so the object is not unreasonable. That is '
                    'a statement about the numerics reproducing the model, not '

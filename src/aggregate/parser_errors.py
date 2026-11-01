@@ -302,6 +302,54 @@ class ErrorReport:
 # Public entry point
 # ----------------------------------------------------------------------
 
+def located_parse_error(source: str, offset: int, width: int, message: str,
+                        *, got: str | None = None,
+                        suggestions: Iterable[str] = ()) -> ValueError:
+    """Build the ``ValueError`` for a DecL error the grammar cannot catch.
+
+    The same form :class:`UnderwritingParser` raises for a Lark error, so a
+    caller reads ``str(err)`` and ``err.report`` alike whichever step refused.
+
+    Parameters
+    ----------
+    source : str
+        The DecL text.
+    offset : int
+        Character offset of the bad span in ``source``.
+    width : int
+        Length of the bad span.
+    message : str
+        One-line summary.
+    got : str, optional
+        The bad text.
+    suggestions : iterable of str
+        "Did you mean" candidates.
+
+    Returns
+    -------
+    ValueError
+        With ``err.report`` set to the :class:`ErrorReport`.
+    """
+    line = source.count("\n", 0, offset) + 1
+    column = offset - source.rfind("\n", 0, offset)
+    report = ErrorReport(
+        line=line,
+        column=column,
+        source=source,
+        source_line=_source_line(source, line),
+        caret=_caret(column, width),
+        got=got,
+        got_type=None,
+        expected=[],
+        expected_terminals=[],
+        suggestions=list(suggestions),
+        message=message,
+    )
+    err = ValueError(report.summary)
+    err.report = report
+    return err
+
+
 def format_error(source: str, exc: BaseException) -> ErrorReport:
     """Convert a Lark parse exception into an :class:`ErrorReport`.
 

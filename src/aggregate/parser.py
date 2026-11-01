@@ -54,7 +54,7 @@ from lark.exceptions import (UnexpectedCharacters, UnexpectedInput,
 from lark.visitors import Transformer_NonRecursive
 
 from .constants import NTT_EXPONENT_MAX_BITS
-from .parser_errors import format_error
+from .parser_errors import format_error, located_parse_error
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,57 @@ def _lift_literals(program: str) -> tuple[str, list[str]]:
         return f'{m.group(1)}{{__DECL_LITERAL_{len(lifted) - 1}__}}'
 
     return _LITERAL_RE.sub(_lift, program), lifted
+
+
+def _unmatched_bracket_error(source: str) -> ValueError:
+    """The parse error for an unmatched bracket in ``source``.
+
+    Parameters
+    ----------
+    source : str
+        Raw DecL source, known to have an unmatched bracket.
+
+    Returns
+    -------
+    ValueError
+        With the bracket's position in ``source`` on ``err.report``.
+
+    Notes
+    -----
+    Called only on failure, so the ordinary path pays nothing for it. Literals
+    and comments are blanked at their own length rather than removed, as
+    :meth:`UnderwritingLexer.preprocess` removes them, so a position counts
+    in the text as written. A closing bracket with nothing open is reported where
+    it stands, and otherwise the last opening bracket left open.
+    """
+    masked = _LITERAL_RE.sub(lambda m: " " * len(m.group(0)), source)
+    masked = re.sub(r"(//|#)[^\n]*", lambda m: " " * len(m.group(0)), masked)
+    opened = []
+    for offset, ch in enumerate(masked):
+        if ch == "[":
+            opened.append(offset)
+        elif ch == "]":
+            if not opened:
+                return located_parse_error(source, offset, 1, "Unmatched ']'.", got="]")
+            opened.pop()
+    return located_parse_error(source, opened[-1], 1, "Unmatched '['.", got="[")
+
+
+class _UnknownSeverityFamily(ValueError):
+    """A transformer refusal of a family word, located by the parser.
+
+    The transformer holds no source text, so :meth:`UnderwritingParser.parse`
+    turns this into the located error.
+
+    Parameters
+    ----------
+    word : str
+        The family word as written.
+    """
+
+    def __init__(self, word):
+        super().__init__(word)
+        self.word = word
 
 
 def _restore_literals(text: str, lifted: list[str]) -> str:
@@ -320,7 +371,14 @@ class UnderwritingLexer:
         -------
         list[str]
             Non-empty, whitespace-normalised DecL statements ready for parsing.
+
+        Raises
+        ------
+        ValueError
+            On an unmatched ``[`` or ``]``, with the position in the source on
+            ``err.report`` (an :class:`~aggregate.parser_errors.ErrorReport`).
         """
+        source = program
         # 0b. Lift every single-line note/tags/hints body and every quoted
         # string behind an indexed placeholder. The text is prose, so a ``#``,
         # ``//`` or ``[`` in it must not be read as DecL punctuation by steps 2
@@ -350,10 +408,13 @@ class UnderwritingLexer:
                 depth += 1
                 max_depth = max(max_depth, depth)
             elif ch == "]":
-                depth = max(0, depth - 1)
+                if depth == 0:
+                    raise _unmatched_bracket_error(source)
+                depth -= 1
+        if depth:
+            raise _unmatched_bracket_error(source)
         if max_depth <= 1:
             out_in = re.split(r"\[|\]", program)
-            assert len(out_in) % 2  # must be odd
             odd = [t.replace("\n", " ") for t in out_in[1::2]]
             even = out_in[0::2]
             program = " ".join(
@@ -364,7 +425,7 @@ class UnderwritingLexer:
                 if ch == "[":
                     depth += 1
                 elif ch == "]":
-                    depth = max(0, depth - 1)
+                    depth -= 1
                 elif ch == "\n" and depth > 0:
                     ch = " "
                 chars.append(ch)
@@ -825,17 +886,18 @@ class UnderwritingTransformer(Transformer_NonRecursive):
 
     # ----- distortion ------------------------------------------------
     def distortion_out_params(self, c):
-        """``distortion NAME kind n1 n2 ...`` -> ``(kind, name, spec)``.
+        """``distortion NAME [as "label"] kind n1 n2 ...`` -> ``(kind, name, spec)``.
 
-        The flat parameter list is mapped onto the kind's natural keyword
+        ``spec['name']`` stays the family; a declared ``as`` clause goes in
+        ``spec['label']``. The flat parameter list is mapped onto the kind's natural keyword
         arguments by :meth:`aggregate.spectral.Distortion.decl_spec`; the
         per-kind ordering lives on the Distortion subclass (``decl_params``),
         not here, so the parser holds no distortion-specific knowledge."""
         from .spectral import Distortion
 
-        _, name, kind_id, numbers, trailer = c
+        _, name, as_label, kind_id, numbers, trailer = c
         return ("distortion", name,
-                {**Distortion.decl_spec(kind_id, numbers), **trailer})
+                {**Distortion.decl_spec(kind_id, numbers), **as_label, **trailer})
 
     def buildin_dist_list_one(self, c):
         return [c[0]]
@@ -860,17 +922,17 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         return children
 
     def distortion_out_combo(self, c):
-        _, name, kind_id, child_ids, trailer = c
+        _, name, as_label, kind_id, child_ids, trailer = c
         if kind_id not in ('minimum', 'mixture'):
             raise ValueError(
                 f"DecL: '{kind_id}' does not take a list of distortion "
                 f"references; only 'minimum' and 'mixture' do")
         children = self._resolve_combo_children(child_ids)
         return ("distortion", name,
-                {"name": kind_id, "distortions": children, **trailer})
+                {"name": kind_id, "distortions": children, **as_label, **trailer})
 
     def distortion_out_combo_wtd(self, c):
-        _, name, kind_id, child_ids, _wts_kw, wts, trailer = c
+        _, name, as_label, kind_id, child_ids, _wts_kw, wts, trailer = c
         if kind_id != 'mixture':
             raise ValueError(
                 f"DecL: weights are only meaningful for 'mixture', not "
@@ -878,7 +940,7 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         children = self._resolve_combo_children(child_ids)
         return ("distortion", name,
                 {"name": kind_id, "distortions": children, "wts": wts,
-                 **trailer})
+                 **as_label, **trailer})
 
     # ----- portfolio -------------------------------------------------
     def port_out(self, c):
@@ -2414,6 +2476,12 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         """
         layer, annual, premium, cede, reinst, variable, as_label = c
         label = as_label.get("label")
+        # ahead of the premium check below, which a 'cede' with no premium
+        # clause would otherwise reach first, with the wrong remedy
+        if cede is not None and variable is not None and variable[0] == 'swing':
+            raise ValueError(
+                "DecL: 'swing' supplies the ceded premium and the commission; "
+                "give it without 'cede'.")
         if annual is not None and reinst is not None:
             raise ValueError(
                 "DecL: 'aad' / 'agglimit' cannot combine with 'reinstatements' "
@@ -2890,6 +2958,25 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         return [*held, hole]
 
     @staticmethod
+    def _check_severity_family(family):
+        """Refuse a ``sev`` family word that names no family.
+
+        Parameters
+        ----------
+        family : str
+            The family word.
+
+        Raises
+        ------
+        _UnknownSeverityFamily
+            Which :meth:`UnderwritingParser.parse` locates in the source, with
+            the closest names.
+        """
+        from ._severity import is_severity_family
+        if not is_severity_family(family):
+            raise _UnknownSeverityFamily(str(family))
+
+    @staticmethod
     def _check_severity_mean_cv(ids):
         """Refuse a ``mean cv`` form on a family that has none.
 
@@ -2907,6 +2994,7 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         """
         from ._severity import severity_shape_count, standard_law_moments
         for family in ([ids] if isinstance(ids, str) else ids):
+            UnderwritingTransformer._check_severity_family(family)
             counts = severity_shape_count(family)
             if counts is None:
                 continue
@@ -2949,6 +3037,8 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         """
         from ._severity import severity_shape_count
         families = [ids] if isinstance(ids, str) else list(ids)
+        for family in families:
+            cls._check_severity_family(family)
         lists = [np.atleast_1d(np.asarray(x, dtype=float)) for x in shapes]
         holes = any(np.isnan(x).any() for x in lists)
         if len(families) == 1:
@@ -3962,6 +4052,14 @@ class UnderwritingParser:
         except VisitError as e:
             # Surface a transformer-raised error (e.g. dbvsev validation) as the
             # original exception rather than Lark's wrapper.
+            if isinstance(e.orig_exc, _UnknownSeverityFamily):
+                from ._severity import severity_family_suggestions
+                word = e.orig_exc.word
+                found = re.search(rf"(?<![\w.]){re.escape(word)}(?![\w.])", text)
+                raise located_parse_error(
+                    text, found.start() if found else 0, len(word),
+                    f"Unknown severity family {word!r}.", got=word,
+                    suggestions=severity_family_suggestions(word)) from None
             raise e.orig_exc from None
 
 

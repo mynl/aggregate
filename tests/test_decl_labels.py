@@ -318,6 +318,31 @@ def test_distortion_explicit_label_wins():
     assert d.label == 'My PH'
 
 
+@pytest.mark.parametrize('clause, label', [('as "My PH"', 'My PH'), ('as myph', 'myph')])
+def test_distortion_as_clause(clause, label):
+    d = build(f'distortion TDn2 {clause} ph 0.5')
+    assert d.name == 'ph'                 # name stays the family
+    assert d.label == label
+    assert d.shape == 0.5
+
+
+def test_distortion_without_as_keeps_the_derived_label():
+    assert build('distortion TDn3 ph 0.5').label == 'PH(0.5)'
+
+
+def test_distortion_as_clause_round_trips():
+    d = build('distortion TDn4 as "My PH" ph 0.5')
+    assert d.program == 'distortion TDn4 as "My PH" ph 0.5'
+    assert build(d.program).label == 'My PH'
+
+
+def test_distortion_as_clause_on_a_combinator():
+    d = build('distortion TDm as "Worst of two" minimum dist.PHDistortion dist.DualDistortion')
+    assert d.name == 'minimum' and d.label == 'Worst of two'
+    w = build('distortion TDw as "Blend" mixture dist.PHDistortion dist.DualDistortion wts [0.6 0.4]')
+    assert w.name == 'mixture' and w.label == 'Blend'
+
+
 def test_distortion_direct_construction_gets_auto_pretty():
     from aggregate.spectral import PHDistortion
     d = PHDistortion(a=0.7)

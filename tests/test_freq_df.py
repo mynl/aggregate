@@ -104,3 +104,32 @@ def test_en_resolved_not_sentinel():
     m = build('agg M2 10 claims sev [lognorm gamma] [10 20] cv [1 2] '
               'wts [.6 .4] poisson', update=False)
     assert np.allclose(m.en, [6.0, 4.0])
+
+
+# ---------------------------------------------------------------------------
+# repr and info on an array parameter ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize('program, a_text, b_text', [
+    ('agg F1 dfreq [1 2 3] dsev [1]', 'a=[1, 2, 3]', 'b=[0.3333, 0.3333, 0.3333]'),
+    ('agg F2 dfreq [3] dsev [1]', 'a=[3]', 'b=[1]'),
+])
+def test_repr_and_info_of_an_empirical_count(program, a_text, b_text):
+    freq = build(program).frequency
+    assert a_text in repr(freq) and b_text in repr(freq)
+    assert 'freq_a' in freq.info and a_text[2:] in freq.info
+
+
+def test_repr_cuts_a_long_empirical_count():
+    freq = build('agg F3 dfreq [1:20] dsev [1]').frequency
+    assert 'a=[1, 2, 3, 4, 5, 6, ...]' in repr(freq)
+
+
+def test_repr_and_info_of_a_renewal_count():
+    freq = build('agg F4 10 years sev gamma 2 wait expon').frequency
+    assert repr(freq).startswith('Frequency(renewal')
+    assert 'renewal' in freq.info
+
+
+def test_repr_of_a_scalar_is_unchanged():
+    freq = build('agg F5 10 claims dsev [1] negbin 3').frequency
+    assert repr(freq) == 'Frequency(negbin, a=3, E[N]=10)'

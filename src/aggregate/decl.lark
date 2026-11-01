@@ -161,14 +161,15 @@ chf_law: STABLE numberl                 -> chf_stable
 // (``decl_params``) and is applied by ``Distortion.decl_spec`` -- the grammar
 // and parser hold no per-kind knowledge. The ``minimum``/``mixture``
 // combinators take a list of distortion *references* instead, so they keep
-// their own productions.
+// their own productions. The ``as_label`` slot declares the label
+// (``distortion D as "my distortion" ph 0.9``); the name stays the family.
 // A distortion carries the same `trailer` as every other statement, so it can
 // be described, tagged and documented like an aggregate. (It could not until
 // 1.0.0a157 -- the shipped library headers used to warn "note{} is NOT legal on
 // dist lines, use a comment"; that restriction is gone.)
-distortion_out: DISTORTION name ID numberl trailer                                    -> distortion_out_params
-              | DISTORTION name ID buildin_dist_list trailer                          -> distortion_out_combo
-              | DISTORTION name ID buildin_dist_list WEIGHTS "[" numberl "]" trailer  -> distortion_out_combo_wtd
+distortion_out: DISTORTION name as_label ID numberl trailer                                    -> distortion_out_params
+              | DISTORTION name as_label ID buildin_dist_list trailer                          -> distortion_out_combo
+              | DISTORTION name as_label ID buildin_dist_list WEIGHTS "[" numberl "]" trailer  -> distortion_out_combo_wtd
 
 buildin_dist_list: buildin_dist_list BUILTIN_DIST   -> buildin_dist_list_cons
                  | BUILTIN_DIST                      -> buildin_dist_list_one

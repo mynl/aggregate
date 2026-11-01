@@ -92,35 +92,106 @@ def guard_unbounded_anchor(obj, p, *, where):
         f'{name}.bounded = True. tail_behavior_df says what the tail is.')
 
 
-def price(agg, p, g, kind='var'):
+def check_price_anchor(obj, p, a):
+    """Refuse a capital level ``price`` cannot use, before any work is done.
+
+    Parameters
+    ----------
+    obj : Aggregate, AggregateCHF or Portfolio
+        The object being priced.
+    p : float or None
+        A probability, at most 1.
+    a : float or None
+        An asset level.
+
+    Raises
+    ------
+    ValueError
+        Unless exactly one of ``p`` and ``a`` is given. For ``p`` above 1, for
+        ``p = 1`` on an unbounded risk (:func:`guard_unbounded_anchor`), for an
+        infinite ``a``, and for an ``a`` above the top of an unbounded risk's
+        grid.
+
+    Notes
+    -----
+    An ``a`` above the grid would snap to the top bucket, which moves with
+    ``log2`` rather than with the risk: the same failure as ``p = 1``. On a
+    bounded risk the top bucket holds the maximum loss, so the ``a`` is honored
+    at that bucket.
     """
-    Price using regulatory and pricing g functions, mirroring Portfolio.price.
-    Unlike Portfolio, cannot calibrate. Applying specified Distortions only.
-    If calibration is needed, embed Aggregate in a one-line Portfolio object.
+    if (p is None) == (a is None):
+        raise ValueError(
+            'price: pass exactly one of p= (a probability) or a= (an asset level)')
+    if p is not None:
+        if p > 1:
+            raise ValueError(
+                f'price: p must be a probability of at most 1, got {p}; '
+                f'pass an asset level as a={p}')
+        guard_unbounded_anchor(obj, p, where='price')
+        return
+    if not np.isfinite(a):
+        raise ValueError(f'price: a must be a finite asset level, got {a}')
+    top = float(obj.density_df.loss.iloc[-1])
+    if a > top + obj.bs / 2 and getattr(obj, 'bounded', None) is False:
+        raise ValueError(
+            f'price: a={a} is above the top of the grid of {obj.name} ({top}), '
+            f'which is unbounded, so the level would move with log2. Raise '
+            f'log2, or certify the support with {obj.name}.bounded = True.')
 
-    Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
-    the regulatory distortion.
 
-    Regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
+def price(agg, p=None, g=None, kind='var', *, a=None):
+    r"""Price with a distortion at a capital level fixed by ``p`` or ``a``.
 
-    * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
-    * if input > 1 it is a directly input  capital number
-    * d dictionary: Distortion; spec { name = dist name | var, shape=p value a distortion used directly
+    Applies the pricing distortion ``g`` and computes
+    :math:`\rho_g(X \wedge a)`. To calibrate a distortion rather than specify it
+    use :func:`calibrate_distortions`, available on ``Aggregate`` and
+    ``Portfolio``.
 
-    ``pricing_g`` is  { name = ph|wang and shape=}, if shape (lr or roe not allowed; require calibration).
+    Parameters
+    ----------
+    agg : Aggregate or AggregateCHF
+        The distribution-bearing object to price.
+    p : float, optional
+        Probability, at most 1, converted to assets by ``kind``. Exactly one of
+        ``p`` and ``a`` is given.
+    g : Distortion or dict
+        The pricing distortion, or a distortion spec.
+    kind : str
+        How ``p`` converts to assets: ``'var'``, ``'lower'``, ``'upper'`` or
+        ``'tvar'``. Not used with ``a``.
+    a : float, optional
+        Asset level, snapped to the grid.
 
-    if ly, must include ro in spec
+    Returns
+    -------
+    pandas.DataFrame
+        One row indexed by the object's name with the canonical pentagon columns.
 
-    :param agg: the distribution-bearing object (an ``Aggregate``) to price.
-    :param p: a distortion function spec or just a number; if >1 assets, if <1 a prob converted to quantile
-    :param kind: var lower upper tvar
-    :param g:  pricing distortion function
-    :return:
+    Raises
+    ------
+    TypeError
+        If ``g`` is missing.
+    ValueError
+        For a capital level :func:`check_price_anchor` refuses.
+
+    Notes
+    -----
+    A distortion with a mass at zero prices at any finite level on an unbounded
+    risk: :math:`X \wedge a` is bounded and the mass lands at :math:`a`, so
+    ``ccoc`` gives :math:`P = (L + ra) / (1 + r)`. The level has to be known,
+    which is why this function can price what a bare ``apply_distortion`` on the
+    same risk refuses, and why it sets the frame's columns without that guard.
+    Only rows below the top of the grid are read here.
     """
+    if g is None:
+        raise TypeError('price: a pricing distortion g is required')
+    check_price_anchor(agg, p, a)
 
     # figure regulatory assets; applied to unlimited losses
-    vd = agg.var_dict(p, kind, snap=True)
-    a_reg = vd[agg.name]
+    if a is None:
+        a_reg = agg.var_dict(p, kind, snap=True)[agg.name]
+    else:
+        a_reg = agg.snap(a)
 
     # figure pricing distortion
     if isinstance(g, Distortion):
@@ -130,7 +201,7 @@ def price(agg, p, g, kind='var'):
         # Distortion spec as dict (may carry note/tags/hints/doc metadata)
         g = Distortion.from_spec(g)
 
-    agg.apply_distortion(g)
+    agg._set_distortion_columns(g)
     aug_row = agg.density_df.loc[a_reg]
 
     el = aug_row['exa']

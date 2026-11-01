@@ -129,6 +129,24 @@ def test_dbvsev_marginal_equals_standalone_compound():
 
 
 # ----------------------------------------------------------------------
+# a pinned grid too small for the lattice ([Using-Notes-Guards])
+# ----------------------------------------------------------------------
+
+@pytest.mark.parametrize('log2, axis, need, atom, given', [
+    ((4, 4), 0, 5, 30, 4),
+    ((5, 3), 1, 5, 20, 3),
+])
+def test_pinned_grid_below_an_atom_is_refused(log2, axis, need, atom, given):
+    with pytest.raises(ValueError, match=(rf'axis {axis} needs log2 >= {need} at bs 1 '
+                                          rf'to hold the atom {atom}; log2 {given} was given')):
+        build('bv Pin dfreq [2] dbvsev [10 20 30] [10 20]', bs=1, log2=log2)
+
+
+def test_pinned_grid_at_the_stated_size_builds():
+    assert build('bv Pin dfreq [2] dbvsev [10 20 30] [10 20]', bs=1, log2=(5, 5)) is not None
+
+
+# ----------------------------------------------------------------------
 # dependence: a non-separable S gives the hand-computable per-claim moments
 # ----------------------------------------------------------------------
 

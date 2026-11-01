@@ -80,12 +80,14 @@ def _validate_reins_layers(reins_list, tol=1e-9):
     Raises
     ------
     ValueError
-        If attachments are not non-decreasing, or two layers overlap.
+        If a share exceeds 100%, attachments are not non-decreasing, or two
+        layers overlap.
 
     Notes
     -----
     Rules over ``[(share, limit, attach), ...]``:
 
+    - a share must be **at most 100%**: a layer cannot cede more than it pays;
     - attachments must be **non-decreasing**;
     - layers must **not overlap**: ``attach_{i+1} >= attach_i + limit_i - tol``.
 
@@ -96,6 +98,11 @@ def _validate_reins_layers(reins_list, tol=1e-9):
     prev_attach = None
     prev_top = None
     for (share, limit, attach) in reins_list:
+        if share > 1 + tol:
+            raise ValueError(
+                f"share {share:.4g} on '{limit:.6g} xs {attach:.6g}' exceeds 100%; "
+                "a bare number before po is an amount of the limit, a percentage "
+                "is the share")
         if prev_attach is not None:
             if attach < prev_attach - tol:
                 raise ValueError(

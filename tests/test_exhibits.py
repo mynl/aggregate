@@ -1977,7 +1977,7 @@ def test_pricing_evaluate_serves_the_panel(objects):
     for step in pivot.index:
         for family in pivot.columns:
             assert pivot.loc[step, family] == pytest.approx(
-                panel.loc[(step, family), 'gini_p'], nan_ok=True)
+                panel.loc[(step, family), 'gini_p'])
     assert kw['float_format'] == '.5g'
     # the insurer caption states the anchor, the premium, and what a blank
     # cell means, which is the thing readers get wrong

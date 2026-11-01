@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from scipy.integrate import quad
 
 from aggregate import Distortion
 from aggregate.spectral import (
@@ -123,10 +124,53 @@ def test_ccoc_neither_rejected():
         Distortion('ccoc')
 
 
-def test_ccoc_static_takes_discount():
-    """The static factory ``Distortion.ccoc(d)`` takes the discount d."""
-    d = Distortion.ccoc(0.1)
-    assert d.d == pytest.approx(0.1)
+def test_ccoc_static_is_keyword_only():
+    """The static factory takes ``d=`` or ``r=``, one of them, by keyword."""
+    assert Distortion.ccoc(d=0.1).d == pytest.approx(0.1)
+    assert Distortion.ccoc(r=0.1).r == pytest.approx(0.1)
+    assert Distortion.ccoc(d=1 / 11).r == pytest.approx(Distortion.ccoc(r=0.1).r)
+    with pytest.raises(TypeError):
+        Distortion.ccoc(0.1)
+    with pytest.raises(TypeError):
+        Distortion.ccoc()
+    with pytest.raises(TypeError):
+        Distortion.ccoc(d=0.1, r=0.1)
+
+
+@pytest.mark.parametrize('name, make', [
+    ('ccoc', lambda: Distortion('ccoc', r=0.1)),
+    ('ph', lambda: Distortion('ph', 0.5)),
+    ('wang', lambda: Distortion('wang', 0.5)),
+    ('dual', lambda: Distortion('dual', 2.0)),
+    ('tvar', lambda: Distortion('tvar', 0.5)),
+    ('bitvar', lambda: Distortion('bitvar', p0=0.5, p1=0.9, w1=0.4)),
+    ('wtdtvar', lambda: Distortion('wtdtvar', ps=[0.5, 0.9], wts=[0.3, 0.7])),
+    ('beta', lambda: Distortion('beta', a=0.5, b=1.5)),
+    ('power', lambda: Distortion('power', x0=0.01, x1=1.0, alpha=2.0)),
+    ('cll', lambda: Distortion('cll', r0=0.05, b=0.9)),
+    ('clin', lambda: Distortion('clin', r0=0.05, slope=2.0)),
+    ('lep', lambda: Distortion('lep', r0=0.03, r=0.15)),
+    ('ly', lambda: Distortion('ly', r0=0.05, r=1.25)),
+    ('minimum', lambda: Distortion.minimum([Distortion('ph', 0.5), Distortion('tvar', 0.5)])),
+    ('mixture', lambda: Distortion.mixture([Distortion('ph', 0.5), Distortion('tvar', 0.5)], [0.5, 0.5])),
+])
+def test_gini_p_is_twice_the_area_above_the_diagonal(name, make):
+    """Every family's ``gini_p`` is finite and agrees with an integral of ``g``."""
+    d = make()
+    area = quad(lambda s: float(d.g(np.float64(s))), 0, 1, limit=500)[0]
+    assert d.gini_p == pytest.approx(2 * area - 1, abs=1e-8), name
+
+
+def test_gini_p_follows_a_recalibrated_shape():
+    d = Distortion('ph', 0.5)
+    d.shape = 0.25
+    assert d.gini_p == pytest.approx(0.6)
+
+
+def test_gini_p_of_a_mixture_is_linear():
+    a, b = Distortion('ph', 0.5), Distortion('tvar', 0.5)
+    mix = Distortion.mixture([a, b], [0.25, 0.75])
+    assert mix.gini_p == pytest.approx(0.25 * a.gini_p + 0.75 * b.gini_p, abs=1e-8)
 
 
 def test_ccoc_direct_subclass():

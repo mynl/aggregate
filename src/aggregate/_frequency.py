@@ -45,6 +45,35 @@ __all__ = [
     'FrequencySichelIG',
 ]
 
+def _frequency_parameter_text(value, spec):
+    """Text of a ``freq_a`` or ``freq_b`` parameter, for ``info`` and ``repr``.
+
+    Parameters
+    ----------
+    value : float or array-like
+        A scalar for a parametric family, an array of outcomes or probabilities
+        for ``dfreq``.
+    spec : str
+        Format specification applied to each number.
+
+    Returns
+    -------
+    str or None
+        The number, or the numbers as a list cut after six values, so a long
+        ``dfreq`` still gives a short line. ``None`` for a zero or unset scalar
+        and for an empty array, which show as absent.
+    """
+    if np.ndim(value):
+        values = np.ravel(value)
+        if values.size == 0:
+            return None
+        items = [format(float(x), spec) for x in values[:6]]
+        if values.size > 6:
+            items.append('...')
+        return f'[{", ".join(items)}]'
+    return format(value, spec) if value else None
+
+
 def _logarithmic_theta(mean):
     """
     Solve for theta parameter given mean, see JKK p. 288
@@ -570,7 +599,9 @@ class Frequency(HelpMixin):
         :param freq_a:
         :param freq_b:
         :param freq_zm: freq_zm True if zero modified, default False
-        :param freq_p0: modified p0, probability of zero claims
+        :param freq_p0: modified p0, probability of zero claims, in [0, 1).
+            ``ValueError`` outside it: a negative value is a negative mass, and
+            1 or more leaves no probability for a claim.
         """
         self.freq_name = freq_name
         self.freq_a = freq_a
@@ -602,6 +633,9 @@ class Frequency(HelpMixin):
             if not self.supports_zm:
                 raise NotImplementedError(
                     f'Zero modification not implemented for {freq_name}')
+            if not 0 <= freq_p0 < 1:
+                raise ValueError(
+                    f'zm: P(N = 0) must lie in [0, 1), not {freq_p0!r}')
             self._install_zm_wrappers()
 
     def __str__(self):
@@ -638,8 +672,8 @@ class Frequency(HelpMixin):
         rows = [
             ('frequency object name', self.name),
             ('frequency distribution', self.freq_name),
-            ('freq_a', f'{self.freq_a:,.6g}' if self.freq_a else INFO_NA),
-            ('freq_b', f'{self.freq_b:,.6g}' if self.freq_b else INFO_NA),
+            ('freq_a', _frequency_parameter_text(self.freq_a, ',.6g') or INFO_NA),
+            ('freq_b', _frequency_parameter_text(self.freq_b, ',.6g') or INFO_NA),
             ('zero modified', bool(self.freq_zm)),
             ('freq_p0', f'{self.freq_p0:,.6g}' if self.freq_zm else INFO_NA),
             ('base mean', f'{float(base):,.6g}'
@@ -668,10 +702,12 @@ class Frequency(HelpMixin):
         frequency reports its family without a mean rather than inventing one.
         """
         parts = [self.freq_name]
-        if self.freq_a:
-            parts.append(f'a={self.freq_a:.4g}')
-        if self.freq_b:
-            parts.append(f'b={self.freq_b:.4g}')
+        a_text = _frequency_parameter_text(self.freq_a, '.4g')
+        b_text = _frequency_parameter_text(self.freq_b, '.4g')
+        if a_text:
+            parts.append(f'a={a_text}')
+        if b_text:
+            parts.append(f'b={b_text}')
         if self.freq_zm:
             parts.append(f'zm p0={self.freq_p0:.4g}')
         if self.en is not None:

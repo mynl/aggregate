@@ -16,6 +16,7 @@ import logging
 import numpy as np
 import pandas as pd
 import scipy.stats as ss
+from scipy.integrate import quad
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
 from scipy.stats import norm
@@ -559,9 +560,8 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         * ``pricing_ok: bool = True`` — included in pricing-only lists.
         * ``has_mass_default: bool = False`` — listed in ``_has_mass_``.
         * ``def _build(self): ...`` — set ``self.has_mass``, ``self.mass``,
-          ``self.gini_p`` (if applicable), ``self.label``
-          (if blank), and override ``g``/``g_inv``/``g_prime`` if the
-          default class methods aren't applicable.
+          ``self.label`` (if blank), and override ``g``/``g_inv``/``g_prime``
+          if the default class methods aren't applicable.
 
     Note: to create a fake Distortion use a small synthetic class::
 
@@ -779,12 +779,10 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         """Initialise the audit/state fields shared by every subclass.
 
         Called from every ``__init__`` before ``_build``. Subclass
-        ``_build`` may then overwrite ``has_mass`` / ``mass`` /
-        ``gini_p``.
+        ``_build`` may then overwrite ``has_mass`` / ``mass``.
         """
         self.has_mass = False
         self.mass = 0.0
-        self.gini_p = np.nan
         self.error = 0.0
         self.premium_target = 0.0
         self.assets = 0.0
@@ -1156,10 +1154,37 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         """Subclass hook: dict mapping row name -> analytic moment value.
 
         Keys may include ``'mean'``, ``'var'``, ``'std'``, ``'cv'``,
-        ``'skew'``. Missing keys show as ``NaN`` in the closed-form column.
-        Multi-knot kinds (bitvar, wtdtvar, minimum, mixture) return ``{}``.
+        ``'skew'``, ``'p_equiv'``. Missing keys show as ``NaN`` in the
+        closed-form column, and :attr:`gini_p` integrates ``g`` when
+        ``'p_equiv'`` is missing. The combinators ``minimum`` and ``mixture``
+        return ``{}``.
         """
         return {}
+
+    @property
+    def gini_p(self):
+        r"""The Gini index :math:`2\int_0^1 g(s)\,ds - 1`, for every family.
+
+        Returns
+        -------
+        float
+            Twice the area between ``g`` and the diagonal: 0 for the mean and 1
+            for the maximum. It equals the level of the TVaR with the same area.
+
+        Notes
+        -----
+        The closed form of :meth:`_describe_closed_form` where the family has
+        one, and otherwise an adaptive quadrature of ``g``. A jump of ``g`` at 0
+        is a single point to the integral. A combinator has kinks, which is the
+        reason for the large subdivision limit. Not cached: calibration changes
+        ``shape`` on an existing object.
+        """
+        closed_form = self._describe_closed_form().get('p_equiv', np.nan)
+        if not np.isnan(closed_form):
+            return closed_form
+        area, _ = quad(lambda s: float(self.g(np.float64(s))), 0, 1, limit=500,
+                       epsabs=1e-11, epsrel=1e-11)
+        return 2 * area - 1
 
     def _kusuoka_summary(self):
         """Subclass hook: ``(mu_atom_0, mu_atom_1, has_interior_atoms)``.
@@ -1627,7 +1652,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
 
         Every row is always present, in the same order, for every
         ``Distortion``; an inapplicable value (e.g. ``shape`` for a kind
-        with no primary parameter, ``gini_p`` for multi-knot kinds) renders
+        with no primary parameter) renders
         as ``n/a``. The row catalogue is documented in
         ``dev/info-strings.rst``. Shares the label/value convention
         (:func:`aggregate.constants.info_row`) with ``Aggregate`` and
@@ -1644,8 +1669,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         else:
             shape_text = INFO_NA
         mu0, mu1, interior = self._kusuoka_summary()
-        # gini_p may be NaN (multi-knot kinds); area = integral of g
-        # = (gini_p + 1) / 2.
+        # area = integral of g = (gini_p + 1) / 2.
         gini_text = f'{self.gini_p:.4g}' if not np.isnan(self.gini_p) else INFO_NA
         area_text = (f'{(self.gini_p + 1) / 2:.4g}'
                      if not np.isnan(self.gini_p) else INFO_NA)
@@ -1759,13 +1783,28 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         return Distortion('bitvar', p0=p0, p1=p1, w1=w)
 
     @staticmethod
-    def ccoc(d):
+    def ccoc(*, d=None, r=None):
+        """Construct a CCoC distortion from the discount ``d`` or the return ``r``.
+
+        Parameters
+        ----------
+        d : float, optional
+            Discount, ``d = r / (1 + r)``.
+        r : float, optional
+            Return.
+
+        Returns
+        -------
+        CCoCDistortion
+
+        Raises
+        ------
+        TypeError
+            Unless exactly one of ``d`` and ``r`` is given. Both are keyword-only
+            because the two differ by little at a small value, so a bare number
+            at a call site would be an unnoticed error.
         """
-        Construct a CCoC distortion from discount factor ``d``. The
-        default constructor takes return ``r`` instead; ``d = r / (1 + r)``.
-        """
-        r = d / (1. - d)
-        return Distortion('ccoc', r=r)
+        return Distortion('ccoc', d=d, r=r)
 
     @staticmethod
     def minimum(distortion_list):
@@ -1850,7 +1889,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
                 case 'tvar':
                     return Distortion.tvar(rng.uniform(0.01, 0.99))
                 case 'ccoc':
-                    return Distortion.ccoc(rng.uniform(0.02, 0.35))
+                    return Distortion.ccoc(d=rng.uniform(0.02, 0.35))
                 case 'wtdtvar':
                     knots = rng.choice([2, 2, 3, 3, 3, 4, 4, 5, 8, 12])
                     mean = 0 if (t := rng.uniform() < 0.5) else t / 2
@@ -2278,7 +2317,6 @@ class CCoCDistortion(Distortion):
         self.v = 1.0 - self.d
         self.has_mass = (self.d > 0)
         self.mass = self.d
-        self.gini_p = self.d
 
     def _id_fields(self):
         return (self._name, self.r, self.d, self.label)
@@ -2375,7 +2413,7 @@ class PHDistortion(Distortion):
         self._build()
 
     def _build(self):
-        self.gini_p = (1 - self.shape) / (1 + self.shape)
+        pass
 
     def g(self, x):
         return x ** self.shape
@@ -2477,9 +2515,7 @@ class WangDistortion(Distortion):
         self._build()
 
     def _build(self):
-        n = ss.norm()
-        self._norm = n
-        self.gini_p = 2 * n.cdf(self.shape / 2 ** 0.5) - 1
+        self._norm = ss.norm()
 
     def g(self, x):
         n = self._norm
@@ -2582,7 +2618,7 @@ class DualDistortion(Distortion):
         self._build()
 
     def _build(self):
-        self.gini_p = (self.shape - 1) / (self.shape + 1)
+        pass
 
     def g(self, x):
         return 1 - (1 - x) ** self.shape
@@ -2681,7 +2717,6 @@ class TVaRDistortion(Distortion):
 
     def _build(self):
         p = self.shape
-        self.gini_p = p
         if p == 1:
             self.has_mass = True
             self.mass = 1
@@ -4013,27 +4048,28 @@ class LEPDistortion(Distortion):
         return self
 
     def _describe_closed_form(self):
-        """Closed-form mean and variance of D_g for the LEP distortion.
+        r"""Closed-form mean of D_g for the LEP distortion.
 
-        ``int sqrt(x(1-x)) dx = pi/8`` (Beta(3/2, 3/2) normalisation) and
-        ``int x sqrt(x(1-x)) dx = pi/16``, so for ``g(x) = d + (1-d)x +
-        spread sqrt(x(1-x))``:
-        ``int g = d + (1-d)/2 + spread*pi/8``,
-        ``E[X^2] = (1-d)/3 - spread*pi/8``.
-        Higher moments require ``int x^2 sqrt(x(1-x)) dx = 5*pi/128``
-        and are left as ``NaN`` in v1.
+        ``g(x) = min(1, d + (1-d)x + spread sqrt(x(1-x)))``. With ``spread > 0``
+        the cap binds on ``[c, 1]``, where
+        :math:`c = (1-d)^2 / ((1-d)^2 + \mathrm{spread}^2)`, for every parameter,
+        because the root leaves 1 faster than the line reaches it. So
+
+        .. math::
+
+            \int_0^1 g = dc + (1-d)c^2/2 + \mathrm{spread}\,I(c) + 1 - c,
+
+        with :math:`I(c) = \int_0^c \sqrt{x(1-x)}\,dx =
+        (2c-1)\sqrt{c(1-c)}/4 + \arcsin(2c-1)/8 + \pi/16`. Higher moments are
+        left as ``NaN``.
         """
         d = float(self._d)
         spread = float(self._spread)
-        int_g = d + (1.0 - d) / 2.0 + spread * np.pi / 8.0
-        m1 = 1.0 - int_g
-        m2 = (1.0 - d) / 3.0 - spread * np.pi / 8.0
-        var = m2 - m1 * m1
-        if var < 0:
-            var = np.nan
-        std = var ** 0.5 if not np.isnan(var) else np.nan
-        cv = std / m1 if (m1 > 0 and not np.isnan(std)) else np.nan
-        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+        c = 1.0 if spread <= 0 else (1.0 - d) ** 2 / ((1.0 - d) ** 2 + spread ** 2)
+        root_area = ((2.0 * c - 1.0) * (c * (1.0 - c)) ** 0.5 / 4.0
+                     + np.arcsin(2.0 * c - 1.0) / 8.0 + np.pi / 16.0)
+        int_g = d * c + (1.0 - d) * c * c / 2.0 + spread * root_area + 1.0 - c
+        return {'mean': 1.0 - int_g,
                 'p_equiv': 2.0 * int_g - 1.0,
                 'loading': int_g - 0.5}
 

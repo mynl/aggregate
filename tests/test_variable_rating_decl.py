@@ -274,6 +274,20 @@ def test_swing_with_premium_rejected():
         build(_HEAD + 'deposit 1500 swing basic 500 lcm 0.5')
 
 
+@pytest.mark.parametrize('clause', ['cede 10% swing basic 500 lcm 0.5',
+                                    'deposit 1500 cede 10% swing basic 500 lcm 0.5'])
+def test_swing_with_cede_rejected(clause):
+    with pytest.raises(ValueError, match="'swing' supplies the ceded premium and the "
+                                         "commission; give it without 'cede'"):
+        build(_HEAD + clause)
+
+
+def test_cede_on_another_layer_beside_swing_is_booked():
+    # swing is not a commission feature, so another layer's fixed commission stands
+    two = _HEAD + 'swing basic 500 lcm 0.5 and 1000 xs 9000 deposit 100'
+    assert build(two + ' cede 50%').est_m - build(two).est_m == pytest.approx(50)
+
+
 def test_slide_with_cede_rejected():
     with pytest.raises(ValueError, match='slide'):
         build(_HEAD + 'deposit 1500 cede 20% slide 45% at 60% and 25% at 70%')

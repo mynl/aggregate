@@ -1777,6 +1777,69 @@ def _scipy_shape_count(gen):
     return 0 if gen.shapes is None else gen.shapes.count(',') + 1
 
 
+def severity_family_suggestions(sev_name):
+    """Close spellings of a severity family word, closest first.
+
+    Parameters
+    ----------
+    sev_name : str
+        The unrecognized word.
+
+    Returns
+    -------
+    list of str
+        At most three names from the DecL word list and the continuous
+        ``scipy.stats`` families, by the cutoff DecL keyword suggestions use.
+    """
+    from difflib import get_close_matches
+    from .decl_words import _SEVERITIES
+    names = {*_SEVERITIES, *ss._continuous_distns._distn_names}
+    return get_close_matches(str(sev_name), sorted(names), n=3, cutoff=0.6)
+
+
+def is_severity_family(sev_name):
+    """Whether a word names a continuous severity family.
+
+    Parameters
+    ----------
+    sev_name : str
+        The family word.
+
+    Returns
+    -------
+    bool
+        True for ``cantor`` and for a continuous ``scipy.stats`` family.
+    """
+    return (sev_name == 'cantor'
+            or isinstance(getattr(ss, str(sev_name), None), ss.rv_continuous))
+
+
+def _scipy_family(sev_name):
+    """The ``scipy.stats`` distribution for a family word.
+
+    Parameters
+    ----------
+    sev_name : str
+        The family word.
+
+    Returns
+    -------
+    scipy.stats.rv_continuous
+        The distribution.
+
+    Raises
+    ------
+    ValueError
+        When the word is not a continuous family, with the closest names.
+    """
+    gen = getattr(ss, str(sev_name), None)
+    if isinstance(gen, ss.rv_continuous):
+        return gen
+    close = severity_family_suggestions(sev_name)
+    hint = f'; did you mean {", ".join(close)}?' if close else ''
+    raise ValueError(f'unknown severity family {str(sev_name)!r}{hint}')
+
+
 def severity_shape_count(sev_name):
     """How many positional numbers a ``sev`` clause gives a named family.
 
@@ -1790,7 +1853,7 @@ def severity_shape_count(sev_name):
     (required, allowed) : tuple of int, or None
         ``(k, k)`` for a ``scipy.stats`` family with ``k`` shapes and ``(0, 1)``
         for ``cantor``, whose one shape has a default. ``None`` for a name that
-        is not a continuous family, left to :class:`SeverityScipy` to refuse.
+        is not a continuous family, refused by :func:`_scipy_family`.
     """
     if _classify_sev(sev_name, None) == 'cantor':
         return 0, 1
@@ -3545,7 +3608,7 @@ class SeverityScipy(Severity):
         form does not read ``sev_scale``.
         """
         sev_name = self.sev_name
-        gen = getattr(ss, sev_name)
+        gen = _scipy_family(sev_name)
         shapes_spec = gen.shapes
         n_shapes = _scipy_shape_count(gen)
 

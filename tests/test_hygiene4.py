@@ -164,9 +164,9 @@ def test_distortion_info_values():
     assert 'shape                    0.6' in info
     assert 'shape name               a' in info
     assert 'other params             none' in info
-    # multi-knot kinds: gini_p / area are n/a, knots in other params
+    # multi-knot kinds: knots in other params, and gini_p is the weighted level
     w = Distortion('wtdtvar', ps=[.5, .9, .99], wts=[.3, .4, .3])
-    assert 'gini_p                   n/a' in w.info
+    assert 'gini_p                   0.807' in w.info
     assert 'ps=[0.5, 0.9, 0.99]' in w.info
 
 

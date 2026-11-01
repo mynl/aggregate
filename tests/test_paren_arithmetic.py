@@ -178,3 +178,21 @@ def test_canonical_text_shows_the_evaluated_literal():
 
     # and the canonical text is a fixed point
     assert format_program(text) == text
+
+
+# ---------------------------------------------------------------------------
+# a share above 100% ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize('layer, share', [
+    ('6 po 5 xs 50', '1.2'),
+    ('150% po 100 xs 50', '1.5'),
+    ('200 po 100 xs 50', '2'),
+])
+def test_share_above_100_percent_is_refused(layer, share):
+    with pytest.raises(ValueError, match=rf"share {share} on .* exceeds 100%"):
+        build(f'agg PO.Bad 1 claim dsev [10 100] occurrence net of {layer} fixed')
+
+
+@pytest.mark.parametrize('layer', ['100% po 100 xs 50', '100 po 100 xs 50', '50% po 100 xs 50', '0.5 po 100 xs 50'])
+def test_share_up_to_100_percent_builds(layer):
+    assert build(f'agg PO.Fine 1 claim dsev [10 100] occurrence net of {layer} fixed').est_m > 0

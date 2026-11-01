@@ -157,8 +157,8 @@ def add_exa(port, df, unit_state):
     signed = origin < 0
 
     p_total = df['p_total'].to_numpy()
-    if not np.all(p_total >= 0):
-        n_neg = int((p_total < -cut_eps).sum())
+    n_neg = int((p_total < -cut_eps).sum())
+    if n_neg:
         logger.warning(f'p_total has {n_neg} negative values; NOT setting to zero...')
     sum_p_total = p_total.sum()
     logger.info(f'{port.name}: sum of p_total is 1 - {1 - sum_p_total:12.8e} NOT rescaling.')

@@ -4502,7 +4502,10 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         Convenience function, delegates to update_work. Avoids having to pass xs.
 
-        :param log2:
+        :param log2: the number of buckets is ``2 ** log2``. With ``bs`` left at
+          0 it is a cap: the sizer may take a smaller grid, as ``log2=19`` builds
+          ``dsev [1 2 3]`` at 4, where an exact grid gains nothing from more
+          buckets. Pinning ``bs`` makes it exact.
         :param bs:
         :param bucket_sizing_p: p value passed to the moment-window bucket sizer. If > 1 converted to 1 - 10**-p.
         :param debug:
@@ -5468,10 +5471,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Raises
         ------
         ValueError
-            For a mass distortion on an unbounded support: the mass lands
-            on the last represented bucket, which is a different bounded
-            problem, not an approximation. Certify ``self.bounded = True``
-            if the support is in fact bounded.
+            For a mass distortion on an unbounded support: this call has no
+            asset level, and over the whole frame the mass lands on the last
+            represented bucket, which is a different bounded problem, not an
+            approximation. :meth:`price` knows its level and prices it. Certify
+            ``self.bounded = True`` if the support is in fact bounded.
         """
         if self.agg_density is None:
             logger.warning('You must update before applying a distortion ')
@@ -5480,9 +5484,19 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             raise ValueError(
                 f'mass distortion ({dist.label}) on an unbounded aggregate: '
                 f'the mass lands on the last represented bucket, a '
-                f'different bounded problem. Certify `bounded = True` if '
+                f'different bounded problem. Use price with p below 1 or a= '
+                f'for a finite asset level, or certify `bounded = True` if '
                 f'the support is in fact bounded.')
+        self._set_distortion_columns(dist, view=view, S_calculation=S_calculation,
+                                     allow_deficit=allow_deficit)
 
+    def _set_distortion_columns(self, dist, *, view='ask', S_calculation='forwards',
+                                allow_deficit=False):
+        """Compute the ``gS``, ``gp_total`` and ``exag`` columns of ``density_df``.
+
+        :meth:`apply_distortion` without its guard, for a caller that has fixed
+        a finite asset level. See :meth:`apply_distortion` for the parameters.
+        """
         g, _, _ = dist.effective_g(view, is_loss_value=self._is_loss_value)
         x = self.density_df.loss.to_numpy()
         p = self.density_df.p_total.to_numpy()
@@ -5501,7 +5515,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         See Embrechts, Kluppelberg, Mikosch 1.2, page 28 Formula 1.11
 
-        :param rho: rho = prem / loss - 1 is the margin-to-loss ratio
+        :param rho: rho = prem / loss - 1 is the margin-to-loss ratio, above 0. At
+          ``rho <= 0`` ruin is certain and the series that gives the function
+          diverges, so ``ValueError`` is raised.
         :param cap: cap = cap severity at cap, which replaces severity with X | X <= cap
         :param excess:  excess = replace severity with X | X > cap (i.e. no shifting)
         :param stop_loss: stop_loss = apply stop loss reinsurance to cap, so  X > stop_loss replaced
@@ -5523,6 +5539,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 f'got {fname!r}{hint}')
         if self.sev_density is None:
             raise ValueError("Must recalc before computing Cramer Lundberg distribution.")
+        if rho <= 0:
+            raise ValueError(f'net profit condition requires rho > 0, got {rho}')
 
         bit = self.sev_density_df.p_sev.copy()
         if cap:
@@ -8314,32 +8332,46 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             d = {self.name: self.snap(d[self.name])}
         return d
 
-    def price(self, p, g, kind='var'):
-        """
-        Price using regulatory and pricing g functions, mirroring Portfolio.price.
-        Unlike Portfolio, cannot calibrate. Applying specified Distortions only.
-        If calibration is needed, embed Aggregate in a one-line Portfolio object.
+    def price(self, p=None, g=None, kind='var', *, a=None):
+        r"""Price with a distortion at a capital level fixed by ``p`` or ``a``.
 
-        Compute E_price (X wedge E_reg(X) ) where E_price uses the pricing distortion and E_reg uses
-        the regulatory distortion.
+        Computes :math:`\rho_g(X \wedge a)` and returns the pentagon. To
+        calibrate a distortion rather than specify it, use
+        :meth:`calibrate_distortions`.
 
-        Regulatory capital distortion is applied on unlimited basis: ``reg_g`` can be:
+        Parameters
+        ----------
+        p : float, optional
+            Probability, at most 1, converted to assets by ``kind``. Exactly one
+            of ``p`` and ``a`` is given.
+        g : Distortion or dict
+            The pricing distortion, or a distortion spec.
+        kind : str
+            How ``p`` converts to assets: ``'var'``, ``'lower'``, ``'upper'`` or
+            ``'tvar'``. Not used with ``a``.
+        a : float, optional
+            Asset level, snapped to the grid.
 
-        * if input < 1 it is a number interpreted as a p value and used to determine VaR capital
-        * if input > 1 it is a directly input  capital number
-        * d dictionary: Distortion; spec { name = dist name | var, shape=p value a distortion used directly
+        Returns
+        -------
+        pandas.DataFrame
+            One row indexed by the object's name with the pentagon columns.
 
-        ``pricing_g`` is  { name = ph|wang and shape=}, if shape (lr or roe not allowed; require calibration).
+        Raises
+        ------
+        ValueError
+            Unless exactly one of ``p`` and ``a`` is given. For ``p`` above 1,
+            ``p = 1`` on an unbounded risk, an infinite ``a``, and an ``a`` above
+            the top of an unbounded risk's grid.
 
-        if ly, must include ro in spec
-
-        :param p: a distortion function spec or just a number; if >1 assets, if <1 a prob converted to quantile
-        :param kind: var lower upper tvar
-        :param g:  pricing distortion function
-        :return:
+        Notes
+        -----
+        A mass distortion such as ``ccoc`` prices at any finite level, because
+        :math:`X \wedge a` is bounded and the mass lands at :math:`a`. See
+        :func:`aggregate._pricing.price`.
         """
         # Thin delegator to the shared single-distribution pricing concern.
-        return _pricing.price(self, p, g, kind)
+        return _pricing.price(self, p, g, kind, a=a)
 
     def price_pentagon(self, *, p=None, a=None, P=None, M=None, Q=None,
                        LR=None, PQ=None, ROE=None, reins_view=None):

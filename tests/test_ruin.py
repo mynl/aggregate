@@ -83,6 +83,12 @@ def test_wh_net_profit_violation(re_agg):
         re_agg.wiener_hopf(-0.2)
 
 
+@pytest.mark.parametrize('rho', [-0.5, -0.2, 0])
+def test_pk_net_profit_violation(po_agg, rho):
+    with pytest.raises(ValueError, match=f'net profit condition requires rho > 0, got {rho}'):
+        po_agg.pollaczeck_khinchine(rho)
+
+
 # ---------------------------------------------------------------------------
 # numerics
 # ---------------------------------------------------------------------------

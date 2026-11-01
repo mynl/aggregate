@@ -21,6 +21,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from aggregate import Severity, build
 from aggregate.parser import UnderwritingLexer
 
 TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
@@ -170,3 +171,59 @@ def test_long_vector_builds_the_right_distribution():
     xs = " ".join(str(i) for i in range(1, n + 1))
     agg = build(f"agg LongVectorBuilt 1 claim dsev [{xs}] fixed")
     assert agg.est_m == pytest.approx((n + 1) / 2)
+
+
+# ---------------------------------------------------------------------------
+# An unmatched bracket ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize('program, char, line, column', [
+    ('agg B1 1 claim dsev [1 2 fixed', '[', 1, 21),
+    ('agg B2 1 claim dsev 1 2] fixed', ']', 1, 24),
+    ('agg B3 1 claim dsev [[1 2] fixed', '[', 1, 21),
+    ('agg B4 1 claim dsev [1 2]] fixed', ']', 1, 26),
+    # a position counts in the text as written, past a comment holding a bracket
+    ('# a comment [\nagg B5 1 claim\n  dsev [1 2\n  fixed', '[', 3, 8),
+])
+def test_unmatched_bracket_is_a_located_parse_error(program, char, line, column):
+    with pytest.raises(ValueError, match=rf"Unmatched '\{char}'") as err:
+        UnderwritingLexer.preprocess(program)
+    report = err.value.report
+    assert (report.line, report.column, report.got) == (line, column, char)
+
+
+@pytest.mark.parametrize('program', [
+    'agg B6 1 claim dsev [1 2] fixed note{E[x}',
+    'agg B7 1 claim dsev [1 2] fixed # stray [ in a comment',
+    'agg B8 as "a[1" 1 claim dsev [1 2] fixed',
+])
+def test_a_bracket_in_a_literal_or_comment_is_not_counted(program):
+    assert len(UnderwritingLexer.preprocess(program)) == 1
+
+
+# ---------------------------------------------------------------------------
+# A severity family that does not exist ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize('program, word, close', [
+    ('agg S1 3 claims sev lognorml 1 poisson', 'lognorml', 'lognorm'),
+    ('agg S2 3 claims sev gammma 100 cv 1 poisson', 'gammma', 'gamma'),
+    ('agg S3 3 claims sev [lognorm gammma] [1 2] poisson', 'gammma', 'gamma'),
+])
+def test_unknown_severity_family_suggests_the_closest(program, word, close):
+    with pytest.raises(ValueError, match=f"Unknown severity family '{word}'") as err:
+        build(program)
+    report = err.value.report
+    assert report.suggestions[0] == close
+    assert report.got == word
+    assert report.source_line[report.column - 1:].startswith(word)
+
+
+def test_unknown_severity_family_with_nothing_close():
+    with pytest.raises(ValueError, match="Unknown severity family 'qqqqzz'") as err:
+        build('agg S4 3 claims sev qqqqzz 1 poisson')
+    assert err.value.report.suggestions == []
+
+
+def test_unknown_severity_family_outside_decl():
+    with pytest.raises(ValueError, match="unknown severity family 'lognorml'; did you mean lognorm"):
+        Severity('lognorml', sev_a=1)
+

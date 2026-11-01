@@ -2211,6 +2211,18 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             # its raw (negative, numpy-wrapped) index would wrap it twice.
             ix = np.round(self._dbv_xs / self.bs[0]).astype(int) + self._i0[0]
             iy = np.round(self._dbv_ys / self.bs[1]).astype(int) + self._i0[1]
+            # An atom off the axis is a pinned grid too small for the lattice.
+            # Fancy indexing would raise above the axis and wrap below it, so
+            # this is refused with the size that holds it.
+            for axis, (idx, atoms, n) in enumerate(((ix, self._dbv_xs, N0),
+                                                    (iy, self._dbv_ys, N1))):
+                if idx.max() >= n or idx.min() < 0:
+                    span = max(idx.max(), 0) - min(idx.min(), 0) + 1
+                    atom = atoms[idx.argmax() if idx.max() >= n else idx.argmin()]
+                    raise ValueError(
+                        f'axis {axis} needs log2 >= {int(np.ceil(np.log2(span)))} '
+                        f'at bs {self.bs[axis]:g} to hold the atom {atom:g}; '
+                        f'log2 {int(np.log2(n))} was given')
             if massive:
                 rows = np.repeat(ix, len(iy))
                 cols = np.tile(iy, len(ix))

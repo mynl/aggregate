@@ -168,7 +168,9 @@ dist W.tph       ph   0.7;
 # by Distortion.decl_spec. See tests/test_distortion_decl.py.
 dist W.tbi       bitvar 0.9 0.99 0.5;
 dist W.tpw       power 0.01 1.0 2;
-dist W.tbe       beta 0.5 2
+dist W.tbe       beta 0.5 2;
+# An `as` clause declares the label; `name` stays the family (tests/test_decl_labels.py).
+dist W.tas as "My PH" ph 0.7
 # dist W.tMIN      minimum dist.W.tcc dist.W.tdu                            # MinimumDistortion of two
 # dist W.tMIX      mixture dist.W.tcc dist.W.tdu wts [0.6 0.4]              # explicit weights
 # dist W.tMIX3     mixture dist.W.tcc dist.W.tdu dist.W.tph                 # uniform default weights (3 children)
@@ -186,6 +188,8 @@ dist W.tbe       beta 0.5 2
 # agg X.Typo02 100 claims sev lognorm 100 cv 2 + +                  note{stray punctuation; UnexpectedToken}
 # agg X.Typo03 100 claims sev lognorm                               note{truncated; UnexpectedEOF}
 # agg X.Typo04 100 claims sev lognorm 100 cv 2 ?                    note{unknown character; no suggestions}
+# agg X.Typo05 1 claim dsev [1 2 fixed                              note{unmatched bracket; refused by preprocess with its position}
+# agg X.Typo06 3 claims sev lognorml 1 poisson                      note{unknown family; suggestion lognorm in report}
 
 
 # Y. Reinsurance reporting regressions
@@ -211,6 +215,9 @@ agg RR.AggB 10 claims sev 200 * beta 2 3 poisson aggregate net of 0.7 po 300 xs 
 # gross-only control (reins objects return None).
 port RR.Port agg A 100 claims 5000 xs 0 sev lognorm 50 cv 1.5 occurrence net of 2000 xs 1000 poisson agg B 50 claims sev lognorm 100 cv 2 poisson aggregate net of 1000 xs 2000 agg C 20 claims sev lognorm 30 cv 1 poisson;
 port RR.Gross agg A 10 claims sev lognorm 100 cv 2 poisson agg B 5 claims sev lognorm 50 cv 1 poisson
+# Refused at build: a share above 100%, from an amount above the limit or a percentage.
+#   agg RR.PoAmount 1 claim dsev [10 100] occurrence net of 6 po 5 xs 50 fixed
+#   agg RR.PoPercent 1 claim dsev [10 100] occurrence net of 150% po 100 xs 50 fixed
 
 
 # Z. Bivariate (joint ceded, net) occurrence reinsurance
@@ -359,6 +366,8 @@ bivariate MV.DBVPoi 5 claims dbvsev [10 20] [1 2 3] [[.4 .1 .0] [.2 .1 .2]];
 bivariate MV.DBVSparse 5 claims dbvsev [[10 1 .4] [10 2 .1] [20 1 .2] [20 2 .1] [20 3 .2]];
 bivariate MV.DBVUniform 5 claims dbvsev [0 1 2] [0 5 10];
 bivariate MV.DBVRange 5 claims dbvsev [0:2] [0:2];
+# Refused at build with bs=1, log2=(4, 4): axis 0 needs log2 >= 5 to hold the atom 30.
+#   bivariate MV.DBVPinned dfreq [2] dbvsev [10 20 30] [10 20]
 bivariate MV.DBVIndep dfreq [1] dbvsev [0 1 2] [0 1 2] [[.30 .15 .05] [.18 .09 .03] [.12 .06 .02]];
 bivariate MV.DBVSigned dfreq [1] dbvsev [-3:3] [0:6];
 bivariate MV.DBV2 dfreq [1 2] [.7 .3] agg A dfreq [0 1] [.5 .5] sev lognorm 50 cv 1 agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 copula gumbel 0.4
@@ -753,6 +762,8 @@ pnl VR.Corridor 10000 premium less agg VR.Corridor_e 10000 prem at 85% lr sev lo
 #   pnl VR.CedePC 10000 premium less agg VR.CedePC_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 cede 10% pc 25% after 10%
 #   pnl VR.CedeSlide 10000 premium less agg VR.CedeSlide_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 deposit 1500 cede 20% slide 45% at 60% and 25% at 70%
 #   pnl VR.CedeOtherLayer 10000 premium less agg VR.CedeOtherLayer_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 1000 xs 3000 deposit 500 cede 10% and 5000 xs 4000 deposit 1500 pc 25% after 10%
+# Refused at parse time: swing supplies the ceded premium and the commission on its layer.
+#   pnl VR.CedeSwing 10000 premium less agg VR.CedeSwing_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson aggregate net of 5000 xs 4000 cede 10% swing basic 500 lcm 0.5
 # retro is the account-level rating clause: it replaces the fixed `<n> premium`
 # head with `retro <collar> premium`, varying the GROSS premium as a collared
 # affine map of net account loss (no inuring reinsurance in the 1-D case). Collar
@@ -871,6 +882,10 @@ agg AC.Trials.Geometric 4 claims dsev [1] geometric zt                          
 agg AC.ZM.Binomial 4 claims dsev [1] binomial 0.6 zm .5 !                                       note{ZM binomial, per-trial probability 0.6};
 agg AC.ZM.Logarithmic 4 claims dsev [1] logarithmic zm .5 !                                     note{Logarithmic already has p0 = 0, so zm only adds mass at zero};
 agg AC.ZM.LossPin 1000 loss sev lognorm 10 cv 1 poisson zm 0.5                              note{Monetary exposure, default reading: hits E[X] = 1000; append ! and it warns and delivers 500};
+# Refused at build: P(N = 0) must lie in [0, 1), with or without the !.
+#   agg AC.ZM.Above 4 claims dsev [1] poisson zm 1.5
+#   agg AC.ZM.One 4 claims dsev [1] poisson zm 1 !
+#   agg AC.ZM.Negative 4 claims dsev [1] poisson zm -0.2
 
 # [ZT-ZM-Recalibrate-Default] (a325): create_frequency renders its child in the
 # explicit base-parameterization form whichever way the parent was written, so

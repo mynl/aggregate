@@ -1318,7 +1318,7 @@ def _render_bvagg(name: str, spec: dict, trailer: bool = True) -> _Block:
 
 
 def _render_distortion(name: str, spec: dict, trailer: bool = True) -> _Block:
-    """Render a distortion definition (``distortion NAME kind n1 n2 ...``).
+    """Render a distortion definition (``distortion NAME [as "label"] kind n1 n2 ...``).
 
     Inverts ``Distortion.decl_spec``: the flat number list is recovered from the
     kind's ``decl_params`` ordering. The ``minimum`` / ``mixture`` combinators
@@ -1342,7 +1342,7 @@ def _render_distortion(name: str, spec: dict, trailer: bool = True) -> _Block:
         raise ValueError(f"distortion {name!r}: unknown kind {kind!r}.")
     params = subclass.decl_params or (subclass.param_name,)
     numbers = ' '.join(_fmt_num(spec[p]) for p in params)
-    return _Block(f'distortion {name} {kind} {numbers}',
+    return _Block(f'distortion {name}{_render_label(spec.get("label"))} {kind} {numbers}',
                   _render_trailer(spec, trailer))
 
 

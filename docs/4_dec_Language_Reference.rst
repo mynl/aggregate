@@ -294,6 +294,17 @@ An aggregate can be declared directly from a catastrophe model's event loss tabl
 
 **Limits.** A loss table body cannot be combined with ``claims``, ``dfreq``, ``sev`` or ``dsev`` clauses, or with ``approximate``, and an ``elt`` and a ``yelt`` source cannot share an aggregate. The table is data, so ``@``, ``*``, ``+`` and ``-`` on a reference to it are refused. A loss table may be a portfolio unit or a ``pnl`` engine; it cannot be a ``bivariate`` component. The ``loss table`` row of ``info`` summarizes the form, event or year count and units. ``elt_description`` adds a few lines: the event rate and mean annual loss (or the annual outcomes), the secondary uncertainty, the grid and a one-line verdict of the checks. ``elt_explanation`` states the model in words, each source with its provenance (for a file the resolved path, size and SHA-256 digest), and every check with its value, tolerance and status, warnings first. ``elt_df`` is the table the model uses, one row per event (or year): a shared ELT6 event appears as its rolled-up row, and zero-rate events are left out. All three serve a ``yelt`` aggregate too, and are empty for an aggregate not declared from a loss table. ``elt``, ``yelt``, ``no2u`` and ``unit`` are reserved words.
 
+Distortions (distortion)
+========================
+
+The ``distortion`` statement, or ``dist``, stores a distortion: a family word and its parameters, or a ``minimum`` or ``mixture`` of stored distortions, then the usual trailer. An optional ``as`` clause after the name declares the label::
+
+    distortion Gentle ph 0.6
+    distortion Named as "my distortion" ph 0.6
+    distortion Blend as "Half and half" mixture dist.Gentle dist.Named wts [0.5 0.5]
+
+``name`` stays the family, ``ph`` in the first two lines, and the declared text goes in ``label``, which otherwise takes a form derived from the parameters, such as ``PH(0.6)``.
+
 Dec Language Grammar Specification
 ===================================
 

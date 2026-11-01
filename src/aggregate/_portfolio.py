@@ -4106,14 +4106,15 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             d = {k: self.snap(v) for k, v in d.items()}
         return d
 
-    def price(self, p, distortion=None, *, allocation=None, view='ask'):
+    def price(self, p=None, distortion=None, *, a=None, allocation=None, view='ask'):
         """Price the total under a distortion and allocate to units.
 
-        ``rho(X ∧ q(p))`` for a single distortion (or a dict / list of
-        distortions). ``p`` is a probability if ``p ≤ 1`` (converted to
-        assets via VaR and snapped to the index) and an asset level
-        otherwise. ``allocation`` defaults to :attr:`allocation_method`
-        (``'linear'`` out of the box); pass ``'lifted'`` to override.
+        ``rho(X ∧ a)`` for a single distortion (or a dict / list of
+        distortions), with the assets fixed by exactly one of ``p``, a
+        probability converted to assets via VaR and snapped to the index,
+        and ``a``, an asset level. ``allocation`` defaults to
+        :attr:`allocation_method` (``'linear'`` out of the box); pass
+        ``'lifted'`` to override.
 
         Both methods read rows of the same unified augmented frame
         (:meth:`apply_distortion`); the only difference is the tail
@@ -4125,11 +4126,14 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
 
         Parameters
         ----------
-        p : float
-            VaR probability when ``p <= 1``; asset level when ``p > 1``.
+        p : float, optional
+            VaR probability, at most 1. Exactly one of ``p`` and ``a`` is
+            given.
         distortion : Distortion | list | dict | None
             One distortion, several, or ``None`` to use
             :attr:`self.distortions`.
+        a : float, optional
+            Asset level, snapped to the index.
         allocation : {'linear', 'lifted', None}, optional
             ``None`` (default) reads :attr:`allocation_method`.
         view : {'ask', 'bid'}
@@ -4140,12 +4144,20 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         PricingResult
             Per-unit ``df`` (pentagon columns), the total price scalar,
             ``price_dict`` keyed by distortion, and ``a_reg`` / ``reg_p``.
+
+        Raises
+        ------
+        ValueError
+            Unless exactly one of ``p`` and ``a`` is given. For ``p`` above 1,
+            ``p = 1`` on an unbounded book, an infinite ``a``, and an ``a`` above
+            the top of an unbounded book's grid.
         """
         if allocation is None:
             allocation = self._allocation_method
         if allocation not in ('lifted', 'linear'):
             raise ValueError(
                 f"allocation must be 'lifted' or 'linear', not {allocation!r}")
+        _pricing.check_price_anchor(self, p, a)
 
         if isinstance(distortion, Distortion):
             distortion = {str(distortion): distortion}
@@ -4156,8 +4168,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             distortion = self.distortions
 
         # figure regulatory assets; applied to unlimited losses
-        if p > 1:
-            a_reg = self.snap(p)
+        if a is not None:
+            a_reg = self.snap(a)
             reg_p = self.cdf(a_reg)
         else:
             a_reg = self.q(p)

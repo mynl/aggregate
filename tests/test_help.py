@@ -96,3 +96,61 @@ def test_help_default_hides_private(a, capsys):
     everything = capsys.readouterr().out
     assert '_apply_reins' in everything
     assert len(everything) > len(public)
+
+
+# ----------------------------------------------------------------------
+# help calls nothing ([Using-Notes-Guards])
+# ----------------------------------------------------------------------
+class _Host:
+    """A host whose method and property raise if anything touches them."""
+
+    plain = 'plain value'
+
+    def method(self):
+        raise AssertionError('help called a method')
+
+    @property
+    def costly(self):
+        raise AssertionError('help evaluated a property')
+
+    @property
+    def fine(self):
+        return 'property value'
+
+
+@pytest.mark.parametrize('values', ['short', 'all'])
+def test_help_never_calls_a_method(values, capsys):
+    u.agg_help(_Host(), '^method$', values=values, fmt='text')
+    out = capsys.readouterr().out
+    assert 'method()' in out                 # name and signature only
+
+
+def test_help_default_evaluates_no_property(capsys):
+    u.agg_help(_Host(), fmt='text')          # a property that raises is not reached
+    out = capsys.readouterr().out
+    assert 'costly' in out and 'Error' not in out
+    assert 'property value' not in out and 'plain value' not in out
+
+
+def test_help_values_reads_properties_and_attributes(capsys):
+    u.agg_help(_Host(), '^(fine|plain)$', values='all', fmt='text')
+    out = capsys.readouterr().out
+    assert 'property value' in out and 'plain value' in out
+
+
+def test_help_values_reports_a_property_that_raises(capsys):
+    u.agg_help(_Host(), '^costly$', values='all', fmt='text')
+    assert 'help evaluated a property' in capsys.readouterr().out
+
+
+def test_help_values_leaves_the_object_alone(capsys, monkeypatch):
+    # update and sharpen have no required argument, so calling them would resize
+    b = build('agg HelpSized 2 claims dsev [1 2] fixed')
+    def _called(*args, **kwargs):
+        raise AssertionError('help called a method')
+    monkeypatch.setattr(b, 'update', _called)
+    monkeypatch.setattr(b, 'sharpen', _called)
+    before = b.bs, b.log2
+    b.help('^(update|sharpen)$', values='all', fmt='text')
+    assert (b.bs, b.log2) == before
+    capsys.readouterr()

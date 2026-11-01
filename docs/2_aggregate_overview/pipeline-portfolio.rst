@@ -181,7 +181,7 @@ Readouts
 :meth:`pricing_at`
     Per-unit pricing at one asset level, which warms the cache. The column order is the pentagon, amounts then ratios: ``L M P Q a | LR PQ ROE``, with ``LR = L/P``, ``PQ = P/Q`` and ``a = P + Q``. See ``pentagon.py``. ``Q_total`` is ``a - exag_total`` exactly.
 :meth:`price`
-    Prices :math:`\rho(X \wedge q(p))` for one distortion, or a list or dict of them, and allocates to units. ``p`` is read as a probability when it is at most 1, converted to assets by VaR and snapped to the index, and as an asset level otherwise. ``allocation`` defaults to :attr:`allocation_method`. It returns a ``PricingResult`` carrying the per-unit frame in pentagon columns, the total price, a ``price_dict`` keyed by distortion, and ``a_reg`` and ``reg_p``.
+    Prices :math:`\rho(X \wedge a)` for one distortion, or a list or dict of them, and allocates to units. The assets are fixed by exactly one of ``p``, a probability of at most 1 converted to assets by VaR and snapped to the index, and ``a``, an asset level. ``allocation`` defaults to :attr:`allocation_method`. It returns a ``PricingResult`` carrying the per-unit frame in pentagon columns, the total price, a ``price_dict`` keyed by distortion, and ``a_reg`` and ``reg_p``.
 :meth:`analyze_distortion`, :meth:`analyze_distortions`
     Single and multi-distortion exhibits built on the same machinery.
 :meth:`allocation_diagnostics`

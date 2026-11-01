@@ -2776,10 +2776,10 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                                    replace=replace, random_state=ar.RANDOM,
                                    ignore_index=True)
 
-    def price(self, p, g, kind='var'):
-        """Price with a regulatory capital rule and a pricing distortion, ``Aggregate.price``'s delegation to ``_pricing.price``."""
+    def price(self, p=None, g=None, kind='var', *, a=None):
+        """Price with a distortion at a capital level fixed by ``p`` or ``a``, ``Aggregate.price``'s delegation to ``_pricing.price``."""
         from . import _pricing
-        return _pricing.price(self, p, g, kind)
+        return _pricing.price(self, p, g, kind, a=a)
 
     def price_ccoc(self, ccoc, *, p):
         """The constant cost of capital price at a VaR level, ``price_pentagon(p=p, ROE=ccoc)``, as ``Aggregate.price_ccoc``."""
@@ -2850,7 +2850,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         :math:`\mathrm{exag}(a) = \sum_{x \le a} x\,gp + a\,g(S(a))` carries the
         window origin. A tilted grid's deficit is its ``outside_above``; a
         materially defective one needs ``allow_deficit=True``. A mass
-        distortion is refused, since every law here is unbounded.
+        distortion is refused, since every law here is unbounded and this call
+        has no asset level; :meth:`price` knows its level and prices it.
 
         Notes
         -----
@@ -2864,14 +2865,25 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         masses of -4.9e-12 and proportional hazard weights of -6.7e-10). A
         finer bucket cures it; the default grid has the truncation at roundoff.
         """
-        from .spectral import choquet_weights
         if self.agg_density is None:
             logger.warning('You must update before applying a distortion ')
             return
         if getattr(dist, 'has_mass', False) and not self.bounded:
             raise ValueError(
                 f'mass distortion ({dist.label}) on an unbounded law: the mass lands '
-                f'on the last represented bucket, a different bounded problem.')
+                f'on the last represented bucket, a different bounded problem. Use '
+                f'price with p below 1 or a= for a finite asset level.')
+        self._set_distortion_columns(dist, view=view, S_calculation=S_calculation,
+                                     allow_deficit=allow_deficit)
+
+    def _set_distortion_columns(self, dist, *, view='ask', S_calculation='forwards',
+                                allow_deficit=False):
+        """Compute the ``gS``, ``gp_total`` and ``exag`` columns of :attr:`density_df`.
+
+        :meth:`apply_distortion` without its guard, for a caller that has fixed
+        a finite asset level. See :meth:`apply_distortion` for the parameters.
+        """
+        from .spectral import choquet_weights
         g, _, _ = dist.effective_g(view, is_loss_value=True)
         df = self.density_df
         x = df.loss.to_numpy()

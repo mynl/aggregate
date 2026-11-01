@@ -45,9 +45,9 @@ class HelpMixin:
         ``'.*'``, which matches every name: a bare ``.help()`` lists the whole
         public surface. Four axes: ``lod``
         (``'terse'|'short'|'all'``) controls how much docstring is shown;
-        ``values`` (``'none'|'short'|'all'``) how much of each value or
-        no-argument call result (a ``DataFrame`` / ``Series`` is headed to 5
-        rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
+        ``values`` (``'none'|'short'|'all'``) how much of each attribute's or
+        property's value, never calling a method (a ``DataFrame`` / ``Series``
+        is headed to 5 rows under ``'short'``); ``private`` (``False``) whether ``_``-prefixed
         names are included; ``fmt`` (``'auto'|'text'|'ansi'|'html'``) the
         render target (``auto`` = ANSI in Jupyter, plain text in a terminal).
         The default ``lod='terse', values='none', private=False`` is a bare
@@ -61,7 +61,8 @@ class HelpMixin:
         lod : {'terse', 'short', 'all'}, default 'terse'
             Level of documentation detail per match.
         values : {'none', 'short', 'all'}, default 'none'
-            How much of each member's value or call result to show.
+            How much of each attribute's or property's value to show. A method
+            is never called.
         private : bool, default False
             Include ``_``-prefixed names.
         fmt : {'auto', 'text', 'ansi', 'html'}, default 'auto'

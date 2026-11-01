@@ -304,3 +304,23 @@ def test_apply_deductible_validates_survival():
     for bad in (0.0, -0.1, 1.5):
         with pytest.raises(ValueError, match=r'survival must lie in'):
             fr.apply_deductible(bad)
+
+
+# ---------------------------------------------------------------------------
+# P(N = 0) outside [0, 1) ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize('clause', ['zm 1.5', 'zm 1', 'zm -0.2', 'zm 1 !', 'zm 1.5 !', 'zm -0.2 !'])
+def test_zm_outside_the_unit_interval_is_refused(clause):
+    with pytest.raises(ValueError, match=r'zm: P\(N = 0\) must lie in \[0, 1\)'):
+        build(f'agg ZM.Bad 3 claims sev lognorm 10 cv 1 poisson {clause}')
+
+
+def test_zm_refusal_on_a_standalone_frequency():
+    with pytest.raises(ValueError, match=r'must lie in \[0, 1\), not 1\.5'):
+        Frequency('poisson', 0, 0, True, 1.5)
+
+
+def test_zm_zero_equals_zero_truncated():
+    zm = build('agg ZM.Zero 3 claims sev lognorm 10 cv 1 poisson zm 0')
+    zt = build('agg ZM.ZT 3 claims sev lognorm 10 cv 1 poisson zt')
+    assert zm.est_m == pytest.approx(zt.est_m, rel=1e-12)

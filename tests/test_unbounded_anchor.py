@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import pytest
 
-from aggregate import build
+from aggregate import Distortion, build
 
 # Poisson frequency, so unbounded even under a bounded per-occurrence severity
 # limit: a bounded layer times an unbounded claim count still has no ceiling.
@@ -105,6 +105,111 @@ def test_reins_price_df_is_guarded_too():
     clean = build(UNBOUNDED)
     with pytest.raises(ValueError, match='carries no reinsurance'):
         clean.reins_price_df(p=1)
+
+
+# ---------------------------------------------------------------------------
+# price: exactly one of p and a ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+PH = Distortion('ph', 0.5)
+CCOC = Distortion('ccoc', r=0.1)
+
+
+@pytest.mark.parametrize('p', [1, 1.0])
+def test_price_refuses_p_of_one_on_an_unbounded_risk(unbounded, p):
+    with pytest.raises(ValueError, match='p=1'):
+        unbounded.price(p, PH)
+
+
+@pytest.mark.parametrize('p', [1.5, 100, 1000])
+def test_price_refuses_a_probability_above_one(unbounded, bounded, p):
+    for obj in (unbounded, bounded):
+        with pytest.raises(ValueError, match=f'p must be a probability of at most 1, got {p}; '
+                                             f'pass an asset level as a={p}'):
+            obj.price(p, PH)
+
+
+def test_price_takes_exactly_one_of_p_and_a(unbounded):
+    with pytest.raises(ValueError, match='exactly one of p= .* or a='):
+        unbounded.price(0.99, PH, a=100)
+    with pytest.raises(ValueError, match='exactly one of p= .* or a='):
+        unbounded.price(g=PH)
+    with pytest.raises(TypeError, match='pricing distortion'):
+        unbounded.price(0.99)
+
+
+def test_price_at_an_asset_level_matches_the_probability(unbounded):
+    a = unbounded.q(0.99)
+    by_p = unbounded.price(0.99, PH)
+    by_a = unbounded.price(g=PH, a=a)
+    assert by_a.P.iloc[0] == pytest.approx(by_p.P.iloc[0], rel=1e-12)
+
+
+def test_price_refuses_an_infinite_or_off_grid_level(unbounded):
+    with pytest.raises(ValueError, match='finite asset level'):
+        unbounded.price(g=PH, a=float('inf'))
+    with pytest.raises(ValueError, match='above the top of the grid'):
+        unbounded.price(g=PH, a=1e12)
+
+
+def test_price_of_a_bounded_risk_at_its_maximum(bounded):
+    """On a bounded law p=1 is the maximum loss, and a= reaches the same row."""
+    by_p = bounded.price(1, PH)
+    assert by_p.a.iloc[0] == 18
+    assert bounded.price(g=PH, a=18).P.iloc[0] == pytest.approx(by_p.P.iloc[0], rel=1e-12)
+
+
+def test_portfolio_price_takes_a_for_assets():
+    book = build(BOOK)
+    level = book.q(0.99)
+    by_a = book.price(distortion=PH, a=level)
+    assert by_a.a_reg == level
+    assert by_a.price == pytest.approx(book.price(0.99, PH).price, rel=1e-12)
+    with pytest.raises(ValueError, match='pass an asset level as a='):
+        book.price(level, PH)
+    with pytest.raises(ValueError, match='UA.Port is unbounded'):
+        book.price(1, PH)
+    with pytest.raises(ValueError, match='exactly one of p= .* or a='):
+        book.price(distortion=PH)
+
+
+# ---------------------------------------------------------------------------
+# ccoc at a finite anchor ([Using-Notes-Guards])
+# ---------------------------------------------------------------------------
+@pytest.mark.parametrize('kw', [{'p': 0.99}, {'p': 0.9}])
+def test_ccoc_prices_at_a_finite_probability(unbounded, kw):
+    """``P = (L + r a) / (1 + r)``: the mass lands at ``a``, not at the grid top."""
+    row = unbounded.price(g=CCOC, **kw).iloc[0]
+    a = unbounded.q(kw['p'])
+    assert row.P == pytest.approx((row.L + 0.1 * a) / 1.1, rel=1e-10)
+    assert row.P == pytest.approx(
+        unbounded.price_ccoc(0.1, p=kw['p'])['P'].iloc[0], rel=1e-10)
+
+
+def test_ccoc_prices_at_a_finite_asset_level(unbounded):
+    a = unbounded.q(0.99)
+    row = unbounded.price(g=CCOC, a=a).iloc[0]
+    assert row.P == pytest.approx((row.L + 0.1 * a) / 1.1, rel=1e-10)
+
+
+def test_ccoc_refuses_an_unbounded_anchor(unbounded):
+    with pytest.raises(ValueError, match='p=1'):
+        unbounded.price(1, CCOC)
+    with pytest.raises(ValueError, match='finite asset level'):
+        unbounded.price(g=CCOC, a=float('inf'))
+
+
+def test_ccoc_refuses_a_bare_apply_distortion(unbounded):
+    """A bare call has no asset level, so the whole frame's top row is the problem."""
+    with pytest.raises(ValueError, match='mass distortion .* Use price with p below 1'):
+        unbounded.apply_distortion(CCOC)
+
+
+def test_ccoc_prices_a_law_from_its_characteristic_function():
+    law = build('chfagg UA.Chf 25 * gamma 4')
+    row = law.price(0.99, CCOC).iloc[0]
+    assert row.P == pytest.approx((row.L + 0.1 * law.q(0.99)) / 1.1, rel=1e-10)
+    with pytest.raises(ValueError, match='mass distortion'):
+        law.apply_distortion(CCOC)
 
 
 def test_a_portfolio_is_bounded_only_when_every_unit_is():

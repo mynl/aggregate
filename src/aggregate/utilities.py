@@ -2,6 +2,7 @@ import inspect
 import itertools
 import logging
 import sys
+from functools import cached_property
 from numbers import Number
 from textwrap import wrap
 
@@ -1036,7 +1037,7 @@ def _help_target(fmt):
 def agg_help(self, regex='.*', lod='terse', values='none', private=False, fmt='auto'):
     """
     Investigate ``self`` for public names matching ``regex`` and display each
-    one's documentation and (optionally) its value or no-argument call result.
+    one's documentation and (optionally) its value. A method is never called.
 
     Module-level free function backing the ``.help(regex, ...)`` method on
     :class:`Aggregate`, :class:`Portfolio`, :class:`Underwriter`,
@@ -1058,9 +1059,8 @@ def agg_help(self, regex='.*', lod='terse', values='none', private=False, fmt='a
         * ``'short'`` -- the first few lines of the docstring;
         * ``'all'`` -- the full docstring.
     values : {'none', 'short', 'all'}, default 'none'
-        How much of each name's *value* to display -- the attribute value, or a
-        method's no-argument call result (methods needing arguments are
-        skipped):
+        How much of each attribute's or property's *value* to display. A method
+        shows its name and signature only:
 
         * ``'none'`` -- show no values (names + docstrings only);
         * ``'short'`` -- show values, but a :class:`pandas.DataFrame` or
@@ -1083,10 +1083,18 @@ def agg_help(self, regex='.*', lod='terse', values='none', private=False, fmt='a
     Notes
     -----
     ``lod``, ``values`` and ``fmt`` are three orthogonal axes: ``lod`` governs
-    the docstring detail, ``values`` how much of the value / call result, and
-    ``fmt`` the render target. The default ``lod='terse', values='none'`` is a
-    bare public-name listing (``private=False``). Documentation is shown for
-    methods and properties only (a plain field carries no useful docstring).
+    the docstring detail, ``values`` how much of the value, and ``fmt`` the
+    render target. The default ``lod='terse', values='none'`` is a bare
+    public-name listing (``private=False``). Documentation is shown for methods
+    and properties only (a plain field carries no useful docstring).
+
+    Listing the surface must not change the object. ``update()`` and ``sharpen()``
+    have no required argument, and an ``Underwriter`` has ``write_default_config()``
+    and ``reload()``, so calling every method with no required argument could
+    resize an object or overwrite a file. Names are therefore classified from the
+    class: a method is never called, and a property is evaluated only when
+    ``values`` asks for its value, so the default listing evaluates nothing. A
+    property that raises when evaluated is reported in place of its value.
 
     Two filters, and only two, decide which names appear: ``regex`` (default
     ``'.*'``, i.e. everything) and the leading-underscore skip governed by
@@ -1152,16 +1160,19 @@ def agg_help(self, regex='.*', lod='terse', values='none', private=False, fmt='a
             continue
         if not re.search(regex, name):
             continue
-        # classify off the *class* so a raising property does not abort the walk
+        # classify off the *class*: reading a property runs its code, so only
+        # a value request does it, and a method is never called
         class_attr = getattr(type(self), name, None)
-        is_property = isinstance(class_attr, property)
-        try:
-            ob = getattr(self, name)
-        except Exception as e:  # noqa: BLE001 - report, don't propagate
-            emit_error(name, f'{type(e).__name__}: {e}')
-            continue
-
-        is_method = callable(ob) and not is_property
+        is_property = isinstance(class_attr, (property, cached_property))
+        if is_property:
+            ob, is_method = None, False
+        else:
+            try:
+                ob = getattr(self, name)
+            except Exception as e:  # noqa: BLE001 - report, don't propagate
+                emit_error(name, f'{type(e).__name__}: {e}')
+                continue
+            is_method = callable(ob)
 
         # header, with the bound signature for methods
         sig = ''
@@ -1180,19 +1191,18 @@ def agg_help(self, regex='.*', lod='terse', values='none', private=False, fmt='a
                     doc = '\n'.join(doc.split('\n')[:short_doc_lines])
                 emit_doc(doc)
 
-        # value / no-arg call result, governed by values
-        if values != 'none':
-            if is_method:
+        # value of an attribute or property, governed by values
+        if values != 'none' and not is_method:
+            if is_property:
                 try:
-                    value = ob()
-                except Exception:  # noqa: BLE001 - needs args or has side effects
+                    ob = getattr(self, name)
+                except Exception as e:  # noqa: BLE001 - report, don't propagate
+                    emit_error(name, f'{type(e).__name__}: {e}')
                     continue
+            if values == 'short' and isinstance(ob, (pd.DataFrame, pd.Series)):
+                emit_value(ob.head(head_n))
             else:
-                value = ob
-            if values == 'short' and isinstance(value, (pd.DataFrame, pd.Series)):
-                emit_value(value.head(head_n))
-            else:
-                emit_value(value)
+                emit_value(ob)
 
 
 def introspect(ob):

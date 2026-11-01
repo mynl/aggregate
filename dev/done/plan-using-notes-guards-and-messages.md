@@ -198,4 +198,30 @@ the listed test matches updated; tier 2.
 
 ## Execution log
 
-(filled at execution)
+Executed 2026-11-01 from 1.58.0. Item numbers below are those of `[Using-Notes-Guards]`.
+
+### Rulings at execution (author, 2026-11-01)
+
+- **Item 5, the open question:** explicit `a=` on both `price` methods. `Aggregate.price`, `AggregateCHF.price` and `Portfolio.price` take exactly one of `p` and `a`; `p > 1` raises on all three, pointing to `a=`; `p = 1` stays valid on a bounded risk. Measured before the ruling: only `tests/test_allocation_gold_standard.py` and the Using page `allocation-bounds.qmd` passed an asset level as `p`, and nothing in `src` or the API.
+- **Item 6:** a direct `apply_distortion` keeps its refusal, since it has no asset level; `price` checks its own anchor and computes through the private `_set_distortion_columns`.
+- **Item 12, ruling 4 that was never received:** the numeric fallback, as the plan defaulted.
+
+### `[Using-Notes-Guards]` divergences, 1.59.0
+
+- **Item 1.** `zm 1 !` raised `cannot convert float NaN to integer` at 1.58.0 where the plan measured a build with a `nan` density. The guard is unchanged.
+- **Item 5.** The plan's message pointed to `price(..., a=...)`, which existed on neither method; the ruling makes it true. New function `_pricing.check_price_anchor`, shared by all three `price` methods. Beyond the plan: `p = 1` on an unbounded `Portfolio.price` now refuses, an infinite `a` refuses, and an `a` above the top of an unbounded risk's grid refuses, because it would snap to the top bucket and reproduce the failure the guard exists to stop.
+- **Item 6.** The plan's change could not be made inside `apply_distortion`, which has no `p`. `test_mass_guard_in_builder` pins the direct refusal and passes unchanged. The Portfolio needed nothing: linear allocation already prices `ccoc` at a finite `p`, the lifted refusal concerns the whole frame's right edge and stays, and the `analyze_distortions` skip and the note in `_reinsurance.py` were already narrowed to lifted and to `a = inf`.
+- **Item 7.** The comparison carries the function's `tol`, so a share computed as 1 + 1e-16 is not refused. The corpora hold no layer share above 1; a regular expression found two, both `corridor ... po`, a separate clause.
+- **Item 9.** `decl_words._SEVERITIES` holds names `scipy.stats` lacks, so validity is `is_severity_family` (`cantor` or a continuous `scipy.stats` family) and the word list feeds only the suggestions. Through DecL the refusal is raised while parsing, so a typo gets the located error with `err.report.suggestions`, by a `ValueError` subclass the transformer raises and `UnderwritingParser.parse` locates: the transformer holds no source text. `_did_you_mean` filters Lark terminal names and could not take this list, so `get_close_matches` is called directly at its cutoff. Other direct calls keep the plain `unknown severity family` `ValueError` from `_scipy_family`.
+- **Item 10.** A closing bracket with nothing open used to pass silently when the split count stayed odd; it is now refused. New `parser_errors.located_parse_error`. The position counts in the source as written, past comments and literals.
+- **Item 12.** The closed form is `_describe_closed_form()['p_equiv']`, the existing single source, so the five `self.gini_p =` assignments in `_build` and the one in `_common_init` are gone. **Finding:** `LEPDistortion`'s closed form ignored the cap of `g` at 1, which binds for every `spread > 0`, so its `mean`, `p_equiv` and `loading` were wrong and a test against `quad` failed: 0.10869 against 0.10866 for `r0 = 0.03`, `r = 0.15`. Corrected in closed form, and the test now passes to 1e-8. Its closed-form `var`, `std` and `cv` shared the error and are dropped, which leaves them blank. `test_hygiene4::test_distortion_info_values` pinned `gini_p n/a` for `wtdtvar` and now pins 0.807; `docs/2_aggregate_overview/info-strings.rst` follows.
+- **Item 13.** A distortion with no `as` has no `label` key in its spec, so the snapshot does not move at all, where the plan expected the distortion lines to. The grammar listing moved on the distortion lines only.
+- **Item 14.** Only `spectral.py` and `tests/test_distortion_construction.py` called `Distortion.ccoc`. The other three test files the plan listed use `Distortion('ccoc', r=...)` and did not change. The plan did not list the Using page `distortions.qmd`, which called it.
+- **Item 15.** The refusal goes ahead of the `cede` needs a premium check, not beside the slide refusal, because that check fires first when no premium is written. It is same-layer only: a `cede` on another layer beside `swing` is booked (`est_m` 2971.86 to 3021.86), which a test pins.
+- **Item 3.** An array longer than six values is cut with `...`, so a long `dfreq` keeps `repr` to one line.
+- **Item 2.** `cached_property` counts as a property, or `Bounds` would run its cached computations under the default listing.
+- **Not applicable.** `dev/TODO.md` has no entry for this plan, and `V:/worktrees/dev-files.md` no longer exists.
+
+### Ripple to the API
+
+`aggregate_api/routes/objects.py` `split_statements` catches `AssertionError` from `preprocess` and raises `unbalanced [ ] in this program`; its docstring has the catch going when the library raises a `ValueError` with an `ErrorReport`, which this bump does. `tests/test_multi_statement.py::test_an_unbalanced_bracket_is_a_422_not_a_500` pins the `AssertionError`. No grammar keyword is new, so `decl-keywords.json` does not move.

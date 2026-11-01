@@ -129,7 +129,7 @@ def test_constant_unit_priced_at_its_value(constant_unit_port, dist):
     top = float(constant_unit_port.apply_distortion(
         dist, allocation='linear').loss.iloc[-1])
     assert top == 12.0
-    rows = _unit_rows(constant_unit_port.price(top, dist), dist)
+    rows = _unit_rows(constant_unit_port.price(distortion=dist, a=top), dist)
     assert rows.loc['C', 'P'] == pytest.approx(5.0, rel=1e-12)
     assert rows.loc['C', 'M'] == pytest.approx(0.0, abs=1e-12)
 

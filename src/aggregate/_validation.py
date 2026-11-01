@@ -513,8 +513,11 @@ def valid_characteristic_function(obj):
     mean exceeds ``eps``, ``AGG_CV`` and ``AGG_SKEW`` at ``10 eps`` and
     ``100 eps``, tested only where the theoretical value is finite and above
     :data:`VALIDATION_NOISE`, so a window statistic of a moment the law lacks
-    never fails. A stable law with a mean therefore fails ``agg mean`` by the
-    tail mass beyond its window, which the explanation quantifies. The grid
+    never fails. On a tilted grid of a stable law with a mean, ``error`` holds
+    the error of the completed mean, the window mean plus the closed-form tail
+    beyond the window (``AggregateCHF._completed_mean``), so the tail the window
+    leaves out by construction does not read as a failure. An untilted grid has
+    no such completion, and its mean fails by the mass that wrapped. The grid
     flags carry the inversion's checks:
 
     * ``DEFECTIVE``: the deficit :math:`1 - \sum p` above

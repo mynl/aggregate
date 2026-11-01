@@ -2586,6 +2586,16 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         against ``mixed``, as on ``Aggregate``, and ``nan`` where the
         theoretical value is not finite: the grid value is then a statistic of
         the window.
+
+        Notes
+        -----
+        The mean row of a tilted law with a power tail and a mean is the
+        exception: its ``error`` is that of :meth:`_completed_mean`. The window
+        mean of such a law misses by the closed-form tail beyond the window at
+        any grid size, so its error measures the window and says nothing of
+        the numerics; the completed mean is the comparison that can fail. The
+        verdict, the ``info`` row, :attr:`validation_df` and the score all read
+        this one number. ``empirical`` keeps the window mean.
         """
         df = self.stats_df
         x, p = self.xs, self.agg_density
@@ -2600,6 +2610,9 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         ok = np.isfinite(th) & np.isfinite(gr)
         err = pd.Series(np.nan, index=df.index)
         err[ok] = _noise_aware_rel_error(gr[ok], th[ok])
+        done = self._completed_mean()
+        if done is not None:
+            err[('agg', 'mean')] = _noise_aware_rel_error(done[1], th[('agg', 'mean')])
         df['error'] = err
 
     @property
@@ -3031,6 +3044,8 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                 err = pd.Series(np.nan, index=df.index)
                 err[ok] = _noise_aware_rel_error(e[ok], th[ok])
                 df[f'Err {c}'] = err
+            # the verdict's number, which for a power tail is the completed mean's
+            df.loc['Agg', 'Err EX'] = self.stats_df.loc[('agg', 'mean'), 'error']
             df = df[['EX', 'Est EX', 'Err EX', spread, f'Est {spread}',
                      f'Err {spread}', 'Sk', 'Est Sk']]
         for c in df.columns:

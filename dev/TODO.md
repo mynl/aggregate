@@ -193,7 +193,8 @@
   window from the power tail, `A alpha x_R ** (1 - alpha) / (alpha - 1)`, and
   for a two-sided law the closed-form correction for each half's left-out mass
   re-entering through the other's tail, which sets the interior error below
-  `alpha = 1`. The validation mean row of every stable law flags until then.
+  `alpha = 1`. The mean is done: the verdict reads the completed mean from
+  1.55.0, `dev/done/plan-validation-verdict.md`.
 - **[Characteristic-Function-Aggregate-Parity]**: done, 1.35.0 to 1.40.0,
   `dev/done/plan-characteristic-function-aggregate-parity.md`. Left over: a
   distortion on a grid whose truncation rings (`choquet_weights` refuses the

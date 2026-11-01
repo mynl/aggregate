@@ -1260,7 +1260,9 @@ def test_the_store_feeds_the_accessors():
     assert s.stats_df.loc[('agg', 'ex2'), 'mixed'] == np.inf and s.stats_df.loc[('agg', 'ex3'), 'mixed'] == np.inf
     assert s.stats_df.loc[('agg', 'cv'), 'mixed'] == np.inf and np.isnan(s.stats_df.loc[('agg', 'cv'), 'error'])
     assert np.isnan(s.validation_df.loc['Agg', 'Err SD'])
-    assert s.validation_df.loc['Agg', 'Err EX'] == pytest.approx(-5.3e-3, rel=0.01)
+    # the error is the completed mean's; the window mean is what the grid holds, 5.3e-3 short
+    assert abs(s.validation_df.loc['Agg', 'Err EX']) < 1e-6
+    assert s.validation_df.loc['Agg', 'Est EX'] / s.actual_m - 1 == pytest.approx(-5.3e-3, rel=0.01)
 
 
 def test_info_has_aggregates_rows_then_the_inversion_block():
@@ -1301,8 +1303,9 @@ def test_info_has_aggregates_rows_then_the_inversion_block():
     ('25 * gamma 4', 'not unreasonable'),
     ('30 * norm + 100', 'not unreasonable'),
     ('tweedie 1.5 100 2', 'not unreasonable'),
-    ('2 * stable 1.5 1 + 10', 'fails agg mean'),
-    ('stable 1.1 1', 'fails agg mean'),
+    ('2 * stable 1.5 1 + 10', 'not unreasonable'),
+    ('stable 1.1 1', 'not unreasonable'),
+    ('stable 1.5 1 hints{tilt=False}', 'fails agg mean, mass outside the window wrapped in; raise log2'),
 ])
 def test_the_verdict_is_aggregates(program, verdict):
     c = build(f'chfagg V {program}')
@@ -1337,7 +1340,33 @@ def test_the_score_and_eps_are_aggregates():
     c = build('chfagg V 25 * gamma 4')
     assert c.validation_eps == build('agg V.A dfreq [1] sev 25 * gamma 4', log2=10).validation_eps
     assert 0 <= c.validation_score < 1
-    assert build('chfagg V 2 * stable 1.5 1 + 10').validation_score > 1
+    assert build('chfagg V 2 * stable 1.5 1 + 10').validation_score < 1
+
+
+@pytest.mark.parametrize('program', ['stable 1.5 1', '2 * stable 1.5 1 + 10', 'stable 1.1 1',
+                                     '2 * stable 1.5 0.5', 'stable 1.5 -1'])
+def test_the_verdict_reads_the_completed_stable_mean(program):
+    """The window mean misses by the tail beyond the window, the completed mean does not."""
+    c = build(f'chfagg V {program}')
+    error = float(c.stats_df.loc[('agg', 'mean'), 'error'])
+    assert c.validation_description == 'not unreasonable'
+    assert abs(error) < 1e-5
+    assert c.validation_df.loc['Agg', 'Err EX'] == error
+    assert {r[0]: r for r in c._validation_rows()}['mean rel error'][1] == error
+    # the window mean stays what the grid holds, and it is what the error used to measure
+    assert float(c.stats_df.loc[('agg', 'mean'), 'empirical']) == c.est_m
+    assert abs(c.est_m - c.actual_m) > 1e-3
+
+
+def test_the_tail_completion_covers_only_a_tilted_law_with_a_mean():
+    from aggregate.constants import Validation
+    untilted = build('chfagg V stable 1.5 1 hints{tilt=False}')
+    assert untilted._completed_mean() is None
+    assert untilted.valid & Validation.ALIASING
+    assert untilted.valid & Validation.AGG_MEAN
+    no_mean = build('chfagg V stable 0.7 1')
+    assert no_mean._completed_mean() is None
+    assert no_mean.validation_description.startswith('grid infeasible for this law; fails pmf deficit')
 
 
 def test_tweedie_truncation_is_the_continuous_part():

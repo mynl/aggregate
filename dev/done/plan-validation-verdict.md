@@ -197,4 +197,44 @@ unchanged. Tier 3 with the numerics gate.
 
 ## Execution log
 
-(filled at execution: versions, the library entries that warn, divergences)
+Executed from 1.54.0 (`29bb5fd`), 2026-11-01. Line numbers in "Current behavior" are 1.43.1's and
+several have moved; every symbol still exists under its name.
+
+### Review at 1.54.0
+
+Measured before any edit, against the plan's claims:
+
+- **Item 3 is out of date.** `100 * norm + 1000` reads `not unreasonable` at 1.54.0, with analytic
+  skewness exactly 0: `[Shifted-Severity-Moments]` cured it. The floor is still wanted, on a different
+  premise: the 858-program sweep has 86 failing verdicts and the floor clears 43, the skew-only false
+  alarms `[Correctness-Oracle]` listed (`1 claims dsev [115 120 125] fixed`).
+- **Item 4 is cured as predicted.** `100 * gamma 2 + 1000000` has skewness 1.4143.
+- **Items 1, 2 and 5 hold,** at the pinned grids the acceptance names.
+- **`warn_once_isolated` does not silence a warning.** Inside it every call warns, which is what
+  sharpen's counting probe needs. `[Validation-Warning]` needs another mechanism.
+- **"Computing `valid` there is a read of `stats_df`" stops being true** once `[Verdict-Reinsured-Views]`
+  lands if the views go through `reins_density_df`, which runs up to three FFTs per unit.
+- **`AggregateNTT.update` rebases `mixed` after `update_work` returns,** so a verdict computed at the
+  end of `update_work` would be the float one.
+- **The app grades the verdict by its text.** `validationState` in the API's `web/src/main.js` strips
+  `reinsurance; subject ` and compares to `not unreasonable`. See the ripple note below.
+- `V:/worktrees/dev-files.md`, the control list the skill mentions, no longer exists, so no row is kept.
+
+### `[Stable-Completed-Mean]`, 1.55.0
+
+`stable 1.5 1`, `2 * stable 1.5 1 + 10`, `stable 1.1 1`, `2 * stable 1.5 0.5` and `stable 1.5 -1` read
+`not unreasonable` with mean errors 4.9e-7, 1.0e-7, 4.4e-6, 7.7e-7 and -4.9e-7. `stable 1.5 1
+hints{tilt=False}` still flags ALIASING, `stable 0.7 1` still reads `grid infeasible for this law; fails
+pmf deficit 5.792e-03`, `test_the_completed_stable_mean_is_the_theoretical` passes unchanged, and
+`validation_score` of `2 * stable 1.5 1 + 10` is 1.0e-3.
+
+Divergences:
+
+- **The verdict's code does not change.** The plan has `valid_characteristic_function` compute the
+  completed error and `_write_empirical_moments` write it too. Writing it once in the `error` column
+  suffices, since the verdict, the `info` row and the score already read that column. Only its
+  docstring moves. `validation_df` computes its own `Err EX`, so it takes the same number explicitly.
+- **`test_the_store_feeds_the_accessors` also changes,** which the plan does not list: it pinned `Err
+  EX` at the window's -5.3e-3. It now checks the completed error and the window shortfall separately.
+- **`_sharpen_terms` is left alone.** `u_agg_mean` stays dropped for a power tail, as the plan's
+  current-behavior note describes, so no sharpen score moves.

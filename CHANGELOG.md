@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.55.0 - 2026-11-01
+
+**[Stable-Completed-Mean] A tilted stable law with a mean reads `not unreasonable`, judged on its completed mean.** The verdict changes: `chfagg X stable 1.5 1`, `2 * stable 1.5 1 + 10` and `stable 1.1 1` read `fails agg mean` before and `not unreasonable` now. The `error` of the mean row in `stats_df`, the `Err EX` of `validation_df`, the `info` row and `validation_score` now use the window mean plus the closed-form tail, with errors from 1e-7 to 4e-6; `empirical` and `est_m` stay the window mean. An untilted grid (`hints{tilt=False}`) still fails, and `tvar` and `lev` beyond the window stay on `[CHF-Tail-Completion]`.
+
 ## 1.54.0 - 2026-11-01
 
 **[Structure-Occurrence-Lee-Per-Claim] The occurrence curve on the structure chart is the per-claim severity again, reversing that part of 1.53.0.** Numbers move back. `chart_structure(lee=True)` gives a return period in claims that does not depend on the claim count: 11.6 at 250 on the Using page's book, was 1.22 years. The series is `Gross claim`, `occ_p` is `Non-exceeding probability`, and the `structure` and `structure_log` render baselines return to their earlier images. The `cede` refusal and the bivariate axis sizing of 1.53.0 stand.

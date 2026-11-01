@@ -3,8 +3,9 @@
 `[Severity-Parameter-Count]`. Drafted 2026-10-29 against aggregate 1.34.0; rechecked
 2026-10-31 against 1.43.1, line numbers and corpus scan updated, and the three
 corrections of the review of 2026-10-30 applied (marked **2026-10-31** below).
-**Status: ready to run** (author, 2026-10-30: "run it as written, with those three
-corrections"); the question at the end stands as a recommendation to confirm. It is
+**Status: executed at 1.51.0, 2026-11-01**; see the execution log at the end. The
+mixed-vector question was ruled the other way from the recommendation
+(**2026-11-01** below): a placeholder `_`, not a `gamma` rewrite. It is
 the `agg` half of a rule ruled the same day (author, 2026-10-29): passing a
 parameter a family does not take is an error, a shape for a zero-shape family,
 two shapes for a one-shape family and so on, in a severity and in a `chfagg`
@@ -118,7 +119,7 @@ today. Anything else is refused:
 | too few | `beta 2`, `burr` | beta takes two shape parameters, got one |
 | `mean cv` on a two-shape family other than `beta` | `burr 100 cv 0.5` | burr has no mean cv form; give its two shapes |
 | `mean cv` on a zero-shape family with no finite mean or variance | `cauchy 10 cv 1` | cauchy has no finite mean, so no mean cv form |
-| a shaped vector with a zero-shape member | `[lognorm expon] [0.5 1]` | expon has no shape parameter, but this vector gives every family one; the exponential is `gamma 1`: write `[lognorm gamma] [0.5 1]` |
+| a number for a family that takes none, in a vector (**2026-11-01**, replaces the `gamma 1` rewrite) | `[lognorm expon] [0.5 1]` | expon has no shape parameter, and in a vector of families `_` holds its place: write `[lognorm expon] [0.5 _]` |
 
 For a two-number zero-shape clause the suggestion follows scipy's positional
 order, location then scale, which is how `ss.norm(100, 30)` reads. A refusal
@@ -174,6 +175,8 @@ the diff read: `D.Sev02` and `N.Comm.Auto.MED` lose `sev_a`, `G.Mixed09`,
 **2026-10-31:** the corpus scan rerun at 1.43.1 finds the same nine clauses
 (`_test_suite.agg` 93, 169, 170, 171, 288; `library.agg` 375;
 `recitations.agg` 299, 306; `reproductions.agg` 990) and no new one.
+**2026-11-01:** the five vectors keep `expon` and write `_`, as `[lognorm expon] [.5 _]`;
+the snapshot's `sev_a` entry for `expon` goes to `nan` and no `sev_name` changes.
 
 **Docs.** A paragraph in `docs/4_dec_Language_Reference.rst` beside the
 arithmetic paragraph (`:98`): positional numbers are the family's shapes in
@@ -234,3 +237,35 @@ cost is that a shaped vector mixing in a zero-shape family with no one-shape
 twin, `[lognorm norm] [0.5 ?]`, can no longer be written. The alternative
 accepts a number for a zero-shape member of a vector only, which keeps that
 spelling but is a silent drop again, in one place.
+
+**Ruling, 2026-11-01.** The author declined both. Refusing with a `gamma` rewrite has no substitute for the normal, and accepting a number is the silent drop the rule exists to stop. The author asked for "a symbol that means DUMMY_PARAMETER", with which the user says "I know what is going on, and there is no cheating involved", and chose `_`, subject to its parsing.
+
+## Execution log, 1.51.0, 2026-11-01
+
+Executed against 1.50.0 in one step and one bump. The rule, the zero-shape `mean cv` repair and the acceptance list landed as specified, with the divergences below.
+
+**The placeholder `[Shape-Placeholder]`, from the ruling.** The grammar gains `shapes`, `shapes_held` and the terminal `SHAPE_HOLE` (`_`), reached only from `sev0`, so it cannot enter an exposure, weight, limit or `mean cv` list, and a test confirms each of those is a parse error. A list reaches `shapes_held` only if it holds a `_`, so a plain list stays on `numbers` and the parse is unambiguous. `_` parses to `nan`, the value of an unset `sev_a`; the engine needed no change, and a test run through the Python API before any edit gave a largest bucket difference of 0.0 against the old spelling. `_` works in the second list as well, `[lognorm beta] [0.5 2] [_ 3]`. Also added: `decl_writer._fmt_shapes` so programs round-trip, a label in `parser_errors`, and a rule in each colorer (`decl_pygments`, `agg.sublime-syntax`), both required by `tests/test_grammar_sync.py`.
+
+**Size.** About 410 lines of source and 320 of tests, against the plan's estimate of 250 in all and the estimate of 50 more for the placeholder given when it was ruled. The excess is mostly the messages, which build a corrected form for each refusal, and the docstrings. Nothing gets slower.
+
+**Check signature.** The plan's `_check_severity_count(ids, count, form)` became `_check_severity_count(ids, shapes)`, because a vector is checked by column and needs the values, with `_check_severity_mean_cv(ids)` for the moment form. Too few is checked before too many across a vector, so a suggested spelling is not itself refused. New helpers in `_severity.py`: `severity_shape_count` as planned, `standard_law_moments`, `_scipy_shape_count`. `rg` found no collision for any of them. A list of the wrong length for a vector of families now raises at parse; it used to fail later, at the broadcast in the build.
+
+**Goal 2 widened.** The plan's table lists the families with no `mean cv` form. Measuring neighbors at 1.50.0 found the same fault by value, so these also raise, at build since they depend on the values: `norm -100 cv 0.3` gave N(0, 1), `norm 100 cv 0` gave N(100, 1), `beta 2 cv 0.2` and `beta 0.5 cv 5` gave `nan`, and a failed shape solve gave `nan` (`t 100 cv 0.5`, `pareto 100 cv 0.5`, `lomax 100 cv 0.5`, `skewnorm`, `loggamma`) or a degenerate law (`invweibull`). `_cv_to_shape` runs its solve under `np.errstate` and logs at info, since the refusal now reports the failure. `pareto 100 cv 0.5` is attainable at $a = 1 + \sqrt{5}$ and fails only because the solve starts at shape 1, where the Pareto has no mean: `[Mean-CV-Solver-Start]` in `dev/TODO.md`.
+
+**Python API widened.** As a result `Severity('norm', sev_mean=100, sev_scale=30)` and `Severity('norm', sev_cv=0.3, sev_loc=100)` raise. Both gave the intended law with a spurious printed warning. `sev_mean` and `sev_scale` alone on a zero-shape family cannot be told from `norm 100 cv 0`, which arrives with the placeholder `sev_scale` of 1. `rg` over `src`, `tests` and `V:/dev` finds no caller.
+
+**`self.sev_loc` stays the shift.** The old zero-shape branch wrote the derived location to `self.sev_loc`, which `_validate_moments` then adds to the target, double counting. The location now goes only into the frozen law, as on a one-shape family, which is what keeps the achieved-CV warning quiet. `Severity._unshifted_law` reads the frozen law at 1.50.0, so `fz0` and `_shift` needed no change.
+
+**A glued minus is not refused.** `gamma 4 -10` and `expon -5` resolve to the shift in a `sev` clause, the same at 1.50.0 and after, compared against an export of HEAD. The law is the intended one, so nothing is refused. `chfagg` resolves the same text to two numbers and refuses it. `monograph/.../_040_severity.qmd` and the published paper say a negative shift must have a space, which is out of date for `sev`.
+
+**Blast radius, correcting the plan.** The plan's claim that `docs`, `tests` and the writing tree hold none of the refused spellings no longer held at 1.50.0. Rewritten here: `tests/test_tail.py` and `tests/test_renewal_agg.py`, where `test_tail.py:159` wrote `expon 100` and so had been testing a standard exponential, and the commented copy at `_test_suite.agg:287`. The live sources elsewhere (author, 2026-11-01: all of them, program text only) are listed below. `reproductions.agg` and `recitations.agg` are copied into `src/aggregate/agg` at release from `D:/Projects/aggregate` (`V:/worktrees/release-agg-sources.txt`), so a rewrite here alone would not survive a release.
+
+**Control lists.** `V:/worktrees/dev-files.md` no longer exists, so there is no row to update. `decl-keywords.json` is gone from `aggregate-api` (`tests/test_grammar_sync.py` gives `decl_words.decl_words` as its replacement, and `_` is not a word), so the app owes nothing.
+
+**Acceptance as measured.** The nine rewritten programs against their old spellings at 1.50.0, on fixed grids: largest bucket difference 0.0 on all nine, which is stronger than the $10^{-15}$ asked, and against 1.50.0 rather than 1.34.0, since the old spelling no longer parses. In the suite the oracle is the `gamma 1` twin, to $10^{-15}$. The snapshot diff is the five `_test_suite.agg` lines and nothing else. Frozen-law moments match to $10^{-12}$ with no printed warning.
+
+**Gates.** Tier 3, `.venv/Scripts/python.exe -m pytest -m 'slow or not slow'`: 10382 passed, 1 skipped (`plotly` not installed). Numerics, the same with `-W error::RuntimeWarning`: 10382 passed, 1 skipped.
+
+**Live sources rewritten outside this repository** (program text only, each committed in its own repository): `aggregate/reproductions` 1.28.1 (`Embrechts1993.qmd`, whose `sev expon {1/BETA:g}` only worked because `BETA` is 1, `reproductions.agg`, `_programs/Embrechts1993.json`); `aggregate/recitations` 1.13.2 (`Frees2018a.qmd`, `recitations.agg`, `_programs/Frees2018a.json`); `aggregate/education` (`_slides/decl-reference.qmd`, `_slides/m09-probability-of-eventual-ruin.qmd`); `aggregate/monograph` (`_060_mixed_severity.qmd`, `_070_vectorization.qmd`); `Using/aggregate` (`pk-wh.qmd`, `ruin.qmd`), with the new page `severity-parameters.qmd`.
+
+**Left for the author.** Prose was out of scope, so these stay as they are: the callout at `monograph/posts/3_user_guides/DecL/_060_mixed_severity.qmd:134` ("it is necessary to enter a dummy shape parameter 1 for the exponential ... a known bug in the parser"), which is now false; `_040_severity.qmd:173` on a negative shift needing a space; and the listing `sev lognorm 50 1.75` at `_080_reinsurance.qmd:43`, whose intent (mean and cv, or shape and scale) is the author's to say, and which is refused if run. Frozen and untouched: the published paper's `[expon pareto] [1 2.5]`, the older blog posts, rendered output, and the blog's copy of `reproductions.agg`, which `update-reproductions` refreshes.

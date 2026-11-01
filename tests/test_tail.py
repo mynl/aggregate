@@ -60,9 +60,9 @@ def test_label_str():
 
 @pytest.mark.parametrize('program,expected', [
     ('agg F dfreq [3] dsev [1]', TailClass.BOUNDED),                  # fixed
-    ('agg F 100 claims sev expon 1 poisson', TailClass.SUPER_EXPONENTIAL),
-    ('agg F 100 claims sev expon 1 negbin 0.5', TailClass.EXPONENTIAL),
-    ('agg F 100 claims sev expon 1 geometric', TailClass.EXPONENTIAL),
+    ('agg F 100 claims sev expon poisson', TailClass.SUPER_EXPONENTIAL),
+    ('agg F 100 claims sev expon negbin 0.5', TailClass.EXPONENTIAL),
+    ('agg F 100 claims sev expon geometric', TailClass.EXPONENTIAL),
 ])
 def test_classify_frequency(program, expected):
     a = _agg(program)
@@ -70,7 +70,7 @@ def test_classify_frequency(program, expected):
 
 
 def test_poisson_log_concave():
-    a = _agg('agg F 100 claims sev expon 1 poisson')
+    a = _agg('agg F 100 claims sev expon poisson')
     cls, lc = classify_frequency(a.frequency)
     assert cls == TailClass.SUPER_EXPONENTIAL and lc is True
 
@@ -156,7 +156,7 @@ def test_infinite_variance_mean_flags():
     ('agg A 100 claims sev 100 * pareto 3 poisson', TailClass.POWER_LAW),
     ('agg A dfreq [2] dsev [1 2 3]', TailClass.BOUNDED),
     ('agg A 100 claims sev 100 * uniform poisson', TailClass.SUPER_EXPONENTIAL),  # freq-driven
-    ('agg A 100 claims sev expon 100 negbin 0.5', TailClass.EXPONENTIAL),
+    ('agg A 100 claims sev 100 * expon negbin 0.5', TailClass.EXPONENTIAL),
 ])
 def test_aggregate_combine(program, expected):
     a = _agg(program)

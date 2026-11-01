@@ -220,6 +220,9 @@ class AggLexer(RegexLexer):
             (r'\*\*|\^', Operator),
             (r'[-+*/@=]', Operator),
             (r'[][():]', Punctuation),
+            # The placeholder in a shape list; a number's own underscore never
+            # reaches this rule, because the number rules run first.
+            (r'_(?![a-zA-Z0-9_])', Punctuation),
             (r'[,|]', Text),
             (r';', Punctuation),
         ],

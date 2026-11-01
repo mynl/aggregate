@@ -987,7 +987,7 @@ agg Robertson1992.Robertson2
 
 agg Embrechts1993.EGP
   20 claims
-  sev expon 1
+  sev expon
   poisson
   note{@Embrechts1993, the compound Poisson whose discretization error is O(h squared).} tags{topic:Embrechts1993}
 

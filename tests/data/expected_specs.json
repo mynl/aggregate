@@ -1046,14 +1046,13 @@
       "hints": ""
     }
   },
-  "agg D.Sev02 1 claim sev 100 * expon 1 + 10 fixed": {
+  "agg D.Sev02 1 claim sev 100 * expon + 10 fixed": {
     "kind": "agg",
     "name": "D.Sev02",
     "spec": {
       "name": "D.Sev02",
       "exp_en": 1.0,
       "sev_name": "expon",
-      "sev_a": 1.0,
       "sev_scale": 100.0,
       "sev_loc": 10.0,
       "sev_wt": 1.0,
@@ -2250,7 +2249,7 @@
       "hints": ""
     }
   },
-  "agg G.Mixed09  8  claim          sev      100 *  [lognorm expon]   [.5 1]  wts  [0.6 .4]                          mixed gamma 0.3    note{different severities}": {
+  "agg G.Mixed09  8  claim          sev      100 *  [lognorm expon]   [.5 _]  wts  [0.6 .4]                        mixed gamma 0.3    note{different severities}": {
     "kind": "agg",
     "name": "G.Mixed09",
     "spec": {
@@ -2262,7 +2261,7 @@
       ],
       "sev_a": [
         0.5,
-        1.0
+        "__nan__"
       ],
       "sev_scale": 100.0,
       "sev_wt": [
@@ -2277,7 +2276,7 @@
       "hints": ""
     }
   },
-  "agg G.Mixed10  1  claim          sev  [50 100]  *  [lognorm expon]    [2 1]   + 10 wts=2                          mixed gamma 0.3": {
+  "agg G.Mixed10  1  claim          sev  [50 100]  *  [lognorm expon]    [2 _]   + 10 wts=2                         mixed gamma 0.3": {
     "kind": "agg",
     "name": "G.Mixed10",
     "spec": {
@@ -2289,7 +2288,7 @@
       ],
       "sev_a": [
         2.0,
-        1.0
+        "__nan__"
       ],
       "sev_scale": [
         50.0,
@@ -2308,7 +2307,7 @@
       "hints": ""
     }
   },
-  "agg G.Mixed11  1  claim          sev  [50 100]  *  [lognorm expon]    [2 1]   + 10                                mixed gamma 0.3": {
+  "agg G.Mixed11  1  claim          sev  [50 100]  *  [lognorm expon]    [2 _]   + 10                         mixed gamma 0.3": {
     "kind": "agg",
     "name": "G.Mixed11",
     "spec": {
@@ -2320,7 +2319,7 @@
       ],
       "sev_a": [
         2.0,
-        1.0
+        "__nan__"
       ],
       "sev_scale": [
         50.0,
@@ -5558,12 +5557,11 @@
       "hints": ""
     }
   },
-  "sev N.Comm.Auto.MED  [2.764e3 24.548e3 275.654e3 1.917469e6 10e6]  * expon 1 wts  [0.824796 0.159065 0.014444 0.001624 0.000071]  note{Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)}": {
+  "sev N.Comm.Auto.MED  [2.764e3 24.548e3 275.654e3 1.917469e6 10e6]  * expon wts  [0.824796 0.159065 0.014444 0.001624 0.000071]  note{Source: Example from Mixed Exponential snippet and Similar Risks IME paper (2022)}": {
     "kind": "sev",
     "name": "N.Comm.Auto.MED",
     "spec": {
       "sev_name": "expon",
-      "sev_a": 1.0,
       "sev_scale": [
         2764.0,
         24548.0,

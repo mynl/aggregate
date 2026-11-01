@@ -146,6 +146,10 @@ contexts:
     - match: ':'
       scope: keyword.operator.range.decl
 
+    # The placeholder in a shape list: [lognorm norm] [0.5 _]
+    - match: '(?<![a-zA-Z0-9._:~\-])_(?![a-zA-Z0-9_])'
+      scope: keyword.operator.placeholder.decl
+
     - match: '[\[\]()]'
       scope: punctuation.section.brackets.decl
 

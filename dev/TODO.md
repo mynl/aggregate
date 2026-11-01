@@ -93,6 +93,11 @@
   `10 claims sev 100 * gamma 2 + 1000000 poisson` gets `bs` 800 against a severity
   sd of 141 and a true `fails sev mean, agg mean`. These are real failures, not the
   false ones `[Shift-Removed-Moments]` cleared. A window is the likely route, unmeasured.
+- **[Mean-CV-Solver-Start]**: `_cv_to_shape` starts its Newton solve at shape 1, where
+  `pareto` has no mean, so `pareto 100 cv 0.5` raises although `a = 1 + sqrt(1 + 1/cv^2)`
+  attains it. A closed form or a better start would fix it. Other families may be the
+  same. `vonmises 100 cv 0.5` converges on a useless law (sd 7.9e17), with only the
+  printed warning. See `dev/done/plan-severity-parameter-count.md`.
 
 ## Tests
 

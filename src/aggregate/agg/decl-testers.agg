@@ -1599,6 +1599,21 @@ agg LM.Far 1 claim 10 xs 1e5 sev 100 * lognorm 1 fixed                          
 agg LM.Near 1 claim 10 xs 1000 sev lognorm 1 fixed                                note{a / y = 100, also thin};
 agg LM.Vanishing 1 claim 100 xs 1000 to 1100 disappearing sev lognorm 1 fixed     note{the third moment was -6.48e6, it is 953,304};
 
+# SP. Severity numbers a family can take ([Severity-Parameter-Count], 1.51.0)
+# ===========================================================================
+# A sev clause gives a family exactly the numbers it takes, and _ holds the place of
+# a family with no shape to give in a vector of families. A refused spelling cannot
+# live here; those are in tests/test_severity_parameter_count.py.
+agg SP.NormCv 1 claim sev norm 100 cv 0.3 fixed                                   note{normal, mean 100, standard deviation 30};
+agg SP.NormCvScaled 1 claim sev 2 * norm 100 cv 0.3 fixed                         note{a multiplier scales the mean, so mean 200, standard deviation 60};
+agg SP.ExponCv 1 claim sev expon 10 cv 1 fixed                                    note{the exponential with mean 10};
+agg SP.ExponCvShift 1 claim sev expon 10 cv 0.5 + 3 fixed                         note{scale 5, shifted by 5 for the cv and by 3 as written};
+agg SP.UniformCv 1 claim sev uniform 10 cv 0.2 fixed                              note{uniform on 10 plus or minus 2 root 3};
+agg SP.Expon 1 claim sev 100 * [lognorm expon] [.5 _] wts [0.6 .4] fixed          note{the same law as the gamma twin below};
+agg SP.ExponTwin 1 claim sev 100 * [lognorm gamma] [.5 1] wts [0.6 .4] fixed      note{the exponential is the gamma with shape 1};
+agg SP.Normal 1 claim sev [100 30] * [lognorm norm] [0.5 _] + [0 100] wts [0.6 0.4] fixed note{a normal has no twin, the reason for the placeholder};
+agg SP.SecondList 1 claim sev [lognorm beta] [0.5 2] [_ 3] wts=2 fixed            note{a place held in the second list};
+
 # SM. Shifted severities, moments without the shift ([Shift-Removed-Moments], 1.50.0)
 # ====================================================================================
 # The skewness is the skewness of the law, and the grid does not move. See

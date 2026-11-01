@@ -1762,6 +1762,63 @@ def _classify_sev(sev_name, sev_xs):
     return 'scipy'
 
 
+def _scipy_shape_count(gen):
+    """The number of shape parameters of a ``scipy.stats`` distribution.
+
+    Parameters
+    ----------
+    gen : scipy.stats.rv_continuous
+        The distribution.
+
+    Returns
+    -------
+    int
+    """
+    return 0 if gen.shapes is None else gen.shapes.count(',') + 1
+
+
+def severity_shape_count(sev_name):
+    """How many positional numbers a ``sev`` clause gives a named family.
+
+    Parameters
+    ----------
+    sev_name : str
+        The family word.
+
+    Returns
+    -------
+    (required, allowed) : tuple of int, or None
+        ``(k, k)`` for a ``scipy.stats`` family with ``k`` shapes and ``(0, 1)``
+        for ``cantor``, whose one shape has a default. ``None`` for a name that
+        is not a continuous family, left to :class:`SeverityScipy` to refuse.
+    """
+    if _classify_sev(sev_name, None) == 'cantor':
+        return 0, 1
+    gen = getattr(ss, str(sev_name), None)
+    if not isinstance(gen, ss.rv_continuous):
+        return None
+    k = _scipy_shape_count(gen)
+    return k, k
+
+
+def standard_law_moments(sev_name):
+    """The mean and standard deviation of a zero-shape family's standard law.
+
+    Parameters
+    ----------
+    sev_name : str
+        A ``scipy.stats`` family with no shape parameter.
+
+    Returns
+    -------
+    (m0, s0) : tuple of float
+        Not finite when the standard law has no such moment, as for ``cauchy``.
+    """
+    with np.errstate(invalid='ignore', divide='ignore'):
+        m0, v0 = getattr(ss, str(sev_name)).stats(moments='mv')
+    return float(m0), float(v0) ** 0.5
+
+
 def _cv_to_shape(sev_name, cv, hint=1):
     """Shape parameter from coefficient of variation for a scipy distribution.
 
@@ -1803,10 +1860,13 @@ def _cv_to_shape(sev_name, cv, hint=1):
         mean, var = fz0.stats('mv')
         return cv - var ** 0.5 / mean
 
+    # A failed solve is the answer here, and on its way the residual meets shapes
+    # with no finite mean or variance, so the arithmetic is allowed to go nan.
     try:
-        shape = newton(_residual, hint)
+        with np.errstate(invalid='ignore', divide='ignore', over='ignore'):
+            shape = newton(_residual, hint)
     except RuntimeError:
-        logger.error('_cv_to_shape | newton solve failed for %s, cv=%s', sev_name, cv)
+        logger.info('_cv_to_shape | newton solve failed for %s, cv=%s', sev_name, cv)
         return np.inf, None
     return shape, gen(shape)
 
@@ -3280,8 +3340,8 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         -----
         The shift is taken from the frozen law rather than ``sev_loc``, which
         ``_build`` does not always use: a ``beta`` from a mean and cv is built
-        at location 0 whatever ``sev_loc`` is, and a law with no shape takes
-        its mean as its location.
+        at location 0 whatever ``sev_loc`` is, and a law with no shape from a
+        mean and cv has a location derived from them.
 
         ``(None, 0.0)`` for the laws whose moments are out of scope here: a
         spliced, reflected or signed law, and any kind but ``scipy``, including
@@ -3431,11 +3491,67 @@ class SeverityScipy(Severity):
     """
     sev_kind = 'scipy'
 
+    def _refuse_unusable_shapes(self, n_shapes):
+        """Refuse a shape value the family cannot take, rather than dropping it.
+
+        Parameters
+        ----------
+        n_shapes : int
+            The family's shape count.
+
+        Notes
+        -----
+        ``nan`` is the value of an unset ``sev_a`` and of a place held by ``_``
+        in a vector of families. An explicit ``sev_b=0`` cannot be told from the
+        default, so it stays accepted on a family that does not read it. DecL
+        input has already been refused with a suggested spelling, by
+        ``_check_severity_count`` in the parser; this covers the Python API.
+        """
+        sev_name, sev_a, sev_b = self.sev_name, self.sev_a, self.sev_b
+        if n_shapes == 0 and not np.isnan(sev_a):
+            raise ValueError(
+                f'{sev_name} has no shape parameter, got sev_a={sev_a}; '
+                'use sev_scale and sev_loc.')
+        if n_shapes <= 1 and sev_b != 0 and not np.isnan(sev_b):
+            takes = 'has no shape parameter' if n_shapes == 0 else 'takes one shape parameter'
+            raise ValueError(f'{sev_name} {takes}, got sev_b={sev_b}; use sev_scale.')
+        if n_shapes >= 2 and (np.isnan(sev_a) or np.isnan(sev_b)):
+            raise ValueError(
+                f'{sev_name} takes {n_shapes} shape parameters, got sev_a={sev_a} '
+                f'and sev_b={sev_b}.')
+
     def _build(self):
+        r"""Populate ``self.fz`` from a scipy family and the stored spec inputs.
+
+        Notes
+        -----
+        A family with no shape takes either ``sev_scale`` and ``sev_loc``, or a
+        mean and coefficient of variation. With :math:`m_0` and :math:`s_0` the
+        mean and standard deviation of the family's standard law, a declared mean
+        :math:`\mu` and coefficient of variation :math:`v` give
+
+        .. math::
+
+            \text{scale} = v \mu / s_0, \qquad
+            \text{loc} = \mu - \text{scale} \cdot m_0.
+
+        The clause's own shift ``sev_loc`` is added to the location after, as on
+        a one-shape family, and stays in ``self.sev_loc`` as the shift, which is
+        what ``_validate_moments`` restates the target by. Taking the mean as the
+        location and ``cv * mean`` as the scale holds only for a standard law of
+        mean 0 and standard deviation 1: it would make ``expon 10 cv 1`` the law
+        with mean 20. ``sev0_mean_cv`` writes a placeholder ``sev_scale`` of 1 and
+        ``sev1_scaled`` has already folded a multiplier into the mean, so the
+        form does not read ``sev_scale``.
+        """
         sev_name = self.sev_name
         gen = getattr(ss, sev_name)
         shapes_spec = gen.shapes
-        n_shapes = 0 if shapes_spec is None else shapes_spec.count(',') + 1
+        n_shapes = _scipy_shape_count(gen)
+
+        # the beta's mean and cv form sets both shapes itself
+        if not (sev_name == 'beta' and self.sev_mean > 0 and self.sev_cv > 0):
+            self._refuse_unusable_shapes(n_shapes)
 
         sev_mean = self.sev_mean
         sev_cv = self.sev_cv
@@ -3451,11 +3567,20 @@ class SeverityScipy(Severity):
             sev_loc = 0.0
 
         if n_shapes == 0:
-            if sev_loc == 0 and sev_mean > 0:
-                sev_loc = sev_mean
-            if sev_scale == 0 and sev_cv > 0:
-                sev_scale = sev_cv * sev_loc
-            self.fz = gen(loc=sev_loc, scale=sev_scale)
+            location = sev_loc
+            if sev_mean != 0 or sev_cv != 0:
+                if not (sev_mean > 0 and sev_cv > 0):
+                    raise ValueError(
+                        f'{sev_name}: a mean and cv form needs both positive, got mean '
+                        f'{sev_mean} and cv {sev_cv}. Otherwise give a scale and shift: '
+                        f'c * {sev_name} + b.')
+                m0, s0 = standard_law_moments(sev_name)
+                if not (np.isfinite(m0) and np.isfinite(s0)):
+                    raise ValueError(
+                        f'{sev_name} has no finite mean and variance, so no mean cv form.')
+                sev_scale = sev_cv * sev_mean / s0
+                location = sev_mean - sev_scale * m0 + sev_loc
+            self.fz = gen(loc=location, scale=sev_scale)
             # Reflect any derived values back onto self so callers can
             # introspect the final parameters.
             self.sev_loc = sev_loc
@@ -3468,6 +3593,11 @@ class SeverityScipy(Severity):
             if sev_name == 'beta' and sev_mean > 0 and sev_cv > 0:
                 m = sev_mean / sev_scale
                 sev_a, sev_b = beta_fit(m, sev_cv)
+                if not (sev_a > 0 and sev_b > 0):
+                    raise ValueError(
+                        f'beta has no law with mean {sev_mean} and cv {sev_cv} on '
+                        f'[0, {sev_scale}]: the mean over the scale, m, must be below 1 '
+                        'and the cv squared below (1 - m) / m.')
                 self.fz = ss.beta(sev_a, sev_b, loc=0, scale=sev_scale)
             else:
                 self.fz = gen(sev_a, sev_b, loc=sev_loc, scale=sev_scale)
@@ -3476,7 +3606,11 @@ class SeverityScipy(Severity):
 
         elif n_shapes == 1:
             if np.isnan(sev_a) and sev_cv > 0:
-                sev_a, _ = _cv_to_shape(sev_name, sev_cv)
+                sev_a, solved = _cv_to_shape(sev_name, sev_cv)
+                if solved is None:
+                    raise ValueError(
+                        f'{sev_name}: no shape found for cv {sev_cv} by a numerical '
+                        f'solve. Give the shape: c * {sev_name} shape.')
                 logger.info(
                     f'sev_a not set, determined as {sev_a} shape from sev_cv {sev_cv}')
             elif np.isnan(sev_a):

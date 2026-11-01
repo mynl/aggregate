@@ -296,14 +296,14 @@ agg Klugman2019.KPW.9.74.cp
 
 agg Frees2018a.lda.3.3.5
   1 claim
-  sev [200 200] * [expon pareto] [1 3] + [0 -200] wts [0.25 0.75]
+  sev [200 200] * [expon pareto] [_ 3] + [0 -200] wts [0.25 0.75]
   fixed
   note{@Frees2018a, Example 3.3.5, a mixture of an exponential and a Pareto.} tags{topic:Frees2018a}
 
 agg Frees2018a.lda.3.4.1
   1 claim
   inf xs 100
-  sev 1000 * expon 1 !
+  sev 1000 * expon !
   fixed
   note{@Frees2018a, Example 3.4.1, an exponential loss under a deductible of 100, per loss.} tags{topic:Frees2018a}
 

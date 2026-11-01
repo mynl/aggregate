@@ -708,10 +708,24 @@
         | sev0                   -> sev1_passthrough
     
     sev0: ids numbers CV numbers   -> sev0_mean_cv
-        | ids numbers numbers      -> sev0_two_params
-        | ids numbers              -> sev0_one_param
+        | ids shapes shapes        -> sev0_two_params
+        | ids shapes               -> sev0_one_param
         | ids xps                  -> sev0_xps
         | ids                      -> sev0_zero_params
+    
+    // A family's shape parameters. A vector of families shares one list of numbers,
+    // so ``_`` holds the place of a family with no shape to give, as in
+    // ``[lognorm norm] [0.5 _]`` ([Severity-Parameter-Count]). It is its own terminal
+    // and appears only here, so it cannot reach an exposure, a weight or a limit. A
+    // list reaches ``shapes_held`` only if it holds a ``_``, so a plain list stays on
+    // ``numbers`` and the parse is unambiguous.
+    shapes: numbers               -> shapes_numbers
+          | "[" shapes_held "]"   -> shapes_list
+    
+    shapes_held: SHAPE_HOLE               -> shapes_held_first
+               | numberl SHAPE_HOLE       -> shapes_held_after_numbers
+               | shapes_held expr         -> shapes_held_number
+               | shapes_held SHAPE_HOLE   -> shapes_held_hole
     
     xps: XPS doutcomes dprobs
     
@@ -1181,6 +1195,7 @@
     // heuristics to land on the intended parse.
     ID: /(?!agg\.|sev\.|dist\.|distortion\.|port\.|chfagg\.|stable\.|tweedie\.)(?!(?:aad|agg|aggregate|agglimit|and|as|approximate|approx|at|bernoulli|binomial|bivariate|bv|cede|ceded|chfagg|claim|claims|clash|copula|cv|dbvsev|deposit|derive|dfreq|disappearing|dist|distortion|dsev|dwait|elt|exp|expense|expenses|exposure|fixed|franchise|free|geometric|grossceded|grossnet|inherit|less|logarithmic|loss|lr|mixed|negbin|net|netceded|neyman|neymana|neymanA|no|no2u|nttagg|occurrence|of|pascal|payoff|peel|picks|pnl|xpnl|po|poisson|port|prem|premium|rate|reinstatements|reinstatement|rol|sev|splice|ssev|stable|to|tower|tweedie|unit|wait|wts|xps|xs|yelt|years|year|zm|zt|after|basic|corridor|lcm|max|min|pc|retro|slide|swing)(?![a-zA-Z0-9._:~\-]))[a-zA-Z][\._:~a-zA-Z0-9\-]*/
     
+    SHAPE_HOLE:       "_"
     EXPONENT:         "**" | "^"
     PLUS:             "+"
     MINUS:            "-"

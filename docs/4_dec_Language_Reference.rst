@@ -109,6 +109,22 @@ Three behaviors are worth knowing.
 
 Expressions evaluate as the program parses, so the specification carries plain numbers and the formula is not retained. The canonical text that :func:`aggregate.decl_writer.spec_to_decl` and :func:`aggregate.decl_writer.format_program` produce therefore shows the evaluated literal: the program above decompiles with ``10 claims 133333.33333333334 premium``. This is the long-standing canonical, not verbatim, contract, the same one that collapses ``exp(.5)`` to its float.
 
+Severity Shape Parameters, Scale and Location
+=============================================
+
+The numbers written after a family word in a ``sev`` clause are the family's shape parameters, in the order ``scipy.stats`` gives them: none for ``norm`` and ``expon``, one for ``gamma`` and ``lognorm``, two for ``beta`` and ``burr``. ``cantor`` is the one exception, its single shape having a default of 1/3. Scale and location are arithmetic around the law, ``c * family shapes + b``, so ``30 * norm + 100`` is the normal with mean 100 and standard deviation 30, and ``25 * gamma 4`` is the gamma with shape 4 and scale 25. A clause with numbers the family cannot take is refused, with a message giving the spelling that does what was probably meant: ``norm 100 30``, ``expon 5`` and ``gamma 4 25`` all point at the arithmetic. No number is dropped.
+
+The ``mean cv v`` form declares the mean and coefficient of variation instead, ``gamma 100 cv 0.5`` or ``norm 100 cv 0.3``. A multiplier scales the mean and a shift is added after, so ``2 * gamma 100 cv 0.5 + 10`` has mean 210 and standard deviation 100. A family with no shape, whose standard law has mean :math:`m_0` and standard deviation :math:`s_0`, takes scale :math:`v\mu/s_0` and location :math:`\mu - \text{scale} \cdot m_0`, so ``expon 10 cv 1`` is the exponential with mean 10, and ``expon 10 cv 0.5`` is the exponential with scale 5 shifted by 5. The form is refused on a family with two or more shapes other than ``beta`` and on a family with no finite mean or variance (``burr``, ``cauchy``), and a mean and cv the family cannot reach is refused when the severity is built. Where the declared law reaches below zero, ``sev`` clamps that part to zero, so the severity's own moments differ from the declared ones: ``norm 100 cv 1`` has mean about 108. ``ssev`` keeps the negative part and delivers the declared moments.
+
+A vector of families shares one list of numbers, entry :math:`i` going to family :math:`i`. The placeholder ``_`` holds the place of a family with no shape to give, and in a second list the place of a family with one::
+
+    sev [100 30] * [lognorm norm] [0.5 _] + [0 100] wts [0.6 0.4]
+    sev [lognorm beta] [0.5 2] [_ 3]
+
+``_`` is legal only in these shape lists, never in a list after a lone family and never in a weight, exposure or limit.
+
+The Python API keeps the same rule where the values show the mistake: ``Severity('gamma', sev_a=4, sev_b=25)`` and ``Severity('norm', sev_a=100)`` raise, and ``Severity('gamma', sev_a=4, sev_scale=25)`` builds. ``sev_a=nan`` is the unset value that ``_`` stands for. An explicit ``sev_b=0`` cannot be told from the default and is accepted.
+
 Parameter Conversions and Named Laws (tweedie, stable)
 ======================================================
 

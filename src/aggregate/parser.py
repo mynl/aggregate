@@ -485,6 +485,48 @@ def _check_vectorizable(value):
     return np.array(value)
 
 
+#: A count of shape parameters as a message states it.
+_COUNT_WORDS = {0: 'none', 1: 'one', 2: 'two', 3: 'three', 4: 'four'}
+
+
+def _affine(scale, body, shift):
+    """``scale * body + shift`` as DecL, ``None`` omitting a part, a negative scalar shift written ``- |b|``."""
+    from .decl_writer import _fmt_seq
+    out = body if scale is None else f'{_fmt_seq(scale)} * {body}'
+    if shift is None or (np.ndim(shift) == 0 and shift == 0):
+        return out
+    if np.ndim(shift) == 0 and shift < 0:
+        return f'{out} - {_fmt_seq(-shift)}'
+    return f'{out} + {_fmt_seq(shift)}'
+
+
+def _mean_cv_spelling(family, location, scale):
+    """The ``mean cv`` spelling of ``scale * family + location``, or ``None`` if it has none.
+
+    Parameters
+    ----------
+    family : str
+        A family with no shape parameter.
+    location, scale : float or list
+        The location and scale as written. A list has no one spelling.
+
+    Returns
+    -------
+    str or None
+    """
+    from ._severity import standard_law_moments
+    from .characteristic_function import _decl_number
+    if np.ndim(location) or np.ndim(scale) or scale <= 0:
+        return None
+    m0, s0 = standard_law_moments(family)
+    if not (np.isfinite(m0) and np.isfinite(s0)):
+        return None
+    mean = location + scale * m0
+    if mean <= 0:
+        return None
+    return f'{family} {_decl_number(mean)} cv {_decl_number(scale * s0 / mean)}'
+
+
 class _PercentNumber(float):
     """Float that remembers it was written with a trailing ``%``.
 
@@ -2792,14 +2834,17 @@ class UnderwritingTransformer(Transformer_NonRecursive):
 
     def sev0_mean_cv(self, c):
         ids, mean, _cv, cv = c
+        self._check_severity_mean_cv(ids)
         return {"sev_name": ids, "sev_mean": mean, "sev_cv": cv, "sev_scale": 1.0}
 
     def sev0_two_params(self, c):
         ids, a, b = c
+        self._check_severity_count(ids, [a, b])
         return {"sev_name": ids, "sev_a": a, "sev_b": b, "sev_scale": 1.0}
 
     def sev0_one_param(self, c):
         ids, a = c
+        self._check_severity_count(ids, [a])
         return {"sev_name": ids, "sev_a": a, "sev_scale": 1.0}
 
     def sev0_xps(self, c):
@@ -2808,7 +2853,180 @@ class UnderwritingTransformer(Transformer_NonRecursive):
 
     def sev0_zero_params(self, c):
         ids = c[0]
+        self._check_severity_count(ids, [])
         return {"sev_name": ids, "sev_scale": 1.0}
+
+    def SHAPE_HOLE(self, tok):
+        # the value of an unset sev_a, so the Severity reads the place as unset
+        return np.nan
+
+    def shapes_numbers(self, c):
+        return c[0]
+
+    def shapes_list(self, c):
+        return c[0]
+
+    def shapes_held_first(self, c):
+        return [c[0]]
+
+    def shapes_held_after_numbers(self, c):
+        numbers, hole = c
+        return [*numbers, hole]
+
+    def shapes_held_number(self, c):
+        held, number = c
+        return [*held, number]
+
+    def shapes_held_hole(self, c):
+        held, hole = c
+        return [*held, hole]
+
+    @staticmethod
+    def _check_severity_mean_cv(ids):
+        """Refuse a ``mean cv`` form on a family that has none.
+
+        Parameters
+        ----------
+        ids : str or list of str
+            The family word, or the families of a vector.
+
+        Raises
+        ------
+        ValueError
+            For a family with two or more shapes other than ``beta``, and a
+            family with no shape whose standard law has no finite mean or
+            variance. The values are checked when the severity is built.
+        """
+        from ._severity import severity_shape_count, standard_law_moments
+        for family in ([ids] if isinstance(ids, str) else ids):
+            counts = severity_shape_count(family)
+            if counts is None:
+                continue
+            if counts[1] >= 2 and family != 'beta':
+                raise ValueError(
+                    f"sev: {family} has no mean cv form; give its "
+                    f"{_COUNT_WORDS[counts[1]]} shapes.")
+            if counts[1] == 0:
+                m0, s0 = standard_law_moments(family)
+                if not np.isfinite(m0):
+                    raise ValueError(f"sev: {family} has no finite mean, so no mean cv form.")
+                if not np.isfinite(s0):
+                    raise ValueError(f"sev: {family} has no finite variance, so no mean cv form.")
+
+    @classmethod
+    def _check_severity_count(cls, ids, shapes):
+        """Refuse a ``sev`` clause whose numbers are not its families' shapes.
+
+        Parameters
+        ----------
+        ids : str or list of str
+            The family word, or the families of a vector.
+        shapes : list
+            The numbers written after the family word: none, one or two, each a
+            number or a list. A ``nan`` in a list is a place held by ``_``.
+
+        Raises
+        ------
+        ValueError
+            When a family's count of numbers is not one it takes, with the
+            spelling that does what was probably meant where there is one.
+
+        Notes
+        -----
+        A vector of families is checked by column: entry ``i`` of each list
+        belongs to family ``i``, and a family's count is its entries that are not
+        ``_``. A scale and a location are the arithmetic ``c *`` and ``+ b``,
+        applied later by ``sev1_scaled`` and ``sev2_add``, so ``shapes`` is
+        exactly what was written after the family word.
+        """
+        from ._severity import severity_shape_count
+        families = [ids] if isinstance(ids, str) else list(ids)
+        lists = [np.atleast_1d(np.asarray(x, dtype=float)) for x in shapes]
+        holes = any(np.isnan(x).any() for x in lists)
+        if len(families) == 1:
+            if holes:
+                raise ValueError(
+                    f"sev: {families[0]} stands alone, so it has no use for '_', which "
+                    "holds a place in a vector of families, as in [lognorm norm] [0.5 _].")
+            counts = severity_shape_count(families[0])
+            if counts is not None and not counts[0] <= len(shapes) <= counts[1]:
+                cls._refuse_family_count(families[0], counts, shapes)
+            return
+        if any(len(x) not in (1, len(families)) for x in lists):
+            raise ValueError(
+                f"sev: a list of shapes has one entry per family, and this vector has "
+                f"{len(families)} families.")
+        columns = [np.broadcast_to(x, len(families)) for x in lists]
+        rows = [(family, severity_shape_count(family), sum(not np.isnan(x[i]) for x in columns))
+                for i, family in enumerate(families)]
+        rows = [row for row in rows if row[1] is not None]
+        # too few first: a suggestion for too many would otherwise be refused in turn
+        for family, counts, written in rows:
+            if written < counts[0]:
+                raise ValueError(f"{cls._takes(family, counts)}, got {_COUNT_WORDS[written]} "
+                                 "in this vector of families.")
+        for family, counts, written in rows:
+            if written > counts[1]:
+                cls._refuse_vector_count(family, counts, families, columns)
+
+    @staticmethod
+    def _takes(family, counts):
+        """``'gamma takes one shape parameter'``, as a message starts."""
+        k = counts[1]
+        if k == 0:
+            return f"sev: {family} has no shape parameter"
+        return f"sev: {family} takes {_COUNT_WORDS[k]} shape parameter{'s' if k != 1 else ''}"
+
+    @classmethod
+    def _refuse_family_count(cls, family, counts, shapes):
+        """Raise the refusal of a single family's numbers, with the spelling to use instead."""
+        from .decl_writer import _fmt_seq as fmt
+        takes = cls._takes(family, counts)
+        written = len(shapes)
+        if written < counts[0]:
+            msg = f"{takes}, got {_COUNT_WORDS[written]}."
+            if counts[1] == 1 or family == 'beta':
+                msg += f" Or give a mean and cv: {family} m cv v."
+            raise ValueError(msg)
+        body = family if counts[1] == 0 else f"{family} {fmt(shapes[0])}"
+        # the numbers that are left once the shapes are taken
+        extra = shapes[counts[1]:]
+        if len(extra) == 2:
+            location, scale = extra
+            msg = (f"{takes}; for location {fmt(location)} and scale {fmt(scale)} write "
+                   f"'{_affine(scale, body, location)}'")
+            alternative = _mean_cv_spelling(family, location, scale)
+            raise ValueError(f"{msg}, or '{alternative}'." if alternative else f"{msg}.")
+        number = extra[0]
+        if np.ndim(number) == 0 and number == 0:
+            raise ValueError(f"{takes}: write '{body}'.")
+        if counts[1] == 0:
+            raise ValueError(f"{takes}; for scale {fmt(number)} write "
+                             f"'{_affine(number, body, None)}', for a shift "
+                             f"'{_affine(None, body, number)}'.")
+        raise ValueError(f"{takes}; for shape {fmt(shapes[0])} and scale {fmt(number)} write "
+                         f"'{_affine(number, body, None)}', and if {fmt(number)} is a cv, "
+                         f"'{family} {fmt(shapes[0])} cv {fmt(number)}'.")
+
+    @classmethod
+    def _refuse_vector_count(cls, family, counts, families, columns):
+        """Raise the refusal of a family given too many numbers in a vector, with the lists to use instead."""
+        from ._severity import severity_shape_count
+        from .decl_writer import _fmt_name, _fmt_shapes
+        # every family keeps as many entries as it takes, and the rest become holes
+        fixed = [np.array(column, dtype=float) for column in columns]
+        for j, member in enumerate(families):
+            allowed = (severity_shape_count(member) or (0, len(fixed)))[1]
+            kept = 0
+            for column in fixed:
+                if not np.isnan(column[j]):
+                    kept += 1
+                    if kept > allowed:
+                        column[j] = np.nan
+        fixed = [column for column in fixed if not np.isnan(column).all()]
+        spelling = ' '.join([_fmt_name(families), *(_fmt_shapes(column) for column in fixed)])
+        raise ValueError(f"{cls._takes(family, counts)}, and in a vector of families '_' holds "
+                         f"its place: write '{spelling}'.")
 
     @staticmethod
     def _histogram_probs(clause, outcomes, probs):

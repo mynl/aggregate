@@ -83,6 +83,7 @@ _TERMINAL_LABELS: dict[str, str] = {
     "INHOMOG_MULTIPLY": "'@'",
     "EQUAL_WEIGHT": "'='",
     "RANGE": "':'",
+    "SHAPE_HOLE": "'_'",
     # DecL keyword terminals (decl.lark). Kept in sync by
     # tests/test_grammar_sync.py — every priority-tagged keyword terminal in
     # the grammar must have a label here.

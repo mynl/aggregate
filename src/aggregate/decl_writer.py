@@ -126,6 +126,19 @@ def _fmt_seq(x) -> str:
     return _fmt_num(x)
 
 
+def _fmt_shapes(x) -> str:
+    """Format a severity's shape parameters: as :func:`_fmt_seq`, a ``nan`` as ``_``.
+
+    A vector of families shares one list of shapes and ``_`` holds the place of
+    a family with no shape to give. The parser stores it as ``nan``, the value
+    ``sev_a`` has when it is not set.
+    """
+    if _is_seq(x):
+        arr = np.atleast_1d(np.asarray(x, dtype=float))
+        return '[' + ' '.join('_' if np.isnan(v) else _fmt_num(v) for v in arr) + ']'
+    return _fmt_num(x)
+
+
 def _fmt_name(name) -> str:
     """Format a severity name (or a bracketed list of names for a mixture)."""
     if isinstance(name, (list, tuple, np.ndarray)):
@@ -209,9 +222,9 @@ def _render_dist(spec: dict, split: bool = False):
         inner = _elt_div(spec['sev_mean'], scale)
         core = f'{name} {_fmt_seq(inner)} cv {_fmt_seq(spec["sev_cv"])}'
     elif 'sev_b' in spec:
-        core = f'{name} {_fmt_seq(spec["sev_a"])} {_fmt_seq(spec["sev_b"])}'
+        core = f'{name} {_fmt_shapes(spec["sev_a"])} {_fmt_shapes(spec["sev_b"])}'
     elif 'sev_a' in spec:
-        core = f'{name} {_fmt_seq(spec["sev_a"])}'
+        core = f'{name} {_fmt_shapes(spec["sev_a"])}'
     else:
         core = name
 

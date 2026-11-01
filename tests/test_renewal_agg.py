@@ -129,7 +129,7 @@ def test_mixture_wait_second_order_mean():
 
 def test_wait_sev_lookup():
     from aggregate import build as _b
-    _b('sev RWW expon 1')
+    _b('sev RWW expon')
     a = build('agg RSN 3 years dsev [1] wait sev.RWW')
     assert a.n == pytest.approx(3.0, abs=1e-7)
 

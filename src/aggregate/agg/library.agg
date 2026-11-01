@@ -372,7 +372,7 @@ agg SevReversed
 
 agg SevMixture
   8 claims
-  sev 100 * [lognorm expon] [0.5 1] wts [0.6 0.4]
+  sev 100 * [lognorm expon] [0.5 _] wts [0.6 0.4]
   mixed gamma 0.3
   note{A mixture of severities, showing that every aspect of the severity clause can be mixed.}
   tags{topic:severity, role:intermediate};

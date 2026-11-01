@@ -2314,7 +2314,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             else self.sev_density
         if sev is None:
             raise ValueError(
-                f'{self.name}: update() before palm_kappa -- no severity '
+                f'{self.name}: update() before palm_kappa, since no severity '
                 'density is present')
         xs = self.xs
         sev = np.asarray(sev, dtype=float)
@@ -5532,7 +5532,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         fname = getattr(self.frequency, 'freq_name', '')
         if fname != 'poisson':
-            hint = (' -- for a renewal (wait-clause) frequency use wiener_hopf'
+            hint = ('; for a renewal (wait-clause) frequency use wiener_hopf'
                     if fname == 'renewal' else '')
             raise ValueError(
                 f'pollaczeck_khinchine assumes a Poisson frequency, '
@@ -5713,7 +5713,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         fname = getattr(self.frequency, 'freq_name', '')
         if fname != 'renewal':
-            hint = (' -- for a Poisson frequency use pollaczeck_khinchine'
+            hint = ('; for a Poisson frequency use pollaczeck_khinchine'
                     if fname == 'poisson' else '')
             raise ValueError(
                 f'wiener_hopf requires a renewal (wait-clause) frequency, '
@@ -6460,8 +6460,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         if self.agg_density is None:
             raise ValueError(
                 f'{self.name}: update the aggregate before converting it to a '
-                'severity -- the conversion reads the distribution it outputs, '
-                'and there is not one yet.')
+                'severity: the conversion uses the computed distribution, '
+                'and there is none yet.')
         return Severity(sev_name=self, exp_attachment=attachment,
                         exp_limit=limit, sev_conditional=conditional)
 

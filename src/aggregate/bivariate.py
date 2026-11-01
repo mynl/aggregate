@@ -1056,6 +1056,24 @@ def _netceded_exact_bs(x0, x1, gross_bs, hi0, hi1, total_log2):
     return None
 
 
+def _joint_keyword(views):
+    """The DecL keyword of a pair of views, for a refusal.
+
+    Parameters
+    ----------
+    views : (str, str)
+        Two of ``'gross'``, ``'ceded'`` and ``'net'``, in either order.
+
+    Returns
+    -------
+    str
+        ``'netceded'``, ``'grossnet'`` or ``'grossceded'``.
+    """
+    if 'gross' not in views:
+        return 'netceded'
+    return 'grossnet' if 'net' in views else 'grossceded'
+
+
 def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
                      total_log2=None):
     """Window measurement, common-``bs`` grid sizing and view-image sampling
@@ -1085,10 +1103,10 @@ def _netceded_sizing(agg, views, bs=None, log2_x=None, log2_y=None,
     """
     if agg.occ_reins is None:
         raise ValueError(
-            'netceded requires occurrence reinsurance; none configured.')
+            f'{_joint_keyword(views)} requires occurrence reinsurance; none configured.')
     if agg.sev_density_gross is None or agg.occ_ceder is None:
         raise ValueError(
-            'netceded requires an updated object (no severity densities '
+            f'{_joint_keyword(views)} requires an updated object (no severity densities '
             'present). Call update() first.')
     if total_log2 is None:
         total_log2 = _TOTAL_LOG2
@@ -1423,7 +1441,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             self._nc_built_here = False
         else:
             if not units:
-                raise ValueError('netceded requires one component aggregate.')
+                raise ValueError(f'{_joint_keyword(self._views)} requires one component aggregate.')
             self._nc_agg = Aggregate(**units[0][2])
             self._nc_built_here = True
 
@@ -1833,7 +1851,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             warn_once(
                 f'bivariate {self.name}: pinned (bs, log2) does not cover the '
                 f'measured window on an axis, so the joint loses mass off the '
-                f'grid -- raise log2, coarsen bs, or unpin one of them.',
+                f'grid. Raise log2, coarsen bs, or unpin one of them.',
                 DefectiveDistributionWarning,
                 key='defective-construction', stacklevel=3)
         return bss, log2s, x_mins, his, clipped
@@ -3694,7 +3712,7 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
                     f'smear rather than exact.')
         if getattr(self, '_clipped', False):
             out.append('The window was clipped to stay inside the memory '
-                       'budget -- pass a larger budget or an explicit per-axis '
+                       'budget. Pass a larger budget or an explicit per-axis '
                        'bs / log2 to widen it.')
         deficit = self.deficit
         if deficit > 1e-5:

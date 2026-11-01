@@ -237,7 +237,7 @@ def test_bivariate_body_is_refused():
     ('agg LT.E elt [[1 .1 50]] elt [[1 .1 60]]', LossTableError,
      'more than once'),
     ('agg LT.E elt unit A [[1 .1 50]] elt unit B [[1 .2 60]]',
-     LossTableError, 'different rates'),
+     LossTableError, 'have different rates'),
     ('agg LT.E elt [[1 .1 50 40]]', LossTableError, 'mean exceeds max'),
     ('agg LT.E elt [[1 -.1 50]]', LossTableError, 'rate must be finite'),
     ('agg LT.E elt no2u [[1 .1 50 100 -1 10]]', LossTableError,

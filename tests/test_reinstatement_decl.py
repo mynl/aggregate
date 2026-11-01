@@ -153,14 +153,14 @@ def test_no_clause_means_no_terms():
 # ----------------------------------------------------------------------
 def test_reins_premium_rule():
     # [reins-premium]: a reinstatements clause needs a base premium clause.
-    with pytest.raises(ValueError, match=r'reins-premium'):
+    with pytest.raises(ValueError, match=r'needs a base premium clause'):
         _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 reinstatements [0 1] poisson')
 
 
 def test_reins_single_layer_rule():
     # [reins-single-layer]: a reinstated layer + a plain second occ layer.
-    with pytest.raises(ValueError, match=r'reins-single-layer'):
+    with pytest.raises(ValueError, match=r'require a single occurrence layer'):
         _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] '
               'and 200 xs 200 poisson')
@@ -168,10 +168,31 @@ def test_reins_single_layer_rule():
 
 def test_reins_one_clause_rule():
     # [reins-one-clause]: two layers each carrying a reinstatements clause.
-    with pytest.raises(ValueError, match=r'reins-one-clause'):
+    with pytest.raises(ValueError, match=r'at most one occurrence'):
         _spec('pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
               'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] '
               'and 200 xs 200 rol 5% reinstatements [0 1] poisson')
+
+
+_HEAD_CAT = 'pnl Cat 10000 premium less agg Cat_e 10000 prem at 85% lr sev lognorm 50 cv 3 '
+
+
+@pytest.mark.parametrize('body', [
+    'occurrence net of 100 xs 100 reinstatements [0 1] poisson',
+    'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] and 200 xs 200 poisson',
+    'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] and 200 xs 200 rol 5% reinstatements [0 1] poisson',
+    'occurrence net of 100 xs 100 rol 10% reinstatements [0 1] swing basic 500 lcm 0.5 poisson',
+    'occurrence net of 100 xs 100 swing basic 500 lcm 0.5 poisson',
+    'poisson aggregate net of 5000 xs 4000 swing basic 500 lcm 0.5 and 1000 xs 9000 swing basic 50 lcm 0.5',
+    'poisson aggregate net of 5000 xs 4000 aad 50',
+])
+def test_a_refusal_holds_no_internal_label(body):
+    """A refusal states what is refused and what to write, in the reader's terms."""
+    with pytest.raises(ValueError) as err:
+        _spec(_HEAD_CAT + body)
+    message = str(err.value)
+    for label in ('[reins-', 'decision 0', 'engine ceiling', 'follow-up', 'this release', 'not yet'):
+        assert label not in message, message
 
 
 def test_reinstatements_rejected_on_aggregate():

@@ -402,7 +402,7 @@ def with_hints(ob, **extra):
     if not bs or not log2:
         raise ValueError(
             f'with_hints: {who} has not been updated, so there is no grid to '
-            'pin. Build or update it at the resolution you want first -- that '
+            'pin. Build or update it at the resolution you want first, which '
             'is the whole point of the method.')
     kind, name, spec = _require_program(ob, 'with_hints')
     spec = dict(spec)

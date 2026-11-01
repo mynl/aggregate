@@ -883,7 +883,7 @@ def _lower_elt(name, declared):
     disagree = np.abs(rate - canon) > RATE_RTOL * canon
     if disagree.any():
         raise LossTableError(
-            f"{name}: an event's unit rows carry different rates (an event "
+            f"{name}: an event's unit rows have different rates (an event "
             f'has one rate, whatever its units): {_quote(disagree)}.')
 
     positive = event_rate > 0

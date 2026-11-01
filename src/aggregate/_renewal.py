@@ -88,7 +88,7 @@ def _kmax_from_pmf(pm, bs, T, z=10.0):
     x = np.arange(len(pm)) * bs
     mu = float(x @ pm) / q
     if mu <= 0:
-        raise ValueError('waiting-time pmf has zero conditional mean -- '
+        raise ValueError('waiting-time pmf has zero conditional mean: '
                          'all wait mass is at 0')
     var = max(float((x * x) @ pm) / q - mu * mu, 0.0)
     kmax = int(ceil(T / mu + z * np.sqrt(T * var / mu ** 3) + z))
@@ -100,7 +100,7 @@ def _kmax_from_pmf(pm, bs, T, z=10.0):
         warnings.warn(
             f'renewal count series length kmax = {kmax} > {KMAX_WARN}; '
             f'the wait law is very short relative to the horizon T = {T}. '
-            f'Cost is kmax vector multiply-adds -- still feasible, but slow.')
+            f'Cost is kmax vector multiply-adds, still feasible but slow.')
     return kmax
 
 
@@ -424,7 +424,7 @@ def wait_grid(mu, sigma, T, atoms=None, *, z=10.0, tol=1e-9, kappa=64.0,
         warnings.warn(
             f'wait grid wants log2 = {l2_raw}, capped at {WAIT_LOG2_CAP}; '
             f'bs = {bs_final:.6g} is coarser than the '
-            f'{binding} rule wants ({h_cand:.6g}) -- count accuracy may '
+            f'{binding} rule wants ({h_cand:.6g}), so count accuracy may '
             f'fall short of tol = {tol}.')
 
     selected = ('exact_lattice' if lattice
@@ -558,7 +558,7 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
     if p0 >= 1.0 - 1e-15 or p0 + defect >= 1.0 - 1e-15:
         raise ValueError(
             f'all waiting-time mass is at or below 0 (P(W<=0) = {p0:.6g}, '
-            f'defect = {defect:.6g}) -- the renewal count is undefined')
+            f'defect = {defect:.6g}), so the renewal count is undefined')
     if neg > 0:
         warnings.warn(
             f'negative waiting-time mass {neg:.6g} collapsed into the '
@@ -626,7 +626,7 @@ def wait_count_pmf(components, weights, T, *, z=10.0, tilt_total=20.0,
         pm += w_ * bed
 
     if pm.sum() <= 0:
-        raise ValueError('no positive waiting-time mass on the grid -- '
+        raise ValueError('no positive waiting-time mass on the grid: '
                          'cannot form a renewal count')
     # conditional positive-wait law (defect stays as short mass)
     pm = pm / (1.0 - p0)

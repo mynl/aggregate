@@ -26,7 +26,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 from aggregate import build  # noqa: E402
 from aggregate.constants import DefectiveDistributionWarning  # noqa: E402
 from aggregate.bivariate import (  # noqa: E402
-    BivariateDistribution, scatter_bivariate)
+    BivariateDistribution, _joint_keyword, scatter_bivariate)
 
 # Bleeding-edge bivariate machinery and among the heaviest cases in the suite;
 # quarantined from the fast local loop (`-m 'not slow'`), still run in full/CI.
@@ -427,3 +427,18 @@ def test_describe_and_info_netceded():
     assert list(b.summary_df.index) == ['Net', 'Ceded', 'total']
     assert np.isclose(float(b.dependency_df.loc['Agg', 'corr']), b.corr)
     assert 'netceded' in b.info
+
+
+@pytest.mark.parametrize('keyword', ['netceded', 'grossnet', 'grossceded'])
+def test_refusal_takes_the_word_of_the_statement(keyword):
+    """A joint with no occurrence reinsurance is refused in the words the reader wrote."""
+    with pytest.raises(ValueError, match=f'^{keyword} requires occurrence reinsurance'):
+        build(f'{keyword} agg RB.None 8 claims sev 300 * beta 2 3 poisson')
+
+
+@pytest.mark.parametrize('views, keyword', [
+    (('net', 'ceded'), 'netceded'), (('ceded', 'net'), 'netceded'),
+    (('gross', 'net'), 'grossnet'), (('gross', 'ceded'), 'grossceded'),
+])
+def test_joint_keyword_of_a_pair_of_views(views, keyword):
+    assert _joint_keyword(views) == keyword

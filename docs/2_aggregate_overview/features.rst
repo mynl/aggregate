@@ -705,12 +705,12 @@ order, so the parser no longer hard-codes kinds. Note ``ccoc`` takes the *return
 Reinsurance share syntax: the number sets the meaning (a17, a52)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``so`` (share-of), ``po`` (part-of), and, since a52, plain ``of`` are synonyms;
-the **number** decides. A literal percentage (``50% po 300 xs 200``) is the share
+``po`` (part-of) is the one partial-placement keyword, and the **number** decides
+the meaning. A literal percentage (``50% po 300 xs 200``) is the share
 directly; a bare amount (``150 po 300 xs 200``) is an absolute amount and the
 share is ``amount / limit``. In 0.30.1 ``50% po`` silently divided the percentage
 by the limit. Layer validation (a18) also hard-errors on out-of-order or
-overlapping layers; express a gap with a zero-share layer.
+overlapping layers and on a share above 100%; express a gap with a zero-share layer.
 
 Number literals: ``_`` digit separators (a52)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

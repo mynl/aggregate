@@ -222,6 +222,17 @@ Executed 2026-11-01 from 1.58.0. Item numbers below are those of `[Using-Notes-G
 - **Item 2.** `cached_property` counts as a property, or `Bounds` would run its cached computations under the default listing.
 - **Not applicable.** `dev/TODO.md` has no entry for this plan, and `V:/worktrees/dev-files.md` no longer exists.
 
+### `[Using-Notes-Messages]` divergences, 1.60.0
+
+- **Dashes, wider than the list.** The acceptance check covers all message text, so all of it was cleaned, not only the listed anchors: 64 non-docstring strings across 20 modules by a scan of the syntax tree (`ast.Constant` outside docstrings), which is now zero. A plain `rg ' -- '` cannot separate a message from a docstring: the rest of its 1,160 matches at 1.58.0 are docstrings and comments, which stay. The file written by `Underwriter`'s `# added ...` header line and the `skipping %s` log line were in the scan.
+- **Also corrected in passing, because the sentence was being rewritten:** `the reference asks the object` in `_severity.py` and `the conversion reads the distribution` in `_aggregate.py` and `_portfolio.py`.
+- **Labels.** `[reins-one-clause]` and the `aad` / `agglimit` copy of `the engine ceiling` were not listed and went the same way. The refusal's remedy for a tower is `Write one occurrence layer`, where the plan left the wording open. Each label stays in a comment beside its refusal. `tests/test_reinstatement_decl.py` matches the new text and gains `test_a_refusal_holds_no_internal_label`.
+- **`is a follow-up`.** The two comments stating the same thing, in `parser.py` and `underwriter.py`, went with the message.
+- **`Aggregate.price` docstring** (`cannot calibrate`) was rewritten at 1.59.0 with its signature; only the `_pricing` module note was left for this bump.
+- **`grossnet` refusal.** New private `bivariate._joint_keyword`; the three messages take it, and a test covers the three keywords.
+- **Exhibit snapshot.** The `bs_window` note text is pinned in four entries of `tests/data/exhibit_snapshots.json`, which the plan did not list. `capture_exhibit_snapshots.py` moved those four and also twelve `raw` values in the last bit, which `_assert_snapshot_close` tolerates by design, so the file was restored and only the text edited.
+- **Left alone, for the author.** Bracketed design labels remain in the P&L construction explanations, such as `[Decision-Kappa-Shared-Source-Rule]` and `[Layer-Peeling-Shorthand]`. They are explanation text rather than refusals and the plan's list stops at the four refusal labels, but a reader sees them.
+
 ### Ripple to the API
 
 `aggregate_api/routes/objects.py` `split_statements` catches `AssertionError` from `preprocess` and raises `unbalanced [ ] in this program`; its docstring has the catch going when the library raises a `ValueError` with an `ErrorReport`, which this bump does. `tests/test_multi_statement.py::test_an_unbalanced_bracket_is_a_422_not_a_500` pins the `AssertionError`. No grammar keyword is new, so `decl-keywords.json` does not move.

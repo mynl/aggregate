@@ -249,7 +249,7 @@ def choquet_weights(x, p, g, *, S_calculation='forwards',
             f'pricing a law with a material PMF deficit {deficit:.3e} '
             f'> {DEFICIT_MATERIALITY:.0e}; parked at the {parked} atom '
             f'({S_calculation}). The two parking directions differ by '
-            f'exactly the deficit -- widen the grid to make the choice '
+            f'exactly the deficit. Widen the grid to make the choice '
             f'immaterial.',
             DefectiveDistributionWarning,
             key='defective-pricing', stacklevel=4)
@@ -281,7 +281,7 @@ def choquet_weights(x, p, g, *, S_calculation='forwards',
         agreement = float(np.max(np.abs(S - S_other)))
         assert agreement <= max(tol, 4 * len(p) * np.finfo(float).eps), (
             f'forwards/backwards S disagree by {agreement:.3e} on a '
-            f'clean law -- defective-distribution diagnostic')
+            f'clean law, a defective-distribution diagnostic')
 
     gS = np.asarray(g(S), dtype=float)
     gT = np.asarray(g(T), dtype=float)

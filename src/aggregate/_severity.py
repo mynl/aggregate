@@ -1107,8 +1107,8 @@ def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
     if xs is None or ps is None:
         raise ValueError(
             f'{label}: cannot be used as a severity before it has computed '
-            'itself -- the reference asks the object what distribution it '
-            'outputs, and it does not have one yet. Call update() (or build '
+            'itself: a reference uses the distribution the object outputs, '
+            'and it does not have one yet. Call update() (or build '
             'it) first.')
 
     xs = np.asarray(xs, dtype=float)
@@ -1119,7 +1119,7 @@ def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
         warnings.warn(
             f'{label}: a signed source is being used as an unsigned severity; '
             f'{clamped:.6g} of probability at negative outcomes is clamped '
-            'onto the zero atom. Write ssev to keep the negative support -- a '
+            'onto the zero atom. Write ssev to keep the negative support. A '
             'signed source in a loss context usually means the value '
             'conventions do not match.',
             UserWarning, stacklevel=3)
@@ -1135,7 +1135,7 @@ def _dhistogram_from_object(obj, normalize=True, signed=False, source=''):
     if deficit > REFERENCE_DEFICIT_MATERIALITY:
         warn_once(
             f'{label}: the reference severity is missing {deficit:.3e} of its '
-            'probability -- the source window does not hold the whole law. '
+            'probability: the source window does not hold the whole law. '
             'Raise the source declaration to a larger hints{log2=...}.',
             DefectiveDistributionWarning,
             key=f'sev-ref-deficit-{label}', stacklevel=3)

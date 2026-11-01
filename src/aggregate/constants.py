@@ -383,11 +383,11 @@ class ValidationWarning(UserWarning):
 class IgnoredDecLClauseWarning(UserWarning):
     """Emitted when a DecL declaration ignores clauses it cannot use.
 
-    A pure ``agg`` accepts every reinsurance decoration -- ceded-premium
+    A pure ``agg`` accepts every reinsurance decoration: ceded-premium
     clauses (``deposit`` / ``rol`` / ``rate``), ceding commissions
-    (``cede``), ``reinstatements``, and the variable-rating features -- but
-    it has no premium context to activate them, so it builds the loss
-    structure only and says so with one warning naming the ignored clauses.
+    (``cede``), ``reinstatements``, and the variable-rating features. It has
+    no premium context to activate them, so it builds the loss structure only
+    and issues one warning listing the ignored clauses.
     The recipe base retains the full decorated spec, so folding the agg
     into a ``pnl`` / ``xpnl`` by reference (``pnl X <premium> less agg.NAME``)
     activates the economics (the spec-injection route). See

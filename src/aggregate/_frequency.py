@@ -316,7 +316,7 @@ class Frequency(HelpMixin):
         if base_mean is None:
             raise ValueError(
                 f'modify_mean: this standalone {self.freq_name!r} frequency has '
-                f'no base mean yet -- pass one explicitly, or let the owning '
+                f'no base mean yet. Pass one explicitly, or let the owning '
                 f'Aggregate stamp .base_mean at construction')
         base_mean = float(base_mean)
         if not self.freq_zm:
@@ -414,7 +414,7 @@ class Frequency(HelpMixin):
                 f'apply_deductible: survival must lie in (0, 1], not {survival!r}')
         if self.base_mean is None:
             raise ValueError(
-                'apply_deductible: base_mean is unset -- set it, or build the '
+                'apply_deductible: base_mean is unset. Set it, or build the '
                 'frequency through an Aggregate, before thinning')
         # theta -> v theta; how that lands on freq_a is family specific.
         if self.freq_name in ('poisson', 'geometric'):
@@ -845,7 +845,7 @@ class Frequency(HelpMixin):
         if mean is None:
             raise ValueError(
                 f'prob_eq_0: this standalone {self.freq_name!r} frequency has '
-                f'no expected claim count yet -- the owning Aggregate stamps '
+                f'no expected claim count yet. The owning Aggregate stamps '
                 f'.en at construction; set fr.en = n to use it standalone')
         return float(self._prob_eq_0(float(mean)))
 
@@ -876,12 +876,12 @@ class Frequency(HelpMixin):
         if base is None:
             raise ValueError(
                 f'freq_df: this standalone {self.freq_name!r} frequency has '
-                f'no expected claim count yet -- the owning Aggregate stamps '
+                f'no expected claim count yet. The owning Aggregate stamps '
                 f'.en at construction; set fr.en = n to use it standalone')
         base = float(base)
         if base > 1000:
             raise ValueError(
-                f'freq_df: mean frequency {base:.6g} > 1000 -- the comparison '
+                f'freq_df: mean frequency {base:.6g} > 1000, and the comparison '
                 f'table is a small-count diagnostic')
         ex1, ex2, _ = self.freq_moms(base)
         sd = np.sqrt(max(ex2 - ex1 * ex1, 0.0))
@@ -1278,7 +1278,7 @@ class FrequencyEmpirical(Frequency):
         mean = float(a @ b)
         if mean > 1000:
             raise ValueError(
-                f'freq_df: mean frequency {mean:.6g} > 1000 -- the '
+                f'freq_df: mean frequency {mean:.6g} > 1000, and the '
                 f'comparison table is a small-count diagnostic')
         k = np.rint(a).astype(int)
         if np.any(np.abs(a - k) > 1e-9) or np.any(k < 0):

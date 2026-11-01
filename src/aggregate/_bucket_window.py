@@ -570,11 +570,11 @@ def bs_explain(agg, *, color: bool = False) -> str:
             f'{i} {fmt_amount(df.loc[i, "W"])}' for i in applied)
         parts.append(
             f'Of the methods that applied ({cand_txt}), the {method} method won '
-            f'(window width {fmt_amount(W)}) -- {blurb}.')
+            f'(window width {fmt_amount(W)}): {blurb}.')
     else:
         parts.append(
-            f'The {method} method won (window width {fmt_amount(W)}) '
-            f'-- {blurb}.')
+            f'The {method} method won (window width {fmt_amount(W)}): '
+            f'{blurb}.')
 
     raw = getattr(agg, '_bs_raw', None)
     if raw is not None:
@@ -1261,8 +1261,8 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
             # -- the user must pass an explicit ``bs`` (item 2).
             raise InfiniteVarianceError(
                 f'{agg.name}: infinite-variance (power-law) aggregate '
-                f'(no finite second moment) -- cannot estimate a bucket '
-                f'size. Pass an explicit bs, e.g. build(..., bs=...).'
+                f'(no finite second moment), so no estimate of a bucket '
+                f'size exists. Pass an explicit bs, e.g. build(..., bs=...).'
             ) from e
         if not np.isfinite(x_hi):
             # deterministic (sd ~ 0) or undefined skew (NaN): a few sd above
@@ -2252,7 +2252,7 @@ def port_build_bs_window_df(port, rows, bs, log2, x_min, cand, resolution, W_ext
         else pd.DataFrame(columns=cols)
     cov = f'1-1e-{WINDOW_NINES}'
     cand_note = {
-        'mm': 'Portfolio MM bulk (3-moment fit on total) -- the live span',
+        'mm': 'Portfolio MM bulk (3-moment fit on total), the live span',
         'rms': 'RMS-of-windows reference (normal approx); mm-rms = skew adj',
         'sbj': 'single big jump look-through: actual_m + max_k(sbj_hi_k - ES_k)',
         'sum': 'legacy linear sum of widths (guaranteed-no-wrap bound)',

@@ -149,7 +149,7 @@ def ignored_clauses_message(name, spec, context='agg'):
         return ''
     plural = 's' if len(clauses) > 1 else ''
     remedy = _IGNORED_CLAUSE_REMEDIES[context].format(name=name)
-    return (f"{name}: ignoring the {', '.join(clauses)} clause{plural} -- "
+    return (f"{name}: ignoring the {', '.join(clauses)} clause{plural}: "
             f"{remedy}")
 
 
@@ -1871,15 +1871,13 @@ class Underwriter(HelpMixin):
             if retro_collar is not None:
                 # Retro varies the gross premium via the collar map over the
                 # gross density. The clean 1-D case is retro with no inuring
-                # reinsurance (net account loss = gross loss); retro +
-                # reinsurance is a follow-up.
+                # reinsurance (net account loss = gross loss).
                 if var_feat is not None or spec.get('occ_reins') or \
                         spec.get('agg_reins'):
                     raise ValueError(
-                        f"{name}: 'retro' with reinsurance (or another variable "
-                        "feature) is not yet supported; retro currently requires a "
-                        "book with no inuring reinsurance (the 1-D net-account-loss "
-                        "= gross-loss case).")
+                        f"{name}: 'retro' cannot combine with reinsurance or another "
+                        "variable feature; it applies to a book with no inuring "
+                        "reinsurance, where net account loss is gross loss.")
                 inner = Aggregate(**spec)
                 from .contract_terms import RetroTerms
                 inner.variable_terms = RetroTerms(**retro_collar)
@@ -3130,7 +3128,7 @@ class Underwriter(HelpMixin):
         if not total:
             raise ValueError(
                 f"{name}: 'inherit premium' but the wrapped engine has no "
-                "premium to inherit -- it needs a 'premium at lr' exposure (or a "
+                "premium to inherit. It needs a 'premium at lr' exposure (or a "
                 "stored agg / port carrying premium). Give an explicit "
                 "'<amount> premium' instead.")
         return total
@@ -3177,7 +3175,7 @@ class Underwriter(HelpMixin):
         """
         if is_tower:
             raise NotImplementedError(
-                f"{name}: 'xpnl' over a portfolio is not supported -- the "
+                f"{name}: 'xpnl' over a portfolio is not supported: the "
                 "portfolio total hides its units, so there is nothing to explode. "
                 "Use 'pnl' for the net-net book P&L (or 'xpnl' over a single agg "
                 "engine).")
@@ -3278,7 +3276,7 @@ class Underwriter(HelpMixin):
                 # there is no cover to step through.
                 raise NotImplementedError(
                     f"{inner.name}: 'xpnl' over a retro program is not "
-                    'supported -- retro has no cession to walk through. '
+                    'supported: retro has no cession to walk through. '
                     "Use 'pnl'.")
             # ``label=inner._label`` is the RAW ``as`` clause, ``None`` when
             # absent, not the resolved ``inner.label`` (which falls back to the
@@ -3406,7 +3404,7 @@ class Underwriter(HelpMixin):
             raise CannotBuild(
                 f'build() could not construct {answer.kind} {answer.name!r}: '
                 f'spec parses but cannot be built standalone (typically a '
-                f'mixture severity — wrap it in an Aggregate, or use '
+                f'mixture severity; wrap it in an Aggregate, or use '
                 f'build_many() to receive the Recipe).'
             )
         return answer.object
@@ -3774,7 +3772,7 @@ class Underwriter(HelpMixin):
                 logger.error('skipping %s...element not implemented', n)
                 continue
             except CannotBuild as e:
-                logger.warning('skipping %s — %s', n, e)
+                logger.warning('skipping %s: %s', n, e)
                 continue
             objects.append(a)
             if describe:
@@ -3980,7 +3978,7 @@ class Underwriter(HelpMixin):
         if mode == 'a' and out.exists():
             # Append a dated block at the end; leading newline guarantees a
             # clean separation even if the file did not end with one.
-            block = (f'\n# added {stamp} — {n_selected} program(s); '
+            block = (f'\n# added {stamp}: {n_selected} program(s); '
                      f'pattern={pattern!r}, kind={kind!r}, source={source!r}\n'
                      f'{body}' + ('\n' if body else ''))
             with out.open('a', encoding='utf-8') as fh:

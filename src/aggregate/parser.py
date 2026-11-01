@@ -1100,9 +1100,7 @@ class UnderwritingTransformer(Transformer_NonRecursive):
             raise ValueError(
                 f'tweedie: p must be strictly between 1 and 2, got {pp}. The '
                 f'clause is `tweedie <p> <mean> <dispersion>` or `tweedie <p> '
-                f'<mean> cv <cv>`, shape parameter first. (It read `<mean> <p> '
-                f'<dispersion>` before 1.0.0a231, so an older program needs its '
-                f'first two numbers swapped.)')
+                f'<mean> cv <cv>`, shape parameter first.')
 
     def _check_tweedie(self, pp, mu, sig2, cv):
         """Validate a reproductive ``tweedie`` clause: p, then positivity.
@@ -2267,7 +2265,7 @@ class UnderwritingTransformer(Transformer_NonRecursive):
             out[f"{which}_reins_label"] = label
         # variable rating (Phase 3): one of swing / slide / pc / corridor on one
         # aggregate layer (decision 0: at most one feature per program, no
-        # stacking; occurrence-basis variable rating is a follow-up). Emit the
+        # stacking). Emit the
         # locked per-feature spec key ``<which>_reins_<feature>`` and record the
         # decorated layer index so the underwriter resolves its economics.
         present = [(i, v) for i, v in enumerate(variable) if v is not None]
@@ -2275,14 +2273,13 @@ class UnderwritingTransformer(Transformer_NonRecursive):
             if which != "agg":
                 raise ValueError(
                     "DecL: variable-rating features (swing / slide / pc / "
-                    "corridor) are supported on aggregate reinsurance only in "
-                    "this release; occurrence-basis variable rating is a "
-                    "follow-up. (Reinstatements remain the occurrence "
-                    "stochastic-ceded feature.)")
+                    "corridor) decorate aggregate reinsurance only. On an "
+                    "occurrence layer, reinstatements give a random ceded "
+                    "premium.")
             if len(present) > 1:
                 raise ValueError(
-                    f"DecL: at most one variable-rating feature per program "
-                    f"(decision 0: no stacking); found {len(present)}.")
+                    f"DecL: at most one variable-rating feature per program; "
+                    f"found {len(present)}.")  # decision 0: no stacking
             idx, (feat, params) = present[0]
             # The P&L builders give a commission feature the whole aggregate
             # program's commission line, so a 'cede' on any layer of it, not
@@ -2303,13 +2300,12 @@ class UnderwritingTransformer(Transformer_NonRecursive):
             if n_reinst > 1:
                 raise ValueError(
                     f"DecL: 'reinstatements' may decorate at most one occurrence "
-                    f"layer; found {n_reinst} ([reins-one-clause]).")
+                    f"layer; found {n_reinst}.")  # [reins-one-clause]
             if len(layers) != 1:
                 raise ValueError(
                     f"DecL: 'reinstatements' require a single occurrence layer; "
-                    f"found {len(layers)} ([reins-single-layer]). A reinstated "
-                    "layer cannot share the occurrence tier with other layers "
-                    "(the engine ceiling is the 2-D (L, R) joint).")
+                    f"found {len(layers)}. Write one occurrence layer: a reinstated "
+                    "layer cannot share the occurrence tier.")  # [reins-single-layer]: the 2-D (L, R) joint is the engine ceiling
             out[f"{which}_reins_reinst"] = reinst
         present_annual = [a for a in annual if a is not None]
         if present_annual:
@@ -2325,9 +2321,8 @@ class UnderwritingTransformer(Transformer_NonRecursive):
             if len(layers) != 1:
                 raise ValueError(
                     f"DecL: 'aad' / 'agglimit' require a single occurrence "
-                    f"layer; found {len(layers)}. The annual terms cannot share "
-                    "the occurrence tier with other layers (the engine ceiling "
-                    "is the 2-D (L, R) joint).")
+                    f"layer; found {len(layers)}. Write one occurrence layer: the "
+                    "annual terms cannot share the occurrence tier.")  # [reins-single-layer]: the 2-D (L, R) joint is the engine ceiling
             aad, agglimit = present_annual[0]
             out["occ_reins_aad"] = aad
             out["occ_reins_agglimit"] = agglimit
@@ -2499,14 +2494,13 @@ class UnderwritingTransformer(Transformer_NonRecursive):
             raise ValueError(
                 "DecL: a 'reinstatements' clause needs a base premium clause "
                 "(deposit / rol / rate) on the same layer; the base rate on "
-                "line r = base_premium / limit would otherwise be undefined "
-                "([reins-premium]).")
+                "line r = base_premium / limit would otherwise be undefined.")  # [reins-premium]
         if variable is not None:
             feat = variable[0]
             if reinst is not None:
                 raise ValueError(
-                    f"DecL: '{feat}' cannot combine with 'reinstatements' "
-                    "(decision 0: one variable-rating feature per program).")
+                    f"DecL: '{feat}' cannot combine with 'reinstatements'; a program "
+                    "takes one variable-rating feature.")  # decision 0
             if feat == 'swing':
                 if premium is not None:
                     raise ValueError(

@@ -42,7 +42,7 @@ def bounded():
 
 def test_an_unbounded_aggregate_refuses_p_equals_one(unbounded):
     assert not unbounded.bounded
-    with pytest.raises(ValueError, match='p=1 does not name an asset level'):
+    with pytest.raises(ValueError, match='p=1 does not fix an asset level'):
         unbounded.calibrate_distortions(0.15, p=1)
 
 

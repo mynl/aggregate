@@ -8,8 +8,7 @@ and never imports ``_aggregate``/``_portfolio``, which is what lets P4 route
 ``Portfolio``-total pricing through it. See ``plan-README.md`` for the
 pricing/allocation boundary.
 
-The distortion-calibration capability (``Distortion.calibrate_set`` + the
-pentagon->target glue) is **not** here yet -- it lands in Phase 1c.
+The distortion-calibration capability is :func:`calibrate_distortions`, here.
 """
 
 import warnings
@@ -71,10 +70,9 @@ def guard_unbounded_anchor(obj, p, *, where):
     the ``total`` row of its ``tail_behavior_df`` shows realized grid extent
     and must not be used for this.
 
-    Three ways past the guard, and each says something different. ``a=``
-    names the level, so ``a=obj.q(1)`` reproduces the old number with the
-    caller having asked for it. A ``p`` below 1 asks a question the
-    distribution can answer. ``obj.bounded = True`` certifies a support the
+    Three ways past the guard, each with its own meaning. ``a=`` sets the
+    level, so ``a=obj.q(1)`` is the top of the grid with the caller having
+    chosen it. A ``p`` below 1 asks a question the distribution can answer. ``obj.bounded = True`` certifies a support the
     heuristic could not prove, which is the right move when the modeller
     knows the cap.
     """
@@ -84,12 +82,12 @@ def guard_unbounded_anchor(obj, p, *, where):
         return
     name = getattr(obj, 'name', 'the object')
     raise ValueError(
-        f'{where}: {name} is unbounded, so p=1 does not name an asset level. '
+        f'{where}: {name} is unbounded, so p=1 does not fix an asset level. '
         f'It resolves to the top of the FFT grid, which moves with log2 '
         f'rather than with the risk, and every number priced off it moves '
-        f'with it. Pass a= to name the level ({name}.q(1) reproduces the old '
-        f'number), use a p below 1, or certify the support with '
-        f'{name}.bounded = True. tail_behavior_df says what the tail is.')
+        f'with it. Pass a= to set the level (a={name}.q(1) is the top of the '
+        f'grid), use a p below 1, or certify the support with '
+        f'{name}.bounded = True. tail_behavior_df shows the tail.')
 
 
 def check_price_anchor(obj, p, a):

@@ -1724,16 +1724,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         return self._grand_result.gd.q(p, kind)
 
     def tvar(self, p):
-        """Tail value at risk of the result. Delegates to the result GD.
+        """Tail value at risk of the result: the mean of its upper tail above ``q(p)``. Delegates to the result GD.
 
         Notes
         -----
-        The P&L is a **payoff**, so the interesting tail is the *low* one: the
-        result GD carries the orientation (:attr:`GridDistribution.is_loss_value`
-        is ``False`` here) and ``tvar`` reads off the correct side, exactly as
-        ``q`` does. Added in 1.0.0a150 -- ``q`` / ``var`` / ``cdf`` / ``sf``
-        delegated from the start but ``tvar`` did not, leaving the library's
-        flagship risk measure unavailable on a P&L.
+        The upper tail of a P&L holds its good outcomes, so ``tvar(0.99)`` is the
+        mean of the best 1% of results. The mean of the worst ``p`` of results is
+        ``(m - (1 - p) * tvar(p)) / p``, with ``m`` the mean result.
         """
         return self._grand_result.gd.tvar(p)
 

@@ -244,7 +244,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             loss_units = [a.name for a in self.agg_list if a._is_loss_value]
             payoff_units = [a.name for a in self.agg_list if not a._is_loss_value]
             raise ValueError(
-                f"Portfolio {self.name!r}: mixed value_type across units -- "
+                f"Portfolio {self.name!r}: mixed value_type across units: "
                 f"{loss_label}: {loss_units}, {payoff_label}: {payoff_units}. "
                 f"A portfolio cannot mix {loss_label} and {payoff_label} units.")
         self._is_loss_value = roles.pop() if roles else True
@@ -800,10 +800,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         units = '; '.join(parts)
         if worst == TailClass.UNKNOWN:
             return (f'Portfolio aggregate tail undetermined (a unit is an '
-                    f'unrecognised or numeric-only family). Units -- {units}.')
+                    f'unrecognised or numeric-only family). Units: {units}.')
         driver_txt = (f', driven by {", ".join(drivers)}' if drivers else '')
         return (f'Portfolio aggregate tail is {_tail.tail_class_label(worst)} '
-                f'(worst-of under independence{driver_txt}). Units -- {units}.')
+                f'(worst-of under independence{driver_txt}). Units: {units}.')
 
     @property
     def reins_kinds(self) -> str:
@@ -2619,8 +2619,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         if self.density_df is None:
             raise ValueError(
                 f'{self.name}: update the portfolio before converting it to a '
-                'severity -- the conversion reads the distribution it outputs, '
-                'and there is not one yet.')
+                'severity: the conversion uses the computed distribution, '
+                'and there is none yet.')
         return Severity(sev_name=self, exp_attachment=attachment,
                         exp_limit=limit, sev_conditional=conditional)
 
@@ -2973,7 +2973,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                     warn_once(
                         f'{self.name}: portfolio PMF deficit {deficit:.3e} '
                         f'(Σp = 1 − {deficit:.3e} < 1); the {kind} window is '
-                        f'narrower than the combined support -- raise log2 or '
+                        f'narrower than the combined support. Raise log2 or '
                         f'widen the grid.', DefectiveDistributionWarning,
                         key='defective-construction', stacklevel=3)
 
@@ -3488,7 +3488,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         if mismatched and not allow_window_mismatch:
             warnings.warn(
                 f'{self.name}: unit window(s) extend beyond the {grid!r} '
-                f'grid -- {"; ".join(mismatched)}. This view is a clipped '
+                f'grid: {"; ".join(mismatched)}. This view is a clipped '
                 f'display artifact; pass allow_window_mismatch=True to '
                 f'acknowledge.', stacklevel=2)
         # A display adapter -- relabel the unit axis (no-op when unlabeled).

@@ -535,7 +535,7 @@ class Bounds(HelpMixin):
     def distortion(self, pl, pu):
         """Return the BiTVaR with knots ``(pl, pu)`` and the matching weight."""
         if (pl, pu) not in self.weight_df.index:
-            raise KeyError(f'({pl}, {pu}) not in weight_df index — '
+            raise KeyError(f'({pl}, {pu}) not in weight_df index: '
                            'must be one of the bracketing pairs')
         w = self.weight_df.at[(pl, pu), 'weight']
         return Distortion('bitvar', p0=pl, p1=pu, w1=w)

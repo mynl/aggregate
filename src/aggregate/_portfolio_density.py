@@ -359,7 +359,7 @@ def priority_state(port, caller='priority ladder'):
     """
     if port.density_df is None:
         raise ValueError(
-            f'{port.name}: update() before {caller} -- no density_df is present')
+            f'{port.name}: update() before {caller}, since no density_df is present')
     if port._signed() or port._combine_x_min is not None:
         raise NotImplementedError(
             f'{caller} requires the default zero-based, non-negative '

@@ -15,8 +15,8 @@ distortions.
   (the achievable capital-allocation set).
 - :class:`~aggregate.bounds.PricingBounds`, the price-range envelope.
 
-These are reached by submodule import (``from aggregate.bounds import Bounds``);
-they are not re-exported at the top level.
+These are importable from the top level (``from aggregate import Bounds``) and from
+:mod:`aggregate.bounds`.
 
 .. currentmodule:: aggregate.bounds
 

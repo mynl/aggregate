@@ -553,11 +553,11 @@ def build_plain_pnl(engine, *, consideration, consideration_label=None,
         'scenario (κ) ladder (single shared source).')
     pnl._construction_explanation = (
         pnl._construction_description + '\n'
-        'Booking: sell -- +consideration, -obligation; loss-basis LAE is '
+        'Booking: sell, with +consideration and -obligation; loss-basis LAE is '
         'stochastic rate * x (the loss is on-source). For a '
-        'reinsurance-bearing engine the density here is the net -- what '
+        'reinsurance-bearing engine the density here is the net, what '
         'comes out of the engine.'
-        + ('\nOne-step walk: no cover to step through -- the grand rows '
+        + ('\nOne-step walk: no cover to step through, so the grand rows '
            'duplicate the gross step and the impact is zero '
            '([Decision-XPnL-Plain-Is-One-Step-Walk]).' if walk else '')
         + '\n\n' + pnl._replay_block())
@@ -645,9 +645,9 @@ def _consolidated_explanation(agg, pnl, persp, p_gross, pc_occ, pc_agg,
     lines = [
         f'Consolidated pnl {pnl.label!r} ([Decision-PnL-Is-Consolidated]).',
         f'Engine: {agg.name!r}'
-        + (f' -- occurrence reinsurance {agg.occ_reins}'
+        + (f'; occurrence reinsurance {agg.occ_reins}'
            if agg.occ_reins is not None else '')
-        + (f' -- aggregate reinsurance {agg.agg_reins}'
+        + (f'; aggregate reinsurance {agg.agg_reins}'
            if agg.agg_reins is not None else '') + '.',
         'Economics resolution: '
         f'gross premium {p_gross:g}; ceded premium occ {pc_occ:g} / '
@@ -656,13 +656,13 @@ def _consolidated_explanation(agg, pnl, persp, p_gross, pc_occ, pc_agg,
         f'{c_occ:g} / agg {c_agg:g} book as one obligation-side commission '
         'leg ([Commission-Obligation-Side]).',
         f'Source: the deepest net marginal, '
-        f"reins_density_df[{_GCN_LOSS_MARGINAL[persp]!r}] -- what comes out "
+        f"reins_density_df[{_GCN_LOSS_MARGINAL[persp]!r}], what comes out "
         'of the engine. The net loss leg reads it per atom; a loss-basis '
         '(LAE) expense is off-source there and books as its deterministic '
         'rate * E[gross loss].',
-        'Booking: sell role -- +consideration, -obligation; the EX column '
+        'Booking: sell role, with +consideration and -obligation; the EX column '
         'adds down the sheet.',
-        'Ladder: scenario (κ) -- the pnl is a single-source ledger, so the '
+        'Ladder: scenario (κ). The pnl is a single-source ledger, so the '
         'stats columns condition on the grand result '
         '([Decision-Kappa-Shared-Source-Rule]).',
         'Ceded economics are netted out and not shown: the per-step walk '
@@ -790,7 +790,7 @@ def build_xpnl_walk(agg, *, gross, ceded, gcn_economics=None,
     pnl._construction_description = (
         f'xpnl walk: {len(groups)}-step per-atom tower '
         f'({" -> ".join(g.label for g in groups)} -> All) over '
-        f'{src_desc}; scenario (\u03ba) ladder -- every column foots.')
+        f'{src_desc}; scenario (\u03ba) ladder: every column foots.')
     pnl._construction_explanation = _walk_explanation(agg, pnl, has_occ,
                                                       src_desc)
     return pnl
@@ -802,14 +802,14 @@ def _walk_explanation(agg, pnl, has_occ, src_desc):
     lines = [
         f'xpnl walk {pnl.label!r} ([XPnL-Walk-Recipe], per-atom).',
         f'Engine: {agg.name!r}'
-        + (f' -- occurrence reinsurance {agg.occ_reins}'
+        + (f'; occurrence reinsurance {agg.occ_reins}'
            if agg.occ_reins is not None else '')
-        + (f' -- aggregate reinsurance {agg.agg_reins}'
+        + (f'; aggregate reinsurance {agg.agg_reins}'
            if agg.agg_reins is not None else '') + '.',
         f'Economics resolution: {econ!r}.',
         f'Source: {src_desc}'
         + (' (occ_bivariate; the ceded-occ aggregate is not a function of '
-           'the gross aggregate, so a footing walk needs the joint -- built '
+           'the gross aggregate, so a footing walk needs the joint, built '
            'on a budget-sized common bucket size, coarser than the engine '
            'grid; CoarseJointGridWarning guards kinked aggregate-tier maps).'
            if has_occ else
@@ -818,7 +818,7 @@ def _walk_explanation(agg, pnl, has_occ, src_desc):
         'every ledger row is a per-atom partial sum, so the EX column and '
         'every \u03ba column foot exactly; loss-basis LAE is stochastic '
         'rate * l (the gross loss is on-source).',
-        'Ladder: scenario (\u03ba) -- one shared source '
+        'Ladder: scenario (\u03ba), one shared source '
         '([Decision-Kappa-Shared-Source-Rule]).',
         '',
         pnl._replay_block(),
@@ -1011,7 +1011,7 @@ def build_xpnl_peel(agg, *, direction, gross, ceded, gcn_economics=None,
     steps = _peel_steps(agg, direction)
     if not steps:
         raise ValueError(
-            f'{agg.name}: nothing to peel -- every reinsurance layer on this '
+            f'{agg.name}: nothing to peel, since every reinsurance layer on this '
             'engine has zero share (gap fillers are structural, not '
             "cessions). Drop the 'peel' clause.")
     occ_steps = [s for s in steps if s[0] == 'occ_reins']
@@ -1050,7 +1050,7 @@ def build_xpnl_peel(agg, *, direction, gross, ceded, gcn_economics=None,
         f'xpnl peel ({direction}): {len(steps)}-layer '
         f'{"per-atom" if route == "per-atom" else "marginal"} tower '
         f'(Gross -> {order} -> All); '
-        + ('scenario (κ) ladder -- every column foots.'
+        + ('scenario (κ) ladder: every column foots.'
            if route == 'per-atom' else
            'EX foots exactly by linearity, dispersion columns are marginal.'))
     pnl._construction_explanation = _peel_explanation(
@@ -1645,9 +1645,9 @@ def _peel_explanation(agg, pnl, direction, steps, route):
     lines = [
         f'xpnl peel {pnl.label!r} ([Layer-Peeling-Shorthand], {route}).',
         f'Engine: {agg.name!r}'
-        + (f' -- occurrence reinsurance {agg.occ_reins}'
+        + (f'; occurrence reinsurance {agg.occ_reins}'
            if agg.occ_reins is not None else '')
-        + (f' -- aggregate reinsurance {agg.agg_reins}'
+        + (f'; aggregate reinsurance {agg.agg_reins}'
            if agg.agg_reins is not None else '') + '.',
         f'Economics resolution: {pnl.economics!r}.',
         f'Peel order ({direction}): '
@@ -1657,17 +1657,17 @@ def _peel_explanation(agg, pnl, direction, steps, route):
     ]
     if per_atom:
         lines += [
-            'Source: one shared source -- at most one occurrence layer is '
+            'Source: one shared source. At most one occurrence layer is '
             'peeled, so the joint ceded axis already is that layer, and each '
             'aggregate layer rides the same atoms as its own ceder (aggregate '
             'layers are disjoint intervals on one subject, so single-layer '
             'ceders sum to the cumulative ceder identically).',
-            'Ladder: scenario (κ) -- every column foots exactly '
+            'Ladder: scenario (κ), and every column foots exactly '
             '([Decision-Kappa-Shared-Source-Rule]).',
         ]
     else:
         lines += [
-            'Source: none -- the ceded-occurrence aggregate is not a function '
+            'Source: none. The ceded-occurrence aggregate is not a function '
             'of the gross aggregate (the random claim count decouples them), '
             'and the total ceded axis of the 2-D joint cannot be split after '
             'the fact, so peeling two or more occurrence layers per-atom '
@@ -1795,13 +1795,13 @@ def build_variable_pnl(agg, *, walk=False, econ=None, expense_spec=None,
                else 'the gross density')
     if walk and layer is not None and has_occ:
         face, ladder = ('per-atom walk over the occurrence joint (xpnl)',
-                        'scenario (κ) ladder -- one shared joint')
+                        'scenario (κ) ladder, one shared joint')
     elif walk and layer is not None:
         face, ladder = ('walk (xpnl)',
-                        'scenario (κ) ladder -- one shared source')
+                        'scenario (κ) ladder, one shared source')
     else:
         face, ladder = ('consolidated',
-                        'scenario (κ) ladder -- one shared source')
+                        'scenario (κ) ladder, one shared source')
     pnl._construction_description = (
         f'Variable-rating {feature} pnl, {face} face; the feature\'s subject '
         f'is {subject}; {ladder}; the feature changes one leg\'s map, never '
@@ -2085,9 +2085,8 @@ def build_reinstatement_source(agg, *, terms=None, gross_premium=None,
     if len(agg.occ_reins) != 1:
         raise ValueError(
             f'reinstatements and annual terms require a single occurrence '
-            f'layer; found {len(agg.occ_reins)} ([reins-single-layer]). The '
-            'decorated layer cannot share the occurrence tier with other '
-            'layers (the engine ceiling is the 2-D (L, R) joint).')
+            f'layer; found {len(agg.occ_reins)}. Write one occurrence layer: the '
+            'decorated layer cannot share the occurrence tier.')  # [reins-single-layer]: the 2-D (L, R) joint is the engine ceiling
     if terms is None:
         terms = getattr(agg, 'reinstatement_terms', None)
     if terms is None:

@@ -22,7 +22,7 @@ from scipy import interpolate
 from scipy.optimize import brentq, NoConvergence  # noqa
 from textwrap import fill
 from ._help import HelpMixin
-from .constants import (DefectiveDistributionWarning,
+from .constants import (validation_warning_suppressed, DefectiveDistributionWarning,
                         INFO_NA, info_row,
                         InfiniteVarianceError,
                         ZeroModifiedExposureWarning,
@@ -4554,13 +4554,17 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # (``ssev`` / negative-``dsev``), so the loss convolves on its genuine
         # signed grid.
         xs = x_min + np.arange(0, N, dtype=float) * bs
-        rv = self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
-                              **kwargs)
         if sharpen:
             # Opt-in only. ``sharpen``'s own probe updates pass sharpen=False,
-            # so there is no recursion.
+            # so there is no recursion. It reports the grid it settles on, so
+            # this first one stays quiet.
+            with validation_warning_suppressed():
+                rv = self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
+                                      **kwargs)
             self.sharpen()
-        return rv
+            return rv
+        return self.update_work(xs, debug=debug, x_min=x_min, x_max=x_max,
+                                **kwargs)
 
     def update_work(self, xs, padding=1, sev_calc='discrete',
                     discretization_calc='survival', normalize=True, force_severity=False,
@@ -4887,6 +4891,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         # invalidate stored functions
         self._cdf = None
+
+        _validation.warn_if_invalid(self)
 
     def _fft_aggregate(self, sev_density, padding):
         """Run one FFT convolution: severity density -> aggregate density.
@@ -7651,7 +7657,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # aggregate analysis
         agg_ans = []
         for bs in bss:
-            cself.update(bs=bs, log2=log2, **kwargs)
+            with validation_warning_suppressed():
+                cself.update(bs=bs, log2=log2, **kwargs)
             agg_ans.append([bs, m, cself.est_m,
                             cself.est_m - m, cself.est_m / m - 1])
 

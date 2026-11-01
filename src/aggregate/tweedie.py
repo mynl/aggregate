@@ -23,6 +23,7 @@ import scipy.stats as ss
 from scipy.special import loggamma
 
 from ._labeled import LabeledMixin
+from .constants import validation_warning_suppressed
 from .distributions import Aggregate
 from .moments import MomentWrangler
 from .underwriter import build
@@ -802,7 +803,8 @@ class Tweedie:
                             # build agg object to include scaling
                             self._fz = build(f'agg Po{id(self)} {mean} claims dsev [{1 / self.index}] poisson', update=False)
                             # update with appropriate bs and log2
-                            self._fz.update(bs=1 / self.index, log2=log2)
+                            with validation_warning_suppressed():
+                                self._fz.update(bs=1 / self.index, log2=log2)
                         case Mode.ADDITIVE:
                             self._fz = ss.poisson(self.index * self.mean)
                             # top unnecessary complaining
@@ -842,7 +844,8 @@ class Tweedie:
                     # get frequency and gamma parameters
                     # po_gamma_shape_rate accounts for mode of self.
                     f, s, r = self.po_gamma_shape_rate
-                    self._fz = build(f'agg TW{id(self)} {f} claims sev {1/r} * gamma {s} poisson')
+                    with validation_warning_suppressed():
+                        self._fz = build(f'agg TW{id(self)} {f} claims sev {1/r} * gamma {s} poisson')
                 case _:
                     # the stable members, p > 2, p < 0 and p = inf: no scipy
                     # law carries the tilt theta applies, so the distribution
@@ -853,7 +856,8 @@ class Tweedie:
                     fam = FamilyTweedie({'p': self.p, 'mean': self.mean,
                                          'dispersion': self.dispersion})
                     self._fz = AggregateCHF.from_family(f'TW{id(self)}', fam)
-                    self._fz.update()
+                    with validation_warning_suppressed():
+                        self._fz.update()
         return self._fz
 
     @property
@@ -888,7 +892,8 @@ class Tweedie:
             fam = FamilyTweedie({'p': self.p, 'mean': self.mean,
                                  'dispersion': self.dispersion})
             self._chf_law = AggregateCHF.from_family(f'TW{id(self)}', fam)
-            self._chf_law.update()
+            with validation_warning_suppressed():
+                self._chf_law.update()
         return self._chf_law
 
     def stats(self):
@@ -1145,7 +1150,8 @@ class Tweedie:
         fam = FamilyTweedie({'p': self.p, 'mean': self.mean,
                              'dispersion': self.dispersion})
         self._chf_law = AggregateCHF.from_family(f'TW{id(self)}', fam)
-        self._chf_law.update(log2=log2, bs=bs or 0)
+        with validation_warning_suppressed():
+            self._chf_law.update(log2=log2, bs=bs or 0)
         if plot:
             from .pedagogy import chf_inversion_figure, chf_simpson_figure
             chf_inversion_figure(self._chf_law, suptitle=self.name, verbose=False)

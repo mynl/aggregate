@@ -3,12 +3,14 @@
 Extracted from ``distributions.py`` / ``_aggregate.py`` (Phase 1b, shared concerns). A leaf/near-leaf: it never imports ``_aggregate``/``_portfolio`` (takes plain data / a distribution object), which is what lets Portfolio reuse it in P4.
 """
 
+import functools
 import logging
 
 import numpy as np
 import pandas as pd
 
-from .constants import Validation
+from . import constants
+from .constants import Validation, ValidationWarning, validation_warning_suppressed, warn_once
 from .config import get_settings
 from .moments import MomentAggregator, _noise_aware_rel_error, skewness_is_testable
 
@@ -997,6 +999,58 @@ def validation_description(obj):
                               subject=_infeasible_subject(obj),
                               view=getattr(obj, '_view_reading', None),
                               undefined=getattr(obj, '_undefined_moments', None))
+
+
+def warn_if_invalid(obj):
+    """Report a build whose verdict fails, with one :class:`~aggregate.constants.ValidationWarning`.
+
+    Parameters
+    ----------
+    obj : Aggregate, Portfolio or AggregateCHF
+        An updated object.
+
+    Notes
+    -----
+    Computing the verdict reads ``stats_df`` and a few grid sums, with no FFT, and
+    takes about a millisecond against 30 for the update at ``log2`` 16. It is not left
+    cached: ``validation_eps`` is a plain attribute a reader may set after a build and
+    before first reading ``valid``, which has always applied, so the cache stays empty
+    as a lazy verdict would leave it.
+    """
+    if constants._VALIDATION_WARNING_SUPPRESSED:
+        return
+    rv = obj.valid
+    if not rv.passes:
+        warn_once(f'{obj.name}: {obj.validation_description}. See validation_explanation.',
+                  ValidationWarning, key=('validation', obj.name, str(rv & ~Validation.INFEASIBLE)),
+                  stacklevel=3)
+    obj._valid = None
+    for a in getattr(obj, 'agg_list', ()):
+        a._valid = None
+
+
+def verdict_reported_after(fn):
+    """Decorate a function that moves an object's grid, so that only the final grid is reported.
+
+    ``sharpen`` updates the object many times on the way to one grid, and the verdict
+    of a cell it rejects is not the reader's concern.
+
+    Parameters
+    ----------
+    fn : callable
+        Takes the object first.
+
+    Returns
+    -------
+    callable
+    """
+    @functools.wraps(fn)
+    def wrapper(obj, *args, **kwargs):
+        with validation_warning_suppressed():
+            out = fn(obj, *args, **kwargs)
+        warn_if_invalid(obj)
+        return out
+    return wrapper
 
 
 def validation_opening(short, eps, components='severity and for the aggregate'):

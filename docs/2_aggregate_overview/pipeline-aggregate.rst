@@ -208,6 +208,8 @@ The ``valid`` property returns a :class:`Validation` flag. It short-circuits to 
 * flags ``INFEASIBLE`` when the severity cannot be reproduced on the grid at **any** bucket size, the reading described in :ref:`bs feasibility`. This one is a new validation *type* rather than a failure: it is a statement about the grid, so it fires whether or not the moments happen to fail, it leads the explanation the way ``DEFECTIVE`` does because it explains the moment flags underneath it, and it is transparent to ``Validation.passes``. An infeasible object whose moments fail still fails; one whose moments hold still passes, carrying the reading;
 * on a reinsured object, marks ``REINSURANCE``, having run the tests above on the subject (gross) moments, and then compares the reported net or ceded view with the exact image of the subject on its grid, at the same thresholds. A failure sets the moment flags together with ``VIEW``, and the verdict reports the two apart: ``reinsurance; subject not unreasonable; net fails sev cv, agg cv``. This catches a cession rebucketed off its lattice, which keeps the right mean and has the wrong distribution. A book's total is compared with the sum of its units' cumulants. ``REINSURANCE`` is transparent to ``Validation.passes``, so a failing subject or view fails.
 
+When ``Validation.passes`` is false a build emits one :class:`~aggregate.constants.ValidationWarning` with the verdict.
+
 A pass means "not unreasonable", a failure to reject the null, rather than "correct". Type-1 error, rejecting a good model, is preferred to type-2.
 
 :meth:`sharpen`, described in :ref:`bs sharpen`, turns the same six error terms into a score and probes neighboring grids with it.

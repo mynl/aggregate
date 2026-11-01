@@ -24,7 +24,8 @@ from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .characteristic_function import AggregateCHF
 from .spectral import Distortion
-from .constants import IgnoredDecLClauseWarning, ZeroPremiumCessionWarning
+from .constants import (IgnoredDecLClauseWarning, ZeroPremiumCessionWarning,
+                        validation_warning_suppressed)
 from .contract_terms import _annual_terms_label
 from . import _loss_table
 from .parser import (UnderwritingLexer, UnderwritingParser, INHERIT_PREMIUM,
@@ -2212,20 +2213,23 @@ class Underwriter(HelpMixin):
             kw = {}
             log2, bs, bucket_sizing_p, kw = _resolve_hints(
                 rec.spec, 0, 0, BUCKET_SIZING_P, kw)
-            if isinstance(inner, Portfolio):
-                inner.update(log2=int(log2), bs=bs,
-                             bucket_sizing_p=bucket_sizing_p,
-                             remove_fuzz=True, force_severity=True,
-                             debug=self.debug, **kw)
-            elif isinstance(inner, AggregateCHF):
-                # a chfagg sizes its own window; tilt and the rest of its
-                # hints pass through ([Characteristic-Function-Severity])
-                inner.update(log2=int(log2), bs=bs,
-                             bucket_sizing_p=bucket_sizing_p, **kw)
-            else:
-                inner.update(log2=int(log2), bs=bs,
-                             bucket_sizing_p=bucket_sizing_p,
-                             force_severity=True, debug=self.debug, **kw)
+            # the inner object is a means to the outer severity: the outer
+            # object's verdict is the one a reader sees
+            with validation_warning_suppressed():
+                if isinstance(inner, Portfolio):
+                    inner.update(log2=int(log2), bs=bs,
+                                 bucket_sizing_p=bucket_sizing_p,
+                                 remove_fuzz=True, force_severity=True,
+                                 debug=self.debug, **kw)
+                elif isinstance(inner, AggregateCHF):
+                    # a chfagg sizes its own window; tilt and the rest of its
+                    # hints pass through ([Characteristic-Function-Severity])
+                    inner.update(log2=int(log2), bs=bs,
+                                 bucket_sizing_p=bucket_sizing_p, **kw)
+                else:
+                    inner.update(log2=int(log2), bs=bs,
+                                 bucket_sizing_p=bucket_sizing_p,
+                                 force_severity=True, debug=self.debug, **kw)
         finally:
             self._sev_ref_stack.pop()
 

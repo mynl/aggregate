@@ -55,6 +55,7 @@ from ._help import HelpMixin
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
 from .config import get_settings
+from . import _validation
 from .constants import INFO_NA, info_row
 from .moments import _noise_aware_rel_error, _snap_noise
 from .stable import Stable
@@ -2375,6 +2376,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         self._valid = None
         self._deficit = np.nan
         self._write_empirical_moments()
+        _validation.warn_if_invalid(self)
 
     @property
     def outside_mass(self):
@@ -3490,6 +3492,7 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
         row.update({k: terms[k] for k in _SHARPEN_INVERSION_TERMS})
         return row
 
+    @_validation.verdict_reported_after
     def sharpen(self, bs=None, log2=None, *, log2_cap=20, bs_limit=16, power=2,
                 good_enough=0.5, execute=True):
         r"""Audit the grid and move toward :meth:`recommended_grid`, ``Aggregate.sharpen``'s analog.

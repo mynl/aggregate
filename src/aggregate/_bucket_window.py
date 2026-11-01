@@ -2531,6 +2531,7 @@ def _pick_cell(df):
     return near.sort_values(['log2', '_move', 'score']).index[0]
 
 
+@_validation.verdict_reported_after
 def sharpen(ob, bs=None, log2=None, *, log2_cap=20, bs_limit=SHARPEN_BS_LIMIT,
             power=2, good_enough=0.5, execute=True):
     """Probe the grid neighborhood and move to a better ``(bs, log2)``.

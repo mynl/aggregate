@@ -1747,7 +1747,11 @@ class AggregateNTT(Aggregate):
                 f"available, estimated exact-numerator memory "
                 f"{sizes['bytes_estimate']:,} bytes (cap {NTT_MAX_BYTES:,}). "
                 f"Pass ntt_override=True to proceed anyway.")
-        rv = super().update(log2=log2, bs=1, **kwargs)
+        # The float pipeline's verdict is not this object's: the exact moments
+        # replace its analytic baseline below, and the verdict is reported after.
+        from .constants import validation_warning_suppressed
+        with validation_warning_suppressed():
+            rv = super().update(log2=log2, bs=1, **kwargs)
         if self.bs != 1 or len(self.xs) < sizes['support'] + 1:
             raise ValueError(
                 f'{self.name}: the float pipeline left the exact lattice '
@@ -1763,6 +1767,8 @@ class AggregateNTT(Aggregate):
         self._accuracy_df = None
         self._p_exact_series = None
         self._attach_exact_moments()
+        from . import _validation
+        _validation.warn_if_invalid(self)
         return rv
 
     def _attach_exact_moments(self):

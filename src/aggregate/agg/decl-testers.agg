@@ -1187,6 +1187,12 @@ agg DP.Discrete dfreq [1 2 3] dsev [10 20 30] occurrence net of 15 xs 5
 # blind. See dev/done/plan-warning-policy.md.
 agg WP.Defective 1 claim sev 0.5 * lomax 1.5 fixed                                                                note{unlimited infinite-variance Lomax: a material pmf deficit at any affordable grid};
 agg WP.Clean 100 claims sev lognorm 100 cv 2 poisson                                                              note{immaterial deficit: the floor exists so this one says nothing};
+# The verdict warning: each fails at the coarse grid its test pins, and builds clean here.
+agg WP.Layered 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed                                                   note{bs 1000 fails sev mean, agg mean, and warns once};
+port WP.Book agg WP.BookA 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed agg WP.BookB 3 claims 1500 xs 250 dsev [1000 3000] fixed;
+chfagg WP.Wrap stable 1.5 1 hints{tilt=False}                                                                      note{an untilted heavy tail wraps, and warns};
+agg WP.Inner 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed hints{bs=1000; log2=8}                               note{a failing inner object of a reference severity stays quiet};
+agg WP.Thick 1 claim sev lognorm 100 cv 8 fixed hints{bs=64; log2=10}                                              note{a grid sharpen cannot cure, reported after the probe};
 port WP.Port agg WP.PA 50 claims sev lognorm 100 cv 2 poisson agg WP.PB 20 claims sev lognorm 200 cv 1 poisson;
 agg WP.Tower as "US Hurricane Reinsurance" 1.74 claims sev lognorm 8.501 cv 14.624 splice [0 500] poisson    note{probe fixture: warn_once_isolated keeps every cell's warning countable}
 

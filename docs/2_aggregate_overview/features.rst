@@ -2349,6 +2349,12 @@ The package no longer runs ``warnings.simplefilter('ignore')`` at import. Muting
 is an explicit opt-in: ``from aggregate import silence_warnings;
 silence_warnings()``, now with optional ``category=`` and ``message=`` scoping.
 
+A build whose verdict fails says so, with one ``ValidationWarning`` carrying the
+verdict (1.58.0). It is keyed on the object's name and flags, so a sweep of one
+failing program reports once, and a Portfolio reports once for itself and its
+units. A build the library makes on the way to something else, such as a cell of
+a ``sharpen`` probe or the inner object of ``sev agg.NAME``, reports nothing.
+
 Underwriter and persistence
 ---------------------------
 

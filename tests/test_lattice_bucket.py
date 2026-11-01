@@ -20,7 +20,7 @@ import pytest
 
 from aggregate import build
 from aggregate._bucket_window import _bucket_is_exact
-from aggregate.constants import LatticeGridWarning, Validation, reset_warn_once
+from aggregate.constants import LatticeGridWarning, Validation, ValidationWarning, reset_warn_once
 from aggregate.utilities import (LATTICE_DEPTH, LATTICE_RTOL,
                                  _dyadic_lattice_step, _lattice_candidates,
                                  silence_warnings)
@@ -166,9 +166,12 @@ def test_nice_divisor_is_noted():
 def test_pinned_bs_off_the_lattice_is_noted_not_warned():
     with warnings.catch_warnings():
         warnings.simplefilter('error')
+        # no lattice warning for a pin; the wrong law it gives fails the verdict
+        warnings.simplefilter('ignore', ValidationWarning)
         a = build('agg FLB.Pin 3 claims dsev [0.75 1.5 2.25] [.25 .5 .25] fixed',
                   bs=0.5)
     assert a.bs == 0.5
+    assert not a.valid.passes
     assert 'pinned bs 1/2 misses the lattice 0.75' in \
         a.bs_window_df.loc['exact_discrete', 'note']
 

@@ -353,3 +353,78 @@ The floor moves no grid: 1,690 programs built with the floor off and on have the
 Three sweep programs at a CV near 1e-5, such as `1000 claims dsev [10002 10007] [2/3 1/3] fixed`, move in
 realized CV by up to 5e-5 relative, probably because the window origin reads the analytic skewness and the
 rounding of the FFT changes with it, which I did not confirm.
+
+### `[Validation-Warning]`, 1.58.0
+
+`agg L 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed` at a pinned `bs` 1000 emits exactly one
+`ValidationWarning`, `L: fails sev mean, agg mean. See validation_explanation.`, and a second build in
+the session emits none. `test_approximate`, `test_ntt`, `test_prob_loss_assets`, `test_stable` and
+`test_unit_density` pass unchanged. The verdict costs 0.3 ms on a plain Aggregate, 0.9 ms on a reinsured
+one and 1.2 ms on a two-unit book, against 30 to 40 ms for the update at `log2` 16, and it runs no FFT.
+
+**The plan expected the number of warning entries to be small. It is not: 56 of 338.** 35 of 203 in
+`library.agg` and 21 of 135 in `reproductions.agg`, each one warning for one build. Every one is a real
+failure that was silent before, nearly all thick or infinite-variance laws at published parameters, so
+the bar stays where it is. Building the library or the reproductions, or a docs page that does, now
+shows these. Listed by verdict:
+
+- `library`, thick laws, `fails sev mean, agg mean` and the higher moments: `CurveLomax`, `CurveGPD`,
+  `RawLognorm`, `SevOneParameterScaled`, `HeavyTailValidation`, `InverseGaussianMixed`, `BodoffFour`,
+  `PropertyCasualty`.
+- `library`, `fails sev cv, agg cv`: `CurveBurrIII`, `CurveFrechet`, `CurveLogLogistic`,
+  `ThickThinPortfolio`.
+- `library`, `fails sev skew, agg skew` or one of them: `CurveBetaPrime`, `CurveBurr12`,
+  `CurveInverseGamma`, `PIRCatNonCatGross`, `SignedPremiumMinusLoss`, `WindowedContinuous` (`sev cv`).
+- `library`, `grid infeasible for this severity`: `CurvePareto`, `GrossCatXOL`, `ThickThickPortfolio`.
+- `library`, `fails pmf deficit`: `DelaporteMixedFrequency`.
+- `library`, picks that leave the declared moments by design: `LayerPicks.Uniform`, `LayerPicks.Compare`,
+  `Capstone.SelectedLosses`, and under a cession `LayerPicks.Lognorm.Experience`, `CommAuto.WithPicks`,
+  `Capstone.XOL`, `Capstone.XOL.PnL`, `Capstone.LossPicksTest`, `Capstone.FullProgram`, `Capstone.PnL`,
+  `Capstone.Capped`.
+- `library`, a failing subject under a cession: `CommAuto.Exposure`, and `USXOLTower`, whose net view
+  fails too.
+- `reproductions`, `fails sev mean, agg mean`: `Kang2019.Pareto`, `Liu2026.T.v2`, `Liu2026.T.v3`,
+  `Liu2026.T.v4`, `Liu2026.Paretos`, `Mack2003.S.v6`, `Pittarello2024.PLM.Table1`, `Denuit2025.K.v2`,
+  `Schaller2008.SchallerTemnov` (with a deficit of 5.6e-2).
+- `reproductions`, `grid infeasible for this severity`: `Mack2003.Lognorm`, `Mack2003.S.v9`,
+  `Mata2005.Lognorm`, `Mata2005.M.v3`, `Mata2005.M.v4`.
+- `reproductions`, `fails sev cv, agg cv`: `Liu2026.T`, `Liu2026.P`, `Denuit2025.K`, `Denuit2025.K.v3`.
+- `reproductions`, on skewness: `Bruno2006.B7`, `Embrechts2009a.EF1`.
+- `reproductions`, a failing subject under a cession: `Wang2000.Wang.Layers`, a mean error of 1.2e-4.
+
+Divergences:
+
+- **`validation_warning_suppressed`, a new context manager, where the plan wraps probes in
+  `warn_once_isolated`.** That one makes every call warn, so it cannot silence anything. The suppressor
+  also skips computing the verdict. sharpen's counting probe keeps `warn_once_isolated` for its other
+  warnings, and `sharpen_df['warns']` does not list this class.
+- **A Portfolio warns once, and its units stay quiet.** The plan's placement gives one warning per
+  failing unit and one for the book, six on `Liu2026.P`, against its goal of one warning for a build. A
+  unit's flags are already in the book's verdict. The message therefore does not name the failing unit,
+  and `validation_df` does.
+- **`sharpen` reports once, after the probe,** through the decorator `verdict_reported_after`, and
+  `update(sharpen=True)` is quiet until then, so a first grid that sharpen cures does not warn.
+- **The verdict is not left cached by the warning.** `validation_eps` is a plain attribute, and
+  setting it after a build and before reading `valid` has always applied, so `warn_if_invalid` clears
+  the cache. A build pays for the verdict once more on first read.
+- **`AggregateNTT.update` reports after `_attach_exact_moments`,** because that step rebases `mixed` and
+  the verdict computed before it is the float one. The plan's placement at the end of `update_work`
+  would have reported that one.
+- **Two more internal builders are quiet,** which the plan's list omits: `Aggregate`'s bucket analysis
+  loop and the four `Tweedie` laws. `port_best_window` needed nothing, since its first pass only sizes.
+  The checklist in "the report of 2026-10-31" is not in the repository, so these come from a run of the
+  whole suite with this class as an error.
+- **Three tests change, where the plan says they pass unchanged:** `test_conditioning_a_genuine_zero_atom_is_silent`,
+  `test_conditioning_a_zero_truncated_reference_warns` and `test_pinned_bs_off_the_lattice_is_noted_not_warned`.
+  Each uses a blanket `simplefilter('error')` to show that a different warning stays silent, on a build
+  whose verdict really fails: `AAS.CondOk` has a severity mean 6.6e-4 out at the outer `bs` 2, and
+  `FLB.Pin` is pinned off its lattice. The plan also requires a pinned `bs` to warn, so these cannot pass
+  unchanged. Each now ignores this class and keeps testing what it was written for.
+- **`pedagogy.py` is left alone.** Its figure builds did not warn in the suite, and a reader who calls one
+  may want to know.
+- **`dev/TODO.md` has no entry to tick.** `[Validation-Verdict]` was not tracked there; only
+  `[CHF-Tail-Completion]` was, reworded at 1.55.0.
+
+Left for the author: the API change above. The eight exact laws that still read a failing verdict, four of
+them `100 claims dsev [1000 1001 1002] ... occurrence net of 500 xs 0 fixed`, now warn about a subject
+the grid does not hold while the reported net is exact.

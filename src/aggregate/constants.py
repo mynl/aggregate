@@ -38,8 +38,9 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'ZeroModifiedExposureWarning',
            'ZeroPremiumCessionWarning',
            'CoarseJointGridWarning', 'DegenerateEvaluationWarning',
-           'ReflectedSeverityClampWarning',
+           'ReflectedSeverityClampWarning', 'ValidationWarning',
            'warn_once', 'reset_warn_once', 'warn_once_isolated',
+           'validation_warning_suppressed',
            'REINS_LABEL_GROSS', 'REINS_LABEL_SUBJECT', 'REINS_LABEL_NET',
            'REINS_LABEL_CEDED', 'REINS_LABEL_OUTPUT',
            'INFO_LABEL_WIDTH', 'INFO_NA', 'info_row',
@@ -354,6 +355,31 @@ class LatticeGridWarning(UserWarning):
     """
 
 
+class ValidationWarning(UserWarning):
+    """Emitted when a build's verdict fails: :attr:`Validation.passes` is false.
+
+    The verdict is otherwise something a reader has to ask for, and a build that
+    fails it is silent at every logging level. The text is the verdict,
+    ``validation_description``, and ``validation_explanation`` gives the reasons.
+
+    Reported through :func:`warn_once`, keyed on the object's name and its flags
+    without :attr:`Validation.INFEASIBLE`, so a sweep of one failing program reports
+    once and a different failure of the same name reports again. An object that only
+    reads ``INFEASIBLE`` passes, and :class:`InfeasibleGridWarning` or
+    :class:`LatticeGridWarning` reports it. One build reports once: a Portfolio's
+    verdict holds its units' flags, so its units stay quiet. A build inside the
+    library (a grid probe, the marginal of a bivariate, the inner object of an
+    aggregate used as a severity) runs under :func:`validation_warning_suppressed`
+    and reports nothing.
+
+    Silence with ``silence_warnings(ValidationWarning)``; re-arm with
+    :func:`reset_warn_once`. See ``dev/done/plan-validation-verdict.md``.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
 class IgnoredDecLClauseWarning(UserWarning):
     """Emitted when a DecL declaration ignores clauses it cannot use.
 
@@ -542,6 +568,10 @@ _WARNED_ONCE = set()
 #: bypass the registry entirely.
 _WARN_ONCE_ISOLATION = 0
 
+#: Depth of nested ``validation_warning_suppressed`` scopes. Non-zero means the
+#: object being built is the library's own, and its verdict is not reported.
+_VALIDATION_WARNING_SUPPRESSED = 0
+
 #: Appended to the one emission, so the reader knows the silence downstream is
 #: policy rather than absence. One sentence on the message line, no block.
 _WARN_ONCE_SUFFIX = (' Further occurrences this session are suppressed; each '
@@ -606,6 +636,29 @@ def reset_warn_once():
     condition would silence ``pytest.warns`` in all the others).
     """
     _WARNED_ONCE.clear()
+
+
+@contextmanager
+def validation_warning_suppressed():
+    """Build objects that belong to the library without reporting their verdicts.
+
+    :class:`ValidationWarning` is for whoever built the object, so a build made on
+    the way to something else stays quiet: a cell of a grid probe, a sizing marginal,
+    a unit of a Portfolio, the inner object of an aggregate used as a severity. The
+    verdict itself is still computed on request, and any other warning is unaffected.
+
+    Notes
+    -----
+    :func:`warn_once_isolated` is not a substitute. It makes every call warn, and
+    filtering that with ``warnings.catch_warnings`` would still pay for a verdict the
+    probe never reads. Here the verdict is not computed at all.
+    """
+    global _VALIDATION_WARNING_SUPPRESSED
+    _VALIDATION_WARNING_SUPPRESSED += 1
+    try:
+        yield
+    finally:
+        _VALIDATION_WARNING_SUPPRESSED -= 1
 
 
 @contextmanager

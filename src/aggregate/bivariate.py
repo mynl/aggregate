@@ -60,7 +60,7 @@ import scipy.sparse as ssp
 from ._help import HelpMixin
 from ._labeled import LabeledMixin
 from ._program import ProgramMixin
-from .constants import (DefectiveDistributionWarning, info_row, INFO_NA,
+from .constants import (validation_warning_suppressed, DefectiveDistributionWarning, info_row, INFO_NA,
                         warn_once)
 from .config import get_settings
 from ._validation import DEFICIT_MATERIALITY
@@ -1653,7 +1653,8 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
         just the empirical case fixed at 1.0.0a355.
         """
         a = self._standalone_marginal(i)
-        a.update(log2=log2)
+        with validation_warning_suppressed():
+            a.update(log2=log2)
         ser = a.density_df.query('p_total > 0').p_total
         reflect, shift = self._affine[i]
         if a.x_min < 0 and not (reflect or shift):
@@ -1662,7 +1663,8 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             margin = 0.5 * (mhi - mlo)        # slack on both sides
             lo_box, hi_box = mlo - margin, mhi + margin
             bs0 = float(round_bucket((hi_box - lo_box) / (1 << log2)))
-            a.update(log2=log2, bs=bs0, x_min=float(np.floor(lo_box / bs0) * bs0))
+            with validation_warning_suppressed():
+                a.update(log2=log2, bs=bs0, x_min=float(np.floor(lo_box / bs0) * bs0))
             ser = a.density_df.query('p_total > 0').p_total
         measured = float((ser.index.values * ser.values).sum())
         mean_t, sd_t, _ = self._marginal_moments(i)
@@ -1963,7 +1965,8 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
             # negative buckets). The output window is measured separately from
             # the marginal -- the severity's negative reach (i0) and the output
             # origin (j0) are independent, exactly as in the 1-D _fft_aggregate.
-            a.update(log2=log2s[i], bs=bss[i])
+            with validation_warning_suppressed():
+                a.update(log2=log2s[i], bs=bss[i])
             self.bs[i] = float(bss[i])
             self._gs.append(np.asarray(a.agg_density, dtype=float).copy())
             self._i0.append(int(round(-a.x_min / a.bs)) if a.x_min else 0)
@@ -2056,7 +2059,8 @@ class BivariateAggregate(HelpMixin, LabeledMixin, ProgramMixin):
                 kw['log2'] = int(log2)
             if bs:
                 kw['bs'] = bs
-            a.update(**kw)
+            with validation_warning_suppressed():
+                a.update(**kw)
         nc = self._netceded_sizing_kwargs(log2, bs)
         # a netceded joint refuses an unhonorable pin rather than clipping one
         self._clipped = False

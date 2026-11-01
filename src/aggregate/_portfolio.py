@@ -11,7 +11,7 @@ import warnings
 from ._help import HelpMixin
 from .constants import (DefectiveDistributionWarning,
                         FIG_H, FIG_W, INFO_NA, info_row,
-                        warn_once,
+                        validation_warning_suppressed, warn_once,
                         REINS_LABEL_OUTPUT)
 from .config import get_settings
 from .distributions import (Aggregate, Severity, WINDOW_NINES, BUCKET_SIZING_P,
@@ -2859,11 +2859,13 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             ft_all = None
             x_mins = []
             for agg in self.agg_list:
-                agg.update(log2=log2, bs=self.bs, padding=self.padding,
-                           sev_calc=sev_calc,
-                           discretization_calc=discretization_calc,
-                           normalize=normalize, force_severity=force_severity,
-                           x_min='auto', bucket_sizing_p=bucket_sizing_p, debug=debug)
+                # a unit's verdict folds into the book's, reported once below
+                with validation_warning_suppressed():
+                    agg.update(log2=log2, bs=self.bs, padding=self.padding,
+                               sev_calc=sev_calc,
+                               discretization_calc=discretization_calc,
+                               normalize=normalize, force_severity=force_severity,
+                               x_min='auto', bucket_sizing_p=bucket_sizing_p, debug=debug)
                 # de-fuzz the native pmf when requested — same convention
                 # as the de-fuzzed density_df the kappa numerator used to
                 # read (the first-moment weighting amplifies far-tail dust)
@@ -2912,8 +2914,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             self.density_df['loss'] = xs
             ft_all = None
             for agg in self.agg_list:
-                agg.update_work(xs, self.padding, sev_calc, discretization_calc,
-                                normalize, force_severity, debug=debug)
+                # a unit's verdict folds into the book's, reported once below
+                with validation_warning_suppressed():
+                    agg.update_work(xs, self.padding, sev_calc, discretization_calc,
+                                    normalize, force_severity, debug=debug)
                 # de-fuzz as for the signed path above (legacy parity: the
                 # kappa numerator read the de-fuzzed p_{unit} columns)
                 p_unit = (remove_fuzz_util(agg.agg_density)
@@ -3005,6 +3009,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             # Opt-in only. ``sharpen``'s own probe updates pass sharpen=False,
             # so there is no recursion.
             self.sharpen()
+        else:
+            _validation.warn_if_invalid(self)
 
     def _build_stats_df(self, ma, max_limit):
         """Construct ``stats_df`` from the ``MomentAggregator`` after init.

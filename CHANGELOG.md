@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.58.0 - 2026-11-01
+
+**[Validation-Warning] A build whose verdict fails emits one `ValidationWarning` with the verdict.** New `constants.ValidationWarning` and `constants.validation_warning_suppressed`; silence it with `silence_warnings(ValidationWarning)`. `agg L 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed` at `bs` 1000 now warns `L: fails sev mean, agg mean`, once per session for a name and its flags. A Portfolio warns once for itself and its units, and `sharpen` once for the grid it settles on. Code that treats any warning as an error will see this one: 56 of the 338 entries in `library.agg` and `reproductions.agg` earn it, all failures that were silent before. No number moves. The verdict costs about 1 ms an update, with no FFT.
+
 ## 1.57.0 - 2026-11-01
 
 **[Verdict-Moment-Floors] A skewness of rounding is not failed, and an analytic moment the library could not compute is reported.** New `moments.third_central_moment` and `moments.skewness_is_testable`, and new flag `Validation.ANALYTIC_UNDEFINED`, read as `analytic cv, skew undefined; not unreasonable` with `passes` false. Numbers move only where the third central moment is within 1e-15 of the terms subtracted, where it is now 0: `1000 claims dsev [999 1000 1001] fixed` had a skewness of 0.015 and `100 * gamma 2 + 100000000` one of 94.9, and no grid moves on 1,690 programs. Below 1e-12 the skewness stays reported and is not tested, so `1 claims dsev [115 120 125] fixed` and `DISC.RoundedProbs` read `not unreasonable`, and `WindowedSimple` leaves the known failures. A `nan` from a zero mean, a zero variance or an infinite moment is not flagged.

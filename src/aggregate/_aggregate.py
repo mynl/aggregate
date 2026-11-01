@@ -35,7 +35,7 @@ from .moments import (MomentAggregator, MomentWrangler,
                       xsden_to_meancv, xsden_to_meancvskew,
                       _noise_aware_rel_error, _snap_noise)
 from .utilities import (ft, ift, below_grid_fill,
-                        round_bucket, _dyadic_lattice_step,
+                        round_bucket, _dyadic_lattice_step, LATTICE_DEPTH,
                         balanced_window,
                         agg_help, remove_fuzz, noise_floor, value_type_role)
 from ._grid_distribution import GridDistribution, return_period_map, period_to_p
@@ -3021,6 +3021,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         self._bs_clip = None        # structured far-tail clip report (item 6) or None
         self._bs_snap = None        # reference-lattice bs snap report, or None
         self._bs_feasibility = None  # severity-vs-grid feasibility reading, or None
+        self._lattice_feasibility = None  # lattice-vs-log2 reading, or None
         self._bs_raw = None         # pre-dyadic-round bs (unset for the multi-method agg sizer)
         # F1 opt-in: when True the severity keeps its negative support (the
         # layering clamp ``x<0 -> 0`` is bypassed). Default False preserves the
@@ -7475,7 +7476,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         def _allint(x):
             return bool(np.allclose(x, np.round(x), atol=1e-9))
 
-        fit = _dyadic_lattice_step(self._severity_views())
+        fit = _dyadic_lattice_step(
+            self._severity_views(),
+            depth=LATTICE_DEPTH if log2 is None else max(LATTICE_DEPTH, log2))
         if not (_allint(n_atoms) and fit is not None):
             return None
         h = fit[0]

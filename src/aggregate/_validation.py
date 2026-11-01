@@ -333,6 +333,11 @@ def valid_aggregate(agg):
                     agg._bs_feasibility['log2_required'],
                     agg._bs_feasibility['log2'])
         rv |= Validation.INFEASIBLE
+    if getattr(agg, '_lattice_feasibility', None) is not None:
+        logger.info('READING: lattice needs log2 %d, %d given',
+                    agg._lattice_feasibility['log2_required'],
+                    agg._lattice_feasibility['log2'])
+        rv |= Validation.INFEASIBLE
 
     # Reinsurance: the realised (after-reins) object has no independent
     # theoretical, so its sev/agg moments cannot be validated. The
@@ -403,6 +408,10 @@ def valid_portfolio(port):
     if defective:
         logger.info('FAIL: Portfolio pmf deficit %.3e > materiality',
                     port._deficit)
+    # The units' readings fold in through ``rv |= r`` below; this is the book's
+    # own, on the shared grid.
+    if getattr(port, '_lattice_feasibility', None) is not None:
+        defective |= Validation.INFEASIBLE
 
     for a in port.agg_list:
         r = a.valid
@@ -688,6 +697,19 @@ def validation_score(obj, power=2):
     return combine_score_terms(validation_score_terms(obj), power)
 
 
+def _infeasible_subject(obj):
+    """What an infeasible grid cannot reproduce, for the verdict's prefix.
+
+    ``'severity'`` for a thick law, and for a lattice book the lattice with the
+    ``log2`` and bucket that would hold it, which is the number the reader needs.
+    """
+    f = getattr(obj, '_lattice_feasibility', None)
+    if f is None:
+        return 'severity'
+    from ._bucket_window import _fmt_bs
+    return f'lattice (needs log2 {f["log2_required"]} at bs {_fmt_bs(f["h"])})'
+
+
 def validation_description(obj):
     """Short one-line validation verdict (str).
 
@@ -707,7 +729,8 @@ def validation_description(obj):
     """
     # ``obj.valid`` first: it is what records ``_deficit``.
     rv = obj.valid
-    return explain_validation(rv, getattr(obj, '_deficit', None))
+    return explain_validation(rv, getattr(obj, '_deficit', None),
+                              subject=_infeasible_subject(obj))
 
 
 def validation_opening(short, eps, components='severity and for the aggregate'):
@@ -753,13 +776,17 @@ def validation_explanation(obj):
     and the reinsurance caveat where they apply.
     """
     rv = obj.valid
-    short = explain_validation(rv, getattr(obj, '_deficit', None))
+    short = explain_validation(rv, getattr(obj, '_deficit', None),
+                               subject=_infeasible_subject(obj))
     if rv & Validation.NOT_UPDATED:
         return ('Not validated: the object has not been updated, so there is no '
                 'realized grid to compare the analytic moments against. Call '
                 'update() (or build with update=True).')
     out = validation_opening(short, getattr(obj, 'validation_eps', None))
-    if rv & Validation.INFEASIBLE:
+    if getattr(obj, '_lattice_feasibility', None) is not None:
+        from ._bucket_window import lattice_explain
+        out.append(lattice_explain(obj._lattice_feasibility))
+    elif rv & Validation.INFEASIBLE:
         f = getattr(obj, '_bs_feasibility', None) or {}
         lost = f.get('lost_at_zero', np.nan)
         lost_txt = (f' {100 * lost:.4g}% of its mean is supplied below the '

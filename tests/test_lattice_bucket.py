@@ -20,8 +20,10 @@ import pytest
 
 from aggregate import build
 from aggregate._bucket_window import _bucket_is_exact
+from aggregate.constants import LatticeGridWarning, Validation, reset_warn_once
 from aggregate.utilities import (LATTICE_DEPTH, LATTICE_RTOL,
-                                 _dyadic_lattice_step, _lattice_candidates)
+                                 _dyadic_lattice_step, _lattice_candidates,
+                                 silence_warnings)
 
 
 # ---------------------------------------------------------------- the routine
@@ -279,6 +281,159 @@ def test_a_portfolio_pools_its_units_views():
     p = build('port LV.Port agg LV.U1 1 claim dsev [1000 2000] occurrence net of 1000 xs 250 fixed '
               'agg LV.U2 1 claim dsev [1000 2000] fixed')
     assert _bucket_is_exact(p, 250) == (True, 250.0)
+
+
+# ------------------- [Lattice-Infeasible-Warning]: a lattice the cap cannot hold
+
+AWK = 'agg LW.AWK dfreq [1:100] dsev [1000 1001]'
+
+
+def _lattice_warnings(build_call):
+    """The object a call builds, and the ``LatticeGridWarning`` texts it raised."""
+    with warnings.catch_warnings(record=True) as rec:
+        warnings.simplefilter('always')
+        ob = build_call()
+    return ob, [str(w.message) for w in rec if issubclass(w.category, LatticeGridWarning)]
+
+
+def test_infeasible_builds_warns_and_says_so_in_the_verdict():
+    a, texts = _lattice_warnings(lambda: build(AWK))
+    assert (a.bs, a.log2) == (2, 16)
+    assert a._lattice_feasibility == dict(h=1.0, bs=2.0, log2=16, log2_required=17)
+    assert len(texts) == 1
+    assert ('LW.AWK: the severity atoms are on the lattice of step 1 and the grid '
+            'needs log2 >= 17 at bs 1; log2 16 was given, so bs 2 is used and the '
+            'atoms do not sit on the grid. Pass build(..., log2=17) or add '
+            'hints{log2=17} to the declaration.') in texts[0]
+    assert a.validation_description.startswith(
+        'grid infeasible for this lattice (needs log2 17 at bs 1); fails')
+    assert a.valid & Validation.INFEASIBLE
+
+
+@pytest.mark.parametrize('kw, program', [
+    (dict(log2=17), AWK),
+    (dict(), AWK + ' hints{log2=17}'),
+])
+def test_the_log2_the_warning_gives_builds_exactly(kw, program):
+    a, texts = _lattice_warnings(lambda: build(program, **kw))
+    assert (a.bs, a.log2) == (1, 17)
+    assert not texts
+    assert a._lattice_feasibility is None
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_the_reading_is_in_every_report():
+    a, _ = _lattice_warnings(lambda: build(AWK))
+    assert 'lattice 1 needs log2 17, log2 16 given, bs 2 off it' in a.bs_description
+    assert 'an exact grid exists, and it needs log2 17 at bs 1' in a.bs_explanation
+    assert 'an exact grid exists' in a.validation_explanation
+    assert 'too fine for the log2 cap (needs log2 17), bs 2 off it' in \
+        a.bs_window_df.loc['exact_discrete', 'note']
+
+
+def test_the_warning_is_once_per_name_step_and_log2():
+    _, first = _lattice_warnings(lambda: build(AWK))
+    _, again = _lattice_warnings(lambda: build(AWK))
+    _, other = _lattice_warnings(lambda: build(AWK, log2=15))
+    assert (len(first), len(again), len(other)) == (1, 0, 1)
+    reset_warn_once()
+    assert len(_lattice_warnings(lambda: build(AWK))[1]) == 1
+
+
+def test_the_warning_can_be_silenced():
+    with warnings.catch_warnings():
+        warnings.simplefilter('error', LatticeGridWarning)
+        silence_warnings(LatticeGridWarning)
+        a = build(AWK)
+    assert a.valid & Validation.INFEASIBLE
+
+
+def test_a_feasible_lattice_book_has_no_reading():
+    a, texts = _lattice_warnings(lambda: build('agg LW.Dice dfreq [3] dsev [1:6]'))
+    assert a._lattice_feasibility is None and not texts
+    assert not a.valid & Validation.INFEASIBLE
+
+
+def test_a_pinned_bucket_is_the_users_opt_out():
+    a, texts = _lattice_warnings(lambda: build(AWK, bs=2))
+    assert a._lattice_feasibility is None and not texts
+    assert 'grid infeasible' not in a.validation_description
+
+
+def test_an_update_to_a_pinned_bucket_clears_the_reading():
+    a, _ = _lattice_warnings(lambda: build(AWK))
+    a.update(log2=17, bs=1)
+    assert a._lattice_feasibility is None
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_a_continuous_severity_has_no_reading():
+    a, texts = _lattice_warnings(lambda: build('agg LW.Gamma 10 claims sev gamma 10 cv 1 poisson'))
+    assert a._lattice_feasibility is None and not texts
+
+
+def test_a_reference_severity_has_no_reading():
+    """Its atoms are a materialized law, and the snap keeps the grids commensurable."""
+    build('agg LW.Inner dfreq [1:10] dsev [1:10] hints{log2=10; bs=1}')
+    a, texts = _lattice_warnings(lambda: build('agg LW.Outer 100000 claims sev agg.LW.Inner poisson',
+                                               log2=10))
+    assert a.bs > 1
+    assert a._lattice_feasibility is None and not texts
+
+
+def test_the_depth_follows_a_cap_above_16():
+    """LATTICE_DEPTH alone refuses the step, and the cap can hold it."""
+    assert _dyadic_lattice_step([1, 200000]) is None
+    a = build('agg LW.Wide 1 claims dsev [1 200000] fixed', log2=18)
+    assert (a.bs, a.log2) == (1, 18)
+    assert a.validation_description == 'not unreasonable'
+
+
+def test_the_depth_does_not_fall_below_16_at_a_low_cap():
+    """At depth 10 this lattice is invisible: no exact grid and no warning."""
+    assert _dyadic_lattice_step([10002, 10007], depth=10) is None
+    a, texts = _lattice_warnings(lambda: build('agg LW.Low dfreq [1:100] dsev [10002 10007]',
+                                               log2=10))
+    assert a._lattice_feasibility['h'] == 1
+    assert len(texts) == 1
+
+
+def test_a_low_cap_names_the_window_when_that_needs_less():
+    """From 0 it needs log2 20. The window needs 14, for the claim of 10007."""
+    a, texts = _lattice_warnings(lambda: build('agg LW.Near 100 claims dsev [10002 10007] fixed',
+                                               log2=9))
+    assert a._lattice_feasibility['log2_required'] == 14
+    assert 'log2=14' in texts[0]
+    assert build('agg LW.Near 100 claims dsev [10002 10007] fixed', log2=14).bs == 1
+
+
+def test_a_one_unit_portfolio_warns_once_as_itself():
+    p, texts = _lattice_warnings(lambda: build(f'port LW.P1 {AWK}'))
+    assert (p.bs, p.log2) == (2, 16)
+    assert len(texts) == 1 and texts[0].startswith('LW.P1: ')
+    assert p._lattice_feasibility['log2_required'] == 17
+    assert p.validation_description.startswith('grid infeasible for this lattice')
+    assert p.agg_list[0]._lattice_feasibility is None
+
+
+def test_a_portfolio_of_several_units_warns_as_itself():
+    program = ('port LW.P2 agg LW.A 1 claims 1500 xs 0 dsev [500 1000 2000] fixed '
+               'agg LW.B dfreq [1:100] dsev [1000 1001]')
+    p, texts = _lattice_warnings(lambda: build(program))
+    assert len(texts) == 1 and texts[0].startswith('LW.P2: ')
+    assert p._lattice_feasibility['log2_required'] == 17
+    assert 'needs log2 17' in p.bs_window_df.loc['used', 'note']
+    assert 'lattice 1 needs log2 17' in p.bs_description
+    assert 'an exact grid exists' in p.bs_explanation
+    assert all(a._lattice_feasibility is None for a in p.agg_list)
+    exact, again = _lattice_warnings(lambda: build(program, log2=17))
+    assert exact.bs == 1 and not again
+    assert 'grid infeasible' not in exact.validation_description
+
+
+def test_a_pinned_portfolio_has_no_reading():
+    p, texts = _lattice_warnings(lambda: build(f'port LW.P3 {AWK}', bs=2))
+    assert p._lattice_feasibility is None and not texts
 
 
 # ------------------------------------------------------- sharpen and Portfolios

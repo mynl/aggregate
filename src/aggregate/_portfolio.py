@@ -323,6 +323,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         self._bs_clip = None            # portfolio far-tail clip record or None
         self._bs_raw = None             # pre-dyadic-round bs (auto-size only) or None
         self._bs_lattice = None         # pooled lattice pick (h, residual, bs) or None
+        self._lattice_feasibility = None  # lattice-vs-log2 reading, or None
         self._combine_x_min = None      # windowed combine origin (Plan B) or None
 
         # for consistency with Aggregates
@@ -918,6 +919,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             cm = clip.get('clipped_mass', float('nan'))
             cm_txt = f'~{cm:.3g}' if np.isfinite(cm) else 'a sliver'
             txt += f'; clips {cm_txt} of the tail (raise log2 to {int(clip["need_log2"])})'
+        txt += _bucket_window.lattice_describe(self._lattice_feasibility)
         return txt
 
     @property
@@ -993,6 +995,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                 f'{_bucket_window._fmt_bs(lat["bs"])}, the first of its lattice '
                 f'buckets whose grid fits log2 {log2}, and every atom lands on a '
                 'grid point.')
+        if self._lattice_feasibility is not None:
+            parts.append(_bucket_window.lattice_explain(self._lattice_feasibility))
 
         lo, hi = _as_float(tot['min']), _as_float(tot['max'])
         if tot['left_tail'] == 'bounded' and np.isfinite(lo):
@@ -2771,6 +2775,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         if log2 <= 0:
             raise ValueError('log2 must be >= 0')
         self.log2 = log2
+        self._lattice_feasibility = None   # set by best_window; a pinned bs skips it
         # Grid sizing routes through ``best_window`` (Portfolio MM bulk + SBJ
         # look-through). ``self._combine_x_min`` records the windowed origin for
         # a *non-signed* total whose mass clears 0 (Plan B): when set, ``update``
@@ -2801,6 +2806,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
                         f'+ SBJ look-through).')
         else:
             self.bs = bs
+        _bucket_window.warn_lattice_grid(self)
         self.padding = padding
         self.sev_calc = sev_calc
         self._remove_fuzz = remove_fuzz

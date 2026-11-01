@@ -512,3 +512,51 @@ Divergences:
   it. A book from 0 reaches `x_hi` already, and holding a continuous hull there would move
   continuous grids with no oracle to measure them, against the reasoning of ruling 8. A non-finite
   hull does not window. The signed span is untouched.
+
+### `[Lattice-Infeasible-Warning]`, 1.48.0
+
+Sweep: every infeasible program warned, nothing else moved.
+
+| Set | exact | exact, beyond spec | WRONG flagged | infeasible warned | no lattice |
+|:--|--:|--:|--:|--:|--:|
+| A fixed plain | 224 | 0 | 0 | 0 | 0 |
+| B dfreq plain | 185 | 0 | 0 | 7 | 0 |
+| C poisson plain | 104 | 0 | 0 | 8 | 0 |
+| D occurrence reins | 76 | 0 | 3 | 1 | 0 |
+| E aggregate reins | 56 | 0 | 2 | 0 | 2 |
+| F layered dsev | 50 | 0 | 0 | 0 | 0 |
+| G port one unit | 79 | 0 | 0 | 1 | 0 |
+| H port two units | 48 | 1 | 2 | 9 | 0 |
+| all | 822 | 1 | 7 | 26 | 2 |
+
+The plan's 27 is now 26 warned and 1 exact beyond the spec: one two-unit book the oracle calls
+infeasible at `log2` 16 builds exactly there, through the second attempt of the previous step. `AWK`
+builds with one warning containing `log2=17` and a verdict starting `grid infeasible for this
+lattice`; `build(..., log2=17)` and `hints{log2=17}` both return the exact law with no warning. `agg
+X 1 claims dsev [1 200000] fixed` at `log2` 18 finds the step 1. Census: of 709 programs no grid moved
+and the one verdict that changed is `PF.Top`, deliberately infeasible, so the shipped corpora raise
+no false alarm.
+
+Divergences:
+
+- **The depth is `max(LATTICE_DEPTH, log2)`,** per ruling 7, where the step gives `depth=log2`.
+- **`log2_required` is the smaller of the selected row's need and the windowed row's,** where the
+  step gives the selected row's. `100 claims dsev [10002 10007] fixed` at `log2` 9 selects a row from
+  0 that needs 20, while the window needs 14, which holds it exactly. The number is the one to pass,
+  so it should be the smallest that works.
+- **A reference severity has no reading,** which the step does not cover. `sev agg.NAME` materializes
+  a law into thousands of atoms on the inner bucket, and `snap_bs_to_reference` already keeps the
+  grids commensurable, so an outer grid off that lattice is the ordinary case and not a fault.
+- **The warning is emitted from `bs_window`, beside `warn_infeasible_grid`,** and from
+  `Portfolio.update` for a book. The phase 1 pass of `port_best_window` ignores the class and clears
+  each unit's reading, since those grids are speculative and the reading belongs to the shared grid.
+- **`validation_explanation` branches on the reading.** The step lists the prefix only; the long
+  form's paragraph tells the reader to add an occurrence limit, which is the wrong remedy here.
+- **`bucket-selection.rst` gains a paragraph,** keeping the page in step with the code. The docs were
+  not built.
+
+Residual, not fixed: a step finer than `2**-16` of the largest atom is not found at `log2` 16, so
+`agg X 1 claims dsev [1 200000] fixed` takes the continuous estimator at `bs` 4, reads `not
+unreasonable`, and does not warn, although the atom at 1 is off the grid. Its moments pass because
+the bucket scheme preserves the mean. `log2=18` builds it exactly. Finding the step would need a
+search deeper than the cap for the warning alone.

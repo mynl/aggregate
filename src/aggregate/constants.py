@@ -34,6 +34,7 @@ __all__ = ['FIG_W', 'FIG_H', 'FONT_SIZE', 'LEGEND_FONT',
            'Validation', 'DefectiveDistributionWarning',
            'DefectiveDistributionError', 'InfiniteVarianceError',
            'IgnoredDecLClauseWarning', 'InfeasibleGridWarning',
+           'LatticeGridWarning',
            'ZeroModifiedExposureWarning',
            'ZeroPremiumCessionWarning',
            'CoarseJointGridWarning', 'DegenerateEvaluationWarning',
@@ -318,6 +319,30 @@ class InfeasibleGridWarning(UserWarning):
 
     Silence with ``silence_warnings(InfeasibleGridWarning)``; re-arm with
     :func:`reset_warn_once`. See ``dev/done/plan-validation-punchup.md``.
+
+    Subclasses ``UserWarning`` so Python's default warning filter shows it
+    (not the logger, which is silent by default).
+    """
+
+
+class LatticeGridWarning(UserWarning):
+    """Emitted when a discrete severity's lattice does not fit the ``log2`` cap.
+
+    The atoms are whole multiples of a dyadic step, so an exact grid exists, and
+    the cap is too small to hold it. The grid then takes a coarser bucket, the
+    atoms fall between grid points, and the law is wrong by construction. The
+    remedy is the opposite of :class:`InfeasibleGridWarning`'s, which is why this
+    is its own class: a thick continuous law needs an occurrence limit and a
+    larger grid does not help it, while a lattice book needs exactly the larger
+    ``log2`` the message gives. ``nttagg`` raises in the same position; an ``agg``
+    warns and builds, since it is often one unit of something larger.
+
+    Reported through :func:`warn_once`, keyed on the object's name, the step and
+    the ``log2`` given. Every object carries the same reading silently in ``valid``
+    (:attr:`Validation.INFEASIBLE`), ``bs_description`` and ``bs_explanation``.
+
+    Silence with ``silence_warnings(LatticeGridWarning)``; re-arm with
+    :func:`reset_warn_once`. See ``dev/done/plan-lattice-grid-sizing.md``.
 
     Subclasses ``UserWarning`` so Python's default warning filter shows it
     (not the logger, which is silent by default).

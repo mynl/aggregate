@@ -1570,7 +1570,15 @@ agg WH.Thin 1 claim sev lognorm 10 cv .09 fixed                                 
 port PF.P agg PF.A1 dfreq [1] dsev [3]                                            note{bs 1, log2 2, the unit's grid};
 port PF.Two agg PF.A2 100 claims dsev [1000 1001] fixed agg PF.B2 100 claims dsev [1000 1001] fixed   note{bs 1, log2 10, windowed};
 port PF.Re agg PF.A3 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4 agg PF.B3 3 claims dsev [8 10] fixed   note{a reinsured unit: from 0};
-port PF.Top agg PF.A4 1 claims 1500 xs 0 dsev [500 1000 2000] fixed agg PF.B4 dfreq [1:100] dsev [1000 1001]   note{at log2 17 the step fits, measured to the sum of the unit windows}
+port PF.Top agg PF.A4 1 claims 1500 xs 0 dsev [500 1000 2000] fixed agg PF.B4 dfreq [1:100] dsev [1000 1001]   note{at log2 17 the step fits, measured to the sum of the unit windows};
+
+# LW. A lattice the cap cannot hold ([Lattice-Infeasible-Warning], 1.48.0)
+# ========================================================================
+# The build completes, the verdict leads `grid infeasible for this lattice`, and
+# LatticeGridWarning gives the log2 to pass. See tests/test_lattice_bucket.py.
+agg LW.AWK dfreq [1:100] dsev [1000 1001]                                         note{bs 2 at log2 16; log2 17 at bs 1 is exact};
+agg LW.Wide 1 claims dsev [1 200000] fixed                                        note{at log2 18 the depth follows the cap and finds step 1};
+agg LW.Low dfreq [1:100] dsev [10002 10007]                                       note{at log2 10 the depth stays 16, so the warning fires}
 
 
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)

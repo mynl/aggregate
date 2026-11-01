@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.48.0 - 2026-11-01
+
+**[Lattice-Infeasible-Warning] A lattice book whose exact grid does not fit the `log2` cap warns, and the verdict says so.** `agg AWK dfreq [1:100] dsev [1000 1001]` still builds at `bs` 2, `log2` 16, and now raises the new `LatticeGridWarning` with the `log2` to pass and reads `grid infeasible for this lattice (needs log2 17 at bs 1); fails sev cv, agg skew`; `build(..., log2=17)` is exact with no warning. A pinned `bs` and a reference severity have no reading. `bs_description`, `bs_explanation`, `validation_explanation` and `bs_window_df` carry the same numbers, on a Portfolio as well. The lattice search now goes to `max(16, log2)` levels, so `dsev [1 200000]` at `log2` 18 finds its step. No shipped corpus program moves.
+
 ## 1.47.0 - 2026-10-31
 
 **[Portfolio-Follows-Unit-Grid] A one-unit Portfolio takes its unit's grid verbatim, and a larger book's grid holds its largest severity.** `port P agg A dfreq [1] dsev [3]` moves from `bs` 1, `log2` 1, mass 0 and `fails pmf deficit 1` to `bs` 1, `log2` 2 and the exact law, the same object as `agg A dfreq [1] dsev [3]`, and this holds for signed, reinsured and continuous units. A book with a reinsured unit is no longer windowed. A lattice book that fits nothing at the moment fit is tried again at the sum of its unit windows before the lattice is given up. Grids move on 3 of the 699 shipped corpus programs, all one-unit Portfolios, none larger.

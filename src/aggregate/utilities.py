@@ -339,7 +339,10 @@ LATTICE_RTOL = 1e-12
 
 #: How many binary levels below the largest atom the lattice search descends. A
 #: step finer than ``2**-LATTICE_DEPTH * max|x|`` is not a sensible bucket, and
-#: matches the default ``log2`` of 16. See :func:`_dyadic_lattice_step`.
+#: matches the default ``log2`` of 16. A sizer with a larger ``log2`` searches to
+#: that ``log2`` (``max(LATTICE_DEPTH, log2)``), and a smaller one still searches
+#: here, so a low cap reports a lattice it cannot hold rather than failing to see
+#: it. See :func:`_dyadic_lattice_step`.
 LATTICE_DEPTH = 16
 
 

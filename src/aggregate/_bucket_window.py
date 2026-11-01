@@ -14,14 +14,15 @@ import scipy.stats as ss
 from scipy.optimize import NoConvergence  # noqa
 from .config import get_settings
 from .constants import (InfiniteVarianceError, DefectiveDistributionWarning,
-                        InfeasibleGridWarning, warn_once, warn_once_isolated)
+                        InfeasibleGridWarning, LatticeGridWarning, warn_once,
+                        warn_once_isolated)
 from . import _validation
 # Module scope is safe: _program imports only decl_writer, which imports nothing
 # from aggregate at module scope, and _program reaches back here for _fmt_bs
 # through a deferred import inside the function.
 from . import _program
 from .utilities import (round_bucket, value_type_role, _dyadic_lattice_step,
-                        _lattice_candidates)
+                        _lattice_candidates, LATTICE_DEPTH)
 from . import tail as _tail
 from ._fits import gamma_fit, lognorm_fit, sgamma_fit, sln_fit
 
@@ -374,6 +375,60 @@ def warn_infeasible_grid(agg) -> bool:
         stacklevel=3)
 
 
+def warn_lattice_grid(ob) -> bool:
+    """Say once that a lattice book's exact grid does not fit the ``log2`` given.
+
+    Parameters
+    ----------
+    ob : Aggregate or Portfolio
+        A sized object carrying ``_lattice_feasibility``.
+
+    Returns
+    -------
+    bool
+        Whether the warning was emitted.
+
+    Notes
+    -----
+    Keyed on the object's name, the step and the ``log2`` given. The sentence is
+    ``nttagg``'s for the same position, which raises where an ``agg`` builds.
+    """
+    f = getattr(ob, '_lattice_feasibility', None)
+    if f is None:
+        return False
+    return warn_once(
+        f'{ob.name}: the severity atoms are on the lattice of step '
+        f'{_fmt_bs(f["h"])} and the grid needs log2 >= {f["log2_required"]} at '
+        f'bs {_fmt_bs(f["h"])}; log2 {f["log2"]} was given, so bs '
+        f'{_fmt_bs(f["bs"])} is used and the atoms do not sit on the grid. Pass '
+        f'build(..., log2={f["log2_required"]}) or add '
+        f'hints{{log2={f["log2_required"]}}} to the declaration.',
+        LatticeGridWarning,
+        key=('lattice-grid', ob.name, float(f['h']), int(f['log2'])),
+        stacklevel=3)
+
+
+def lattice_describe(feasibility) -> str:
+    """One clause naming a lattice the cap cannot hold, or ``''`` when there is none."""
+    if feasibility is None:
+        return ''
+    return (f'; lattice {_fmt_bs(feasibility["h"])} needs log2 '
+            f'{feasibility["log2_required"]}, log2 {feasibility["log2"]} given, '
+            f'bs {_fmt_bs(feasibility["bs"])} off it')
+
+
+def lattice_explain(feasibility) -> str:
+    """The account of a lattice the cap cannot hold, or ``''`` when there is none."""
+    if feasibility is None:
+        return ''
+    return (f'The severity atoms are on the lattice of step '
+            f'{_fmt_bs(feasibility["h"])}, so an exact grid exists, and it needs '
+            f'log2 {feasibility["log2_required"]} at bs '
+            f'{_fmt_bs(feasibility["h"])}. log2 {feasibility["log2"]} was given, '
+            f'so bs {_fmt_bs(feasibility["bs"])} is used and the atoms do not sit '
+            f'on the grid. Pass log2={feasibility["log2_required"]}.')
+
+
 def feasibility_describe(feasibility) -> str:
     """One clause naming the shortfall, or ``''`` when there is none."""
     if not grid_is_infeasible(feasibility):
@@ -445,7 +500,8 @@ def bs_describe(agg, *, color: bool = False) -> str:
         if color:
             msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
         text += msg
-    feas = feasibility_describe(getattr(agg, '_bs_feasibility', None))
+    feas = (feasibility_describe(getattr(agg, '_bs_feasibility', None))
+            + lattice_describe(getattr(agg, '_lattice_feasibility', None)))
     if feas:
         if color:
             feas = f'{_tail._ANSI_THICK}{feas}{_tail._ANSI_RESET}'
@@ -559,11 +615,12 @@ def bs_explain(agg, *, color: bool = False) -> str:
         if color:
             msg = f'{_tail._ANSI_THICK}{msg}{_tail._ANSI_RESET}'
         parts.append(msg)
-    feas = feasibility_explain(getattr(agg, '_bs_feasibility', None))
-    if feas:
-        if color:
-            feas = f'{_tail._ANSI_THICK}{feas}{_tail._ANSI_RESET}'
-        parts.append(feas)
+    for feas in (feasibility_explain(getattr(agg, '_bs_feasibility', None)),
+                 lattice_explain(getattr(agg, '_lattice_feasibility', None))):
+        if feas:
+            if color:
+                feas = f'{_tail._ANSI_THICK}{feas}{_tail._ANSI_RESET}'
+            parts.append(feas)
     return ' '.join(parts)
 
 
@@ -581,7 +638,7 @@ def _integer_ratio(a, b, rel_tol=1e-9):
     return r >= 1.0 and math.isclose(r, round(r), rel_tol=rel_tol)
 
 
-def _lattice_note(h, residual, bs, pinned):
+def _lattice_note(h, residual, bs, pinned, need=None):
     """Bucket table note fragment for a row sized against the lattice step ``h``.
 
     Parameters
@@ -595,6 +652,8 @@ def _lattice_note(h, residual, bs, pinned):
         The row's chosen bucket.
     pinned : bool
         Whether ``bs`` was pinned by the caller.
+    need : int, optional
+        The ``log2`` the row needs at the step, quoted when ``bs`` misses it.
 
     Returns
     -------
@@ -608,7 +667,8 @@ def _lattice_note(h, residual, bs, pinned):
         return f'; lattice {_fmt_bs(h)}{res}, bs {_fmt_bs(bs)} on it'
     if pinned:
         return f'; pinned bs {_fmt_bs(bs)} misses the lattice {_fmt_bs(h)}'
-    return (f'; lattice {_fmt_bs(h)} too fine for the log2 cap, '
+    needs = '' if need is None else f' (needs log2 {need})'
+    return (f'; lattice {_fmt_bs(h)} too fine for the log2 cap{needs}, '
             f'bs {_fmt_bs(bs)} off it')
 
 
@@ -999,7 +1059,8 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     # The lattice step and its residual, once: every lattice row uses the step,
     # and the residual goes in their notes.
     _atoms = agg._severity_atoms()
-    lattice_fit = None if _atoms is None else _dyadic_lattice_step(_atoms)
+    lattice_fit = (None if _atoms is None else
+                   _dyadic_lattice_step(_atoms, depth=max(LATTICE_DEPTH, log2)))
     lattice, lattice_residual = (lattice_fit if lattice_fit is not None
                                  else (None, np.nan))
     # What a single claim needs of the grid, once. The severity is discretized
@@ -1011,6 +1072,11 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     hull_lo, hull_hi = agg._severity_hull(p)
     sev_reach = max(hull_hi, 0.0) - min(hull_lo, 0.0)
     hold = sev_reach if lattice is not None and np.isfinite(sev_reach) else 0.0
+
+    def _need_at_step(x_lo, x_hi, h, force_origin=False):
+        """``log2`` a window needs at the step ``h``, holding the claim as well."""
+        x0 = float(np.floor(x_lo / h) * h) if signed or force_origin else 0.0
+        return max(_need_log2(x_hi - x0, h), _need_log2(hold, h))
 
     def _size(x_lo, x_hi, lattice_bs, force_origin=False, grow_cap=None,
               nice=True):
@@ -1156,7 +1222,9 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
                         note=f'{note}; non-finite window (rejected)')
         x0, bs_, l2_ = _size(x_lo, x_hi, lattice_bs, force_origin, grow_cap)
         if lattice_bs is not None:
-            note += _lattice_note(lattice_bs, lattice_residual, bs_, bs_in > 0)
+            note += _lattice_note(
+                lattice_bs, lattice_residual, bs_, bs_in > 0,
+                _need_at_step(x_lo, x_hi, lattice_bs, force_origin))
         return dict(applies=True, x_min=float(x0), x_max=float(x_hi),
                     W=float(x_hi - x0), bs=bs_, log2=l2_,
                     coverage=coverage, note=note)
@@ -1621,6 +1689,28 @@ def bs_window(agg, log2, bs_in, x_min_in, bucket_sizing_p,
     agg._bs_feasibility = severity_feasibility(agg, sel_bs, sel_l2, grid_x_max)
     warn_infeasible_grid(agg)
 
+    # ---- lattice feasibility reading --------------------------------
+    # The atoms have a step and the grid is off it, because no candidate fit
+    # the cap. The ``log2`` to name is the smaller of what the selected row and
+    # the windowed row need, since either holds the law at the step. A pinned
+    # ``bs`` is the user's opt-out, and a reference severity is a materialized
+    # law whose grid ``snap_bs_to_reference`` has already made commensurable.
+    agg._lattice_feasibility = None
+    if (lattice is not None and bs_in <= 0
+            and not _integer_ratio(lattice, sel_bs)
+            and not any(getattr(s, 'reference_bs', None) for s in agg.sevs)):
+        _sel = rows[selected]
+        needs = [_need_at_step(float(_sel['x_min']), float(_sel['x_max']),
+                               lattice, selected == 'windowed')]
+        if 'windowed' in rows:
+            needs.append(_need_at_step(float(rows['windowed']['x_min']),
+                                       float(rows['windowed']['x_max']),
+                                       lattice, True))
+        agg._lattice_feasibility = dict(
+            h=float(lattice), bs=sel_bs, log2=int(log2),
+            log2_required=int(min(needs)))
+        warn_lattice_grid(agg)
+
     # ---- journey columns (bs-reporting item 1) ----------------------
     # Purely derived reporting -- no effect on the grid. ``log2_need`` is the
     # log2 a method's own window needs at its own ``bs`` (so a row whose
@@ -1801,7 +1891,7 @@ def _port_lattice_bucket(port, log2, signed, windowed, x_lo, x_hi,
     the fit gives it: a continuous approximation drawn on a discrete book's grid
     has a tail that needs it.
     """
-    fit = _pooled_lattice(port.agg_list)
+    fit = _pooled_lattice(port.agg_list, max(LATTICE_DEPTH, log2))
     if fit is None:
         return None
     h, residual = fit
@@ -1826,6 +1916,10 @@ def _port_lattice_bucket(port, log2, signed, windowed, x_lo, x_hi,
                 port._bs_lattice = dict(h=float(h), residual=float(residual),
                                         bs=float(b))
                 return float(b), int(min(log2, max(need, 1))), x_min
+    # The last ``need`` is the step's, at the tighter top: the smallest ``log2``
+    # the book needs. ``port_best_window`` adds the bucket it goes on to use.
+    port._lattice_feasibility = dict(h=float(h), residual=float(residual),
+                                     log2=int(log2), log2_required=int(need))
     return None
 
 
@@ -1935,11 +2029,17 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     rows = []
     bs_ks, x_min_ks, x_max_ks, W_ks = [], [], [], []
     unit_grid = None
+    port._lattice_feasibility = None
+    unit_feasibility = None
     with warn_once_isolated(), warnings.catch_warnings():
         warnings.simplefilter('ignore', DefectiveDistributionWarning)
+        warnings.simplefilter('ignore', LatticeGridWarning)
         for a in port.agg_list:
             bs_k, l2_k, x_min_k = a._bs_window(log2, 0, None, bucket_sizing_p)
             unit_grid = (float(bs_k), int(l2_k), float(x_min_k))
+            # the reading belongs to the book's grid, not this speculative one
+            unit_feasibility = a._lattice_feasibility
+            a._lattice_feasibility = None
             wdf = a._bs_window_df
             sel = wdf[wdf['selected']].iloc[0] if 'selected' in wdf.columns \
                 else wdf.loc['used']
@@ -2014,7 +2114,8 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
     if bs_in <= 0 and len(port.agg_list) == 1:
         bs, log2_out, x_min = unit_grid
         port._bs_raw = None                      # the unit's, not rounded here
-        fit = _pooled_lattice(port.agg_list)
+        port._lattice_feasibility = unit_feasibility
+        fit = _pooled_lattice(port.agg_list, max(LATTICE_DEPTH, log2))
         if fit is not None and _integer_ratio(fit[0], bs):
             port._bs_lattice = dict(h=float(fit[0]), residual=float(fit[1]),
                                     bs=float(bs))
@@ -2024,6 +2125,10 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
         port._build_bs_window_df(rows, bs, log2_out, x_min, cand,
                                  resolution, W_ext)
         port._bs_window_df.loc['used', 'note'] += "; one unit, the unit's grid"
+        if unit_feasibility is not None:
+            port._bs_window_df.loc['used', 'note'] += _lattice_note(
+                unit_feasibility['h'], np.nan, bs, False,
+                unit_feasibility['log2_required'])
         return bs, log2_out, x_min
     lattice_pick = (None if bs_in > 0 else
                     _port_lattice_bucket(port, log2, signed, window_nonsigned,
@@ -2086,6 +2191,15 @@ def port_best_window(port, log2=16, bs_in=0, bucket_sizing_p=BUCKET_SIZING_P):
                 sbj=(sbj_lo, sbj_hi), sum=(min(x_lo, 0.0), W_sum + min(x_lo, 0.0)))
     port._build_bs_window_df(rows, bs, log2_out, x_min, cand,
                              resolution, W_ext)
+    lat = port._lattice_feasibility
+    if lat is not None:
+        if _integer_ratio(lat['h'], bs):
+            # the bucket is on the lattice after all, so no atom is off the grid
+            port._lattice_feasibility = None
+        else:
+            lat['bs'] = float(bs)
+            port._bs_window_df.loc['used', 'note'] += _lattice_note(
+                lat['h'], lat['residual'], bs, False, lat['log2_required'])
     return bs, log2_out, x_min
 
 
@@ -2299,13 +2413,16 @@ def _bs_steps(bs_limit):
     return k
 
 
-def _pooled_lattice(aggs):
+def _pooled_lattice(aggs, depth=LATTICE_DEPTH):
     """Dyadic lattice fit of every severity atom of every unit, pooled.
 
     Parameters
     ----------
     aggs : list of Aggregate
         The units.
+    depth : int
+        Binary levels searched below the largest atom; see
+        :data:`~aggregate.utilities.LATTICE_DEPTH`.
 
     Returns
     -------
@@ -2323,7 +2440,7 @@ def _pooled_lattice(aggs):
     pools = [a._severity_atoms() for a in aggs]
     if not pools or any(v is None for v in pools):
         return None
-    return _dyadic_lattice_step(np.concatenate(pools))
+    return _dyadic_lattice_step(np.concatenate(pools), depth=depth)
 
 
 def _sharpen_lattice(ob):

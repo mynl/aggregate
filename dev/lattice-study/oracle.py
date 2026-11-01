@@ -205,7 +205,9 @@ LAWS = {}
 def run(specs, log2=16, port=False, **kw):
     """Build, compare with the oracle. Returns a dict of findings."""
     from aggregate import build
-    from aggregate.constants import InfeasibleGridWarning
+    from aggregate.constants import (InfeasibleGridWarning, LatticeGridWarning,
+                                     reset_warn_once)
+    grid_warnings = (InfeasibleGridWarning, LatticeGridWarning)
     if port or len(specs) > 1:
         prog = 'port P ' + ' '.join(decl(s, f'U{i}') for i, s in enumerate(specs))
         if prog not in LAWS:
@@ -218,6 +220,8 @@ def run(specs, log2=16, port=False, **kw):
     h, from0, win, reach = feasible(specs, law)
     out = dict(prog=prog, h=h, need0=from0, needw=win, reach=reach,
                feasible=(h is not None and min(from0, win) <= log2))
+    # warn_once keys on the object's name, and every program here is X or P
+    reset_warn_once()
     with warnings.catch_warnings(record=True) as w:
         warnings.simplefilter('always')
         try:
@@ -226,8 +230,8 @@ def run(specs, log2=16, port=False, **kw):
             out.update(error=f'{type(e).__name__}: {str(e)[:80]}', wrong=True, flagged=True,
                        warned=False, tv=np.nan, bs=np.nan, log2=np.nan, x_min=np.nan)
             return out
-        warned = any(issubclass(x.category, InfeasibleGridWarning) for x in w)
-        other = [x for x in w if not issubclass(x.category, InfeasibleGridWarning)]
+        warned = any(issubclass(x.category, grid_warnings) for x in w)
+        other = [x for x in w if not issubclass(x.category, grid_warnings)]
     d = ob.density_df
     lib = defaultdict(float)
     for v, p in zip(d.index.to_numpy(float), d['p_total'].to_numpy(float)):

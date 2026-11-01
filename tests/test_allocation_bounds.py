@@ -73,7 +73,10 @@ The p = 0 vertex (4.75, 3.8, 0.95) must equal density_df
 (exa_total, exa_A, exa_B) at loss = 9 — the PIR alpha-S integral.
 """
 
+import copy
+
 import numpy as np
+import pandas as pd
 import pytest
 
 from aggregate import build
@@ -366,3 +369,30 @@ def test_cts_bounded_audits(cts_port):
     # Bounded additivity: the collapsed atom sums to a exactly; residual
     # only from the body exeqa noise.
     assert ab.additivity_error < 1e-4 * ab.premium_range[0]
+
+
+def test_a_tie_in_the_vertex_table_does_not_change_the_answer(cts_port):
+    """Ties here are floating-point wobble, since the vertices are X's own atoms.
+
+    The filter keeps ``T`` strictly increasing, and a tie that did reach the
+    shared engine reduces to one of two vertices that are the same point, so
+    the bounds do not move.
+    """
+    ab = cts_port.allocation_bounds(p=0.995)
+    assert np.all(np.diff(ab._T) > 0)
+    lo, hi = ab.premium_range
+    P = np.linspace(lo, hi, 9)
+    expected = ab.bounds(P)
+
+    # A second copy of a mid-table vertex, its allocations off by a wobble.
+    i = len(ab._T) // 2
+    wobble = 1.0 + 1e-15 * np.ones_like(ab._A[i])
+    wobble[0] = 1.0
+    tied = copy.copy(ab)
+    tied._init_engine(np.insert(ab._T, i + 1, ab._T[i]),
+                      np.insert(ab._A, i + 1, ab._A[i] * wobble, axis=0),
+                      np.insert(ab._p_vert, i + 1, ab._p_vert[i]),
+                      np.insert(ab._S, i + 1, ab._S[i]),
+                      ab.units)
+    pd.testing.assert_frame_equal(tied.bounds(P), expected, check_exact=False,
+                                  rtol=1e-12)

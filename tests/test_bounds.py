@@ -83,6 +83,19 @@ def test_min_envelope_is_distortion(bdd_at_tvar50):
     assert np.all(np.diff(g) >= -1e-10)
 
 
+def test_min_envelope_has_no_mass_at_zero(bdd_at_tvar50):
+    """The minimum of the cloud leaves zero with the cloud, and has no jump.
+
+    The envelope is a minimum of distortions that are ``2e-12`` at ``JUMP_EPS``,
+    so a mass of any size there is an artifact of the construction.
+    """
+    _, _, bd = bdd_at_tvar50
+    assert not bd.min_envelope.has_mass
+    cloud_min = float(bd.cloud_df.min(axis=1).loc[JUMP_EPS])
+    assert cloud_min == pytest.approx(2e-12, rel=1e-3)
+    assert 0 < float(bd.min_envelope.g(1e-12)) < 10 * cloud_min
+
+
 def test_max_envelope_is_callable(bdd_at_tvar50):
     """max_envelope is a callable interp1d (NOT a Distortion)."""
     _, _, bd = bdd_at_tvar50
@@ -213,9 +226,9 @@ def test_the_two_envelopes_do_not_cross(bdd_at_tvar50):
     """``max_envelope`` above ``min_envelope`` off the grid as well as on it.
 
     The two are built by different machinery, a linear interpolation against a
-    fitted concave distortion, so they can only be compared where both are
+    weighted-TVaR distortion, so they can only be compared where both are
     evaluated. Inside the first cell they used to cross, because the
-    interpolation ramped up from zero while the fit left the origin steeply.
+    interpolation ramped up from zero while the old fit left the origin steeply.
     """
     _, _, bd = bdd_at_tvar50
     s = np.linspace(0, 1, 20001)

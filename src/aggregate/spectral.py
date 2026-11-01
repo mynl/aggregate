@@ -18,7 +18,6 @@ import pandas as pd
 import scipy.stats as ss
 from scipy.interpolate import interp1d
 from scipy.optimize import brentq
-from scipy.spatial import ConvexHull
 from scipy.stats import norm
 
 logger = logging.getLogger(__name__)
@@ -4227,26 +4226,26 @@ def consistent_distortions(p):
 # These functions BUILD a Distortion from sample data; they are not
 # distortion kinds themselves. Kept at module level so the ``Distortion``
 # namespace stays focused on actual kinds; each returns a
-# ``WtdTVaRDistortion`` instance with knots taken from the upper convex
-# hull of the supplied (s, g(s)) data.
+# ``WtdTVaRDistortion`` instance with knots taken from the upper concave
+# envelope of the supplied (s, g(s)) data.
 
 
 def convex_distortion(s, gs, *, label=None):
     """
-    Build a distortion as the upper convex envelope of ``(s, g(s))`` points.
+    Build a distortion as the upper concave envelope of ``(s, g(s))`` points.
 
-    Returns a :class:`WtdTVaRDistortion` whose piecewise-linear ``g``
-    interpolates the convex hull of the supplied points. The caller is
-    expected to handle any DataFrame / column-name extraction pre-call;
-    this function takes two raw arrays.
+    Returns a :class:`WtdTVaRDistortion` whose piecewise-linear ``g`` is the
+    upper concave envelope of the supplied points through ``(0, 0)`` and
+    ``(1, 1)``. The caller is expected to handle any DataFrame / column-name
+    extraction pre-call; this function takes two raw arrays.
 
     Parameters
     ----------
     s : array_like
-        x-coordinates (probabilities). 0 and 1 are added if absent.
+        x-coordinates (probabilities), in ``[0, 1]``.
     gs : array_like
-        Matching ``g(s)`` values, same length as ``s``. The points
-        ``(0, 0)`` and ``(1, 1)`` are added if missing.
+        Matching ``g(s)`` values, same length as ``s``, in ``[0, 1]``. The
+        points ``(0, 0)`` and ``(1, 1)`` are always included.
     label : str, optional
         Explicit override label (the DecL ``as`` clause).
 
@@ -4255,59 +4254,67 @@ def convex_distortion(s, gs, *, label=None):
     WtdTVaRDistortion
         Equivalent piecewise-linear weighted-TVaR distortion.
 
+    Raises
+    ------
+    ValueError
+        For arrays of different lengths, or a point outside the unit square,
+        whose envelope would decrease and so is not a distortion.
+
     Notes
     -----
-    For ordered hull knots ``(s_0=0, gs_0=0), …, (s_K=1, gs_K=1)`` with
-    slopes ``m_i = (gs_{i+1} - gs_i) / (s_{i+1} - s_i)`` (non-increasing
-    by concavity), the corresponding TVaR weights solve a small linear
-    system via :meth:`Distortion.tvar_terms`.
+    The knots are the vertices of the upper hull alone, ``s_0 = 0 < s_1 < ...
+    < s_K = 1``. Since ``TVaR_p`` has distortion ``min(1, s / (1 - p))``, the
+    representation ``g = sum_i w_i TVaR_{1 - s_i}`` over the knots ``s_i > 0``
+    has slope ``sum_{i > j} w_i / s_i`` on ``(s_j, s_{j+1})``. Differencing
+    the slopes ``k_j`` gives the weights directly,
+    ``w_i = (k_{i-1} - k_i) s_i`` with ``k_K = 0`` above the last knot, which
+    are nonnegative by concavity and sum to ``g(1) - g(0+)``.
+
+    A mass at zero (the term at ``p = 1``, the maximal distortion) appears only
+    when the envelope leaves ``s = 0`` at a positive height ``g(0+)``, which
+    takes a supplied point ``(0, g0)`` with ``g0 > 0``; its weight is ``g0``.
+    With ``(0, 0)`` as the first vertex there is no such term. Solving for the
+    weights on all the knots instead is rank deficient, because the ``p = 1``
+    column and the column of the first positive knot agree at every knot, and
+    a minimum norm solution splits the weight between them into a spurious mass.
     """
+    from .bounds import _monotone_hull          # bounds imports this module
+
     s = np.asarray(s, dtype=float).ravel()
     gs = np.asarray(gs, dtype=float).ravel()
     if len(s) != len(gs):
         raise ValueError(
             f'convex_distortion: s and gs must have the same length, '
             f'got {len(s)} and {len(gs)}')
+    # A little room for an average of values that are each at most 1.
+    tol = 1e-9
+    if (s.min(initial=0.0) < 0 or s.max(initial=1.0) > 1
+            or gs.min(initial=0.0) < -tol or gs.max(initial=1.0) > 1 + tol):
+        raise ValueError(
+            'convex_distortion: every (s, g(s)) point must lie in the unit '
+            f'square, got s in [{s.min():g}, {s.max():g}] and g(s) in '
+            f'[{gs.min():g}, {gs.max():g}]')
+    gs = np.clip(gs, 0.0, 1.0)
 
-    # ensure 0 and 1 are present so the hull touches both corners.
-    if 0.0 not in s:
-        s = np.concatenate([[0.0], s])
-        gs = np.concatenate([[0.0], gs])
-    if 1.0 not in s:
-        s = np.concatenate([s, [1.0]])
-        gs = np.concatenate([gs, [1.0]])
+    # Sort by s then g, and keep the last of each repeated s, the only one the
+    # upper envelope can reach. Appending the corners first means a supplied
+    # (0, g0) stands and (1, 1) always closes the envelope.
+    s = np.concatenate([[0.0], s, [1.0]])
+    gs = np.concatenate([[0.0], gs, [1.0]])
+    order = np.lexsort((gs, s))
+    s, gs = s[order], gs[order]
+    last = np.concatenate([s[1:] > s[:-1], [True]])
+    s, gs = s[last], gs[last]
 
-    pts = np.column_stack([s, gs])
-    if len(pts) >= 3:
-        hull = ConvexHull(pts)
-        knot_idx = sorted(set(hull.simplices.flatten()))
-    else:
-        knot_idx = list(range(len(pts)))
-
-    s_h = s[knot_idx]
-    gs_h = gs[knot_idx]
-    order = np.argsort(s_h)
-    s_h = s_h[order]
-    gs_h = gs_h[order]
-    # remove duplicate s values (the hull may double-count corners)
-    keep = np.concatenate([[True], np.diff(s_h) > 0])
-    s_h = s_h[keep]
-    gs_h = gs_h[keep]
-
-    # solve gs_h = wts @ tvar_terms(ps) on the (ascending) hull knots.
-    # ps are derived from the hull's x-coordinates: ps = 1 - s_h[::-1].
-    ps = (1 - s_h[::-1]).astype(float)
-    M = Distortion.tvar_terms(ps)
-    # tvar_terms returns an (n, n) matrix mapping wts -> gs evaluated at
-    # the reversed s values; solve in least-squares for stability.
-    wts, *_ = np.linalg.lstsq(M.T, gs_h, rcond=None)
-    wts = np.clip(wts, 0.0, None)
-    if wts.sum() <= 0:
-        # degenerate input: fall back to uniform weighting
-        wts = np.ones_like(ps) / len(ps)
-    wts = wts / wts.sum()
-    return WtdTVaRDistortion('wtdtvar', ps=ps, wts=wts,
-                             label=label)
+    knots = _monotone_hull(s, gs, 'upper')
+    s_h, gs_h = s[knots], gs[knots]
+    slopes = np.concatenate([np.diff(gs_h) / np.diff(s_h), [0.0]])
+    wts = (slopes[:-1] - slopes[1:]) * s_h[1:]
+    # ascending p is descending s, and the knot at s = 0 is not a TVaR column
+    ps, wts = 1.0 - s_h[:0:-1], wts[::-1]
+    if gs_h[0] > 0:
+        ps, wts = np.append(ps, 1.0), np.append(wts, gs_h[0])
+    return WtdTVaRDistortion('wtdtvar', ps=ps, wts=wts, label=label)
 
 
 def bagged_distortion(data, proportion, samples, *,

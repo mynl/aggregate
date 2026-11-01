@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.52.0 - 2026-11-01
+
+**[Bounds-Envelopes] `PricingBounds` keeps the vertical segment where the reference saturates, and `convex_distortion` returns the upper concave envelope with no mass at zero.** Numbers move. A `PricingBounds` risk that saturates above the reference, usual with a finite cap, has a higher upper bound: `[0.75, 0.75]` becomes `[0.75, 1.25]` on the smallest example, and 126.11 becomes 152.58 on a capped book at `P = 1.2 E`; lower bounds do not move, and `curve_df` gains the tied rows. `convex_distortion` on (0, 0), (1/2, 0.8), (1, 1) has mass 0, was 0.3, and $g(1/4) = 0.4$, was 0.55; a point below the envelope no longer moves the curve. The false mass also leaves `Bounds.min_envelope`, `bagged_distortion` and `convex_example` (`bond` 0.0031 and `cat` 0.0230, both now 0). A point outside the unit square now raises `ValueError`, and collinear points return the identity rather than a Qhull error.
+
 ## 1.51.0 - 2026-11-01
 
 **[Severity-Parameter-Count] A `sev` clause gives a family exactly the numbers it takes, and the `mean cv` form works on a family with no shape.** Positional numbers are the family's shapes; scale and location are `c *` and `+ b`. Numbers move: `norm 100 cv 0.3` is N(100, 30), was N(100, 1); `expon 10 cv 1` has mean 10, was 11; `uniform 10 cv 0.2` has mean 10 and standard deviation 2, was mean 10.5. New DecL: `_` holds the place of a family with no shape in a vector of families, `[lognorm norm] [0.5 _]` and `[lognorm beta] [0.5 2] [_ 3]`. A `mean cv` the family cannot reach raises at build where it gave `nan` or the wrong law: `norm -100 cv 0.3`, `norm 100 cv 0`, `beta 2 cv 0.2`, `pareto 100 cv 0.5`. `Severity` raises on `sev_a` for a family with no shape, `sev_b` for a family of at most one, an unset shape on a two-shape family, and a mean or cv alone on a family with no shape.

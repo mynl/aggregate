@@ -448,8 +448,8 @@ class Bounds(HelpMixin):
         Pointwise minimum of the cloud, as a :class:`Distortion`.
 
         Min-of-concaves is concave, so this is a coherent distortion. Built
-        through :func:`aggregate.spectral.convex_distortion`, which fits a
-        piecewise-linear weighted-TVaR to the (s, gs) sample points.
+        through :func:`aggregate.spectral.convex_distortion`, which takes the
+        weighted-TVaR weights from the upper hull of the (s, gs) sample points.
         """
         from .spectral import convex_distortion
         s = self.s_grid
@@ -655,6 +655,43 @@ def _monotone_hull(t, y, side):
                 break
         idx.append(i)
     return np.asarray(idx, dtype=np.intp)
+
+
+def _column_envelope(t, y, side):
+    """
+    Indices of one envelope of a vertex column whose x-coordinates may tie.
+
+    Parameters
+    ----------
+    t : ndarray
+        Non-decreasing x-coordinates (the TVaR values).
+    y : ndarray
+        y-coordinates (the item curve).
+    side : {'lower', 'upper'}
+        Which envelope to build.
+
+    Returns
+    -------
+    ndarray of int
+        Indices into ``t``/``y`` of the envelope vertices, left to right, with
+        strictly increasing ``t``.
+
+    Notes
+    -----
+    The feasible set is the convex hull of the curve ``(T_X(p), T_Y(p))``. Where
+    ``T_X`` ties the curve runs vertically, and only the end of that segment
+    facing the envelope can be a vertex of it: the largest ``y`` for the upper
+    envelope, the smallest for the lower. Each tied run is reduced to that one
+    vertex, per column and per side, because the columns need not agree and
+    :func:`_monotone_hull` and the slice divide by differences in ``t``.
+    """
+    starts = np.flatnonzero(np.concatenate([[True], t[1:] > t[:-1]]))
+    ends = np.concatenate([starts[1:], [len(t)]])
+    keep = starts.copy()
+    best = np.argmin if side == 'lower' else np.argmax
+    for k in np.flatnonzero(ends - starts > 1):
+        keep[k] = starts[k] + best(y[starts[k]:ends[k]])
+    return keep[_monotone_hull(t[keep], y[keep], side)]
 
 
 def _bitvar_g(s, s0, s1, w1):
@@ -883,7 +920,8 @@ class _HullEngine(HelpMixin):
 
     The vertex table is held as
 
-    - ``_T`` : (n,) strictly increasing x-axis = ``TVaR_p(X)`` at the vertices,
+    - ``_T`` : (n,) non-decreasing x-axis = ``TVaR_p(X)`` at the vertices, tied
+      only above the saturation of a :class:`PricingBounds` reference,
     - ``_A`` : (n, 1 + k), column 0 == ``_T``, columns 1.. the k item curves,
     - ``_p_vert`` / ``_S`` : the vertex p-values and exact tail masses ``1 - p``,
     - ``_y_names`` : the k item (unit / risk) names,
@@ -923,8 +961,8 @@ class _HullEngine(HelpMixin):
         self._hulls = {}
         for j, u in enumerate(self._y_names):
             y = self._A[:, j + 1]
-            self._hulls[u] = {'lower': _monotone_hull(self._T, y, 'lower'),
-                              'upper': _monotone_hull(self._T, y, 'upper')}
+            self._hulls[u] = {'lower': _column_envelope(self._T, y, 'lower'),
+                              'upper': _column_envelope(self._T, y, 'upper')}
         self.premium_range = (float(self._T[0]), float(self._T[-1]))
 
     # ----------------------------------------------------------------------
@@ -1694,18 +1732,16 @@ class PricingBounds(_HullEngine):
         ycols = [src.tvar(p_vert) for _, src in y_items]
         A = np.column_stack([T] + ycols)
 
-        # T_X must be strictly increasing.  It is for distinct p (conditional
-        # tail expectations increase) until X saturates at its ess sup, where
-        # several top vertices tie; keep only strictly-advancing vertices
-        # (the slicing/hull machinery needs a strict x-order).
+        # T_X increases with p until X saturates at its ess sup, where the
+        # remaining vertices tie while a Y that saturates later keeps rising.
+        # The ties stay in the table: they are the vertical segment at the top
+        # of the feasible set, and its upper end anchors the upper envelope.
+        # _column_envelope reduces them per column and per side.
         order = np.argsort(T, kind='mergesort')
         T, A, p_vert = T[order], A[order], p_vert[order]
-        runmax = np.maximum.accumulate(np.concatenate([[-np.inf], T[:-1]]))
-        ok = T > runmax
-        if ok.sum() < 2:
+        if not np.any(T[1:] > T[:-1]):
             raise ValueError('Fewer than two usable curve vertices; the '
                              'x-source is degenerate or s_floor too aggressive.')
-        T, A, p_vert = T[ok], A[ok], p_vert[ok]
 
         self._init_engine(T, A, p_vert, 1.0 - p_vert, y_names)
 

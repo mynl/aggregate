@@ -148,6 +148,99 @@ def test_multiple_y_and_names(discrete_pb):
 
 
 # ---------------------------------------------------------------------------
+# Y's breakpoint above X's saturation: the vertical segment at the top
+# ---------------------------------------------------------------------------
+#
+# X has outcomes {0, 2} each probability 1/2 and Y has {0: 3/4, 2: 1/4}, so X
+# saturates at p = 1/2 while Y keeps rising to p = 3/4:
+#
+#     p      T_X    T_Y
+#     0      1      1/2
+#     1/2    2      1
+#     3/4    2      2
+#
+# The last two vertices tie in T_X. The feasible set is the triangle on the
+# three vertices, so the slice at P = 3/2 runs from the chord to (2, 1), height
+# 3/4, up to the chord to (2, 2), height 5/4.
+
+@pytest.fixture(scope='module')
+def saturating_pb():
+    """Exact discrete cross-pricing with Y's breakpoint above X's saturation."""
+    X = pd.Series([0.5, 0.5], index=[0.0, 2.0])
+    Y = pd.Series([0.75, 0.25], index=[0.0, 2.0])
+    return PricingBounds(X, {'Y': Y})
+
+
+def test_tied_vertices_stay_in_the_table(saturating_pb):
+    cd = saturating_pb.curve_df
+    assert np.allclose(cd.index, [0, 0.5, 0.75], atol=TOL)
+    assert np.allclose(cd['tvar_X'], [1, 2, 2], atol=TOL)
+    assert np.allclose(cd['price_Y'], [0.5, 1, 2], atol=TOL)
+    assert saturating_pb.premium_range == pytest.approx((1.0, 2.0), abs=TOL)
+
+
+def test_upper_envelope_reaches_the_top_of_the_segment(saturating_pb):
+    b = saturating_pb.bounds(1.5)
+    assert b.loc[(1.5, 'Y'), 'lower'] == pytest.approx(0.75, abs=TOL)
+    assert b.loc[(1.5, 'Y'), 'upper'] == pytest.approx(1.25, abs=TOL)
+    bv = saturating_pb.bitvars(1.5)
+    r = bv.loc[(1.5, 'Y', 'lower')]
+    assert (r['p0'], r['p1']) == (0.0, 0.5)
+    r = bv.loc[(1.5, 'Y', 'upper')]
+    assert (r['p0'], r['p1']) == (0.0, 0.75)
+    assert r['w1'] == pytest.approx(0.5, abs=TOL)
+
+
+def test_the_slice_at_the_saturated_premium_is_the_whole_segment(saturating_pb):
+    # P = ess sup X puts all the weight at or above p = 1/2, where T_Y runs
+    # from 1 to 2.
+    b = saturating_pb.bounds(2.0)
+    assert b.loc[(2.0, 'Y'), 'lower'] == pytest.approx(1.0, abs=TOL)
+    assert b.loc[(2.0, 'Y'), 'upper'] == pytest.approx(2.0, abs=TOL)
+
+
+@pytest.mark.parametrize('P', [1.25, 1.5, 1.75])
+def test_saturating_check_reprices_exactly(saturating_pb, P):
+    chk = saturating_pb.check(P)
+    assert np.abs(chk['err']).max() < TOL
+    assert np.abs(chk['total_err']).max() < TOL
+
+
+def test_tied_vertices_are_selected_per_column():
+    # Y saturates above X and needs the top of the segment; Z saturates with X
+    # and is flat along it, so a filter on the shared table could not serve both.
+    X = pd.Series([0.5, 0.5], index=[0.0, 2.0])
+    Y = pd.Series([0.75, 0.25], index=[0.0, 2.0])
+    Z = pd.Series([0.5, 0.5], index=[0.0, 4.0])
+    pb = PricingBounds(X, {'Y': Y, 'Z': Z})
+    assert np.allclose(pb.curve_df.index, [0, 0.5, 0.75], atol=TOL)
+    b = pb.bounds(1.5)
+    assert b.loc[(1.5, 'Y'), 'upper'] == pytest.approx(1.25, abs=TOL)
+    assert b.loc[(1.5, 'Z'), 'lower'] == pytest.approx(3.0, abs=TOL)
+    assert b.loc[(1.5, 'Z'), 'upper'] == pytest.approx(3.0, abs=TOL)
+
+
+def test_a_degenerate_reference_is_refused():
+    with pytest.raises(ValueError, match='Fewer than two usable curve vertices'):
+        PricingBounds(pd.Series([1.0], index=[2.0]),
+                      {'Y': pd.Series([0.5, 0.5], index=[0.0, 2.0])})
+
+
+def test_a_finite_cap_saturates_the_reference(cts_port):
+    """Every capped call has the segment, and only the upper bound moves."""
+    pb = cts_port.pricing_bounds(cts_port.agg_list[0], p=0.99)
+    assert pb._T[-1] == pb._T[-2] == pb.a
+    P = 1.2 * pb.premium_range[0]
+    b = pb.bounds(P)
+    name = cts_port.agg_list[0].name
+    assert b.loc[(P, name), 'lower'] == pytest.approx(119.72, abs=0.005)
+    assert b.loc[(P, name), 'upper'] == pytest.approx(152.58, abs=0.005)
+    chk = pb.check(P)
+    assert np.abs(chk['err']).max() < 1e-8
+    assert np.abs(chk['total_err']).max() < 1e-8
+
+
+# ---------------------------------------------------------------------------
 # Structural invariants
 # ---------------------------------------------------------------------------
 

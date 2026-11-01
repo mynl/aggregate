@@ -98,6 +98,11 @@
   attains it. A closed form or a better start would fix it. Other families may be the
   same. `vonmises 100 cv 0.5` converges on a useless law (sd 7.9e17), with only the
   printed warning. See `dev/done/plan-severity-parameter-count.md`.
+- **[Pricing-Bounds-Callable-Y]**: `uniform` as the Y of a `PricingBounds` supplies no
+  breakpoints, so a discrete X leaves no vertex above its saturation and between its
+  breakpoints the curve is not linear: `{0: 1/2, 2: 1/2}` against `uniform` gives
+  `bounds(1.5)` of `[0.625, 0.625]`, exact upper 0.75. See
+  `dev/done/plan-using-notes-wrong-answers.md`.
 
 ## Tests
 

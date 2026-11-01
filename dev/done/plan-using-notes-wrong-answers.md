@@ -152,4 +152,40 @@ Using page `structure-chart` is rerendered and its sentence on return periods ch
 
 ## Execution log
 
-(filled at execution: versions, the recorded numbers, divergences)
+### 1.52.0 `[Bounds-Envelopes]`, 2026-11-01
+
+**Names.** One new private helper, `_column_envelope(t, y, side)` in `bounds.py`, which reduces each tied run to its one reachable vertex per column and per side and then calls `_monotone_hull`. `_init_engine` calls it, so `AllocationBounds` passes through it with no ties to reduce. No public name was added or changed. The first choice, `_envelope`, is already a private function in `charts/_emit_bounds.py`, hence the longer name.
+
+**Formula check.** Both formulas were verified by hand before coding. The weight formula needs one convention the plan left implicit: $k = 0$ above the last knot, so the knot at $s = 1$ has weight equal to the last slope. On the toy this gives weights 0.6 at $s = 1/2$ and 0.4 at $s = 1$, and $g(1/4) = 0.4$.
+
+**Recorded numbers.**
+
+| Quantity | Before | After |
+|:--|--:|--:|
+| Hand example, `bounds(1.5)` | `[0.75, 0.75]` | `[0.75, 1.25]` |
+| `cts_port`, `p = 0.99`, lower at `P = 239.15` | 119.72 | 119.72 |
+| `cts_port`, `p = 0.99`, upper at `P = 239.15` | 126.11 | 152.58 |
+| `cts_port` vertices, distinct $T_X$ | 6,147, 6,147 | 8,165, 6,147 |
+| `features.rst` 2295 example, `P = 21,899.22`, lower | 10,799.44 | 10,799.44 |
+| `features.rst` 2295 example, `P = 21,899.22`, upper | 10,897.51 | 12,941.39 |
+| Toy, mass, $g(1/4)$ | 0.3, 0.55 | 0, 0.4 |
+| Four-point case, $g(0.5)$ | 0.897 | 0.8 |
+| `convex_example('bond')`, mass | 0.003058 | 0 |
+| `convex_example('cat')`, mass | 0.022958 | 0 |
+| BDD `min_envelope`, $g(10^{-12})$ against the cloud minimum $2\times10^{-12}$ | $5.9\times10^{-4}$ | $2\times10^{-12}$ |
+
+The `features.rst` "before" comes from re-applying the old filter to the new vertex table. Every `check` error on the capped book is below $10^{-11}$, on the new upper bound as on the old.
+
+**Gates.** `uv run pytest -m 'slow or not slow'` and the same with `-W error::RuntimeWarning`, in `.venv`: 10,408 passed, 1 skipped (`plotly` not installed), each in about 2:47.
+
+**Divergences.**
+
+- **A point outside the unit square is refused.** The plan says nothing on this. The new weights would be negative on such a point, and the old code clipped and rescaled them, which is another silent wrong number. `convex_distortion` raises `ValueError` (with $10^{-9}$ of room on `gs`, since an average of values at most 1 can round above 1).
+- **The corners are always included.** The plan's formula says "through $(0,0)$ and $(1,1)$"; the code used to add a corner only when that `s` was absent, then rescale. A supplied $(1, g)$ with $g < 1$ is now overridden by $(1,1)$. A supplied $(0, g_0)$ with $g_0 > 0$ stands and is a true mass of $g_0$, the plan's "positive intercept" case: `[0, .5, 1], [.1, .8, 1]` has mass 0.1, was 0.3.
+- **Qhull is gone from `spectral.py`.** The knots come from the existing `_monotone_hull`, imported inside the function because `bounds.py` imports `spectral.py`. Collinear points now return the identity, where Qhull raised a precision error.
+- **The `AllocationBounds` test inserts the tie.** A floating-point wobble cannot be produced on demand, so the test asserts `T` strictly increasing on a real book and then hands the engine a duplicate vertex.
+
+**Findings, not fixed.**
+
+- **The plan overstates "every capped call is affected".** A risk that saturates at or below the reference has no tied vertex above it, so its bound does not move. The examples on the Using `pricing-bounds` page are of this kind and keep their numbers (14.098, 18.497, 3.810, 11.811).
+- **`uniform` as Y has the same missing segment.** It supplies no breakpoints, so no vertex sits above a discrete X's saturation: on the hand X, `PricingBounds(X, {'U': 'uniform'}).bounds(1.5)` is `[0.625, 0.625]` where the exact upper is 0.75. Recorded as `[Pricing-Bounds-Callable-Y]` in `dev/TODO.md`.

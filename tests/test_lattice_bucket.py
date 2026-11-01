@@ -436,6 +436,26 @@ def test_a_pinned_portfolio_has_no_reading():
     assert p._lattice_feasibility is None and not texts
 
 
+# ---------------------------- the named programs of [Correctness-Oracle], section LO
+
+@pytest.mark.parametrize('program, bs, log2, x0, outcomes, verdict', [
+    ('agg LO.T 100 claims dsev [1000 1001] fixed', 1, 10, 99640, None, 'not unreasonable'),
+    ('port LO.P agg LO.A dfreq [1] dsev [3]', 1, 2, 0, [3], 'not unreasonable'),
+    ('agg LO.AWK dfreq [1:100] dsev [1000 1001]', 2, 16, 0, None,
+     'grid infeasible for this lattice (needs log2 17 at bs 1); fails sev cv, agg skew'),
+    ('agg LO.Net 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed',
+     50, 6, 0, [250, 500, 1500], 'reinsurance; subject not unreasonable'),
+])
+def test_the_programs_that_started_the_lattice_study(program, bs, log2, x0, outcomes, verdict):
+    with warnings.catch_warnings():
+        warnings.simplefilter('ignore')
+        ob = build(program)
+    assert (ob.bs, ob.log2, float(ob.density_df.index[0])) == (bs, log2, x0)
+    assert ob.validation_description == verdict
+    if outcomes is not None:
+        assert list(_law(ob).index) == outcomes
+
+
 # ------------------------------------------------------- sharpen and Portfolios
 
 def test_portfolio_lattice_is_the_pooled_step():

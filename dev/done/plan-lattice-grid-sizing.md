@@ -559,4 +559,35 @@ Residual, not fixed: a step finer than `2**-16` of the largest atom is not found
 `agg X 1 claims dsev [1 200000] fixed` takes the continuous estimator at `bs` 4, reads `not
 unreasonable`, and does not warn, although the atom at 1 is off the grid. Its moments pass because
 the bucket scheme preserves the mean. `log2=18` builds it exactly. Finding the step would need a
-search deeper than the cap for the warning alone.
+search deeper than the cap for the warning alone. Tracked as `[Lattice-Step-Past-The-Cap]`.
+
+### `[Correctness-Oracle]`, 1.48.1
+
+`tests/lattice_oracle.py` reproduces the study: the 858 specs are identical to `sweep.py`'s and their
+DecL identical to `oracle.py`'s. `nttagg` agrees with the enumeration on all 285 programs in its
+scope, maximum total variation 2.9e-14, at a `log2` raised to fit each. The fast selection is 147
+cases in 9.4 s under xdist, within the plan's 10 seconds. The slow set is 1,576 cases in 17 s, and
+the whole 858 takes 46 s serial.
+
+Divergences:
+
+- **This step bumps the patch, 1.48.1,** where the header gives "five minor bumps and a test step" and
+  the steps section gives each step a bump. `decl-testers.agg` ships in the package, so it is a code
+  change under the project's rule, and no behavior changes.
+- **A reinsured book may warn with an exact output,** where the step asks for no warning on every
+  exact program. Two programs of set E hit this: `30 claims dsev [10002 10007] [1/3 2/3] fixed
+  aggregate ceded to 50% po 100000 xs 25000` cedes 50,000 every time, a point mass that `bs` 5 holds,
+  while the gross atoms are off the grid. The warning is right about the subject, whose `reins_density_df`
+  columns are wrong. The test requires no warning on an exact program with no reinsurance.
+- **The seven feasible and wrong programs are listed by name,** `WINDOWED_REINSURED`. The plan's five
+  Aggregates and two of its Portfolios. They read `grid infeasible` and fail if a new one appears;
+  one that becomes exact passes without complaint.
+- **`cross_check_ntt.py` derives its path** from `__file__`, where it had `V:\worktrees\...` written in.
+
+Finding for `[Validation-Verdict]`: of the 823 programs whose law is exact, 49 still read a failing
+verdict, 41 of them only on skew (`fails sev skew` on `1 claims dsev [115 120 125] fixed`, whose
+theoretical skew is near 0, or `fails agg skew` where the mean is large). Four read `subject fails
+agg mean`, on books whose gross overruns a grid the output fits. These are the false alarms that plan
+has to clear before a validation warning.
+
+**Plan closed 2026-11-01:** 1.44.0 to 1.48.1. The Using page is the last step, in the Using repository.

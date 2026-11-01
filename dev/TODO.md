@@ -66,6 +66,16 @@
   flags all of them as failing.
 - **[Layered-Dsev-Lattice]**: done at 1.45.0 as `[Lattice-Views]`,
   `dev/done/plan-lattice-grid-sizing.md`.
+- **[Windowed-Reinsured-Book]**: after 2.0. Seven discrete programs need a windowed
+  grid and carry reinsurance (`100 claims dsev [1000 1001] occurrence net of 25% po
+  1500 xs 200 fixed`: from 0 needs `log2` 19, windowed 12). The refusal to window is
+  right today because the occurrence machinery carries the severity on the output
+  grid. They are flagged and warned, and named in `WINDOWED_REINSURED` in
+  `tests/test_lattice_oracle.py`, which fails if a new one appears.
+- **[Lattice-Step-Past-The-Cap]**: a step finer than `2**-16` of the largest atom is
+  not found at `log2` 16, so `1 claims dsev [1 200000] fixed` takes the continuous
+  estimator, with the atom at 1 off the grid, reads `not unreasonable` and does not
+  warn. Finding it for the warning alone needs a search deeper than the cap.
 
 - **[Padding-Discard-Measurement]**: have `utilities.ift` report the
   probability its slice to the grid discards, and pass that to

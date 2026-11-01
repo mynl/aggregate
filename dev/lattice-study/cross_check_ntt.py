@@ -1,6 +1,6 @@
 """Cross-check of the study oracle against nttagg, the exact in-library engine, on the integer programs of sets A and B."""
 import sys, os, time, warnings
-sys.path.insert(0, r'V:\worktrees\aggregate_REFACTOR\dev\lattice-study')
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 warnings.simplefilter('ignore')
 import numpy as np, pandas as pd
 import oracle, sweep

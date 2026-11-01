@@ -310,6 +310,13 @@ seconds in a pool and about a minute serial.
 
 ## How to rerun
 
+The maintained version is `tests/lattice_oracle.py` and `tests/test_lattice_oracle.py`, from 1.48.1:
+about 120 programs in the fast suite, and the full 858 and the 718-program comparison under
+`uv run pytest tests/test_lattice_oracle.py -m slow`. The scripts below are the exploratory copy.
+The prototype patches in `patches.py` target 1.43.1 and no longer apply, and `sweep.py base` and
+`port_vs_agg.py base` overwrite the tracked `res_base.pkl` and `pva_base.pkl`, which hold the 1.43.1
+frames the tables here quote, so restore them after a rerun.
+
 ```
 .venv/Scripts/python.exe dev/lattice-study/sweep.py base     # the library as it stands
 .venv/Scripts/python.exe dev/lattice-study/sweep.py four     # the four prototype patches

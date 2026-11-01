@@ -122,7 +122,7 @@ bases), `tests/test_validation.py`, `tests/test_reins_reporting.py`,
 
 **Acceptance.** `agg X 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` at
 1.43.1's grid (`bs` 1000) reads `reinsurance; subject not unreasonable; net fails sev cv, agg
-cv` and `passes` is false; after `[Lattice-Grid-Sizing]` the same program at `bs` 250 reads
+cv` and `passes` is false; after `[Lattice-Grid-Sizing]` the same program at `bs` 50 reads
 `reinsurance; subject not unreasonable; net not unreasonable` and passes. The 68 silent wrong
 answers of the lattice study at 1.43.1 (`dev/lattice-study/res_base.pkl`, class `WRONG-silent`)
 all read a view failure under this verdict; the study's `classify` gains the view words. A

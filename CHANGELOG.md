@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.48.1 - 2026-11-01
+
+**[Correctness-Oracle] Discrete programs are now checked in the test suite against an oracle that shares no code with the sizer.** The new `tests/lattice_oracle.py` enumerates the law of a program and gives the smallest `log2` that holds it, with `nttagg` as the reference where a program is in its scope. `tests/test_lattice_oracle.py` runs about 120 programs in the fast suite, and the full 858 and a 718-program comparison of each unit alone and as a one-unit Portfolio under `slow`. Seven reinsured programs that need a window are named as known residuals, so any new wrong answer fails. No library behavior changes.
+
 ## 1.48.0 - 2026-11-01
 
 **[Lattice-Infeasible-Warning] A lattice book whose exact grid does not fit the `log2` cap warns, and the verdict says so.** `agg AWK dfreq [1:100] dsev [1000 1001]` still builds at `bs` 2, `log2` 16, and now raises the new `LatticeGridWarning` with the `log2` to pass and reads `grid infeasible for this lattice (needs log2 17 at bs 1); fails sev cv, agg skew`; `build(..., log2=17)` is exact with no warning. A pinned `bs` and a reference severity have no reading. `bs_description`, `bs_explanation`, `validation_explanation` and `bs_window_df` carry the same numbers, on a Portfolio as well. The lattice search now goes to `max(16, log2)` levels, so `dsev [1 200000]` at `log2` 18 finds its step. No shipped corpus program moves.

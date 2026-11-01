@@ -111,6 +111,15 @@ def _estimate_agg_percentile(m, cv, skew, p=0.999):
     :param skew:
     :param p: if > 1 converted to 1 - 10**-n
     :return:
+
+    Notes
+    -----
+    A positive skewness that is zero to rounding (``dsev [1 200000]`` has about
+    2.5e-16) degenerates both fits: ``sln_fit`` divides by an ``eta`` of exactly
+    0 and the frozen laws have an infinite location. The answer is then ``nan``,
+    which :func:`bs_window` tests for and replaces with a few standard deviations
+    above the mean, so the floating point warnings report arithmetic whose result
+    is discarded and are silenced here.
     """
 
     # p_estimator = interp1d([0.53294, 0.86894, 1.9418, 7.3211, 22.738, 90.012, 457.14, 2981],
@@ -132,12 +141,13 @@ def _estimate_agg_percentile(m, cv, skew, p=0.999):
         fzn = ss.norm(scale=m * cv, loc=m)
         pn = fzn.isf(1 - p)
     elif not np.isinf(skew):
-        shift, mu, sigma = sln_fit(m, cv, skew)
-        fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
-        shift, alpha, theta = sgamma_fit(m, cv, skew)
-        fzg = ss.gamma(alpha, scale=theta, loc=shift)
-        pl = fzl.isf(1 - p)
-        pg = fzg.isf(1 - p)
+        with np.errstate(divide='ignore', invalid='ignore', over='ignore'):
+            shift, mu, sigma = sln_fit(m, cv, skew)
+            fzl = ss.lognorm(sigma, scale=np.exp(mu), loc=shift)
+            shift, alpha, theta = sgamma_fit(m, cv, skew)
+            fzg = ss.gamma(alpha, scale=theta, loc=shift)
+            pl = fzl.isf(1 - p)
+            pg = fzg.isf(1 - p)
     else:
         mu, sigma = lognorm_fit(m, cv)
         fzl = ss.lognorm(sigma, scale=np.exp(mu))

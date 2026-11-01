@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.49.0 - 2026-11-01
+
+**[Analytic-Layer-Tail-Cancellation] Layer moments on `lognorm`, `gamma`, `expon`, `pareto`, `lomax` and `beta` are right wherever the layer attaches.** Numbers move: `10 xs 1000` on `lognorm 1` goes from conditional moments 9.64, 111.2 and -14,784 to 9.657, 95.44 and 948.8, and `10 xs 1e5` on `100 * lognorm 1` from 8.28, 171,386 and -1.7e10 to 9.996, 99.95 and 999.5 and now reads `not unreasonable`. A far-tail franchise or disappearing deductible gets the same fix (`100 xs 1000 to 1100 disappearing` on `lognorm 1`: third moment -6.48e6 to 953,304). A layer at or below the median with attachment up to 16 times its width is unchanged to the bit. Thin layers move below the median as well (third moment by 1e-8 at attachment 17 times the width, 4e-3 at 1,000 times), and other layers past it by up to 6e-9 for a survival probability of at least 1e-3. `moms()` with a zero limit returns zeros rather than raising.
+
 ## 1.48.1 - 2026-11-01
 
 **[Correctness-Oracle] Discrete programs are now checked in the test suite against an oracle that shares no code with the sizer.** The new `tests/lattice_oracle.py` enumerates the law of a program and gives the smallest `log2` that holds it, with `nttagg` as the reference where a program is in its scope. `tests/test_lattice_oracle.py` runs about 120 programs in the fast suite, and the full 858 and a 718-program comparison of each unit alone and as a one-unit Portfolio under `slow`. Seven reinsured programs that need a window are named as known residuals, so any new wrong answer fails. No library behavior changes.

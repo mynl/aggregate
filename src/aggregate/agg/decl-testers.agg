@@ -1589,7 +1589,15 @@ agg LW.Low dfreq [1:100] dsev [10002 10007]                                     
 agg LO.T 100 claims dsev [1000 1001] fixed                                        note{bs 1, log2 10 from 99640; was bs 2 from 0, atom split};
 port LO.P agg LO.A dfreq [1] dsev [3]                                             note{bs 1, log2 2; was log2 1 from 3, mass 0};
 agg LO.AWK dfreq [1:100] dsev [1000 1001]                                         note{infeasible at log2 16, warned; log2 17 is exact};
-agg LO.Net 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed     note{the smallest reinsured failure: right mean, wrong law, no flag}
+agg LO.Net 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed     note{the smallest reinsured failure: right mean, wrong law, no flag};
+
+# LM. Layer moments on a closed-form law, wherever the layer attaches ([Analytic-Layer-Tail-Cancellation], 1.49.0)
+# ================================================================================================================
+# The moments agree with the survival integral to 1e-8, and with the grid. See
+# tests/test_layer_tail_moments.py.
+agg LM.Far 1 claim 10 xs 1e5 sev 100 * lognorm 1 fixed                            note{a / y = 1e4, a thin layer; second moment below 100, third positive};
+agg LM.Near 1 claim 10 xs 1000 sev lognorm 1 fixed                                note{a / y = 100, also thin};
+agg LM.Vanishing 1 claim 100 xs 1000 to 1100 disappearing sev lognorm 1 fixed     note{the third moment was -6.48e6, it is 953,304}
 
 
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)

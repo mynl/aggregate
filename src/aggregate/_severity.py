@@ -12,7 +12,7 @@ import pandas as pd
 from scipy.integrate import quad, IntegrationWarning
 import scipy.stats as ss
 from scipy.optimize import newton
-from scipy.special import betainc, loggamma, binom
+from scipy.special import betainc, betaincc, gammaincc, loggamma, log_ndtr, binom
 from scipy.optimize import NoConvergence  # noqa
 from ._help import HelpMixin
 from .constants import (FIG_H, FIG_W, INFO_NA, IgnoredDecLClauseWarning,
@@ -332,10 +332,365 @@ def _partial_e(sev_name, fz, a, n):
         return ans
 
 
+def _partial_e_pareto_type_1_upper(alpha, lam, a, n):
+    r"""Upper partial expected values of a Type-I Pareto.
+
+    Parameters
+    ----------
+    alpha : float
+        Shape (tail index).
+    lam : float
+        Scale, and the lower end of the support.
+    a : float
+        Lower limit of integration; may be ``np.inf``.
+    n : int
+        Highest power required; returns ``k = 0 .. n``.
+
+    Returns
+    -------
+    list of float
+        :math:`\mathsf P[X^k; X > a]`, ``inf`` where ``k >= alpha``.
+
+    Notes
+    -----
+    With :math:`t = \max(a, \lambda)`,
+
+    .. math::
+
+        \mathsf P[X^k; X > a] = \frac{\alpha t^k}{\alpha - k}\,
+            \Bigl(\frac{\lambda}{t}\Bigr)^\alpha, \qquad k < \alpha,
+
+    the tail factored out, so nothing overflows where :math:`\lambda^\alpha`
+    would.
+    """
+    if a == np.inf:
+        return [0.0] * (n + 1)
+    t = max(a, lam)
+    tail = (lam / t) ** alpha
+    return [alpha * t ** k * tail / (alpha - k) if k < alpha else np.inf
+            for k in range(n + 1)]
+
+
+def _partial_e_lomax_upper(alpha, lam, a, n):
+    r"""Upper partial expected values of a Lomax (shifted Pareto) severity.
+
+    Parameters
+    ----------
+    alpha : float
+        Shape (tail index).
+    lam : float
+        Scale.
+    a : float
+        Lower limit of integration; may be ``np.inf``.
+    n : int
+        Highest power required; returns ``k = 0 .. n``.
+
+    Returns
+    -------
+    list of float
+        :math:`\mathsf P[X^k; X > a]`, ``inf`` where ``k >= alpha``.
+
+    Notes
+    -----
+    The series of :func:`_partial_e_lomax` on the Type-I tail: with
+    :math:`Y = X + \lambda`,
+
+    .. math::
+
+        \mathsf P[X^k; X > a] = \sum_{i=0}^{k}\binom{k}{i}(-\lambda)^{k-i}\,
+            \mathsf P[Y^i; Y > \lambda + a].
+    """
+    if a == np.inf:
+        return [0.0] * (n + 1)
+    inner = _partial_e_pareto_type_1_upper(alpha, lam, lam + a, n)
+    ans = []
+    for k in range(n + 1):
+        if not np.all(np.isfinite(inner[:k + 1])):
+            ans.append(np.inf)
+        else:
+            ans.append(sum(binom(k, i) * (-lam) ** (k - i) * inner[i]
+                           for i in range(k + 1)))
+    return ans
+
+
+def _partial_e_upper(sev_name, fz, a, n):
+    r"""Upper partial expected values of a frozen scipy law, in closed form.
+
+    Parameters
+    ----------
+    sev_name : str
+        scipy.stats name of the law, one of :data:`_ANALYTIC_KINDS`.
+    fz : scipy.stats frozen distribution
+        The law itself.
+    a : float
+        Lower limit of integration; may be ``np.inf``.
+    n : int
+        Highest power required.
+
+    Returns
+    -------
+    list of float or None
+        :math:`\mathsf P[X^k; X > a]` for ``k = 0, ..., n``, ``inf`` where the
+        moment does not exist. ``None`` for a ``pareto``, ``lomax`` or ``beta``
+        shifted other than the standard way, the laws :func:`_partial_e` sends
+        to quadrature.
+
+    Notes
+    -----
+    The complement of :func:`_partial_e`, kind by kind: the same shift of the
+    shape, with the complementary regularized function in place of the cdf.
+    The lognormal is evaluated in log form because
+    :math:`\exp(k\mu + k^2\sigma^2/2)` overflows at a large :math:`\sigma`
+    while its product with the normal tail does not.
+    """
+    if a == np.inf:
+        return [0.0] * (n + 1)
+    if sev_name == 'lognorm':
+        sigma = fz.args[0]
+        mu = np.log(fz.stats('m')) - sigma ** 2 / 2
+        z = (np.log(a) - mu) / sigma
+        return [np.exp(k * mu + (k * sigma) ** 2 / 2 + log_ndtr(k * sigma - z))
+                for k in range(n + 1)]
+    if sev_name in ('gamma', 'expon'):
+        shape = 1. if sev_name == 'expon' else fz.args[0]
+        scale = fz.stats('m') / shape
+        lgs = loggamma(shape)
+        return [scale ** k * np.exp(loggamma(shape + k) - lgs)
+                * gammaincc(shape + k, a / scale) for k in range(n + 1)]
+    if sev_name == 'pareto':
+        alpha = fz.args[0]
+        lam = fz.kwds['scale']
+        loc = fz.kwds.get('loc', 0.0)
+        if loc == 0.0:
+            return _partial_e_pareto_type_1_upper(alpha, lam, a, n)
+        if lam + loc != 0:
+            return None
+        return _partial_e_lomax_upper(alpha, lam, a, n)
+    if sev_name == 'lomax':
+        if fz.kwds.get('loc', 0.0) != 0:
+            return None
+        return _partial_e_lomax_upper(fz.args[0], fz.kwds.get('scale', 1.0), a, n)
+    if sev_name == 'beta':
+        p, q = fz.args[:2]
+        lo, hi = fz.support()
+        if lo != 0:
+            return None
+        t = min(a / hi, 1.0)
+        ans = []
+        r = 1.0
+        for k in range(n + 1):
+            ans.append(hi ** k * r * betaincc(p + k, q, t))
+            r *= (p + k) / (p + q + k)
+        return ans
+    raise NotImplementedError(f'{sev_name} NYI for analytic moments')
+
+
+def _partial_e_difference(sev_name, fz, a, d, n):
+    r"""``P[X^k; a < X <= d]``, ``k = 0..n``, differencing whichever side keeps digits.
+
+    Parameters
+    ----------
+    sev_name : str
+        scipy.stats name of the law, one of :data:`_ANALYTIC_KINDS`.
+    fz : scipy.stats frozen distribution
+        The law itself.
+    a, d : float
+        Ends of the interval; ``d`` may be ``np.inf``.
+    n : int
+        Highest power required.
+
+    Returns
+    -------
+    list of float
+        Length ``n + 1``, ``inf`` where ``d`` is infinite and the moment does
+        not exist.
+
+    Notes
+    -----
+    Past the median two lower partial expectations are nearly equal and their
+    difference loses about :math:`F(a)/S(a)` in relative accuracy, so the
+    upper ones are differenced there. At or below the median the lower form
+    is used, which is what keeps an ordinary layer's value where it was.
+
+    An upper partial expectation of order :math:`k \ge \alpha` is infinite on
+    a Pareto or Lomax, while the difference to a finite :math:`d` is not, so
+    those orders fall back to the lower form: it is dominated by the top of
+    the interval and cannot cancel the same way.
+    """
+    upper_a = upper_d = None
+    if fz.sf(a) < 0.5:
+        upper_a = _partial_e_upper(sev_name, fz, a, n)
+    if upper_a is not None:
+        upper_d = _partial_e_upper(sev_name, fz, d, n)
+    if upper_d is not None and np.all(np.isfinite(upper_a)):
+        return [upper_a[k] - upper_d[k] for k in range(n + 1)]
+    pe_a = _partial_e(sev_name, fz, a, n)
+    pe_d = _partial_e(sev_name, fz, d, n)
+    if upper_d is None:
+        return [pe_d[k] - pe_a[k] for k in range(n + 1)]
+    return [upper_a[k] - upper_d[k] if np.isfinite(upper_a[k]) else pe_d[k] - pe_a[k]
+            for k in range(n + 1)]
+
+
+def _expand_about_attachment(difference, attachment, n):
+    r"""``P[(X-a)^m; a < X <= d]``, ``m = 0..n``, from ``P[X^k; a < X <= d]``.
+
+    Parameters
+    ----------
+    difference : sequence of float
+        ``P[X^k; a < X <= d]``, ``k = 0..n``.
+    attachment : float
+        The point ``a`` expanded about.
+    n : int
+        Highest power required.
+
+    Returns
+    -------
+    numpy.ndarray
+        Length ``n + 1``.
+
+    Notes
+    -----
+    The binomial expansion is unusable the moment any term is infinite: with
+    attachment 0 the low-order coefficients are 0, so a term is 0 * inf, and
+    with attachment > 0 the alternating signs give inf - inf. Both produce nan
+    for a layer moment that is simply infinite.
+
+    Short-circuit instead. A layer capped at a finite limit is bounded by
+    limit**m, so every difference to a finite detachment is finite and the sum
+    is safe. Only an UNLIMITED layer can diverge, and the m-th moment of an
+    unlimited excess layer exists exactly when E[X**m] does, which is what
+    ``difference[m]`` reports. Lower orders are then finite too (Lyapunov), so
+    the sum is only ever evaluated on finite terms.
+    """
+    return np.array([
+        np.inf if not np.isfinite(difference[m]) else
+        sum([(-1) ** (m - k) * binom(m, k) * attachment ** (m - k) * difference[k]
+             for k in range(m + 1)])
+        for m in range(n + 1)])
+
+
+def _excess_moments_beta_top(fz, a, width, n):
+    r"""``P[(X-a)^m; a < X <= a + width]`` for a beta, from the top of its support.
+
+    Parameters
+    ----------
+    fz : scipy.stats frozen distribution
+        A frozen ``beta``.
+    a : float
+        Attachment, below the top of the support.
+    width : float
+        Layer width; may be ``np.inf``.
+    n : int
+        Highest power required.
+
+    Returns
+    -------
+    numpy.ndarray
+        Length ``n + 1``.
+
+    Notes
+    -----
+    Near the top of the support :math:`a/y` is large at every width, and the
+    density :math:`(\text{top} - x)^{q-1}` is singular or barely differentiable
+    there for small :math:`q`, so neither the expansion about :math:`a` nor a
+    fixed quadrature rule holds up. Reflecting does. With :math:`e = \text{top}
+    - a`, the variable :math:`U = \text{top} - X` is a beta with the shapes
+    exchanged and :math:`X - a = e - U`, so
+
+    .. math::
+
+        \mathsf P[(X-a)^m; a < X \le a + y] = \sum_{k=0}^{m}\binom{m}{k}
+            e^{m-k}(-1)^k\, \mathsf P[U^k; e - y \le U < e].
+
+    The terms have the size of the answer unless :math:`y \ll e`, a layer
+    narrow against its distance to the top, where the density is smooth and
+    :func:`_excess_moments` integrates directly instead.
+    """
+    p, q = fz.args[:2]
+    lo, hi = fz.support()
+    scale = hi - lo
+    e = hi - a
+    bottom = max(e - width, 0.0)
+    difference = []
+    r = 1.0
+    for k in range(n + 1):
+        difference.append(scale ** k * r * (betainc(q + k, p, e / scale)
+                                            - betainc(q + k, p, bottom / scale)))
+        # r_{k+1} = r_k (q + k) / (p + q + k), the ratio B(q+k+1, p)/B(q, p)
+        r *= (q + k) / (p + q + k)
+    return np.array([sum(binom(m, k) * e ** (m - k) * (-1) ** k * difference[k]
+                         for k in range(m + 1))
+                     for m in range(n + 1)])
+
+
+def _excess_moments(sev_name, fz, a, width, n):
+    r"""``P[(X-a)^m; a < X <= a + width]``, ``m = 0..n``, wherever the layer sits.
+
+    Parameters
+    ----------
+    sev_name : str
+        scipy.stats name of the law, one of :data:`_ANALYTIC_KINDS`.
+    fz : scipy.stats frozen distribution
+        The law itself.
+    a : float
+        Attachment.
+    width : float
+        Layer width; may be ``np.inf``.
+    n : int
+        Highest power required.
+
+    Returns
+    -------
+    numpy.ndarray
+        Length ``n + 1``. The mass at the top of the layer is not included.
+
+    Notes
+    -----
+    Differencing partial expectations and expanding about :math:`a` subtracts
+    terms of size :math:`a^m \mathsf P[a < X \le d]` to leave an answer of
+    size :math:`y^m \mathsf P[a < X \le d]`, so it loses about
+    :math:`(a/y)^m` to rounding whichever side is differenced. Upper partial
+    expectations (:func:`_partial_e_difference`) remove the further
+    :math:`F(a)/S(a)` past the median but not this factor, which at
+    :math:`a/y = 10^4` leaves a third moment wrong by about 2%. It is the
+    width of the layer rather than its depth in the tail that does the damage.
+
+    So a thin layer, :data:`_THIN_LAYER_RATIO` or more times narrower than its
+    attachment, is integrated directly,
+
+    .. math::
+
+        \mathsf P[(X-a)^m; a < X \le a + y] = \int_0^y t^m f(a + t)\,dt,
+
+    by a fixed Gauss-Legendre rule. The integrand is positive, so nothing
+    cancels, and the density is smooth across so narrow a layer. The range is
+    clipped to the support, since a density edge inside the range would spoil
+    the rule. A thin layer near the top of a ``beta`` is the exception: the
+    density may be singular at that end, so it is reflected instead, which is
+    exact at every shape (:func:`_excess_moments_beta_top`).
+    """
+    if sev_name not in _ANALYTIC_KINDS:
+        raise NotImplementedError(f'{sev_name} NYI for analytic moments')
+    lo, hi = fz.support()
+    t_lo = max(lo - a, 0.0)
+    t_hi = min(width, hi - a)
+    narrow = t_hi - t_lo
+    if narrow > 0 and a > _THIN_LAYER_RATIO * narrow:
+        if sev_name == 'beta' and hi - a <= _THIN_LAYER_RATIO * narrow:
+            return _excess_moments_beta_top(fz, a, width, n)
+        t = t_lo + 0.5 * narrow * (_THIN_LAYER_NODES + 1)
+        w = 0.5 * narrow * _THIN_LAYER_WEIGHTS
+        f = fz.pdf(a + t)
+        return np.array([np.sum(w * t ** m * f) for m in range(n + 1)])
+    return _expand_about_attachment(
+        _partial_e_difference(sev_name, fz, a, a + width, n), a, n)
+
+
 def _moms_analytic(fz, limit, attachment, n, analytic=True):
     """
     Return moments of :math:`E[(X-attachment)^+ \\wedge limit]^m`
-    for m = 1,2,...,n.
+    for m = 0,1,...,n.
 
     To check:
     ::
@@ -354,39 +709,28 @@ def _moms_analytic(fz, limit, attachment, n, analytic=True):
     :param attachment: double, limit
     :param n: int, power
     :param analytic: if True use analytic formula, else numerical integrals
+
+    Notes
+    -----
+    The analytic route is :func:`_excess_moments`, which picks the form that
+    keeps its digits for the layer at hand. The numerical route is the lower
+    difference at every attachment, kept as the audit of the closed form.
     """
     # easy
     if limit == 0:
-        return np.array([0.] * n)
+        return np.zeros(n + 1)
 
     # don't know how robust this will be...
     sev_name = str(fz.__dict__['dist']).split('.')[-1].split('_')[0]
 
-    # compute and store the partial_e
     detachment = attachment + limit
     if analytic is True:
-        pe_attach = _partial_e(sev_name, fz, attachment, n)
-        pe_detach = _partial_e(sev_name, fz, detachment, n)
+        ans1 = _excess_moments(sev_name, fz, attachment, limit, n)
     else:
         pe_attach = _partial_e_numeric(fz, attachment, n)
         pe_detach = _partial_e_numeric(fz, detachment, n)
-
-    # The binomial expansion is unusable the moment any partial expectation is
-    # infinite: with attachment 0 the low-order coefficients are 0, so a term
-    # reads 0 * inf, and with attachment > 0 the alternating signs give
-    # inf - inf. Both produce nan for a layer moment that is simply infinite.
-    #
-    # Short-circuit instead. A layer capped at a finite limit is bounded by
-    # limit**m, so every partial expectation to a finite detachment is finite
-    # and the sum is safe. Only an UNLIMITED layer can diverge, and the m-th
-    # moment of an unlimited excess layer exists exactly when E[X**m] does,
-    # which is what pe_detach[m] reports. Lower orders are then finite too
-    # (Lyapunov), so the sum below is only ever evaluated on finite terms.
-    ans1 = np.array([
-        np.inf if not np.isfinite(pe_detach[m]) else
-        sum([(-1) ** (m - k) * binom(m, k) * attachment ** (m - k) * (pe_detach[k] - pe_attach[k])
-             for k in range(m + 1)])
-        for m in range(n + 1)])
+        ans1 = _expand_about_attachment(
+            [pe_detach[k] - pe_attach[k] for k in range(n + 1)], attachment, n)
 
     if np.isinf(limit):
         ans2 = np.zeros_like(ans1)
@@ -402,6 +746,17 @@ def _moms_analytic(fz, limit, attachment, n, analytic=True):
 #: closed form, and so the kinds whose layered moments :meth:`Severity.moms`
 #: computes exactly rather than by quadrature.
 _ANALYTIC_KINDS = ('lognorm', 'gamma', 'pareto', 'expon', 'lomax', 'beta')
+
+#: :func:`_excess_moments` integrates a layer directly once its attachment is
+#: more than this many times its width. Below it the upper form still holds a
+#: third moment to about 5e-10; the expansion's loss grows as the cube of the
+#: ratio.
+_THIN_LAYER_RATIO = 16
+
+#: Gauss-Legendre nodes and weights on ``[-1, 1]`` for a thin layer. Sixty-four
+#: points resolve a survival function falling by many orders of magnitude
+#: across the layer, which a thin tail does at a large attachment.
+_THIN_LAYER_NODES, _THIN_LAYER_WEIGHTS = np.polynomial.legendre.leggauss(64)
 
 #: The kinds :func:`feasible_bucket` reads. Everything else reports nothing
 #: rather than guessing; see that function's Notes. A subset of
@@ -1250,14 +1605,15 @@ def make_layer_retention_isf(attachment, retention_end, limit, pattach,
     return actual_decorator
 
 
-def _moms_retention(partial_e, sf, attachment, retention_end, limit, n):
+def _moms_retention(difference, excess, sf, attachment, retention_end, limit, n):
     """Raw moments ``E[g(X)^m]``, ``m = 0..n``, unconditional (not divided by ``S(d1)``).
 
     Parameters
     ----------
-    partial_e : callable
-        ``partial_e(t)`` returns ``[E[X^j; X <= t] for j in 0..n]``, analytic
-        (:func:`_partial_e`) or numerical (:func:`_partial_e_numeric`).
+    difference : callable
+        ``difference(a, d)`` returns ``[E[X^j; a < X <= d] for j in 0..n]``.
+    excess : callable
+        ``excess(a, w)`` returns ``[E[(X - a)^m; a < X <= a + w] for m in 0..n]``.
     sf : callable
         Ground-up survival function.
     attachment, retention_end, limit : float
@@ -1284,26 +1640,25 @@ def _moms_retention(partial_e, sf, attachment, retention_end, limit, n):
     where the identity term is present only when ``D > d2``. The three terms
     are the ramp on ``(d1, min(d2, D)]``, the identity piece on ``(d2, D]``
     and the mass at the limit. The ramp is absent for the franchise
-    (``d2 = d1``). An infinite limit drops the mass term and reads the
+    (``d2 = d1``). An infinite limit drops the mass term and treats the
     identity piece as the tail of ``E[X^m]``.
+
+    The ramp and the identity piece take the same care as an ordinary layer,
+    through ``excess`` and ``difference``: the sum above and the difference
+    ``PE_m(D) - PE_m(d2)`` cancel in the far tail as :func:`_moms_analytic`
+    would (:func:`_excess_moments`).
     """
     d1, d2, y = attachment, retention_end, limit
     det = _retention_detachment(d1, d2, y)
     ramp_end = min(d2, det)
-    pe_d1 = np.asarray(partial_e(d1), dtype=float)
-    pe_ramp = np.asarray(partial_e(ramp_end), dtype=float)
-    pe_d2 = np.asarray(partial_e(d2), dtype=float)
-    pe_det = np.asarray(partial_e(det), dtype=float)
+    ramp = excess(d1, ramp_end - d1) if d2 > d1 else None
+    ident = difference(d2, det) if det > d2 else None
     out = np.zeros(n + 1)
     for m in range(n + 1):
-        ramp = 0.0
-        if d2 > d1:
-            k = d2 / (d2 - d1)
-            ramp = k ** m * sum(binom(m, j) * (-d1) ** (m - j)
-                                * (pe_ramp[j] - pe_d1[j]) for j in range(m + 1))
-        ident = pe_det[m] - pe_d2[m] if det > d2 else 0.0
+        ramp_m = (d2 / (d2 - d1)) ** m * ramp[m] if ramp is not None else 0.0
+        ident_m = ident[m] if ident is not None else 0.0
         mass = y ** m * float(sf(det)) if np.isfinite(y) else 0.0
-        out[m] = ramp + ident + mass
+        out[m] = ramp_m + ident_m + mass
     return out
 
 
@@ -2793,12 +3148,19 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             raw = [float(np.sum(g ** m * self.fz.pk)) for m in (1, 2, 3)]
         else:
             if self._uses_closed_form_moments():
-                def pe(t):
-                    return _partial_e(self.sev_name, self.fz, t, 3)
+                def difference(lo, hi):
+                    return _partial_e_difference(self.sev_name, self.fz, lo, hi, 3)
+
+                def excess(lo, width):
+                    return _excess_moments(self.sev_name, self.fz, lo, width, 3)
             else:
-                def pe(t):
-                    return _partial_e_numeric(self.fz, t, 3)
-            raw = list(_moms_retention(pe, self.fz.sf, a, r, y, 3)[1:])
+                def difference(lo, hi):
+                    return (np.asarray(_partial_e_numeric(self.fz, hi, 3), dtype=float)
+                            - np.asarray(_partial_e_numeric(self.fz, lo, 3), dtype=float))
+
+                def excess(lo, width):
+                    return _expand_about_attachment(difference(lo, lo + width), lo, 3)
+            raw = list(_moms_retention(difference, excess, self.fz.sf, a, r, y, 3)[1:])
         if self.conditional:
             if self.pattach == 0:
                 return 0.0, 0.0, 0.0

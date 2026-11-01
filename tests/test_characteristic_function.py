@@ -1198,8 +1198,8 @@ def test_every_corpus_chfagg_line_round_trips():
     from aggregate import Underwriter
     uw = Underwriter(update=False)
     root = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg'
-    lines = [ln.rstrip().rstrip(';') for f in ('_test_suite.agg', 'decl-testers.agg')
-             for ln in (root / f).read_text(encoding='utf-8').splitlines() if ln.startswith('chfagg ')]
+    lines = [ln.rstrip().rstrip(';') for ln in (root / 'decl-testers.agg').read_text(encoding='utf-8').splitlines()
+             if ln.startswith('chfagg ')]
     assert len(lines) >= 30
     for program in lines:
         kind, name, spec = _parse(uw, program)
@@ -1275,7 +1275,7 @@ def test_info_has_aggregates_rows_then_the_inversion_block():
     agg_labels = labels(a.info)
     head = agg_labels[:agg_labels.index('validation') + 1]
     root = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg'
-    lines = [ln.rstrip().rstrip(';') for ln in (root / '_test_suite.agg').read_text(encoding='utf-8').splitlines()
+    lines = [ln.rstrip().rstrip(';') for ln in (root / 'decl-testers.agg').read_text(encoding='utf-8').splitlines()
              if ln.startswith('chfagg ')]
     for program in lines:
         c = build(program)
@@ -1397,7 +1397,7 @@ def test_aggregate_and_portfolio_keep_their_opening():
 
 def test_every_corpus_explanation_has_the_shared_opening():
     root = Path(__file__).resolve().parents[1] / 'src' / 'aggregate' / 'agg'
-    lines = [ln.rstrip().rstrip(';') for ln in (root / '_test_suite.agg').read_text(encoding='utf-8').splitlines()
+    lines = [ln.rstrip().rstrip(';') for ln in (root / 'decl-testers.agg').read_text(encoding='utf-8').splitlines()
              if ln.startswith('chfagg ')]
     for program in lines:
         c = build(program)

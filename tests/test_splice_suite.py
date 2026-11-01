@@ -1,18 +1,13 @@
-"""Parametric tests for splice / splice-and-layer cases from _test_suite2.agg.
+"""Parametric tests for splice / splice-and-layer cases.
 
 Twelve cases hand-curated by the user that exercise the `sev_lb` / `sev_ub`
 splice path with and without policy layers. Four of them describe
 measure-zero splices (the splice window does not intersect the underlying
-distribution's support) and must raise ``ValueError`` at construction time.
-
-Lives alongside (not inside) ``_test_suite.agg`` so the established 134-line
-parametric test count doesn't move; the two files will be consolidated in
-a later pass.
+distribution's support) and must raise ``ValueError`` at construction time, so
+``decl-testers.agg`` holds those four commented out (section TS).
 """
 
 from __future__ import annotations
-
-from pathlib import Path
 
 import pytest
 
@@ -20,7 +15,20 @@ from aggregate.distributions import Aggregate, Severity
 from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
-SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite2.agg"
+PROGRAMS = """
+sev G.Splice01  10 * uniform + 5 splice [8  12];
+sev G.Splice02  10 * uniform + 5 splice [1   2]  note{error in plot};
+sev G.Splice03  10 * uniform + 5 splice [1  10];
+sev G.Splice04  10 * uniform + 5 splice [12 20];
+sev G.Splice05  10 * uniform + 5 splice [20 30]  note{error in plot};
+agg G.Splice06  1  claim          sev 10 * uniform + 5 splice [8 12] fixed;
+agg G.Splice07  1  claim          sev 10 * uniform + 5 splice [1  2] fixed note{error in plot};
+agg G.Splice08  1  claim          sev 10 * uniform + 5 splice [1 10] fixed;
+agg G.Splice09  1  claim          sev 10 * uniform + 5 splice [12 20] fixed;
+agg G.Splice10  1  claim          sev 10 * uniform + 5 splice [20 30] fixed note{error in plot};
+agg G.Splice11  1  claim  5 xs 3        sev 10 * uniform + 5 splice [8 12] fixed note{full limit loss};
+agg G.Splice12  1  claim  2 xs 8        sev 10 * uniform + 5 splice [8 12] fixed note{proper excess layer}
+"""
 
 # Names of the four cases that describe measure-zero splices — the splice
 # window lies entirely outside the underlying distribution's support, so the
@@ -28,16 +36,11 @@ SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test
 INVALID_NAMES = {"Splice02", "Splice05", "Splice07", "Splice10"}
 
 
-def _load_lines() -> list[str]:
-    text = SUITE_PATH.read_text(encoding="utf-8")
-    return UnderwritingLexer.preprocess(text)
-
-
 def _line_id(line: str) -> str:
     return (line[:80] + "...") if len(line) > 80 else line
 
 
-LINES = _load_lines()
+LINES = UnderwritingLexer.preprocess(PROGRAMS)
 
 
 @pytest.fixture(scope="module")
@@ -92,7 +95,7 @@ def _build_from_spec(kind: str, spec: dict):
     """Instantiate the appropriate top-level object from a parsed spec.
 
     Mirrors the dispatch in ``Underwriter._factory`` for the two kinds that
-    appear in ``_test_suite2.agg``. We don't go through ``Underwriter.write``
+    appear in ``PROGRAMS``. We don't go through ``Underwriter.write``
     because the splice failures need to surface as a ``ValueError`` at the
     Severity layer; the Underwriter wraps errors and rebuilds.
     """

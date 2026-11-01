@@ -8,7 +8,7 @@ from aggregate.constants import reset_warn_once
 from aggregate.parser import UnderwritingLexer
 from aggregate.underwriter import Underwriter
 
-TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
+DECL_TESTERS_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "decl-testers.agg"
 
 
 @pytest.fixture(autouse=True)
@@ -26,22 +26,16 @@ def _reset_warn_once():
 
 
 @pytest.fixture(scope="session")
-def test_suite_lines() -> list[str]:
-    """All preprocessed DecL lines from aggregate/agg/_test_suite.agg."""
-    text = TEST_SUITE_PATH.read_text(encoding="utf-8")
-    return UnderwritingLexer.preprocess(text)
+def underwriter():
+    """An Underwriter with the decl-testers.agg recipes tolerantly preloaded.
 
-
-@pytest.fixture(scope="session")
-def underwriter(test_suite_lines):
-    """An Underwriter with the _test_suite.agg recipes tolerantly preloaded.
-
-    Each line is parsed and added to the recipe base; parse failures are
+    Each statement is parsed and added to the recipe base; parse failures are
     swallowed here so they surface as individual test failures in the
-    parametrized parse tests rather than as a fixture error.
+    parametrized parse tests rather than as a fixture error, which ``load``
+    would raise for every user of the fixture.
     """
     uw = Underwriter()
-    for line in test_suite_lines:
+    for line in UnderwritingLexer.preprocess(DECL_TESTERS_PATH.read_text(encoding="utf-8")):
         try:
             kind, name, spec = uw.parser.parse(uw.lexer.tokenize(line))
         except Exception:

@@ -44,7 +44,7 @@ J_RE14_SKEW = -7.691
 
 @pytest.fixture(scope='module')
 def uw():
-    return Underwriter(databases=['library', '_test_suite'])
+    return Underwriter(databases=['library', 'decl-testers'])
 
 
 def theory_skew(a):

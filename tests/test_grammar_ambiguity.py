@@ -131,7 +131,7 @@ def test_sweep_actually_covers_the_corpus():
     files = {name for name, _ in statements}
     assert len(statements) > 500, f'only {len(statements)} statements swept'
     assert 'decl-testers.agg' in files
-    assert '_test_suite.agg' in files
+    assert 'library.agg' in files
 
 
 # ----------------------------------------------------------------------

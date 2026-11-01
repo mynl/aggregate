@@ -51,8 +51,7 @@ from aggregate.decl_words import (
 from aggregate.parser_errors import _TERMINAL_LABELS
 
 #: The shipped DecL corpora, tokenized whole by the corpus tests below.
-CORPORA = ('library.agg', '_test_suite.agg', '_test_suite2.agg',
-           'decl-testers.agg')
+CORPORA = ('library.agg', 'decl-testers.agg')
 
 #: The Sublime Text colorer, the second hand-maintained mirror.
 SUBLIME_FILE = Path(__file__).parents[1] / 'agg.sublime-syntax'

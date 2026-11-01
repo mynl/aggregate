@@ -36,7 +36,7 @@ _AGG_DIR = Path(aggregate.__file__).parent / 'agg'
 # ``library.agg`` is here for the grammar rules ``decl-testers.agg`` leaves to it
 # (``tower``, ``sev_builtin``, ``freq_mixed_two``, ...), which no other file
 # round-trips.
-_CORPUS_FILES = ['_test_suite.agg', '_test_suite2.agg', 'decl-testers.agg', 'library.agg']
+_CORPUS_FILES = ['decl-testers.agg', 'library.agg']
 
 # Genuinely lossy / non-canonical-spec constructs: idempotence holds but the
 # first parse's spec is not a fixed point, so fidelity is exempt. These six are

@@ -143,8 +143,11 @@ def test_fork_is_a_snapshot_not_a_subscription():
 
 def test_interpret_file_is_written_on_fork():
     """The hand-rolled scratch copy interpret_file used to carry."""
+    # The base is lazy and a fork loads it, so load first or this compares
+    # against an empty set on a worker where this test runs first.
+    _ = global_build.recipes
     before = set(global_build._recipes)
-    df = global_build.interpret_file()
+    df = global_build.interpret_file(global_build.default_dir / 'decl-testers.agg')
     assert df.error.sum() == 0
     # validating a file must not pollute the base that validated it
     assert set(global_build._recipes) == before

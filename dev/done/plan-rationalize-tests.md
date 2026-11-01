@@ -173,3 +173,21 @@ Divergences:
 - **Section headings lose their dashes**, since the Contents list is generated from them and the list now names all 71 sections.
 - **The library round trip is 198 faithful, 2 skipped, 6 exempt, not 206.** `Capstone.XOL.PnL`, `Capstone.PnL`, `Capstone.Capped`, `SwingRatedAggCover`, `RetroRatedAccount` and `SlidingScaleCommission` are a pnl or xpnl on a named engine. The parser keeps the referenced recipe's note as `engine_note`, the underwriter strips it before build, and the canonical form inlines the engine with nowhere to write it. All six stay idempotent. They go in `_FIDELITY_EXEMPT`, which had been empty since 1.0.0a231, since this step changes tests only, and `[Unparser-Reference-Gaps]` records the loss.
 - **The rule census has moved a little.** Five, not seven, rules are exercised by the scaffold and `library.agg` but not `decl-testers.agg`, since later programs picked up `layers_xs_disappearing` and `layers_xs_franchise`.
+
+### `[Snapshot-On-Decl-Testers]`
+
+Acceptance measured: `expected_specs.json` has 647 entries and no `error`, 443 KB against 156 KB. The 23 programs in both the old and the new snapshot have identical specs. The fast suite passes with the scaffold present and unread: 9678 passed, 3 skipped. A grep of `tests/` for `_test_suite` finds five docstrings and no read, and nothing calls `interpret_file()` without an argument.
+
+Divergences:
+
+- **647 entries, not 547,** since the corpus had grown to 624 statements before section TS added 23.
+- **The key is the kind word and name as written, with `#2`, `#3` for a repeat, not `(kind, name)`.** The plan's key cannot hold: seven pairs repeat in section DP, which holds an input and the programs derived from it under one name, so 17 statements share them and `(kind, name)` would silently keep 7. The text key needs no parse at collection, which every xdist worker would pay for. It groups the corpus exactly as the parsed pair does (measured, 637 groups each), and `capture_spec_snapshot.main` asserts that the name agrees. A view word stays in the key (`grossnet agg Name`). Spacing and `note{}` edits leave a key alone, which is what the plan wanted; only within DP does a key also depend on order.
+- **27 specs hold objects with no JSON form,** `Copula`, `INHERIT_PREMIUM` and `DERIVE_PREMIUM`, which the plan did not anticipate. `plain_value` gives each a plain form for both the capture and the comparison. A copula is its family and parameter, the two fields `test_decl_unparser` compares.
+- **`VALID_KINDS` gains `pnl`, `xpnl` and `bvagg`,** which the scaffold never had.
+- **`test_decl_parser` imports from the capture script** rather than repeating its sentinels, so `tests/test_decl_parser.py` and `tests/capture_spec_snapshot.py` cannot disagree. An `error` entry now fails where it used to skip, and `test_snapshot_has_no_orphan_entries` is new, so a removed or renamed program is noticed.
+- **The `underwriter` fixture keeps its tolerant loop** rather than `load`, which would turn one typo into an error in every test using the fixture.
+- **The twelve splices go inline verbatim from `_test_suite2.agg`.** The plan's "8 from section T" is wrong: section T holds five other programs.
+- **The two `chfagg` test bodies now cover 35 statements, not 14,** since they select on the `chfagg ` prefix of `decl-testers.agg`. All 35 pass, so no narrowing to `CHF.` was needed.
+- **`test_interpret_file_is_written_on_fork` loads the base first.** It compared against `set(_recipes)` of a lazy base, which is empty on a worker where this test runs first, and a fork loads it. Measured in a scratch run; found while repointing the line, and it is a one-line guard.
+
+Consequence for later plans: a program appended to `decl-testers.agg` fails `test_spec_matches_snapshot` until the snapshot is re-captured, so a re-capture is now routine at a bump. The file's header says so, and `CLAUDE.md` and the skills follow at `[Scaffold-Retirement]`.

@@ -1,48 +1,33 @@
-"""Parse tests for every line of aggregate/agg/_test_suite.agg.
+"""Parse tests for every statement of aggregate/agg/decl-testers.agg.
 
-These tests are the regression net for the SLY -> Lark parser migration.
-Each DecL line in _test_suite.agg becomes its own parametrized test case so
-a parser failure points at the specific offending line.
+Each statement becomes its own parametrized test case, so a parser failure
+points at the specific program.
 
 Two test functions:
 
-- ``test_line_parses`` only checks that the line parses and returns a valid
+- ``test_line_parses`` only checks that the statement parses and returns a valid
   ``(kind, name, spec)`` shape.
-- ``test_spec_matches_snapshot`` compares the spec against a JSON snapshot
-  captured from SLY before the Lark migration, catching any semantic drift.
+- ``test_spec_matches_snapshot`` compares the spec against the JSON snapshot
+  written by ``tests/capture_spec_snapshot.py``, a change detector for semantic
+  drift in the grammar and the transformer.
 """
 
 import json
 import math
 import sys
 from fractions import Fraction
-from pathlib import Path
 
 import numpy as np
 import pytest
 
 from aggregate import Severity, build
 from aggregate.parser import UnderwritingLexer
-
-TEST_SUITE_PATH = Path(__file__).parent.parent / "src" / "aggregate" / "agg" / "_test_suite.agg"
-SNAPSHOT_PATH = Path(__file__).parent / "data" / "expected_specs.json"
+from tests.capture_spec_snapshot import (CORPUS, NAN_SENTINEL, NEG_INF_SENTINEL,
+                                         OUT as SNAPSHOT_PATH, POS_INF_SENTINEL,
+                                         plain_value, statement_keys)
 
 VALID_KINDS = {"agg", "sev", "port", "distortion", "expr", "nttagg", "chfagg",
-               "stable", "tweedie"}
-
-# Sentinels used by tests/capture_spec_snapshot.py for non-JSON floats.
-POS_INF_SENTINEL = "__inf__"
-NEG_INF_SENTINEL = "__-inf__"
-NAN_SENTINEL = "__nan__"
-
-
-def _load_lines() -> list[str]:
-    text = TEST_SUITE_PATH.read_text(encoding="utf-8")
-    return UnderwritingLexer.preprocess(text)
-
-
-def _line_id(line: str) -> str:
-    return (line[:80] + "...") if len(line) > 80 else line
+               "stable", "tweedie", "pnl", "xpnl", "bvagg"}
 
 
 def _from_sentinel(obj):
@@ -68,6 +53,7 @@ def _normalize(obj):
     Converts numpy arrays/scalars to plain Python lists/numbers so that
     ``assert actual == expected`` works against JSON-loaded data.
     """
+    obj = plain_value(obj)
     if isinstance(obj, Fraction):
         # exact nttagg probabilities; capture_spec_snapshot.jsonify writes
         # the same "a/b" string form
@@ -113,13 +99,14 @@ def _assert_equal(actual, expected, path: str = ""):
     assert actual == expected, f"At {path}: {actual!r} != {expected!r}"
 
 
-LINES = _load_lines()
+LINES = UnderwritingLexer.preprocess(CORPUS.read_text(encoding="utf-8"))
+KEYS = statement_keys(LINES)
 SNAPSHOT = _from_sentinel(json.loads(SNAPSHOT_PATH.read_text(encoding="utf-8")))
 
 
-@pytest.mark.parametrize("line", LINES, ids=[_line_id(ln) for ln in LINES])
+@pytest.mark.parametrize("line", LINES, ids=KEYS)
 def test_line_parses(line: str, underwriter):
-    """Every DecL line in _test_suite.agg must parse to a valid (kind, name, spec)."""
+    """Every statement of decl-testers.agg must parse to a valid (kind, name, spec)."""
     kind, name, spec = underwriter.parser.parse(underwriter.lexer.tokenize(line))
     assert kind in VALID_KINDS, f"Unexpected kind {kind!r} for line: {line}"
     assert isinstance(name, str) and name, f"Empty name for line: {line}"
@@ -127,17 +114,23 @@ def test_line_parses(line: str, underwriter):
         assert isinstance(spec, dict), f"Spec should be a dict for kind {kind}, got {type(spec)}"
 
 
-@pytest.mark.parametrize("line", LINES, ids=[_line_id(ln) for ln in LINES])
-def test_spec_matches_snapshot(line: str, underwriter):
-    """Parsed (kind, name, spec) must match the SLY-captured snapshot exactly."""
-    expected = SNAPSHOT.get(line)
-    assert expected is not None, f"No snapshot entry for line: {line}"
-    if "error" in expected:
-        pytest.skip(f"Line errored in SLY snapshot: {expected['error']}")
+@pytest.mark.parametrize("key, line", list(zip(KEYS, LINES)), ids=KEYS)
+def test_spec_matches_snapshot(key: str, line: str, underwriter):
+    """Parsed (kind, name, spec) must match the captured snapshot exactly."""
+    expected = SNAPSHOT.get(key)
+    assert expected is not None, (
+        f"No snapshot entry for {key}: run tests/capture_spec_snapshot.py and read the diff")
+    assert "error" not in expected, f"{key} errored at capture: {expected['error']}"
     kind, name, spec = underwriter.parser.parse(underwriter.lexer.tokenize(line))
     assert kind == expected["kind"]
     assert name == expected["name"]
     _assert_equal(_normalize(spec), expected["spec"])
+
+
+def test_snapshot_has_no_orphan_entries():
+    """An entry names a statement of the corpus, so a removed or renamed program is noticed."""
+    orphans = sorted(set(SNAPSHOT) - set(KEYS))
+    assert not orphans, f"{orphans} left the corpus: run tests/capture_spec_snapshot.py"
 
 
 def test_list_longer_than_recursion_limit(underwriter):

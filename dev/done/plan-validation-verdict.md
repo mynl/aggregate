@@ -238,3 +238,65 @@ Divergences:
   EX` at the window's -5.3e-3. It now checks the completed error and the window shortfall separately.
 - **`_sharpen_terms` is left alone.** `u_agg_mean` stays dropped for a power tail, as the plan's
   current-behavior note describes, so no sharpen score moves.
+
+### `[Verdict-Reinsured-Views]`, 1.56.0
+
+`agg X 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` at `bs` 1000 reads
+`reinsurance; subject not unreasonable; net fails sev cv, agg cv` with `passes` false, and at its own
+`bs` 50 reads `reinsurance; subject not unreasonable; net not unreasonable` and passes. The layer on
+bucket edges stays clean.
+
+**The acceptance on the 68 silent wrong answers is not met as written.** Rebuilt at their 1.43.1 `bs`
+and `log2`, 61 read a view failure, 3 read a subject failure and 4 pass. Of the four,
+`30 claims dsev [300 700] [0.6 0.4] fixed aggregate ceded to 1000 xs 0` is no longer wrong: its fault
+was the window origin 3,900, and it now builds from 0. The other three are wrong beyond the study's
+total variation of 1e-4 and right to within the moment tolerances: a half-integer cession such as
+`1 claims dsev [1000 1001 1002] poisson aggregate ceded to 50% po 1000 xs 100` at `bs` 1 splits 12% of
+the mass by half a bucket, which moves the variance by 6e-7 against a tolerance of 1e-3 on the CV. A
+moment test cannot see that, and a test on the distribution would need a reference for every view. The
+sizer has since put these programs on their lattice, and none of the 858 is silently wrong at its
+automatic grid.
+
+Sweep of the 858 at 1.56.0's automatic grids: no silent wrong answer, and of the 822 exact laws 49 read
+a failing verdict, the count `[Correctness-Oracle]` reported. One of the 49 also fails its view, on skew
+noise, which `[Verdict-Moment-Floors]` clears. Reinsured programs in the corpora, 123: three fail their
+view, `USXOLTower`, `BV.Ced` (ceded CV 0.481 against 0.470) and `J.Re14` (0.0344 against 0.0339). The
+last two are continuous severities whose ceded layer nearly always exhausts, so the cession is close to
+a point mass off the grid, and the rebucketing is a real error at the tolerance.
+
+Seven library entries move into `VALIDATION_BASELINE`, all with a real subject failure: two picks under
+a cession, three `Capstone` links, `CommAuto.Exposure` (bs 125 loses 0.7% of the gross mean) and
+`USXOLTower`. `Wang2000.Wang.Layers` in the reproductions reads a mean error of 1.2e-4 at its pinned
+`bs`.
+
+Divergences:
+
+- **The verdict does not go through `reins_view_stats` or `Portfolio.reins_density_df`.** Both run FFTs
+  (up to three per unit, then six per unit), which the warning of the next step would pay on every
+  update. `reins_realized_bases` computes the realized view's two bases with no FFT, and a test pins
+  that `_reins_density_df` stays `None`.
+- **A book's total uses cumulants,** the sum over units of the exact final view, or of the analytic
+  moments for an unreinsured unit, against `stats_df['empirical']`, where the plan names
+  `Portfolio.reins_density_df`. Same reference and no FFT. Only the aggregate row is tested, since the
+  total's severity row is computed from the units' severity moments. The total's ALIASING test now also
+  runs under reinsurance.
+- **A zero exact CV is tested absolutely, at 10 eps,** where the plan says the same floors as the
+  subject. In the prototype the subject's skip caught 54 of the 68 and the absolute test 65: a constant
+  cession off the grid is exactly the case the skip hides.
+- **An aggregate cover compares moments of the mass on the grid,** de-fuzzed on both sides, rather than
+  `stats_df['empirical']`. Its convention parks lost mass at the grid top, which a capped cession never
+  reaches: `1 claims dsev [1000 1003] poisson aggregate ceded to 50% po 500 xs 250` read a false `ceded
+  fails agg cv` from a deficit of 1e-6. FFT dust on the subject also gave a net that is exactly 0 a CV
+  of 1e8.
+- **The view word is `_reins_after_label`,** so a program mixing `net of` and `ceded to` reads `output`,
+  the library's existing word, where the plan gives `net` or `ceded`.
+- **`explain_validation` takes `view=(word, subject_flags, view_flags)`,** which the plan's flag set
+  alone cannot express, since a subject and a view can fail the same moment. Given only flags, the text
+  reads `subject or view fails ...`.
+- **`test_lattice_bucket.py` changes one expected verdict,** which the plan's file list omits.
+
+Ripple, not done here: `validationState` in `V:/dev/aggregate-api/web/src/main.js` strips
+`reinsurance; subject ` and compares the rest with `not unreasonable`, so `not unreasonable; net not
+unreasonable` grades `warn`. Every clean reinsured object in aLL turns the strip amber until that is
+changed, and the API's editable install picks this up at once. The fix is to grade the clauses after
+the prefix, `s.split(';')`, ok when each is `not unreasonable`, bad when any names the mean.

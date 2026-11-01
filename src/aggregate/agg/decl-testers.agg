@@ -106,6 +106,14 @@ agg T.SpliceUnbounded 5 claims sev lognorm 40 cv .65 splice [1 100] poisson     
 agg U.Die     dfreq [1] dsev [1:6]                                                            note{fair die; analytic skew = 0};
 agg U.LN     25 claims sev lognorm 50 cv 0.75 poisson                                         note{genuinely skewed; skew > 0.1 preserved};
 port U.TestSym agg A dfreq [1] dsev [1:6] agg B dfreq [1] dsev [1:6]
+# The reinsured view in the verdict: a cession that lands off the bucket has the right mean and the
+# wrong law. Built here on its lattice; the tests pin the coarser grids that show the failure.
+agg U.NetOffGrid    1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed           note{bs 1000 fails the view, bs 50 passes};
+agg U.SubjectFails  3 claims 1500 xs 250 dsev [1000 2000 3000] occurrence net of 500 xs 500 fixed note{bs 1000 fails the subject};
+agg U.CededConstant 3 claims dsev [100 200] occurrence ceded to 10 xs 10 fixed                   note{a constant cession, its one amount off bs 100};
+agg U.NetConstant   2 claims dsev [300 700] fixed aggregate net of 1500 xs 250                   note{a constant net, its one amount off bs 100};
+port U.ReinsBook agg A 3 claims dsev [100 200] occurrence ceded to 10 xs 10 fixed agg B 2 claims dsev [1 2 3] fixed;
+port U.ReinsBookOverrun agg A 1 claim dsev [2 3] occurrence net of 1 xs 1 fixed agg B 1 claim dsev [2 3] fixed;
 
 
 # V. Underwriter / build smoke fixtures

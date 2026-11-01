@@ -143,6 +143,21 @@ VALIDATION_BASELINE = {
     # two mean flags cleared; cv and skew remain what picking moved.
     'Capstone.SelectedLosses':
         'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW',
+    # The same departures under a cession. Until 1.56.0 ``passes`` was true for any
+    # reinsured object, so these read as passing with a failing subject; the
+    # cession itself is clean on every one.
+    'CommAuto.WithPicks': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|REINSURANCE',
+    'LayerPicks.Lognorm.Experience': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|REINSURANCE',
+    'Capstone.XOL': 'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW|REINSURANCE',
+    'Capstone.LossPicksTest': 'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW|REINSURANCE',
+    'Capstone.FullProgram': 'SEV_CV|SEV_SKEW|AGG_CV|AGG_SKEW|REINSURANCE',
+    # --- A thick subject on a pinned grid, under a cession ---------------
+    # Each pins a bucket too coarse for the unlimited or heavy subject, which the
+    # reinsured verdict now reports. ``CommAuto.Exposure`` loses 0.7% of its gross
+    # mean at bs 125. ``USXOLTower`` is the cat model of ``GrossCatXOL`` with its
+    # towers, and its net view fails too, by 0.1% of the mean on the coarse bs 2.
+    'CommAuto.Exposure': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|REINSURANCE',
+    'USXOLTower': 'SEV_MEAN|SEV_CV|SEV_SKEW|AGG_MEAN|AGG_CV|AGG_SKEW|REINSURANCE|INFEASIBLE|VIEW',
     # --- Signed severity on a wrapped window ----------------------------
     # A signed window aliases at the ends; the numerics section exists to
     # show that behavior rather than to hide it. Three entries left this list

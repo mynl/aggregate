@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.56.0 - 2026-11-01
+
+**[Verdict-Reinsured-Views] The verdict checks the reinsured view against the exact image of the subject on its grid, and `Validation.passes` stops treating reinsurance as a pass.** Every reinsured verdict changes: a clean one reads `reinsurance; subject not unreasonable; net not unreasonable`, was `reinsurance; subject not unreasonable`, and `agg X 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` at `bs` 1000 reads `reinsurance; subject not unreasonable; net fails sev cv, agg cv`. New flag `Validation.VIEW`, and `explain_validation` takes `view=`. `passes` is now false for a failing subject or view, so seven library entries move into the known failures, among them `CommAuto.Exposure` and `USXOLTower`. A Portfolio with a reinsured unit checks its total against the sum of its units' cumulants instead of skipping it. No number moves.
+
+The API must follow: `validationState` in `web/src/main.js` compares the text after `reinsurance; subject ` with `not unreasonable`, so it grades every clean reinsured object as a warning until it reads the second clause.
+
 ## 1.55.0 - 2026-11-01
 
 **[Stable-Completed-Mean] A tilted stable law with a mean reads `not unreasonable`, judged on its completed mean.** The verdict changes: `chfagg X stable 1.5 1`, `2 * stable 1.5 1 + 10` and `stable 1.1 1` read `fails agg mean` before and `not unreasonable` now. The `error` of the mean row in `stats_df`, the `Err EX` of `validation_df`, the `info` row and `validation_score` now use the window mean plus the closed-form tail, with errors from 1e-7 to 4e-6; `empirical` and `est_m` stay the window mean. An untilted grid (`hints{tilt=False}`) still fails, and `tvar` and `lev` beyond the window stay on `[CHF-Tail-Completion]`.

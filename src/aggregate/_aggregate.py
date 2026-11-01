@@ -4806,8 +4806,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         # view. To express the Subject -> after-occ -> after-agg progression
         # we also need the subject (gross) empirical moments and -- when
         # reinsurance is present -- the intermediate after-occ moments.
-        # Validation continues to use the subject vs theoretical comparison,
-        # which is the only apples-to-apples check available under reins.
+        # Validation uses the subject vs theoretical comparison for the subject,
+        # and ``after_occ`` against the exact image of the subject for the view.
         has_occ = self.occ_reins is not None
         has_agg = self.agg_reins is not None
 
@@ -4879,9 +4879,9 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
 
         # ``error`` is the SUBJECT validation: gross_empirical vs mixed.
         # With no reinsurance gross_empirical == empirical and this is
-        # exactly the legacy theoretical-vs-empirical column. With reins it
-        # is the only apples-to-apples check (the after-reins object has no
-        # independent theoretical to validate against).
+        # exactly the legacy theoretical-vs-empirical column. With reins the
+        # after-reins object has no analytic moments in this frame, and the
+        # verdict checks it separately against the exact image of the subject.
         self.stats_df['error'] = _noise_aware_rel_error(
             self.stats_df['gross_empirical'], self.stats_df['mixed'])
 
@@ -5037,6 +5037,11 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         drops mass, which DEFECTIVE and AGG_MEAN already own. See
         :func:`aggregate._validation.convolution_residual` and
         ``dev/done/plan-validation-punchup.md``.
+
+        Under reinsurance the tests above read the subject (gross) moments, and
+        the reported net or ceded view is compared with the exact image of the
+        subject on its grid. A failure there sets the same moment flags together
+        with ``VIEW``.
 
         Run with logger level 20 (info) for more information on failures.
 

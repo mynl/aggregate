@@ -169,7 +169,7 @@ def sweep(sets, log2=16, tag='base', patch_name=None, workers=8):
 
 
 def summary(df):
-    order = ['exact', 'exact (beyond spec)', 'WRONG-flagged', 'WRONG-silent',
+    order = ['exact', 'exact (beyond spec)', 'WRONG-view-flagged', 'WRONG-flagged', 'WRONG-silent',
              'infeasible-warned', 'infeasible-flagged', 'INFEASIBLE-silent', 'no-lattice', 'error']
     t = pd.crosstab(df['set'], df['class']).reindex(columns=[c for c in order if c in df['class'].unique()], fill_value=0)
     t.loc['all'] = t.sum()

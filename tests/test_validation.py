@@ -129,6 +129,117 @@ def test_valid_relocation_to_validation_module():
 
 
 # ---------------------------------------------------------------------------
+# [Verdict-Reinsured-Views]: the verdict reads the reinsured view as well
+# ---------------------------------------------------------------------------
+NET_OFF_GRID = 'agg U.NetOffGrid 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed'
+SUBJECT_FAILS = ('agg U.SubjectFails 3 claims 1500 xs 250 dsev [1000 2000 3000] '
+                 'occurrence net of 500 xs 500 fixed')
+REINS_BOOK = ('port U.ReinsBook agg A 3 claims dsev [100 200] occurrence ceded to 10 xs 10 fixed '
+              'agg B 2 claims dsev [1 2 3] fixed')
+
+
+def test_a_cession_rebucketed_off_its_lattice_fails_on_the_view():
+    """Right mean, wrong law: what the subject's own check cannot see."""
+    a = build(NET_OFF_GRID, bs=1000, log2=8)
+    assert a.validation_description == 'reinsurance; subject not unreasonable; net fails sev cv, agg cv'
+    assert a.valid & Validation.VIEW and a.valid & Validation.SEV_CV and a.valid & Validation.AGG_CV
+    assert not a.valid & Validation.SEV_MEAN and not a.valid.passes
+    assert a.est_m == pytest.approx(750)
+    assert 'rebucketing the cession' in a.validation_explanation
+
+
+def test_the_same_cession_on_its_lattice_passes():
+    a = build(NET_OFF_GRID)
+    assert (a.bs, a.log2) == (50, 6)
+    assert a.validation_description == 'reinsurance; subject not unreasonable; net not unreasonable'
+    assert a.valid == Validation.REINSURANCE and a.valid.passes
+    assert 'exact image of the subject' in a.validation_explanation
+    assert 'rebucketing the cession' not in a.validation_explanation
+
+
+def test_a_failing_subject_no_longer_passes_under_a_cession():
+    a = build(SUBJECT_FAILS, bs=1000, log2=8)
+    assert a.validation_description.startswith('reinsurance; subject fails sev mean, agg mean; net ')
+    assert a.valid & Validation.SEV_MEAN and not a.valid.passes
+
+
+@pytest.mark.parametrize('program, bs, log2, verdict', [
+    ('agg U.CededConstant 3 claims dsev [100 200] occurrence ceded to 10 xs 10 fixed', 100, 3,
+     'reinsurance; subject not unreasonable; ceded fails sev cv, agg cv'),
+    ('agg U.NetConstant 2 claims dsev [300 700] fixed aggregate net of 1500 xs 250', 100, 4,
+     'reinsurance; subject not unreasonable; net fails agg cv'),
+])
+def test_a_constant_cession_off_the_grid_fails_on_its_spread(program, bs, log2, verdict):
+    """The exact CV is zero, which the subject's test skips and the view's must not."""
+    a = build(program, bs=bs, log2=log2)
+    assert a.validation_description == verdict
+    assert a.valid & Validation.VIEW and not a.valid.passes
+
+
+def test_the_verdict_reads_the_exact_basis_without_a_new_fft():
+    """The two bases agree with ``reins_view_stats``, without its aggregate FFTs."""
+    from aggregate._reinsurance import reins_realized_bases
+    a = build(NET_OFF_GRID, bs=1000, log2=8)
+    assert a.valid & Validation.VIEW
+    assert a._reins_density_df is None
+    bases = {comp: (raw, realized) for comp, raw, realized in reins_realized_bases(a)}
+    st = a._reins_view_stats
+    for comp in ('sev', 'agg'):
+        for k, value in zip(('ex1', 'ex2', 'ex3'), bases[comp][0]):
+            assert value == pytest.approx(st[('occ', 'net', 'EX')][(comp, k)])
+        for m, value in zip(('mean', 'cv', 'skew'), bases[comp][1]):
+            assert value == pytest.approx(st[('occ', 'net', 'Est')][(comp, m)])
+
+
+def test_passes_is_no_failure_of_subject_or_view():
+    assert Validation.REINSURANCE.passes
+    assert (Validation.REINSURANCE | Validation.INFEASIBLE).passes
+    assert not (Validation.REINSURANCE | Validation.SEV_MEAN).passes
+    assert not (Validation.REINSURANCE | Validation.SEV_CV | Validation.VIEW).passes
+    assert not (Validation.INFEASIBLE | Validation.AGG_SKEW).passes
+
+
+def test_the_flags_alone_cannot_attribute_a_failure():
+    explain = _validation.explain_validation
+    assert explain(Validation.REINSURANCE) == 'reinsurance; subject not unreasonable'
+    assert explain(Validation.REINSURANCE | Validation.SEV_CV) == 'reinsurance; subject fails sev cv'
+    assert (explain(Validation.REINSURANCE | Validation.SEV_CV | Validation.VIEW)
+            == 'reinsurance; subject or view fails sev cv')
+
+
+def test_a_subject_and_a_view_can_fail_the_same_moment_and_are_reported_apart():
+    rv = Validation.REINSURANCE | Validation.SEV_CV | Validation.VIEW
+    view = ('net', Validation.SEV_CV, Validation.SEV_CV)
+    assert (_validation.explain_validation(rv, view=view)
+            == 'reinsurance; subject fails sev cv; net fails sev cv')
+    view = ('ceded', Validation.NOT_UNREASONABLE, Validation.SEV_CV)
+    assert (_validation.explain_validation(rv, view=view)
+            == 'reinsurance; subject not unreasonable; ceded fails sev cv')
+
+
+def test_a_book_reports_a_unit_view_failure():
+    p = build(REINS_BOOK, bs=100, log2=8)
+    assert p.valid & Validation.VIEW and not p.valid.passes
+    assert p.validation_description.startswith('reinsurance; subject ')
+    assert '; ceded fails ' in p.validation_description
+
+
+def test_a_clean_reinsured_book_checks_its_total():
+    p = build(REINS_BOOK)
+    assert p.valid == Validation.REINSURANCE and p.valid.passes
+    assert p.validation_description == 'reinsurance; subject not unreasonable; ceded not unreasonable'
+
+
+def test_a_book_that_overruns_its_grid_fails_on_the_total():
+    """Each unit fits, so only the check of the total can see the sum run off the top."""
+    p = build('port U.ReinsBookOverrun agg A 1 claim dsev [2 3] occurrence net of 1 xs 1 fixed '
+              'agg B 1 claim dsev [2 3] fixed', bs=1, log2=2)
+    assert all(a.valid.passes for a in p)
+    assert p.valid & Validation.VIEW and p.valid & Validation.AGG_MEAN and not p.valid.passes
+    assert '; net fails agg mean' in p.validation_description
+
+
+# ---------------------------------------------------------------------------
 # [Aliasing-Direct-Measure]: the ALIASING flag measures the convolution step
 # ---------------------------------------------------------------------------
 # Through 1.0.0a310 the flag was a ratio of the aggregate mean error to the
@@ -249,6 +360,8 @@ def test_reinsurance_layer_on_bucket_edges_is_clean():
     r = build('agg RT 10 claims 1000 xs 0 sev lognorm 100 cv 2 '
               'occurrence net of 500 xs 500 poisson')
     assert not (r.valid & Validation.ALIASING)
+    assert not (r.valid & Validation.VIEW)
+    assert r.valid.passes
 
 
 def test_portfolio_aliasing_parity_clean():

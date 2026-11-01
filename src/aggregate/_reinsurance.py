@@ -16,7 +16,7 @@ from .constants import (REINS_LABEL_GROSS, REINS_LABEL_NET,
 from .pentagon import complete_pentagon
 from .moments import (MomentAggregator, MomentWrangler, xsden_to_mwrangler,
                       _noise_aware_rel_error, _snap_noise)
-from .utilities import ft, remove_fuzz
+from .utilities import ft, noise_floor, remove_fuzz
 
 logger = logging.getLogger(__name__)
 
@@ -873,6 +873,65 @@ def reins_density6(agg, p):
     """``(ex1, ex2, ex3, mean, cv, skew)`` of a density on the grid."""
     mw = xsden_to_mwrangler(agg.xs, np.asarray(p, dtype=float))
     return (*mw.noncentral, *mw.mcvsk)
+
+
+def reins_realized_bases(agg):
+    """The exact and the realized moments of the reinsured view the object reports.
+
+    The two bases :func:`reins_view_stats` holds for every view, for the one view
+    that was realized, and without its FFTs, so that the verdict can read them on
+    every update.
+
+    Parameters
+    ----------
+    agg : Aggregate
+        An updated object with reinsurance.
+
+    Returns
+    -------
+    list of tuple
+        ``(component, (ex1, ex2, ex3), realized)``, one per moment the cession
+        fixes, in program order: ``sev`` then ``agg`` for an occurrence cover,
+        then ``agg`` for an aggregate cover. ``realized`` is the matching
+        ``(mean, cv, skew)``.
+
+    Notes
+    -----
+    The exact moments are those of the image of the on-grid subject through the
+    ceder or netter, ``sum g(xs)^j p``, compounded through the frequency for an
+    occurrence cover. No rebucketing enters them, so against the realized moments
+    they isolate what rebucketing did. They are exact whenever the subject is
+    exact on the grid, which is what the subject's own check certifies, and for a
+    continuous severity they are the grid's best reference rather than the truth.
+
+    An occurrence cover reads its realized moments from ``stats_df['after_occ']``,
+    whose convention parks mass lost off the grid at the grid top, the reading of
+    ``X ^ m`` the compounded exact moments are compared with for the subject too.
+    An aggregate cover cannot: its exact image holds only the mass on the grid,
+    and a capped cession never reaches the grid top, so parked mass would read as
+    an error of 1e-6 times the top. Both of its bases are therefore moments of the
+    mass on the grid, de-fuzzed, and lost mass stays with ``DEFECTIVE``.
+    """
+    st = agg.stats_df
+
+    def realized(col, comp):
+        return tuple(float(st[col][(comp, m)]) for m in ('mean', 'cv', 'skew'))
+
+    out = []
+    if agg.occ_reins is not None:
+        image = agg.occ_ceder if agg.occ_kind == 'ceded to' else agg.occ_netter
+        sev_raw = reins_exact_image_raw(agg, image, agg.sev_density_gross)
+        f1, f2, f3 = agg.frequency.freq_moms(agg.n)
+        agg_raw = MomentAggregator.agg_from_fs(f1, f2, f3, *sev_raw)
+        out.append(('sev', sev_raw, realized('after_occ', 'sev')))
+        out.append(('agg', agg_raw, realized('after_occ', 'agg')))
+    if agg.agg_reins is not None:
+        image = agg.agg_ceder if agg.agg_kind == 'ceded to' else agg.agg_netter
+        subject, reported = agg.agg_density_gross, agg.agg_density
+        agg_raw = reins_exact_image_raw(agg, image, remove_fuzz(subject, eps=noise_floor(subject)))
+        mw = xsden_to_mwrangler(agg.xs, remove_fuzz(reported, eps=noise_floor(reported)), deficit=0.0)
+        out.append(('agg', agg_raw, mw.mcvsk))
+    return out
 
 
 def reins_view_stats(agg):

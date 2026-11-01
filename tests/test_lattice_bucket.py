@@ -444,7 +444,7 @@ def test_a_pinned_portfolio_has_no_reading():
     ('agg LO.AWK dfreq [1:100] dsev [1000 1001]', 2, 16, 0, None,
      'grid infeasible for this lattice (needs log2 17 at bs 1); fails sev cv, agg skew'),
     ('agg LO.Net 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed',
-     50, 6, 0, [250, 500, 1500], 'reinsurance; subject not unreasonable'),
+     50, 6, 0, [250, 500, 1500], 'reinsurance; subject not unreasonable; net not unreasonable'),
 ])
 def test_the_programs_that_started_the_lattice_study(program, bs, log2, x0, outcomes, verdict):
     with warnings.catch_warnings():

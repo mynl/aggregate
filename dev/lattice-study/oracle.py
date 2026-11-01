@@ -244,6 +244,7 @@ def run(specs, log2=16, port=False, **kw):
     verdict = ob.validation_description
     out.update(tv=tv, wrong=tv > 1e-4, mean_err=abs(m_lib - m_ex) / max(abs(m_ex), 1e-12),
                flagged=('fails' in verdict or 'infeasible' in verdict), warned=warned,
+               view_flagged=any(f'; {word} fails' in verdict for word in ('net', 'ceded', 'output')),
                other_warnings=len(other), verdict=verdict,
                bs=ob.bs, log2=ob.log2, x_min=float(d.index[0]), mass=float(d['p_total'].sum()))
     return out
@@ -257,6 +258,8 @@ def classify(r):
     if r['feasible']:
         if not r['wrong']:
             return 'exact'
+        if r.get('view_flagged'):
+            return 'WRONG-view-flagged'
         return 'WRONG-flagged' if r['flagged'] else 'WRONG-silent'
     if not r['wrong']:
         return 'exact (beyond spec)'

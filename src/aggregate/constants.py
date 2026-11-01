@@ -218,7 +218,9 @@ class Validation(Flag):
     adding to them. ``TRUNCATION`` flags a law computed from its
     characteristic function whose transform at the highest frequency kept,
     :math:`\\pi/bs`, is above the truncation flag; ``Aggregate`` never sets it
-    (``[CHF-Validation-Verdict]``, 1.37.0).
+    (``[CHF-Validation-Verdict]``, 1.37.0). ``VIEW`` says the moment flags set
+    beside it include a failure of the reinsured view the object reports, against
+    the exact image of the subject on its grid, rather than only of the subject.
     """
 
     NOT_UNREASONABLE = 0
@@ -234,25 +236,23 @@ class Validation(Flag):
     DEFECTIVE = auto()
     INFEASIBLE = auto()
     TRUNCATION = auto()
+    VIEW = auto()
 
     @property
     def passes(self):
-        """Whether this result clears validation (clean *or* cleanly reinsured).
+        """Whether this result clears validation: no failure is set, subject or view.
 
-        ``True`` for a clean ``NOT_UNREASONABLE`` object and for one whose only
-        concern is ``REINSURANCE`` (the subject validated under the hood; the
-        cession makes the realised moment audit n/a). Display surfaces (``qd``,
-        the HTML reprs) read it to flag only a genuine failure.
-
-        ``INFEASIBLE`` is **transparent** here: it is a reading about the grid
-        rather than a verdict on the outcome, so it neither fails an object
-        whose moments hold nor rescues one whose moments do not. It is masked
-        out of the first term and deliberately does **not** join the
-        ``REINSURANCE`` arm, which would let the flag hide the very problem it
-        names. See ``dev/done/plan-validation-punchup.md``.
+        ``REINSURANCE`` and ``INFEASIBLE`` are **transparent** here. The first
+        only marks that the object reports a cession, whose subject and view are
+        each checked, so it neither fails a clean object nor rescues one with a
+        failing subject or view. The second is a reading about the grid rather
+        than a verdict on the outcome, so it neither fails an object whose moments
+        hold nor rescues one whose moments do not. See
+        ``dev/done/plan-validation-punchup.md`` and
+        ``dev/done/plan-validation-verdict.md``.
         """
-        return ((self & ~Validation.INFEASIBLE) == Validation.NOT_UNREASONABLE
-                or bool(self & Validation.REINSURANCE))
+        return ((self & ~(Validation.INFEASIBLE | Validation.REINSURANCE))
+                == Validation.NOT_UNREASONABLE)
 
 
 class DefectiveDistributionWarning(UserWarning):

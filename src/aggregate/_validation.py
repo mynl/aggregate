@@ -10,6 +10,7 @@ import pandas as pd
 
 from .constants import Validation
 from .config import get_settings
+from .moments import MomentAggregator, _noise_aware_rel_error
 
 logger = logging.getLogger(__name__)
 
@@ -107,35 +108,23 @@ def pmf_deficit(ob):
     return 1.0 - float(np.sum(dens))
 
 
-def explain_validation(rv, deficit=None, subject='severity'):
-    """
-    Explain the validation result rv.
-    Don't over report: if you fail CV don't need to be told you fail Skew too.
-
-    Under reinsurance the realised view has no independent theoretical and
-    cannot be validated, but the SUBJECT (gross) view was validated under
-    the hood (§1.3 of the aggregate refactor plan). The message reports
-    that subject status alongside the ``reinsurance`` marker, so the user
-    can tell whether the underlying gross object is sound.
+def _failure_parts(rv, deficit, subject):
+    """The failures in ``rv``, as the phrases of the ``fails`` list.
 
     Parameters
     ----------
     rv : Validation
-        The flag set to explain.
-    deficit : float, optional
-        The measured pmf deficit, quoted when ``rv`` carries
-        :attr:`~aggregate.constants.Validation.DEFECTIVE`. Optional because
-        the flag alone is enough to name the failure; the magnitude is what
-        tells the reader whether it matters.
-    subject : str, default 'severity'
-        What an ``INFEASIBLE`` grid cannot reproduce, in the prefix ``grid
-        infeasible for this <subject>``: ``'law'`` for a law computed from its
-        characteristic function (``[CHF-Validation-Verdict]``).
+        The flag set.
+    deficit : float or None
+        The measured pmf deficit, quoted for ``DEFECTIVE``.
+    subject : str
+        ``'law'`` selects the aliasing wording of a law computed from its
+        characteristic function.
+
+    Returns
+    -------
+    list of str
     """
-    if rv == Validation.NOT_UNREASONABLE:
-        return "not unreasonable"
-    if rv & Validation.NOT_UPDATED:
-        return "n/a, not updated"
     # Collect failures from the SEV/AGG/ALIASING flags (suppressing higher
     # moments once a lower-order moment already failed).
     parts = []
@@ -163,9 +152,53 @@ def explain_validation(rv, deficit=None, subject='severity'):
         parts.append('sev skew')
     if not (rv & Validation.AGG_CV) and (rv & Validation.AGG_SKEW):
         parts.append('agg skew')
-    explanation = ', '.join(parts)
-    if rv & Validation.REINSURANCE:
-        out = (f'reinsurance; subject fails {explanation}' if explanation
+    return parts
+
+
+def explain_validation(rv, deficit=None, subject='severity', view=None):
+    """
+    Explain the validation result rv.
+    Don't over report: if you fail CV don't need to be told you fail Skew too.
+
+    Under reinsurance the subject (gross) object is checked against its analytic
+    moments, and the reinsured view the object reports against the exact image of
+    the subject on its grid. The message gives each after the ``reinsurance``
+    marker, so a reader can tell which of the two failed.
+
+    Parameters
+    ----------
+    rv : Validation
+        The flag set to explain.
+    deficit : float, optional
+        The measured pmf deficit, quoted when ``rv`` carries
+        :attr:`~aggregate.constants.Validation.DEFECTIVE`. Optional because
+        the flag alone is enough to name the failure; the magnitude is what
+        tells the reader whether it matters.
+    subject : str, default 'severity'
+        What an ``INFEASIBLE`` grid cannot reproduce, in the prefix ``grid
+        infeasible for this <subject>``: ``'law'`` for a law computed from its
+        characteristic function (``[CHF-Validation-Verdict]``).
+    view : tuple, optional
+        ``(word, subject_flags, view_flags)``, the split of the moment flags
+        that the flag set cannot hold, since a subject and a view can fail the
+        same moment. ``word`` is ``net``, ``ceded`` or ``output``. Without it the
+        reinsured message cannot attribute the flags: the marker alone gives the
+        subject's status when ``VIEW`` is clear, and ``subject or view`` when set.
+    """
+    if rv == Validation.NOT_UNREASONABLE:
+        return "not unreasonable"
+    if rv & Validation.NOT_UPDATED:
+        return "n/a, not updated"
+    explanation = ', '.join(_failure_parts(rv, deficit, subject))
+    if rv & Validation.REINSURANCE and view is not None:
+        word, subject_flags, view_flags = view
+        of_subject = ', '.join(_failure_parts(subject_flags, deficit, subject))
+        of_view = ', '.join(_failure_parts(view_flags, deficit, subject))
+        out = (f'reinsurance; subject {f"fails {of_subject}" if of_subject else "not unreasonable"}; '
+               f'{word} {f"fails {of_view}" if of_view else "not unreasonable"}')
+    elif rv & Validation.REINSURANCE:
+        who = 'subject or view' if rv & Validation.VIEW else 'subject'
+        out = (f'reinsurance; {who} fails {explanation}' if explanation
                else 'reinsurance; subject not unreasonable')
     else:
         out = f'fails {explanation}' if explanation else 'not unreasonable'
@@ -176,6 +209,130 @@ def explain_validation(rv, deficit=None, subject='severity'):
     if rv & Validation.INFEASIBLE:
         return f'grid infeasible for this {subject}; {out}'
     return out
+
+
+def _view_moment_flags(comp, exact, realized, eps):
+    """The moment flags of one component of a reinsured view, realized against exact.
+
+    Parameters
+    ----------
+    comp : str
+        ``'sev'`` or ``'agg'``.
+    exact : tuple of float
+        The exact ``(mean, cv, skew)``.
+    realized : tuple of float
+        The realized ``(mean, cv, skew)``.
+    eps : float
+        The object's ``validation_eps``.
+
+    Returns
+    -------
+    Validation
+
+    Notes
+    -----
+    Mean at ``eps``, CV at ``10 eps``, skewness at ``100 eps``, with the floors of
+    the subject's test but one. The subject skips a theoretically zero CV, because
+    the grid's estimate of the spread of a deterministic severity is noise. A
+    cession can also be deterministic, with its one amount off the grid: 10 xs 10
+    on a claim of 100 at ``bs`` 100 cedes 10 every time and is rebucketed onto 0
+    and 100, a CV of 3 against 0. That spread is the whole of the error, so a zero
+    exact CV is tested absolutely, at ``10 eps``.
+    """
+    mean_flag, cv_flag, skew_flag = {
+        'sev': (Validation.SEV_MEAN, Validation.SEV_CV, Validation.SEV_SKEW),
+        'agg': (Validation.AGG_MEAN, Validation.AGG_CV, Validation.AGG_SKEW)}[comp]
+    rv = Validation.NOT_UNREASONABLE
+    m, cv, skew = exact
+    est_m, est_cv, est_skew = realized
+    if np.isfinite(m) and np.isfinite(est_m) and abs(_noise_aware_rel_error(est_m, m)) > eps:
+        rv |= mean_flag
+    if np.isfinite(cv) and np.isfinite(est_cv):
+        if abs(cv) <= VALIDATION_NOISE:
+            if abs(est_cv) > 10 * eps:
+                rv |= cv_flag
+        elif not np.isclose(est_cv, cv, rtol=10 * eps, atol=VALIDATION_NOISE):
+            rv |= cv_flag
+    if (np.isfinite(skew) and abs(skew) > VALIDATION_NOISE and np.isfinite(est_skew)
+            and not np.isclose(est_skew, skew, rtol=100 * eps, atol=VALIDATION_NOISE)):
+        rv |= skew_flag
+    return rv
+
+
+def _book_view_flags(port):
+    """The moment flags of a reinsured book's total against the sum of its units' exact views.
+
+    Parameters
+    ----------
+    port : Portfolio
+
+    Returns
+    -------
+    Validation
+
+    Notes
+    -----
+    The total is the independent sum of the units' realized views, so its first
+    three cumulants are the sums of theirs. A reinsured unit contributes the exact
+    moments of its final view, any other unit its analytic moments. Summing them
+    leaves the convolution of the units as the only thing under test, and needs no
+    FFT, where ``Portfolio.reins_density_df`` would run six per unit on every
+    update. Only the aggregate row is tested: the total's severity row is computed
+    from the units' severity moments, which their own verdicts have read.
+
+    The CV and skewness come straight from the cumulants. Rebuilding raw moments
+    from them to reuse ``static_moments_to_mcvsk`` would put the mean back in only
+    to cancel it, which on a symmetric total leaves a skewness of rounding above
+    the noise floor.
+    """
+    from ._reinsurance import reins_realized_bases
+    k1 = k2 = k3 = scale = 0.0
+    for a in port.agg_list:
+        if a.reins_kinds != 'None':
+            e1, e2, e3 = reins_realized_bases(a)[-1][1]
+        else:
+            mixed = a.stats_df['mixed']
+            e1, e2, e3 = (float(mixed[('agg', k)]) for k in ('ex1', 'ex2', 'ex3'))
+        k1 += e1
+        k2 += e2 - e1 * e1
+        k3 += e3 - 3 * e1 * e2 + 2 * e1 ** 3
+        scale += abs(e2)
+    if not np.isfinite([k1, k2, k3]).all():
+        return Validation.NOT_UNREASONABLE
+    sd = 0.0 if abs(k2) <= VALIDATION_NOISE * scale else np.sqrt(max(k2, 0.0))
+    exact = (k1, sd / k1 if k1 else np.nan, k3 / sd ** 3 if sd else np.nan)
+    emp = port.stats_df['empirical']
+    return _view_moment_flags(
+        'agg', exact, tuple(float(emp[('agg', m)]) for m in ('mean', 'cv', 'skew')),
+        float(port.validation_eps))
+
+
+def _book_aliasing(port):
+    """``ALIASING`` when the book's total mean is not the sum of its units' realized means.
+
+    The same direct measurement as ``valid_aggregate``, with the portfolio's
+    predictor. The portfolio step is the convolution of the units, so what the
+    total's mean must be is the sum of the units' realized aggregate means, whether
+    they report a gross or a reinsured view.
+
+    Parameters
+    ----------
+    port : Portfolio
+
+    Returns
+    -------
+    Validation
+    """
+    predicted = sum(float(a.stats_df['empirical'][('agg', 'mean')])
+                    for a in port.agg_list)
+    residual = convolution_residual(
+        1.0, predicted, float(port.stats_df['empirical'][('agg', 'mean')]))
+    if (np.isfinite(residual) and residual > ALIASING_EPS
+            and abs(port._deficit) <= VALIDATION_NOISE):
+        logger.info('FAIL: Portfolio convolution residual %.3e > %.3e with '
+                    'no deficit', residual, ALIASING_EPS)
+        return Validation.ALIASING
+    return Validation.NOT_UNREASONABLE
 
 
 # ====================================================================
@@ -224,6 +381,12 @@ def valid_aggregate(agg):
     drops mass, which DEFECTIVE and AGG_MEAN already own. See
     :func:`convolution_residual` and ``dev/done/plan-validation-punchup.md``.
 
+    Under reinsurance the tests above read the subject (gross) moments, and the
+    reported net or ceded view is compared with the exact image of the subject on
+    its grid, :func:`_view_moment_flags`. A failure there sets the same moment flags
+    together with ``VIEW``, and ``agg._view_reading`` keeps the two apart for the
+    verdict.
+
     Run with logger level 20 (info) for more information on failures.
 
     A Type 1 error (rejecting a valid model) is more likely than Type 2 (failing to reject an invalide one).
@@ -244,7 +407,7 @@ def valid_aggregate(agg):
     # vs ``mixed``. Under no reinsurance ``gross_empirical ==
     # empirical`` and this is the classical theoretical-vs-empirical
     # check; under reinsurance it is the subject-validation hook from
-    # §1.3 of the plan, the only apples-to-apples check available.
+    # §1.3 of the plan, and the reported view is checked further down.
     err = agg.stats_df['error'].abs()
     eps = agg.validation_eps
     sev_err_mean = float(err.get(('sev', 'mean'), 0.0))
@@ -339,13 +502,24 @@ def valid_aggregate(agg):
                     agg._lattice_feasibility['log2'])
         rv |= Validation.INFEASIBLE
 
-    # Reinsurance: the realised (after-reins) object has no independent
-    # theoretical, so its sev/agg moments cannot be validated. The
-    # checks above ran against the SUBJECT moments and remain
-    # meaningful; mark the result with REINSURANCE so callers know the
-    # public surface (``agg_density`` etc.) is the after-reins view.
+    # Reinsurance: the checks above ran against the SUBJECT moments, and the
+    # marker says the public surface (``agg_density`` etc.) is the after-reins
+    # view. That view is checked here against the exact image of the subject on
+    # its grid, which isolates what rebucketing the cession did. Its failures set
+    # the same moment flags as the subject's, so the split between the two is kept
+    # beside the flag set for the verdict to report.
+    agg._view_reading = None
     if agg.reins_kinds != 'None':
-        rv |= Validation.REINSURANCE
+        from ._reinsurance import reins_realized_bases
+        view_flags = Validation.NOT_UNREASONABLE
+        for comp, raw, realized in reins_realized_bases(agg):
+            view_flags |= _view_moment_flags(
+                comp, MomentAggregator.static_moments_to_mcvsk(*raw), realized, eps)
+        agg._view_reading = (agg._reins_after_label().lower(), rv, view_flags)
+        rv |= Validation.REINSURANCE | view_flags
+        if view_flags:
+            logger.info('FAIL: reinsured view %s', view_flags)
+            rv |= Validation.VIEW
 
     if rv == Validation.NOT_UNREASONABLE:
         logger.info('Aggregate %s does not fail any validation: not unreasonable', agg.name)
@@ -413,20 +587,46 @@ def valid_portfolio(port):
     if getattr(port, '_lattice_feasibility', None) is not None:
         defective |= Validation.INFEASIBLE
 
+    # The units' subject and view failures stay apart, as on a unit, so that the
+    # book's verdict can report them apart.
+    subject_flags = view_flags = Validation.NOT_UNREASONABLE
     for a in port.agg_list:
         r = a.valid
-        if r & Validation.REINSURANCE:
-            logger.info(f'Aggregate {a.name} has reinsurance, validation n/a')
-        elif not r:
+        if not r.passes:
             logger.info(f'Aggregate {a.name} fails validation')
         rv |= r
+        reading = getattr(a, '_view_reading', None)
+        if reading is None:
+            subject_flags |= r
+        else:
+            subject_flags |= reading[1]
+            view_flags |= reading[2]
+    reinsured = bool(rv & Validation.REINSURANCE)
 
-    if rv != Validation.NOT_UNREASONABLE:
-        logger.info('Exiting: Portfolio validation steps skipped due to failed or n/a Aggregate validation')
+    def book_reading():
+        return (port._reins_after_label().lower(), subject_flags | defective,
+                view_flags) if reinsured else None
+
+    if rv & ~Validation.REINSURANCE:
+        logger.info('Exiting: Portfolio validation steps skipped due to failed Aggregate validation')
+        port._view_reading = book_reading()
         port._valid = rv | defective
         return port._valid
     else:
         logger.info('No Aggregate object fails validation')
+
+    # A reinsured unit puts its view into the total, so the total has no analytic
+    # moments of its own. It is checked against the sum of the units' exact views.
+    if reinsured:
+        view_flags = _book_aliasing(port) | _book_view_flags(port)
+        port._view_reading = book_reading()
+        rv |= defective | view_flags
+        if view_flags:
+            logger.info('FAIL: Portfolio reinsured view %s', view_flags)
+            rv |= Validation.VIEW
+        port._valid = rv
+        return rv
+    port._view_reading = None
 
     # apply validation to the Portfolio total. SSoT: relative errors
     # come straight off ``stats_df['error']`` (noise-aware diff of
@@ -443,23 +643,7 @@ def valid_portfolio(port):
         logger.info('FAIL: Portfolio Agg mean error > eps')
         rv |= Validation.AGG_MEAN
 
-    # Aliasing: the same direct measurement as ``valid_aggregate``, with the
-    # portfolio's predictor. The portfolio step is the convolution of the
-    # units, and every unit's own FFT was validated above (this code is only
-    # reached when they all passed), so what the total's mean must be is the
-    # sum of the units' realized aggregate means. ``empirical`` rather than
-    # ``gross_empirical`` on the units is not a choice: a unit carrying
-    # reinsurance sets REINSURANCE, which trips the early return above, so the
-    # two columns coincide for every unit that reaches here.
-    predicted = sum(float(a.stats_df['empirical'][('agg', 'mean')])
-                    for a in port.agg_list)
-    residual = convolution_residual(
-        1.0, predicted, float(port.stats_df['empirical'][('agg', 'mean')]))
-    if (np.isfinite(residual) and residual > ALIASING_EPS
-            and abs(port._deficit) <= VALIDATION_NOISE):
-        logger.info('FAIL: Portfolio convolution residual %.3e > %.3e with '
-                    'no deficit', residual, ALIASING_EPS)
-        rv |= Validation.ALIASING
+    rv |= _book_aliasing(port)
 
     # CV and skew: tested only when the theoretical value is meaningfully
     # non-zero (abs(theo) > VALIDATION_NOISE); a theoretically-zero skew
@@ -635,9 +819,10 @@ def validation_score_terms(obj):
     :meth:`Aggregate.sharpen` probe. A non-finite *empirical* value is a genuine
     failure and scores infinite rather than dropping out.
 
-    Under reinsurance ``error`` compares the SUBJECT (gross) moments: the after
-    reinsurance object has no independent theoretical, so the gross comparison is
-    the only apples-to-apples check available.
+    Under reinsurance ``error`` compares the SUBJECT (gross) moments, so the score
+    measures the subject alone. The after reinsurance view has no analytic moments
+    in ``stats_df``; :func:`valid_aggregate` checks it against the exact image of
+    the subject.
     """
     err = obj.stats_df['error'].abs()
     theo = _theory_column(obj)
@@ -733,7 +918,8 @@ def validation_description(obj):
     # ``obj.valid`` first: it is what records ``_deficit``.
     rv = obj.valid
     return explain_validation(rv, getattr(obj, '_deficit', None),
-                              subject=_infeasible_subject(obj))
+                              subject=_infeasible_subject(obj),
+                              view=getattr(obj, '_view_reading', None))
 
 
 def validation_opening(short, eps, components='severity and for the aggregate'):
@@ -780,7 +966,8 @@ def validation_explanation(obj):
     """
     rv = obj.valid
     short = explain_validation(rv, getattr(obj, '_deficit', None),
-                               subject=_infeasible_subject(obj))
+                               subject=_infeasible_subject(obj),
+                               view=getattr(obj, '_view_reading', None))
     if rv & Validation.NOT_UPDATED:
         return ('Not validated: the object has not been updated, so there is no '
                 'realized grid to compare the analytic moments against. Call '
@@ -827,11 +1014,15 @@ def validation_explanation(obj):
                    'being dropped. Try a larger bs, or a larger log2 at the '
                    'same bs.')
     if rv & Validation.REINSURANCE:
-        out.append('The reported view is net or ceded, and a cession has no '
-                   'independent analytic moments, so it cannot be validated '
-                   'directly. The verdict above is for the subject (gross) '
-                   'object underneath, which is what the cession is computed '
-                   'from.')
+        out.append('The reported view is net or ceded. The subject (gross) object '
+                   'underneath is checked against its analytic moments, and the '
+                   'cession against the exact image of the subject on its grid.')
+    if rv & Validation.VIEW:
+        out.append('The reported view departs from that image, which is the error '
+                   'of rebucketing the cession onto the grid: the reported '
+                   'distribution is not the distribution of the cession, whatever '
+                   'its mean. A bucket that the net and ceded amounts land on '
+                   'removes the error.')
     if rv == Validation.NOT_UNREASONABLE:
         out.append('Nothing failed, so the object is not unreasonable. That is '
                    'a statement about the numerics reproducing the model, not '

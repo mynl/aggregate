@@ -21,7 +21,7 @@ Design notes
 ------------
 This is a **leaf** module: it imports only the standard library, so any
 ``aggregate`` module may import it without risking an import cycle. It owns the
-path names (``USER_DIR_NAME`` / ``PACKAGE_DATA_DIR`` / ``TEST_SUITE_FILENAME``)
+path names (``USER_DIR_NAME`` / ``PACKAGE_DATA_DIR`` / ``LIBRARY_FILENAME``)
 because it is the authority on where the library reads and writes. The narrow
 sibling :mod:`aggregate.constants` keeps only the ``Validation`` flag enum, the
 ``DefectiveDistributionWarning`` class, and the structural reinsurance column
@@ -48,8 +48,7 @@ __all__ = [
     'BivariateSettings', 'LabelSettings', 'Settings',
     'get_settings', 'load_settings', 'reload_settings',
     'config_path', 'user_dir', 'write_default_config', 'describe_settings',
-    'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'TEST_SUITE_FILENAME',
-    'LIBRARY_FILENAME',
+    'USER_DIR_NAME', 'PACKAGE_DATA_DIR', 'LIBRARY_FILENAME',
 ]
 
 # --- path names (the "where things live" authority) ------------------------
@@ -58,10 +57,6 @@ __all__ = [
 USER_DIR_NAME = '.aggregate'
 # Subdirectory inside the installed `aggregate` package holding bundled .agg files.
 PACKAGE_DATA_DIR = 'agg'
-# The canonical bundled test suite filename (lives in PACKAGE_DATA_DIR). The
-# leading underscore marks it temporary migration scaffolding (retired before
-# beta); see dev/done/plan-decl-newline.md and the agg-file rationalization.
-TEST_SUITE_FILENAME = '_test_suite.agg'
 # The shipped DecL library (lives in PACKAGE_DATA_DIR) and the default
 # recipe base. Names in it are unique across kinds -- enforced at load by
 # Underwriter._check_library_names_unique. See dev/plan-meta-data.md.
@@ -99,9 +94,8 @@ class BuildSettings:
         default -- the one DecL library, which replaced the overlapping
         ``examples`` / ``cookbook`` / ``actuarial-severity-curves`` trio of
         ``.agg`` files at
-        1.0.0a159. ``"_test_suite"`` keeps the historical ``build`` recipe
-        base; ``"default"`` would load every bundled file, ``"all"`` bundled
-        plus user.
+        1.0.0a159. ``"default"`` would load every bundled file, ``"all"``
+        bundled plus user.
     update : bool
         Whether constructed objects are auto-updated.
     """

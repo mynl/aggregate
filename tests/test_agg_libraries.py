@@ -11,9 +11,7 @@ load order -- ``Underwriter.load`` raises on either failure, so a successful
 load is itself the assertion. The tests below add the invariants the merge
 established: globally-unique names, and a tag on every entry.
 
-This is the lasting net that lets the temporary ``_test_suite`` /
-``_test_suite2`` migration scaffolding (and its SLY snapshot) retire before
-beta: the user-facing library carries its own coverage here.
+The user-facing library carries its own coverage here.
 
 ``decl-testers.agg`` is deliberately excluded: it is the language-stress corpus
 and reuses names across kinds, so the invariants here do not apply to it. It

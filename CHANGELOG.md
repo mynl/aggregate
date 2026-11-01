@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.61.0 - 2026-11-01
+
+**[Scaffold-Retirement] The SLY-parity corpora `_test_suite.agg` and `_test_suite2.agg` are deleted, and the test suite parses, round-trips and snapshots `decl-testers.agg` instead.** No number or default moves, since `build` already loaded `library`. `tests/data/expected_specs.json` has 647 entries, up from 209, keyed by kind word and name rather than statement text. Section TS of `decl-testers.agg` holds the 23 programs tests still need, including the only exercise of six grammar rules. `library.agg` joins the unparser corpus. `tests/data/bucket_baseline_*.csv` are deleted, and the maintenance scripts default to `library`.
+
+**Breaking.** `aggregate.config.TEST_SUITE_FILENAME` and `Underwriter.test_suite_file` are removed. `Underwriter.interpret_file` requires its `filename`; a bundled file is `build.default_dir / 'library.agg'`. `Underwriter(databases='_test_suite')` warns and loads nothing, and `load('_test_suite')` raises `FileNotFoundError`. **In this repository, a program appended to `decl-testers.agg` fails `test_spec_matches_snapshot` until `uv run python tests/capture_spec_snapshot.py` records it.**
+
 ## 1.60.1 - 2026-11-01
 
 **[Gini-P-Negative-Return] `gini_p`, and so `calibrate_distortions`, works on a `ccoc` with a negative return, which 1.59.0 broke.** A premium below expected loss calibrates `ccoc` to `r < 0`, and from 1.59.0 `calibrate_distortions(coc=-0.5, p=0.99)` raised `TypeError` from a complex standard deviation. `gini_p` is `r / (1 + r)` again, -1 here. `stats_df` on such a distortion also stops raising, and a negative closed-form variance gives a `nan` standard deviation. The `dual` calibration at such a premium, which has no solution and gives a `nan` row, no longer emits a `RuntimeWarning`. No other number moves.

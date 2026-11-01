@@ -106,11 +106,10 @@
 
 ## Tests
 
-- **[Rationalize-Tests]**, then **[Scaffold-Retirement]**, in that order:
-  rework how the suite consumes the library (the `conftest` parametrization,
-  the spec snapshot) without losing coverage, then retire the
-  `_test_suite.agg` scaffold, still read by eleven test files and five non-test
-  consumers. Evidence in `dev/done/plan-a400-v1-loose-ends.md` phase 4.
+- **[Reproductions-Build-Check]**: a loader test that `reproductions.agg` and
+  `recitations.agg` build. Today only the ambiguity glob reaches them.
+- **[Grammar-Coverage-Pass]**: the rules no corpus exercises, listed in
+  `dev/done/plan-rationalize-tests.md` under "Not in this plan".
 
 ## Reporting
 

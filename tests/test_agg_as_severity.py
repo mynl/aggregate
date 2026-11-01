@@ -14,8 +14,7 @@ The programmatic half (``Severity(agg)`` / ``as_severity``) is tested in
 ``tests/test_reference_severity.py``; both share
 ``aggregate._severity._dhistogram_from_object``.
 
-Programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` section ASV, and
-the shipped-corpus form is ``_test_suite.agg`` section Z.
+Programs are mirrored in ``src/aggregate/agg/decl-testers.agg`` section ASV.
 """
 
 import logging

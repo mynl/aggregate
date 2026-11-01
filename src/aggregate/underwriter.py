@@ -18,8 +18,7 @@ from ._help import HelpMixin
 from .config import (get_settings, reload_settings as _reload_settings,
                      write_default_config as _write_default_config,
                      describe_settings, config_path,
-                     USER_DIR_NAME, PACKAGE_DATA_DIR, TEST_SUITE_FILENAME,
-                     LIBRARY_FILENAME)
+                     USER_DIR_NAME, PACKAGE_DATA_DIR, LIBRARY_FILENAME)
 from .portfolio import Portfolio
 from .distributions import Aggregate, Severity, PnL, BUCKET_SIZING_P
 from .characteristic_function import AggregateCHF
@@ -789,9 +788,9 @@ class Underwriter(HelpMixin):
         to the database of curves, portfolios and aggregates.
 
         All arguments are **keyword-only**. This prevents the easy mistake of
-        ``Underwriter('examples')``, which previously bound the first
+        ``Underwriter('library')``, which previously bound the first
         positional to ``name`` and silently *named* the underwriter after the
-        database you meant to load. Use ``Underwriter(databases='examples')``.
+        database you meant to load. Use ``Underwriter(databases='library')``.
 
         ``update`` and ``log2`` default to the configured values in
         :mod:`aggregate.config` (the ``[build]`` section); pass an explicit
@@ -799,7 +798,7 @@ class Underwriter(HelpMixin):
         split between a bare ``Underwriter`` and the module-level ``build``.
         ``databases`` is **not** config-driven: a bare ``Underwriter()`` loads
         **nothing** (``databases=None``). The module-level ``build`` is the one
-        that loads the configured ``build.databases`` (``examples`` by
+        that loads the configured ``build.databases`` (``library`` by
         default), by passing it explicitly — so ``config.toml`` still controls
         what ``build`` knows, while ad-hoc underwriters start empty.
 
@@ -1155,9 +1154,9 @@ class Underwriter(HelpMixin):
         and no ``kind=`` disambiguator is ever needed. Checked at load so the
         invariant cannot rot silently as entries are added.
 
-        Scoped to ``library.agg`` only: ``decl-testers.agg`` and
-        ``_test_suite.agg`` are regression corpora, not a curated surface, and
-        they reuse names across kinds deliberately.
+        Scoped to ``library.agg`` only: ``decl-testers.agg`` is a regression
+        corpus, not a curated surface, and it reuses names across kinds
+        deliberately.
         """
         from collections import Counter
         names = Counter(name for (_kind, name), r in self._recipes.items()
@@ -1444,7 +1443,7 @@ class Underwriter(HelpMixin):
         DataFrame, so collapse them by location:
 
         - a **built-in** database (under :attr:`default_dir`) shows just its
-          name — no directory, no ``.agg`` suffix (e.g. ``test_suite``);
+          name — no directory, no ``.agg`` suffix (e.g. ``library``);
         - a **user** database (under :attr:`user_dir`, ``~/.aggregate``) shows
           ``~/<name>`` with the suffix dropped, keeping any sub-directory
           (e.g. ``~/mylib``, ``~/sub/mylib``);
@@ -2576,12 +2575,6 @@ class Underwriter(HelpMixin):
         import aggregate
         return aggregate.__version__
 
-    @property
-    def test_suite_file(self):
-        """Path to the bundled test suite ``.agg`` file, or ``None`` if not present."""
-        f = self.default_dir / TEST_SUITE_FILENAME
-        return f if f.exists() else None
-
     @staticmethod
     def show_settings():
         """Print every resolved setting and where its value came from.
@@ -3482,7 +3475,7 @@ class Underwriter(HelpMixin):
         """
         return self.build(*args, **kwargs)
 
-    def interpret_file(self, filename=None, *, where=''):
+    def interpret_file(self, filename, *, where=''):
         """
         Parse every DecL program in a ``.agg`` or ``.csv`` file and return per-line error info.
 
@@ -3491,8 +3484,8 @@ class Underwriter(HelpMixin):
         error), this method collects errors for every statement and returns a
         DataFrame with columns ``kind, error, name, output, program``.
 
-        The bundled test suite lives at :attr:`test_suite_file` — call
-        ``interpret_file()`` with no arguments to run it.
+        The bundled files live in :attr:`default_dir`, so
+        ``build.interpret_file(build.default_dir / 'library.agg')`` checks one.
 
         For ``.csv`` files the first column is used as index, and each cell is
         preprocessed in place (a cell may still hold several statements). For
@@ -3510,14 +3503,14 @@ class Underwriter(HelpMixin):
         doc body into one bogus statement per line of markdown and reported each
         as a parse error. ``library.agg`` alone showed 67 such phantoms.
 
-        :param filename: a string or :class:`Path`. When ``None`` (default),
-            uses :attr:`test_suite_file`.
+        ``filename`` has been required since 1.61.0, when the bundled test suite
+        it defaulted to was retired.
+
+        :param filename: a string or :class:`Path`.
         :param where: regex filter on the DataFrame index; ``''`` means all rows.
         :return: DataFrame with one row per statement in the input file.
         """
-        if filename is None:
-            filename = self.test_suite_file
-        elif isinstance(filename, str):
+        if isinstance(filename, str):
             filename = Path(filename)
         if filename.suffix == '.csv':
             df = pd.read_csv(filename, index_col=0)
@@ -3999,7 +3992,7 @@ class Underwriter(HelpMixin):
 # Module-level singleton — the canonical user-facing entry point. Importable
 # as `from aggregate import build`. log2 / update come from aggregate.config
 # ([build] section). Unlike a bare ``Underwriter()`` (which loads nothing),
-# ``build`` loads the configured ``build.databases`` (``examples`` by
+# ``build`` loads the configured ``build.databases`` (``library`` by
 # default) by passing it explicitly — so config.toml still controls what
 # ``build`` knows out of the box.
 build = Underwriter(databases=list(get_settings().build.databases) or None, debug=False)

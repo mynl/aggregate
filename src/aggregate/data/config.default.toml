@@ -33,7 +33,6 @@
 
 # databases: knowledge base(s) loaded on construction. A list of names.
 #   "library"              -- the shipped DecL library (shipped default)
-#   "_test_suite"          -- bundled regression suite (temporary; retired pre-beta)
 #   "default"              -- every bundled *.agg file
 #   "user"                 -- your *.agg files in ~/.aggregate
 #   "all"                  -- bundled + user

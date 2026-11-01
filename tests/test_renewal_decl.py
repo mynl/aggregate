@@ -2,8 +2,7 @@
 
 Exact spec dicts for each surface form, strict-pairing parse failures, and
 keyword-boundary checks. Parse-only -- no ``build()``. DecL programs are
-mirrored in ``src/aggregate/agg/decl-testers.agg`` (Z.*) and exercised as
-suite lines in ``src/aggregate/agg/_test_suite.agg`` (Y.*).
+mirrored in ``src/aggregate/agg/decl-testers.agg`` (AB.*).
 See dev/plan-sparre-a.md [Renewal-Frequency-Wait-Clause].
 """
 

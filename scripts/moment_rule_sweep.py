@@ -42,7 +42,7 @@ the repository.
 From Jupyter::
 
     from moment_rule_sweep import sweep, summarize
-    df = sweep(('library', 'reproductions', '_test_suite'))
+    df = sweep(('library', 'reproductions'))
     summarize(df)
 """
 import argparse
@@ -60,7 +60,7 @@ from aggregate.moments import VALIDATION_NOISE
 from aggregate.utilities import remove_fuzz, noise_floor
 
 EPS = np.finfo(float).eps
-DEFAULT_DATABASES = ('library', 'reproductions', '_test_suite')
+DEFAULT_DATABASES = ('library', 'reproductions')
 RULES = ('today', 'plan', 'draft')
 
 
@@ -172,7 +172,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__.split('\n', 1)[0])
     p.add_argument('-d', '--database', action='append',
                    help='knowledge base to sweep; repeatable; default library, '
-                        'reproductions, _test_suite')
+                        'reproductions')
     p.add_argument('-o', '--output',
                    default=os.path.join(tempfile.gettempdir(), 'moment_rule_sweep.csv'),
                    help='CSV to write (default moment_rule_sweep.csv in the OS temp dir)')

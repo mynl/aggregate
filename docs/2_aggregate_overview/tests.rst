@@ -168,15 +168,15 @@ That single function becomes two named cases, ``test_default_path_identity[agg I
 
 .. _tests grammar suite:
 
-The DecL grammar suite, every line of ``test_suite.agg``
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The DecL grammar suite, every statement of ``decl-testers.agg``
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-``src/aggregate/agg/test_suite.agg`` is a long file of example DecL programs, organized into categories A to O: frequencies, severities, reinsurance, distortions, case studies, papers. ``tests/test_decl_parser.py`` turns each line into its own pair of parametrized tests:
+``src/aggregate/agg/decl-testers.agg`` is a long file of DecL programs, organized into sections by the language feature or test module they serve; the Contents list at its head names them. ``tests/test_decl_parser.py`` turns each statement into its own pair of parametrized tests:
 
-* ``test_line_parses``, the line parses to a valid ``(kind, name, spec)`` triple, so the program is grammatically legal.
-* ``test_spec_matches_snapshot``, the parsed ``spec`` matches a stored reference in ``tests/data/expected_specs.json``. This catches semantic drift: if a grammar change silently alters how a program is interpreted, the spec no longer matches and the test fails.
+* ``test_line_parses``, the statement parses to a valid ``(kind, name, spec)`` triple, so the program is grammatically legal.
+* ``test_spec_matches_snapshot``, the parsed ``spec`` matches a stored reference in ``tests/data/expected_specs.json``, keyed by the statement's kind word and name, so a spacing or ``note{}`` edit does not disturb it. This catches semantic drift: if a grammar change silently alters how a program is interpreted, the spec no longer matches and the test fails.
 
-Adding a line to ``test_suite.agg`` therefore adds test coverage for it automatically. Two companion corpora work the same way: ``tests/test_decl_unparser.py`` checks that every program round-trips through ``format_program``, and ``tests/test_grammar_sync.py`` checks the grammar reference against ``decl.lark``.
+Adding a statement to ``decl-testers.agg`` therefore adds test coverage for it, once ``uv run python tests/capture_spec_snapshot.py`` has recorded it. Two companion tests read the same file: ``tests/test_decl_unparser.py`` checks that every program round-trips through ``format_program``, and ``tests/test_grammar_sync.py`` checks the grammar reference against ``decl.lark``.
 
 Snapshot or golden-master tests, "does the answer still match the file?"
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -224,12 +224,12 @@ A fixture is reusable setup shared by many tests, so each test does not repeat i
    def test_something(underwriter):     # 'underwriter' is a fixture
        ...                              # pytest builds it and passes it in
 
-``aggregate``'s ``conftest.py`` provides two: ``test_suite_lines``, all the preprocessed DecL lines from ``test_suite.agg``, and ``underwriter``, an :class:`Underwriter` with those lines pre-loaded. Both are ``scope="session"``, so they are built once and reused across the whole run, which is fast.
+``aggregate``'s ``conftest.py`` provides ``underwriter``, an :class:`Underwriter` with the programs of ``decl-testers.agg`` pre-loaded. It is ``scope="session"``, so it is built once and reused across the whole run, which is fast.
 
 Keeping ``decl-testers.agg`` in sync
 ------------------------------------
 
-When a hand-written test such as ``test_negative_x.py`` uses DecL programs, the same programs are mirrored into ``src/aggregate/agg/decl-testers.agg`` under a matching section. That file is a human-readable catalogue of the programs the tests rely on. It is documentation rather than something auto-run, but it keeps the language examples discoverable and in one place. Add to it whenever you add DecL-driven tests.
+When a hand-written test such as ``test_negative_x.py`` uses DecL programs, the same programs are mirrored into ``src/aggregate/agg/decl-testers.agg`` under a matching section. That file is a human-readable catalogue of the programs the tests rely on, and the suite parses, snapshots and round-trips every statement in it, which keeps the language examples discoverable and in one place. Add to it whenever you add DecL-driven tests, and re-capture the snapshot.
 
 .. _tests regenerating:
 
@@ -243,6 +243,7 @@ Snapshot and golden tests compare against saved files. When you make a change th
    uv run python tests/baseline/capture.py          # the characterization baseline
    uv run python tests/capture_severity_golden.py   # severity golden master
    uv run python tests/capture_distortion_snapshot.py
+   uv run python tests/capture_spec_snapshot.py     # the DecL spec snapshot
 
 Then commit the regenerated ``.parquet`` and ``.json`` in the same commit as the code change, with a message explaining why the numbers moved. The discipline is: if a snapshot test fails, first decide whether the change was intended. If it was, regenerate and explain. If it was not, you just caught a bug, so fix the code rather than regenerating.
 

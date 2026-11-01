@@ -230,7 +230,7 @@ def test_the_library_entries_carry_their_own_natural_bucket(name, c, m, q, hinte
 
 
 def test_the_corpus_lines_build():
-    """The four ``_test_suite.agg`` severity lines are real programs."""
+    """Four spellings of a cantor severity are real programs."""
     for program in (
             'agg D.Sev18 1 claim sev cantor fixed',
             'agg D.Sev19 1 claim sev cantor 0.5 fixed',

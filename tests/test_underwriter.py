@@ -261,6 +261,7 @@ def test_available_databases_discovers_bundled():
     df = uw.available_databases()
     assert 'name' in df.columns and 'where' in df.columns and 'path' in df.columns
     assert 'decl-testers' in set(df['name'])
+    assert not any(name.startswith('_test_suite') for name in df['name'])
 
 
 def test_reload_resets_to_as_created():
@@ -639,6 +640,12 @@ def test_interpret_file_runs_clean():
     df = global_build.interpret_file(global_build.default_dir / 'decl-testers.agg')
     assert df.error.sum() == 0
     assert len(df) >= 140
+
+
+def test_interpret_file_requires_a_filename():
+    """The default went with the bundled test suite it pointed at."""
+    with pytest.raises(TypeError, match='filename'):
+        global_build.interpret_file()
 
 
 # ---------------------------------------------------------------------------

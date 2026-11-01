@@ -64,7 +64,7 @@ uv run jupyter notebook
 ```
 uv run pytest
 ```
-Tests live in `tests/`. Every line of `aggregate/agg/test_suite.agg` is exercised as its own parametrized test case (one assert-parses test and one shape-regression test against a captured SLY snapshot).
+Tests live in `tests/`. Every statement of `src/aggregate/agg/decl-testers.agg` is exercised as its own parametrized test case (one assert-parses test and one shape-regression test against a captured snapshot).
 
 **Build documentation:**
 ```
@@ -126,7 +126,7 @@ agg MyBook
     occurrence net of 50 xs 0      # per-occurrence reinsurance
 ```
 
-`build('...')` is the primary public API — it parses DecL and returns an `Aggregate` or `Portfolio`. The full grammar is in `aggregate/decl.lark`; reference examples are in `aggregate/agg/test_suite.agg`.
+`build('...')` is the primary public API — it parses DecL and returns an `Aggregate` or `Portfolio`. The full grammar is in `aggregate/decl.lark`; worked examples are in `aggregate/agg/library.agg`, and `aggregate/agg/decl-testers.agg` exercises the whole language.
 
 ### Computation pattern
 
@@ -216,12 +216,12 @@ The Using aggregate website, `D:/Projects/Using/aggregate` (also reached as `hac
 
 ## Testing
 
-The pytest suite at `tests/` is the primary test mechanism — run with `uv run pytest`. The DecL corpora live in `src/aggregate/agg/`: `_test_suite.agg` and `_test_suite2.agg` (the SLY-parity scaffold, still load-bearing for eleven test files — see `[Scaffold-Retirement]` in `dev/TODO.md`), plus the shipped `library.agg` and `decl-testers.agg`. Each line of `_test_suite.agg` (categories A–O: frequencies, severities, reinsurance, distortions, case studies, papers) becomes two parametrized cases:
+The pytest suite at `tests/` is the primary test mechanism: run it with `uv run pytest`. The DecL corpora live in `src/aggregate/agg/`: `library.agg` (the shipped default recipe base), `decl-testers.agg` (the language-stress corpus), and `reproductions.agg` and `recitations.agg` (refreshed from their source projects). Each statement of `decl-testers.agg` becomes two parametrized cases:
 
-- `test_line_parses` — the line parses to a valid `(kind, name, spec)` shape.
-- `test_spec_matches_snapshot` — the spec matches `tests/data/expected_specs.json`. This catches semantic drift in the grammar/transformer.
+- `test_line_parses`: the statement parses to a valid `(kind, name, spec)` shape.
+- `test_spec_matches_snapshot`: the spec matches its entry in `tests/data/expected_specs.json`, keyed by the kind word and name as written (`agg P.Mix`, and `agg DP.Moves#2` for a repeat), so a spacing or `note{}` edit does not disturb it. This catches semantic drift in the grammar/transformer.
 
-Regenerate the snapshot with `uv run python tests/capture_spec_snapshot.py`. It is **not** frozen: the script runs the current Lark parser and re-capturing is routine after any grammar or transformer change. What it gives you is a change detector, not a correctness oracle. It cannot prove the parser right, since it is captured from the parser it checks; it makes an edit's blast radius show up as a diff you must read and accept deliberately. A line you did not expect to move is a finding.
+Regenerate the snapshot with `uv run python tests/capture_spec_snapshot.py`. It is **not** frozen: the script runs the current Lark parser, and re-capturing is routine after any grammar or transformer change and **after appending a program to `decl-testers.agg`, which fails `test_spec_matches_snapshot` until it is recorded**. What it gives you is a change detector, not a correctness oracle. It cannot prove the parser right, since it is captured from the parser it checks; it makes an edit's blast radius show up as a diff you must read and accept deliberately. An entry you did not expect to move is a finding.
 
 Validation failures surface as warnings via `explain_validation()`; numerical issues (aliasing, CV mismatch, skewness) set flags in `constants.py`.
 

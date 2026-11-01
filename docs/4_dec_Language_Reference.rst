@@ -319,9 +319,9 @@ Here is the full DecL Grammar and a `grammar railroad diagram <_static/diagram.x
 Test Suite Programs
 ===================
 
-The parser corpus (``aggregate/agg/_test_suite.agg``) is exercised by the
-pytest suite: each line of the file becomes its own parametrized test case, one
-asserting it parses and one checking the resulting spec against a captured
+The parser corpus (``aggregate/agg/decl-testers.agg``) is exercised by the
+pytest suite: each statement of the file becomes its own parametrized test case,
+one asserting it parses and one checking the resulting spec against a captured
 snapshot. The snapshot is regenerated from the current Lark parser, so it is a
 change detector rather than a correctness oracle. Run::
 
@@ -329,13 +329,13 @@ change detector rather than a correctness oracle. Run::
 
 The full ``.agg`` source:
 
-.. literalinclude:: ../src/aggregate/agg/_test_suite.agg
+.. literalinclude:: ../src/aggregate/agg/decl-testers.agg
    :language: agg
 
 To only parse the file from Python::
 
     from aggregate import build
-    filename = build.default_dir / '_test_suite.agg'
+    filename = build.default_dir / 'decl-testers.agg'
     assert filename.exists()
 
     build.logger_level(30)

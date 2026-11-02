@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.63.0 - 2026-11-02
+
+**[Pedagogy-Repairs] Three broken `pedagogy.py` functions run again, and `ClassicalPremium` takes a keyword-only `fischer_power`, default 2.** `similar_risks_example()` raised `TypeError` from `Bounds.plot_envelope(axs=...)`; it now draws the two-panel envelope and returns its frame. `plot_similar_risks_graphs(..., p_reg=0.9)` raised `AttributeError`; it now prices the new portfolio by $\mathrm{TVaR}_p(X \wedge a)$ at $a = q_{p_{reg}}(X)$, and `p_reg=1`, the default, gives the same numbers as before. `ClassicalPremium.calibrate` and `price(method='Fischer')` raised `AttributeError` for any input; the Fischer premium is $\mathsf{P}X + c\,(\mathsf{P}[(X - \mathsf{P}X)_+^r])^{1/r}$ with $r$ = `fischer_power`, and power 1 equals the `Dutch` premium. `decl-testers.agg` has a new section PED with three programs.
+
 ## 1.62.0 - 2026-11-02
 
 **[Research-Distortions] `cll` leaves the default `Distortion.available_distortions()`, which is now `('ccoc', 'ph', 'wang', 'dual', 'tvar')`, equal to `DEFAULT_CALIBRATION_DISTORTIONS`.** No calibration or table moves, since calibration already defaulted to those five. Code that relied on the default list holding `cll` must pass `pricing=True, strict=False`, and `Distortion.distortions_from_params` at its defaults no longer reads a `cll` row. `available_distortions(pricing=True, strict=False)`, `available_distortions(pricing=False)`, the DecL distortion words, `Distortion('cll', ...)` and `calibrate_distortions(..., names=['cll'])` are unchanged. The research families `cll`, `clin`, `lep` and `ly` are described under a new heading, Research distortion families, on the Distortion reference page and in the `Distortion` docstring; the docs are pending a rebuild.

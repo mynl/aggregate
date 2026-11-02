@@ -20388,5 +20388,112 @@
       "note": "a law pinned to its grid, for the reference below",
       "hints": "log2=12; bs=1/4"
     }
+  },
+  "port PED.Unif": {
+    "kind": "port",
+    "name": "PED.Unif",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "ONE",
+          {
+            "name": "ONE",
+            "exp_en": 1.0,
+            "sev_name": "beta",
+            "sev_a": 1.0,
+            "sev_b": 1.0,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": "",
+            "hints": ""
+          }
+        ]
+      ],
+      "note": "uniform base portfolio of the similar-risks example",
+      "hints": ""
+    }
+  },
+  "port PED.Beta": {
+    "kind": "port",
+    "name": "PED.Beta",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "TWO",
+          {
+            "name": "TWO",
+            "exp_en": 1.0,
+            "sev_name": "beta",
+            "sev_a": [
+              200.0,
+              300.0,
+              400.0,
+              500.0,
+              600.0,
+              7.0
+            ],
+            "sev_b": [
+              600.0,
+              500.0,
+              400.0,
+              300.0,
+              200.0,
+              1.0
+            ],
+            "sev_scale": 1.0,
+            "sev_wt": [
+              0.16666666666666666,
+              0.16666666666666666,
+              0.16666666666666666,
+              0.16666666666666666,
+              0.16666666666666666,
+              0.16666666666666666
+            ],
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "fixed",
+            "note": "",
+            "hints": ""
+          }
+        ]
+      ],
+      "note": "beta mixture priced against PED.Unif",
+      "hints": ""
+    }
+  },
+  "port PED.Classical": {
+    "kind": "port",
+    "name": "PED.Classical",
+    "spec": {
+      "spec": [
+        [
+          "agg",
+          "Limit1",
+          {
+            "name": "Limit1",
+            "exp_en": 0.1,
+            "exp_attachment": 0.0,
+            "exp_limit": 1000000.0,
+            "sev_name": "lognorm",
+            "sev_mean": 50000.0,
+            "sev_cv": 10.0,
+            "sev_scale": 1.0,
+            "sev_wt": 1.0,
+            "sev_lb": 0.0,
+            "sev_ub": "__inf__",
+            "freq_name": "poisson",
+            "note": "",
+            "hints": ""
+          }
+        ]
+      ],
+      "note": "a thick-tailed limited unit for the classical premiums",
+      "hints": ""
+    }
   }
 }

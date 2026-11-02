@@ -211,10 +211,9 @@
   a combination's parameters on a grid, closing the loop from parameters to
   density. Pended by the author, 2026-10-30; `[Stable-Arithmetic]` landed at 1.43.0, in
   `dev/done/plan-stable-expressions.md`.
-- **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`;
-  `pedagogy.similar_risks_example` raises `TypeError`, passing arguments that
-  `Portfolio.plot` and `Bounds.plot_envelope` do not take (the second part is in
-  `dev/plan-pre-release-housekeeping.md`).
+- **[Plot-Argument-Warts]**: `Distortion.plot_affine(ax=)` ignores `ax`. The
+  `pedagogy.similar_risks_example` part landed at 1.63.0,
+  `dev/done/plan-pre-release-housekeeping.md`.
 - **[Library-Items-Raised-By-API]**: after 2.0. `chart_envelope` resamples with no
   seed, so its document hash changes (`charts/_emit_bounds.py`); `Recipe.decl` is
   empty for `minimum` and `mixture`; `format_program`'s fallback collapses a

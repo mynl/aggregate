@@ -97,6 +97,7 @@
 # CFE. Laws from a characteristic function ([Characteristic-Function-Statement], 1.30.0)
 # NL. Named stable and tweedie laws ([Named-Conversion-Statements], 1.42.0)
 # TS. Programs moved from the SLY-parity scaffold ([Scaffold-Retirement])
+# PED. The repaired pedagogy.py functions ([Pedagogy-Repairs], 1.63.0)
 
 
 # P. Baseline harness: Aggregate regression cases
@@ -1846,3 +1847,13 @@ chfagg CHF.RefGamma     25 * gamma 4 hints{log2=12; bs=1/4} note{a law pinned to
 # sev G.Splice05  10 * uniform + 5 splice [20 30]  note{error in plot}
 # agg G.Splice07  1  claim          sev 10 * uniform + 5 splice [1  2] fixed note{error in plot}
 # agg G.Splice10  1  claim          sev 10 * uniform + 5 splice [20 30] fixed note{error in plot}
+
+
+# PED. The repaired pedagogy.py functions ([Pedagogy-Repairs], 1.63.0)
+# =====================================================================
+# Programs behind tests/test_pedagogy_repairs.py. PED.Unif and PED.Beta are the
+# UNIF and BETA portfolios of pedagogy.similar_risks_example, which builds them
+# inline; PED.Classical is the ClassicalPremium fixture.
+port PED.Unif note{uniform base portfolio of the similar-risks example} agg ONE 1 claim sev 1 * beta 1 1 fixed;
+port PED.Beta note{beta mixture priced against PED.Unif} agg TWO 1 claim sev 1 * beta [200 300 400 500 600 7] [600 500 400 300 200 1] wts=6 fixed;
+port PED.Classical note{a thick-tailed limited unit for the classical premiums} agg Limit1 0.1 claims 1000000 xs 0 sev lognorm 50000 cv 10 poisson;

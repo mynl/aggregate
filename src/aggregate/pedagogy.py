@@ -106,10 +106,11 @@ def plot_max_min(bounds, ax):
     Pulled out of ``Bounds.cloud_view``/``plot_envelope`` so that case-study
     code can compose a custom figure layout from the cloud.
     """
-    ax.fill_between(bounds.cloud_df.index, bounds.cloud_df.min(1),
-                    bounds.cloud_df.max(1), facecolor='C7', alpha=.15)
-    bounds.cloud_df.min(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='k')
-    bounds.cloud_df.max(1).plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='k')
+    lo = bounds.cloud_df.min(axis=1)
+    hi = bounds.cloud_df.max(axis=1)
+    ax.fill_between(bounds.cloud_df.index, lo, hi, facecolor='C7', alpha=.15)
+    lo.plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='k')
+    hi.plot(ax=ax, label='_nolegend_', lw=0.5, ls='-', c='k')
 
 
 def plot_lee(port, ax, c, lw=1):
@@ -130,14 +131,39 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     Stand-alone version of the similar-risks figure used in the bounded-beta
     case studies. ONLY WORKS FOR BOUNDED PORTFOLIOS.
 
-    Inputs:
+    Parameters
+    ----------
+    axd : dict or None
+        Mosaic dict from ``fig.subplot_mosaic`` with keys ``A`` to ``F``;
+        None makes a new figure.
+    bounds : Bounds
+        A calibrated ``Bounds`` object on the base portfolio.
+    port : Portfolio
+        The base portfolio, with calibrated distortions.
+    pnew : Portfolio
+        The new portfolio whose pricing range is to be visualized.
+    roe, prem : float
+        Parameters used to construct the ccoc and TVaR distortions.
+    p_reg : float, default 1
+        Regulatory probability; 1 is unbounded.
 
-    - ``axd``        mosaic dict from ``fig.subplot_mosaic``
-    - ``bounds``     a calibrated ``Bounds`` object on the base portfolio
-    - ``port``       the base portfolio
-    - ``pnew``       the new portfolio whose pricing range is to be visualised
-    - ``roe``, ``prem``   parameters used to construct the ccoc/TVaR distortions
-    - ``p_reg``      regulatory probability (1 == unbounded)
+    Returns
+    -------
+    pandas.DataFrame
+        ``bounds.weight_df`` with the bracket prices ``t1`` of ``pnew``.
+
+    Notes
+    -----
+    With ``p_reg < 1`` the new portfolio is priced with assets limited to
+    the regulatory level :math:`a = q_{p_{reg}}(X)`, using
+
+    .. math::
+
+        \\mathrm{TVaR}_p(X \\wedge a) = \\mathrm{TVaR}_p(X)
+        - \\frac{(1 - F(a))\\,(\\mathrm{TVaR}_{F(a)}(X) - a)}{1 - p}
+
+    for :math:`p < F(a)`, and :math:`a` for :math:`p \\ge F(a)`
+    (``Bounds._tvar_x_a``).
 
     Provenance: ``make_port`` in ``Examples_2022_post_publish``.
     fka similar_risks_graphs_sa
@@ -156,12 +182,10 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     df = bounds.weight_df.copy()
     df['test'] = df['t_upper'] * df.weight + df.t_lower * (1 - df.weight)
 
-    # HERE IS ISSUE - should really use tvar with bounds and incorporate the bound
     if p_reg < 1:
-        logger.warning('figuring tvars with bounds')
-        btemp = Bounds(pnew, premium=prem)
-        b = pnew.q(p_reg)
-        tvar1 = {p: btemp._tvar_x_func(p) for p in bounds.p_knots}
+        # TVaR of min(X_new, a) at the regulatory asset level a = q(p_reg)
+        btemp = Bounds(pnew, premium=prem, a=pnew.q(p_reg))
+        tvar1 = {p: float(btemp._tvar_x_a(p)) for p in bounds.p_knots}
     else:
         tvar1 = {p: float(pnew.tvar(p)) for p in bounds.p_knots}
     df['t1_lower'] = [tvar1[p] for p in df.index.get_level_values(0)]
@@ -196,7 +220,7 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
     ax.lines[n + 2].set(color='C1', label='tvar', ls='-.')
     ax.lines[n + 4].set(color='C4', label='max', lw=1)
     ax.lines[n + 6].set(color='C5', label='min', lw=1)
-    bounds.cloud_df.mean(1).plot(ax=ax, c='C3', ls='-.', lw=1.5, label='Avg extreme')
+    bounds.cloud_df.mean(axis=1).plot(ax=ax, c='C3', ls='-.', lw=1.5, label='Avg extreme')
     ax.legend(loc='upper left')
 
     ax.set(title=f'Max ({pl}, {pu}), min ({pln}, {pun})')
@@ -243,10 +267,17 @@ def plot_similar_risks_graphs(axd, bounds, port, pnew, roe, prem, p_reg=1):
 
 def similar_risks_example():
     """
-    Bounded-beta example showing how to use ``similar_risks_graphs_sa``.
+    Bounded-beta example showing how to use ``plot_similar_risks_graphs``.
 
     Builds a base UNIF portfolio, calibrates distortions, then a candidate BETA
-    portfolio whose pricing range we visualise against the base.
+    portfolio whose pricing range we visualize against the base.
+
+    Returns
+    -------
+    pandas.DataFrame
+        The frame from :func:`plot_similar_risks_graphs`. Three figures are
+        drawn: the pricing envelope, the BETA portfolio, and the
+        similar-risks mosaic.
     """
     uw = Underwriter()
     p_base = uw.build('''
@@ -254,7 +285,7 @@ def similar_risks_example():
         agg ONE 1 claim sev 1 * beta 1 1 fixed
     ''')
     p_base.update(11, 1 / 1024, remove_fuzz=True)
-    prem = p_base.tvar(0.2, 'interp')
+    prem = p_base.tvar(0.2)
     a = 1
     d = (prem - p_base.ex) / (a - p_base.ex)
     v = 1 - d
@@ -262,15 +293,8 @@ def similar_risks_example():
     p_base.calibrate_distortions(roe, a=a)
     bounds = Bounds(p_base, premium=prem, a=a)
 
-    f, axs = plt.subplots(1, 3, figsize=_fit_to_page((18.0, 6.0)), layout='constrained')
-    bounds.plot_envelope(axs=axs.flatten(), n_resamples=0, alpha=1,
-                         title=f'Premium={prem:,.1f}, a={a:,.0f}, p*={bounds.p_star:.3f}',
-                         distortions=[{k: p_base.distortions[k] for k in ['ccoc', 'tvar']},
-                                      {k: p_base.distortions[k] for k in ['ph', 'wang', 'dual']}])
-    for ax in axs.flatten()[1:]:
-        ax.legend(ncol=1, loc='lower right')
-    for ax in axs.flatten():
-        ax.set(title=None)
+    # two panels, the calibrated distortions on the second
+    bounds.plot_envelope(n_resamples=0)
 
     program = '''
     port BETA
@@ -278,7 +302,7 @@ def similar_risks_example():
     '''
     p_new = uw.build(program)
     p_new.update(11, 1 / 1024, remove_fuzz=True)
-    p_new.plot(figsize=(6, 4))
+    p_new.plot()
 
     axd = plt.figure(constrained_layout=True, figsize=_fit_to_page((16, 8))).subplot_mosaic(
         """
@@ -707,14 +731,35 @@ class ClassicalPremium:
     Used by :func:`plot_ruin_surplus_paths` for the surplus-path illustration
     in ``docs/5_technical_guides/5_x_pk.rst``. Originally in ``hack.py`` then the
     PIR ``CaseStudy`` machinery.
+
+    Parameters
+    ----------
+    ports : dict
+        Portfolios keyed by name; ``port_name`` in the methods is a key.
+    calibration_premium : float
+        The target premium, reset by each :meth:`calibrate` call.
+    fischer_power : float, default 2
+        The power :math:`r` of the Fischer premium, keyword only.
+
+    Notes
+    -----
+    The Fischer premium with loading :math:`c` and power :math:`r \\ge 1` is
+
+    .. math::
+
+        \\mathsf{P}X + c\\,\\bigl(\\mathsf{P}[(X - \\mathsf{P}X)_+^{\\,r}]\\bigr)^{1/r}.
+
+    Power 1 is the ``Dutch`` premium exactly, so only a power above 1 gives
+    a distinct principle. The default 2 loads the upper semideviation.
     """
 
     __classical_methods__ = ['Expected Value', 'VaR', 'Variance', 'Standard Deviation',
                              'Semi-Variance', 'Exponential', 'Esscher', 'Dutch', 'Fischer']
 
-    def __init__(self, ports, calibration_premium):
+    def __init__(self, ports, calibration_premium, *, fischer_power=2):
         self.ports = ports
         self.calibration_premium = calibration_premium
+        self.fischer_power = fischer_power
 
     def distribution(self, port_name, unit_name):
         """Pull the per-unit marginal and basic moment stats out of ``ports[port_name]``.
@@ -810,7 +855,8 @@ class ClassicalPremium:
             excess = np.sum(np.maximum(df.loss - mn, 0) * df.p)
             return mn + param * excess
         if method == 'Fischer':
-            excess = np.sum(np.maximum(df.loss - mn, 0) ** self.p * df.p) ** (1 / self.p)
+            r = self.fischer_power
+            excess = np.sum(np.maximum(df.loss - mn, 0) ** r * df.p) ** (1 / r)
             return mn + param * excess
 
     def illustrate(self, port_name, unit_name, ax, margin,

@@ -222,3 +222,25 @@ Divergences:
 - **The `available_distortions` docstring** states the three lists as returned values rather than a table, and its `pricing` description says it drops `beta`; the old text said `convex` and `beta`, but `convex` is not a registered kind.
 - **The `Distortion` docstring** was not NumPy style before (a "Subclass contract:" block and a "Note:" block). A NumPy `Notes` section was appended after them rather than restructuring the docstring, which is outside the plan.
 - **The docs heading** also gives the Python and DecL construction forms and the `names=` route to calibrating a research family, which the plan text implies but does not spell out.
+
+### `[Pedagogy-Repairs]`, 1.63.0
+
+Done as specified. Measured on the repaired module at 1.62.0:
+
+| Check | Plan | Measured |
+|:--|:--|:--|
+| `similar_risks_example()` | (11913, 7), `t1` 0.635566 to 0.650011, three figures, about 0.5 s | (11913, 7), `t1` 0.6355662 to 0.6500109, three figures, 0.60 s |
+| `p_reg=1` | `t1` 0.635566 to 0.650011 | the same |
+| `p_reg=0.9` | `a` 0.876953, maximum `t1` 0.628715 | `a` 0.876953125, maximum `t1` 0.6287148 |
+| `_tvar_x_a(0.5)` | 0.73640109, equal to the direct sum | 0.7364010859568928, direct 0.7364010859568949 |
+| `calibrate('gross', 'Limit1', 8000)` | nine methods within 1e-3 relative | nine methods, worst 9.8e-6 relative |
+| Fischer at power 1 | equal to Dutch | 5580.659309605665 both |
+
+Tier 1 on `tests/test_pedagogy_repairs.py`, `tests/test_unit_density.py`, `tests/test_decl_parser.py` and `tests/test_decl_unparser.py`: 2,211 passed, 2 skipped (the existing combinator round-trip skips). The snapshot re-capture adds three entries, `port PED.Unif`, `port PED.Beta`, `port PED.Classical`, and moves nothing else (650 entries, 107 lines added). `dev/regen_features.py` reports no change.
+
+Divergences:
+
+- **`Exponential` and `Esscher` land at 7,999.95 and 7,999.92**, not the 7,999.57 and 7,999.63 the plan measured at 1.43.1, presumably because grid sizing changed between 1.44.0 and 1.48.0; not traced. Both are inside the 1e-3 relative tolerance the test uses.
+- **Corpus names are prefixed.** The plan calls the programs `UNIF` and `BETA`; the corpus and the test use `PED.Unif`, `PED.Beta` and `PED.Classical` in a new section PED, following the corpus convention of a section prefix. `similar_risks_example` keeps its inline `UNIF` and `BETA`. Each note sits after the port name, as in `UD.Plain`, so it belongs to the port rather than to its one unit.
+- **Pandas 4 warnings fixed on the repaired path.** `plot_max_min` and `plot_similar_risks_graphs` called `cloud_df.min(1)`, `max(1)` and `mean(1)`, which emit `Pandas4Warning` and will raise under pandas 4; they now pass `axis=1`. `bodoff_exhibit`'s `bit.sum(1)` is off the path and was left.
+- **Docstrings.** `plot_similar_risks_graphs` moved to NumPy style with a `Notes` section giving the bounded TVaR formula; `similar_risks_example` gained a `Returns` section; `ClassicalPremium` gained `Parameters` and a `Notes` section with the Fischer formula. The plan asked only for the last. The stale `logger.warning('figuring tvars with bounds')` and the `HERE IS ISSUE` comment went with the old branch.

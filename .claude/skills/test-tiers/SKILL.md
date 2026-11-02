@@ -115,7 +115,9 @@ fix. This is deliberately **not** in `addopts`: a third-party release could
 break the everyday loop, and one bivariate case flakes under it
 (`[Bivariate-Gate-Flake]`).
 
-**Grammar snapshot.** After any grammar or transformer change:
+**Grammar snapshot.** After any grammar or transformer change, and after
+appending a program to `decl-testers.agg`, which fails
+`test_spec_matches_snapshot` until it is recorded:
 
 ```
 uv run python tests/capture_spec_snapshot.py
@@ -124,8 +126,8 @@ uv run python tests/capture_spec_snapshot.py
 The snapshot is not frozen and re-capturing is routine. It is a change detector,
 not a correctness oracle: it cannot prove the parser right, since it is captured
 from the parser it checks. What it gives you is an edit's blast radius as a diff
-you must read and accept deliberately. **A line you did not expect to move is a
-finding.** Do not regenerate and commit without reading it.
+you must read and accept deliberately. **An entry you did not expect to move is
+a finding.** Do not regenerate and commit without reading it.
 
 ## Markers
 

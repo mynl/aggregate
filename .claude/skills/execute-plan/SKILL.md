@@ -112,8 +112,8 @@ for an action. Say the chosen names in the review so they can be challenged.
 verification section, ask for one rather than inventing a standard for it.
 
 **Blast radius.** What else reads what this changes. `rg` the symbols. If the
-grammar or the transformer moves, the snapshot regenerates and its diff must be
-read deliberately. If a public surface moves, `dev/FEATURES.csv` regenerates. If
+grammar or the transformer moves, or a program joins `decl-testers.agg`, the
+snapshot regenerates and its diff must be read deliberately. If a public surface moves, `dev/FEATURES.csv` regenerates. If
 a public name the API imports moves, that is a ripple, not a local change.
 
 **Ripple to the app.** DecL grammar or keyword changes must be checked against
@@ -152,7 +152,7 @@ divergence is a good outcome. An unrecorded one is the failure.
   the files or cases in scope. Do not run the full suite inside the loop.
 - **Write the tests the plan asks for.** Any new DecL program used in a pytest
   case is appended to `src/aggregate/agg/decl-testers.agg` under the matching
-  section, and it must round-trip.
+  section, it must round-trip, and the snapshot is re-captured to record it.
 - **Docstrings on everything new or modified.** NumPy style, and for
   non-trivial mathematics the why goes in Notes. This is an actuarial library;
   the why is often the point.

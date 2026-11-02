@@ -74,7 +74,8 @@ the change implies, and never splits them across commits:
   than leaving it stale.
 - `dev/FEATURES.csv` if the change touches the class by capability matrix,
   regenerated with `uv run python dev/regen_features.py`.
-- The grammar snapshot if the grammar or transformer moved,
+- The grammar snapshot if the grammar or transformer moved or
+  `decl-testers.agg` gained a program,
   `uv run python tests/capture_spec_snapshot.py`, with its diff read
   deliberately before it is committed.
 - The plan moved from `dev/` to `dev/done/` if this is its first bump; later

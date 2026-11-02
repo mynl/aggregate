@@ -157,9 +157,6 @@
 
 - **[Esscher-Exponential-Premium]**: the one classical premium principle the
   distortions do not subsume; today only in a `pedagogy.py` figure.
-- **[Distortion-Production-vs-Research]**: separate the production distortions
-  from the research zoo (CLL, CLin, LEP, LY) with a docs heading, no namespace
-  (ruled 2026-10-30). In `dev/plan-pre-release-housekeeping.md`.
 - **[Two-Surfaces-Blessed-Path]**: document the blessed path per task: DecL to
   construct, objects to analyze.
 

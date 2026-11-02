@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.62.0 - 2026-11-02
+
+**[Research-Distortions] `cll` leaves the default `Distortion.available_distortions()`, which is now `('ccoc', 'ph', 'wang', 'dual', 'tvar')`, equal to `DEFAULT_CALIBRATION_DISTORTIONS`.** No calibration or table moves, since calibration already defaulted to those five. Code that relied on the default list holding `cll` must pass `pricing=True, strict=False`, and `Distortion.distortions_from_params` at its defaults no longer reads a `cll` row. `available_distortions(pricing=True, strict=False)`, `available_distortions(pricing=False)`, the DecL distortion words, `Distortion('cll', ...)` and `calibrate_distortions(..., names=['cll'])` are unchanged. The research families `cll`, `clin`, `lep` and `ly` are described under a new heading, Research distortion families, on the Distortion reference page and in the `Distortion` docstring; the docs are pending a rebuild.
+
 ## 1.61.0 - 2026-11-01
 
 **[Scaffold-Retirement] The SLY-parity corpora `_test_suite.agg` and `_test_suite2.agg` are deleted, and the test suite parses, round-trips and snapshots `decl-testers.agg` instead.** No number or default moves, since `build` already loaded `library`. `tests/data/expected_specs.json` has 647 entries, up from 209, keyed by kind word and name rather than statement text. Section TS of `decl-testers.agg` holds the 23 programs tests still need, including the only exercise of six grammar rules. `library.agg` joins the unparser corpus. `tests/data/bucket_baseline_*.csv` are deleted, and the maintenance scripts default to `library`.

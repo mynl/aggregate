@@ -32,6 +32,11 @@ Distortion class
 
 .. autoclass:: aggregate.spectral.Distortion
 
+Research distortion families
+----------------------------
+
+``cll`` (capped loglinear), ``clin`` (capped linear), ``lep`` (leverage equivalent pricing) and ``ly`` (linear yield) are research families. They are built by the same :class:`Distortion` class and called the same way as the production families, ``Distortion('cll', b=0.9)`` in Python and ``distortion D cll 0.9`` in DecL. They are absent from the default :meth:`Distortion.available_distortions` list and from the default calibration set, both of which are ``ccoc``, ``ph``, ``wang``, ``dual`` and ``tvar``. ``available_distortions(pricing=True, strict=False)`` and ``available_distortions(pricing=False)`` include them, and ``calibrate_distortions(..., names=['cll'])`` calibrates one.
+
 Spectral functions
 ------------------
 

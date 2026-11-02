@@ -397,3 +397,21 @@ def test_property_setter_rebuilds():
     g_at_half_after = float(d.g(0.5))
     assert g_at_half_after != pytest.approx(g_at_half_before)
     assert d.a == 0.5
+
+
+# --- research families leave the default list (Pre-2.0-Housekeeping) -------
+
+def test_default_list_equals_default_calibration_set():
+    """The default ``available_distortions()`` is the production set, the
+    same tuple calibration uses by default; ``cll`` is not in it."""
+    from aggregate._pricing import DEFAULT_CALIBRATION_DISTORTIONS
+    assert Distortion.available_distortions() == DEFAULT_CALIBRATION_DISTORTIONS
+    assert 'cll' not in Distortion.available_distortions()
+
+
+@pytest.mark.parametrize('kind', ['cll', 'clin', 'lep', 'ly'])
+def test_research_families_in_the_wider_lists(kind):
+    """Each research family stays in the non-strict pricing list and in the
+    full list, so DecL and explicit calibration still reach it."""
+    assert kind in Distortion.available_distortions(pricing=True, strict=False)
+    assert kind in Distortion.available_distortions(pricing=False)

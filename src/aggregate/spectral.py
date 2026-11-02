@@ -591,6 +591,19 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         g = type('Distortion', (),
                  {'g': your_g, 'g_inv': your_g_inv,
                   'g_dual': lambda self, x: 1 - your_g(1 - x)})()
+
+    Notes
+    -----
+    **Research distortion families.** ``cll`` (capped loglinear), ``clin``
+    (capped linear), ``lep`` (leverage equivalent pricing) and ``ly``
+    (linear yield) are built by this class and called the same way as the
+    production families, in Python and in DecL. They are absent from the
+    default :meth:`available_distortions` list and from the default
+    calibration set ``_pricing.DEFAULT_CALIBRATION_DISTORTIONS``, which are
+    both ``ccoc``, ``ph``, ``wang``, ``dual``, ``tvar``; pass one in
+    ``calibrate_distortions(..., names=)`` to calibrate it. ``clin``,
+    ``lep`` and ``ly`` are excluded by their
+    ``has_mass_default`` flag and ``cll`` by its ``strict_pricing`` flag.
     """
 
     # registry of subclasses keyed by ``kind``; populated by
@@ -607,6 +620,9 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     pricing_ok: bool = False
     # included in available_distortions(pricing=True, strict=True): single
     # shape parameter, no mass at zero, calibratable from a single number.
+    # Meeting these is necessary, not sufficient: the flag also marks the
+    # family as a production choice, so a research family that meets them
+    # (cll) leaves it False.
     strict_pricing: bool = False
     has_mass_default: bool = False
     # natural name of the scalar shape parameter, used by the base
@@ -924,12 +940,39 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     @classmethod
     def available_distortions(cls, pricing=True, strict=True):
         """
-        List of available distortions.
+        Names of the registered distortion kinds, filtered by use.
 
-        :param pricing: only return kinds suitable for pricing
-            (excludes ``convex`` and ``beta``).
-        :param strict: only include kinds without a mass at zero
-            (pricing only).
+        Parameters
+        ----------
+        pricing : bool, default True
+            Only kinds suitable for pricing (``pricing_ok``), which drops
+            ``beta``.
+        strict : bool, default True
+            With ``pricing``, only the production families: one shape
+            parameter, no mass at zero, calibrated from a single premium
+            (``strict_pricing`` and not ``has_mass_default``). Ignored when
+            ``pricing`` is False.
+
+        Returns
+        -------
+        tuple of str
+            In declaration order. The three lists are:
+
+            * ``available_distortions()``: ``ccoc``, ``ph``, ``wang``,
+              ``dual``, ``tvar``, equal to
+              ``_pricing.DEFAULT_CALIBRATION_DISTORTIONS``.
+            * ``available_distortions(pricing=True, strict=False)``: those
+              five, then ``bitvar``, ``wtdtvar`` and the research families
+              ``cll``, ``clin``, ``lep``, ``ly``.
+            * ``available_distortions(pricing=False)``: every documented
+              kind, the source of the DecL distortion words in
+              ``decl_words``.
+
+        Notes
+        -----
+        The research families are built and called like any other kind;
+        they are absent from the default list only. See the ``Distortion``
+        class docstring.
         """
         registry = cls._registry
         if pricing and strict:
@@ -1860,8 +1903,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         ----------
         params : pandas.DataFrame
             Indexed by ``(group, kind)`` with a ``param`` column;
-            one entry per available distortion kind. Called by
-            ``Portfolio.calibrate_distortions``.
+            one entry per available distortion kind.
         index : hashable
             Group index used to slice ``params``.
         r0 : float, optional
@@ -3743,7 +3785,8 @@ class CLLDistortion(Distortion):
     long_name = 'Capped Loglinear'
     documented = True
     pricing_ok = True
-    strict_pricing = True
+    # a research family, kept out of the default list (author, 2026-10-30)
+    strict_pricing = False
     _calibration_init_shape = 0.95
 
     def __init__(self, name='cll', *, r0=0.0, b, label=None):

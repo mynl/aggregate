@@ -210,4 +210,15 @@ current version. `git status --short` shows only the files named in this step.
 
 ## Execution log
 
-(filled at execution: version per step, the measured table, divergences)
+Executed 2026-11-02 against 1.61.0 (`06f67f71`), eighteen bumps after the draft. Review at the start: every named symbol and quoted snippet still reads as written, and the three failures reproduce (`plot_envelope() got an unexpected keyword argument 'axs'`, `'ClassicalPremium' object has no attribute 'p'`). `fischer_power` has no match in `src` or `tests`. `available_distortions` and `distortions_from_params` have no use in `V:/dev/aggregate-api` or `V:/dev/PMIR`. The control list `V:/worktrees/dev-files.md` no longer exists, so no row was updated.
+
+### `[Research-Distortions]`, 1.62.0
+
+Done as specified. `available_distortions()` is `('ccoc', 'ph', 'wang', 'dual', 'tvar')` and equal to `DEFAULT_CALIBRATION_DISTORTIONS`; the other two lists keep `cll`; `calibrate_distortions(..., names=['cll'])` was checked by hand and calibrates. Tier 1 on `tests/test_distortion_*.py` and `tests/test_decl_words.py`: 510 passed (the one `IntegrationWarning` is from the existing `test_calibrating_below_expected_loss_reports_gini_p`).
+
+Divergences:
+
+- **Line numbers.** The plan's line numbers are those of 1.43.1. At 1.61.0 the `strict_pricing` comment is at `spectral.py` 608 (plan 586), `available_distortions` at 925 (905), `distortions_from_params` at 1854 (1793), `CLLDistortion.strict_pricing` at 3746 (3683), and `DEFAULT_CALIBRATION_DISTORTIONS` at `_pricing.py` 25 (26). Same symbols, same text.
+- **The `available_distortions` docstring** states the three lists as returned values rather than a table, and its `pricing` description says it drops `beta`; the old text said `convex` and `beta`, but `convex` is not a registered kind.
+- **The `Distortion` docstring** was not NumPy style before (a "Subclass contract:" block and a "Note:" block). A NumPy `Notes` section was appended after them rather than restructuring the docstring, which is outside the plan.
+- **The docs heading** also gives the Python and DecL construction forms and the `names=` route to calibrating a research family, which the plan text implies but does not spell out.

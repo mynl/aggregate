@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.63.2 - 2026-11-02
+
+**[Library-Loss-Tables-And-Laws] `library.agg` gains six entries: its first event and year loss tables, and two more characteristic function laws.** A new section, Event and year loss tables, holds `EventLossTable` (eight events, `[id rate mean max]`), `EventLossTable.SecondaryUncertainty` (the six column form, which needs `pip install aggregate[elt]`), `EventLossTable.SharedEvents` (two units under an occurrence layer) and `YearLossTable` (an annual aggregate cover), all four tagged with the new `topic:elt`. `NormalLaw` (`30 * norm + 20`) and `GammaLaw` (`100 * gamma 4 - 200`, support from -200) join `StableLaw` under Numerical character. No existing entry changes.
+
 ## 1.63.1 - 2026-11-02
 
 **[Deductible-Forms-Follow-Ups] A layer's `pdf` marks the point mass at the limit with `inf`, conditional and unconditional.** The conditional form returned 0 at the limit. The unconditional form put the marker at the detachment `a + y`, a ground-up loss, and returned a nonzero density between the limit and the detachment, where it now returns 0. `severity_error_analysis` sets a marker to 0 in its quadratic term, so `h2_adj` is finite when a grid point lands on the limit (it was `nan` for a franchise) and unchanged for an ordinary layer. The density series of `chart_severity` for an ordinary layer carries one `inf` at the limit, as a franchise's already did. Contributed by @KasraBashirioskooei (#24).

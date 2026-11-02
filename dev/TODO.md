@@ -47,10 +47,11 @@
   here, plus two tolerance failures from #11 (a near-zero skew at `rtol=1e-6`
   in `test_moment_deficit.py`, an exact `est_cv == 0.0` in `test_moments.py`).
   Make the comparisons portable and keep them as change detectors.
-- **[Deductible-Forms-Follow-Ups]** (from the #15 review): (1)
-  `make_layer_attachment_pdf` tests `x >= limit` before `x == limit`, so it
-  never returns the point mass at the limit; (2) `feasible_bucket` and
-  `size_biased_cdf` give no reading under a finite `retention_end`.
+- **[Deductible-Forms-Follow-Ups]** (from the #15 review): `feasible_bucket`
+  and `size_biased_cdf` give no reading under a finite `retention_end`. Offered
+  in #24: the unconditional `make_layer_attachment_cdf` and `sf` miss the mass
+  at `x == limit` (`cdf(1000)` is 0.99357 for `1000 xs 50`), with dropping the
+  unused `detachment` argument of `make_layer_attachment_pdf`.
 
 ## Correctness
 
@@ -64,6 +65,12 @@
   fixed-count units, and large reinsured books that need a windowed grid
   (`[Windowed-Reinsured-Book]`, `dev/done/plan-lattice-grid-sizing.md`). The verdict
   flags all of them as failing.
+- **[Severity-Error-Analysis-Boundary]**: `severity_error_analysis` takes
+  `np.gradient` of `pdf` across 0, so `h2_adj` depends on the pdf below the
+  support: the conditional attachment pdf stays unmasked there to give
+  `-bs^2/24 f(0+)`, the masked retention pdf gives `+bs^2/48 f(0+)`. Compute the
+  boundary term on the support, then mask both. The total row's `prod(1)` also
+  turns a `nan` component into its weight.
 - **[Layered-Dsev-Lattice]**: done at 1.45.0 as `[Lattice-Views]`,
   `dev/done/plan-lattice-grid-sizing.md`.
 - **[Windowed-Reinsured-Book]**: after 2.0. Seven discrete programs need a windowed

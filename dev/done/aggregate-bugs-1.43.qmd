@@ -1,0 +1,248 @@
+---
+title: "aggregate 1.43.0 bugs"
+subtitle: "Runnable reproductions of seven defects in aggregate 1.43.0, each with its correct answer"
+date: last-modified
+format:
+  html:
+    toc: true
+    embed-resources: true
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+Each section reproduces one defect, sets the output beside the correct answer, and gives the reasoning or calculation that establishes that answer. Warnings are left on. Run the blocks in order: the last block resets the session's recipes, so it comes at the end, and nothing here writes to disk. The defects in `convex_distortion`, `PricingBounds`, `cede` with `pc`, and `help` give no warning. The other three fail validation, so a reader who checks the verdict is told something is wrong.
+
+```{python}
+import numpy as np
+import pandas as pd
+from aggregate import build, qd, Distortion, __version__
+from greater_tables import GT
+print(__version__)
+```
+
+## False mass at zero from `convex_distortion`
+
+The function `convex_distortion` builds the piecewise linear distortion through a set of concave points. Through $(0, 0)$, $(1/2, 0.8)$, and $(1, 1)$ the correct function is $g(s) = 1.6s$ on $[0, 1/2]$, with $g(1/4) = 0.4$ and no jump at zero. The library returns $g(1/4) = 0.55$ and a mass of 0.3 at zero, although it agrees on $[1/2, 1]$.
+
+```{python}
+from aggregate.spectral import convex_distortion
+
+s, gs = np.array([0, 0.5, 1]), np.array([0, 0.8, 1])
+g = convex_distortion(s, gs)
+grid = np.array([1e-9, 0.25, 0.5, 0.75, 1])
+print(f'mass = {g.mass:.4f}')
+GT(pd.DataFrame({'s': grid, 'library': g.g(grid), 'correct': np.interp(grid, s, gs)}))
+```
+
+The first row is the practical consequence: a risk with a one in a billion chance of a loss of 1 is priced at 0.3. The callers of `convex_distortion` inherit the mass: `bagged_distortion` and `convex_example` in `spectral.py`, and `Bounds.min_envelope` in `bounds.py`.
+
+***How on earth does that happen?? Is the fix clear?***
+
+
+## Understated upper bound from `PricingBounds`
+
+The class `PricingBounds` brackets the price of a risk $Y$ over all distortions that price a reference risk $X$ at $P$. The attainable pairs of prices are the convex hull of the curve $(\mathrm{TVaR}_p(X), \mathrm{TVaR}_p(Y))$. In a small example, $X$ is 0 or 1 with probability $1/2$ each, and $Y$ is 0, 1, or 2 with probabilities $1/2$, $1/4$, and $1/4$. The curve has vertices $(1/2, 3/4)$, $(1, 3/2)$, and $(1, 2)$, because $X$ reaches its maximum at $p = 1/2$ while $Y$ keeps rising. The filter `ok = T > runmax` in `PricingBounds.__init__` keeps only the first vertex of a tie, so $(1, 2)$ is lost and the range at $P = 3/4$ collapses to the single value 1.125.
+
+```{python}
+from aggregate.bounds import PricingBounds
+
+X = pd.Series({0: 1/2, 1: 1/2})
+Y = pd.Series({0: 1/2, 1: 1/4, 2: 1/4})
+pb = PricingBounds(X, Y)
+print(pb.curve_df, '\n')
+print(pb.bounds(3/4))
+```
+
+The correct range is $[1.125, 1.375]$. An explicit distortion attains the upper end: half the weight on $\mathrm{TVaR}_0$ and half on $\mathrm{TVaR}_{3/4}$ prices $X$ at $g(1/2) = 3/4$ and $Y$ at $g(1/2) + g(1/4) = 1.375$, each integral being a sum over unit steps of the survival function.
+
+```{python}
+d = Distortion('bitvar', p0=0, p1=3/4, w1=1/2)
+print(f'price of X = {d.g(np.array([1/2])).sum():.4f}')
+print(f'price of Y = {d.g(np.array([1/2, 1/4])).sum():.4f}')
+```
+
+The standard call on a `Portfolio` with a finite cap meets the same tie, since a capped total always reaches its maximum before $p = 1$. The next block compares the library's upper bound on the capped unit $A$ with the best mix of a retained vertex and the top of the curve, where $\mathrm{TVaR}_p$ of both capped risks equals the cap $a$. It then checks the result with an explicit biTVaR.
+
+```{python}
+port = build("""
+port BugBounds
+    agg BugUnitA 2 claims dsev [1 2 4] [.5 .3 .2] poisson
+    agg BugUnitB 3 claims dsev [1 3] [.7 .3] poisson
+""")
+unit = port.BugUnitA
+pb = port.pricing_bounds({'A': unit}, p=0.99)
+a, P = pb.a, 20.0
+print(f'cap a = {a}')
+print(pb.bounds(P), '\n')
+
+t_x, t_y = pb.curve_df.iloc[:, 0], pb.curve_df.iloc[:, 1]
+below = t_x < P
+w = (P - t_x[below]) / (a - t_x[below])
+mix = (1 - w) * t_y[below] + w * a
+p0 = mix.idxmax()
+print(f'attainable price of A at P = {P}: {mix.max():.4f}, from p0 = {p0:.4f}, w = {w[p0]:.4f}')
+
+
+def capped_price(pmf, distortion, cap):
+    """Choquet integral of min(X, cap) on the grid of pmf."""
+    survival = (1 - pmf.cumsum().values).clip(0, 1)
+    return distortion.g(survival)[pmf.index.values < cap].sum() * port.bs
+
+
+pmf_x, pmf_a = port.density_df.p_total, unit.density_df.p_total
+d = Distortion('bitvar', p0=p0, p1=1 - pmf_a[pmf_a.index >= a].sum(), w1=w[p0])
+print(f'explicit biTVaR: price of total = {capped_price(pmf_x, d, a):.4f}, '
+      f'price of A = {capped_price(pmf_a, d, a):.4f}')
+```
+
+## `cede` dropped when `pc` is on the same layer
+
+The clause `cede` returns a ceding commission on the ceded premium, and `pc` adds a profit commission. On a layer with a deposit of 1,500, `cede 10%` alone moves the mean by 150, as it should. With `pc` on the same layer the program builds without complaint and the result equals `pc` alone to every digit, so the 150 has gone. The same combination with `slide` is refused, which is the alternative to booking it.
+
+```{python}
+program = """
+pnl BugPC.{name} 10000 premium
+    less agg BugPC.{name}_e 10000 prem at 85% lr sev lognorm 50 cv 3 poisson
+    aggregate net of 5000 xs 4000 deposit 1500 {feature}
+"""
+features = {'None': '', 'Cede': 'cede 10%', 'PC': 'pc 25% after 10%', 'Both': 'cede 10% pc 25% after 10%'}
+print(pd.Series({f or 'none': build(program.format(name=n, feature=f)).est_m for n, f in features.items()},
+                name='mean').round(4))
+
+try:
+    build(program.format(name='Slide', feature='cede 10% slide 0.32 at 0.6 and 0.22 at 0.7'))
+except ValueError as e:
+    print('\nslide with cede:', e)
+```
+
+***Make cede/pc have the same error as slide***
+
+## Wrong analytic skewness for a shifted severity
+
+Adding a constant does not change skewness, so `sev 100 * gamma 2 + 10000` has the skewness of a gamma with shape 2, namely $2/\sqrt{2} = 1.41421$. The analytic value `sev_skew` is 1.387. The discretized estimate is right, so validation reports a failure of a grid that is correct, and the unshifted severity passes.
+
+```{python}
+shifted = build('agg BugShift 1 claim sev 100 * gamma 2 + 10000 fixed')
+plain = build('agg BugPlain 1 claim sev 100 * gamma 2 fixed')
+pd.DataFrame({'analytic': [shifted.sev_skew, plain.sev_skew],
+              'estimated': [shifted.est_sev_skew, plain.est_sev_skew],
+              'exact': [2 / 2 ** 0.5] * 2,
+              'verdict': [shifted.validation_description, plain.validation_description]},
+             index=['shifted', 'unshifted'])
+```
+
+***Diagnosis?***
+
+## Negative masses from `poisson zm 1.5 !`
+
+A zero-modified count has a probability at zero, $p_0$, which must lie in $[0, 1]$. Without the `!`, $p_0 = 1.5$ is refused, although with a message about bracketing a mean rather than about $p_0$. With the `!`, the program builds a distribution with a probability of 1.447 at 0, a probability of -0.1775 at 1, and a total of 1.27. Validation flags it only as a failure of the mean.
+
+```{python}
+try:
+    build('agg BugZMRefused 2 claims dsev [1] poisson zm 1.5')
+except ValueError as e:
+    print('without !:', e, '\n')
+
+zm = build('agg BugZM 2 claims dsev [1] poisson zm 1.5 !')
+print(zm.density_df.p.head(4).round(5))
+print(f'total mass = {zm.density_df.p.sum():.4f}, verdict: {zm.validation_description}')
+```
+
+***This should be a clear fail. any p outside [0,1) is a fail.***
+
+## Severity collapse from a layer off the lattice
+
+The lattice rule for a discrete severity pools the atoms before any layer is applied. A layer whose attachment is off that lattice moves the atoms between grid points, and they are then rounded onto a grid that cannot hold them. The layer `1500 xs 250` on `dsev [1000 2000 3000]` has layered losses 750, 1500, and 1500, on a lattice of step 750. The rule sees the unlayered step and takes `bs` 1000, which puts the whole severity on one point. The mean is 3,000 against a true 3,750, and the CV under a fixed count is 0 against 0.163. The layer `100 xs 1` loses the severity altogether, with a mean of 0 against 300. Pinning `bs` gives the right answer, and every collapsed row fails validation. Part of this defect is a regression: at aggregate 1.11.0 the fixed count rows were right, with `bs` 1, while the Poisson rows were already wrong.
+
+```{python}
+programs = {
+    '1500 xs 250, fixed': 'agg BugLat.A 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed',
+    '1500 xs 250, poisson': 'agg BugLat.B 3 claims 1500 xs 250 dsev [1000 2000 3000] poisson',
+    '100 xs 1, poisson': 'agg BugLat.C 3 claims 100 xs 1 dsev [1000 2000 3000] poisson',
+    'inf xs 3, fixed': 'agg BugLat.D 3 claims inf xs 3 dsev [8 16 32] fixed',
+    '1500 xs 250, bs pinned': 'agg BugLat.E 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed hints{bs=250}',
+}
+rows = {}
+for label, program in programs.items():
+    x = build(program)
+    sev = pd.Series(x.sev_density, index=x.xs)
+    rows[label] = dict(bs=x.bs, log2=x.log2, est_m=round(x.est_m, 3), actual_m=x.actual_m,
+                       est_cv=round(x.est_cv, 4), actual_cv=round(x.actual_cv, 4),
+                       severity=sev[sev > 1e-12].round(4).to_dict(), verdict=x.validation_description)
+pd.set_option('display.max_colwidth', None)
+GT(pd.DataFrame(rows).T)
+```
+
+***Is the issue here that in the past this would have gotten log2=16 and a nice small bucket. Now we get the "appropriate" lattice bs, but it is only appropriate for the gross, not net?***
+
+
+## Methods called by `help(values=...)`
+
+***Should not execute any methods?***
+
+The method `help` with `values` other than `'none'` calls every matching method that has no required arguments, in order to display the result. On an `Underwriter` the callable methods include `write_default_config` and `reload`, so a bare `build.help(values='short')` creates `~/.aggregate/config.toml` if the file is absent and discards every recipe built in the session. The next block lists what such a call would run, without running any of it.
+
+```{python}
+import inspect
+
+
+def called_by_help(ob):
+    """Public methods of ob with no required arguments, which help(values=...) calls."""
+    out = []
+    for name in dir(ob):
+        if name.startswith('_') or isinstance(inspect.getattr_static(type(ob), name, None), property):
+            continue
+        attr = getattr(ob, name)
+        if callable(attr):
+            try:
+                parameters = inspect.signature(attr).parameters.values()
+            except (TypeError, ValueError):
+                continue
+            if all(v.default is not v.empty or v.kind in (v.VAR_POSITIONAL, v.VAR_KEYWORD) for v in parameters):
+                out.append(name)
+    return out
+
+
+print(called_by_help(build))
+```
+
+The next block proves the call to the writer. It replaces the function behind `write_default_config` with a stub for the duration, so no file is created.
+
+```{python}
+import aggregate.underwriter as underwriter
+
+calls = []
+real_writer = underwriter._write_default_config
+underwriter._write_default_config = lambda path=None, force=False: calls.append(path) or 'stub: no file written'
+try:
+    build.help('^write_default_config$', values='short')
+finally:
+    underwriter._write_default_config = real_writer
+print(f'writer called {len(calls)} time(s)')
+```
+
+The last block runs `reload` for real through `help`, and the recipe built just before it disappears. Every other recipe built in this session goes with it, which is why the block comes last.
+
+```{python}
+def recipe_present(name):
+    """True if a bare name resolves to a stored recipe."""
+    try:
+        build(name)
+        return True
+    except ValueError:
+        return False
+
+
+build('agg BugHelpProbe 1 claim dsev [1] fixed')
+print('recipe present before help:', recipe_present('BugHelpProbe'))
+build.help('^reload$', values='short')
+print('recipe present after help: ', recipe_present('BugHelpProbe'))
+```

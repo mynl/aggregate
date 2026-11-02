@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 1.63.1 - 2026-11-02
+
+**[Deductible-Forms-Follow-Ups] A layer's `pdf` marks the point mass at the limit with `inf`, conditional and unconditional.** The conditional form returned 0 at the limit. The unconditional form put the marker at the detachment `a + y`, a ground-up loss, and returned a nonzero density between the limit and the detachment, where it now returns 0. `severity_error_analysis` sets a marker to 0 in its quadratic term, so `h2_adj` is finite when a grid point lands on the limit (it was `nan` for a franchise) and unchanged for an ordinary layer. The density series of `chart_severity` for an ordinary layer carries one `inf` at the limit, as a franchise's already did. Contributed by @KasraBashirioskooei (#24).
+
 ## 1.63.0 - 2026-11-02
 
 **[Pedagogy-Repairs] Three broken `pedagogy.py` functions run again, and `ClassicalPremium` takes a keyword-only `fischer_power`, default 2.** `similar_risks_example()` raised `TypeError` from `Bounds.plot_envelope(axs=...)`; it now draws the two-panel envelope and returns its frame. `plot_similar_risks_graphs(..., p_reg=0.9)` raised `AttributeError`; it now prices the new portfolio by $\mathrm{TVaR}_p(X \wedge a)$ at $a = q_{p_{reg}}(X)$, and `p_reg=1`, the default, gives the same numbers as before. `ClassicalPremium.calibrate` and `price(method='Fischer')` raised `AttributeError` for any input; the Fischer premium is $\mathsf{P}X + c\,(\mathsf{P}[(X - \mathsf{P}X)_+^r])^{1/r}$ with $r$ = `fischer_power`, and power 1 equals the `Dutch` premium. `decl-testers.agg` has a new section PED with three programs.

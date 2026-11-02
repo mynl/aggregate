@@ -1,5 +1,7 @@
 # Task — maintain `docs/2_aggregate_overview/features.rst`
 
+**Note (2026-11-02).** The `1.0.0a*` entries this task reads moved from `CHANGELOG.md` to `dev/done/CHANGELOG-before-1.0.md` at 1.63.0; read "`CHANGELOG.md`" below as that file for the alpha series.
+
 > **What this is.** A *repeatable task*, not a one-shot plan. Invoke it by saying
 > **"execute task-features"** (or "bring features up to date"). Each run
 > reconciles `docs/2_aggregate_overview/features.rst` against the current

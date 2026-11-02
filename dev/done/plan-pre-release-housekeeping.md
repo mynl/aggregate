@@ -244,3 +244,13 @@ Divergences:
 - **Corpus names are prefixed.** The plan calls the programs `UNIF` and `BETA`; the corpus and the test use `PED.Unif`, `PED.Beta` and `PED.Classical` in a new section PED, following the corpus convention of a section prefix. `similar_risks_example` keeps its inline `UNIF` and `BETA`. Each note sits after the port name, as in `UD.Plain`, so it belongs to the port rather than to its one unit.
 - **Pandas 4 warnings fixed on the repaired path.** `plot_max_min` and `plot_similar_risks_graphs` called `cloud_df.min(1)`, `max(1)` and `mean(1)`, which emit `Pandas4Warning` and will raise under pandas 4; they now pass `axis=1`. `bodoff_exhibit`'s `bit.sum(1)` is off the path and was left.
 - **Docstrings.** `plot_similar_risks_graphs` moved to NumPy style with a `Notes` section giving the bounded TVaR formula; `similar_risks_example` gained a `Returns` section; `ClassicalPremium` gained `Parameters` and a `Notes` section with the Fischer formula. The plan asked only for the last. The stale `logger.warning('figuring tvars with bounds')` and the `HERE IS ISSUE` comment went with the old branch.
+
+### `[Changelog-Split]`, no bump, left uncommitted for the author
+
+Run at 1.63.0 (`195ce62f`), after checking that no bump was in progress: the only other worktree, `V:/dev/aggregate` on `master`, was clean, and the two files already modified here (`dev/done/plan-validation-verdict.md`, `tests/test_validation.py`) are non-bump edits left by the session of 2026-11-01. At 1.63.0 the file has 13,070 lines and `## 1.0.0a401` is line 632, so 631 lines stay (the plan's "about 535" was 1.43.1) and 12,439 move, as the plan counted. The split was done on bytes by a scratch script that refuses to run unless the file equals `HEAD`. Acceptance: kept bytes less the three-line pointer, followed by moved bytes less the three-line header, equal `git show HEAD:CHANGELOG.md`; `CHANGELOG.md` has exactly one `## 1.63.0`; it is 634 lines with the pointer.
+
+Divergences:
+
+- **`features.rst` line 25**, "every major point in `CHANGELOG.md` is accounted for by a row", also refers to the alpha entries and was left, as the plan names only lines 15 to 16 and the "Under the hood" line (3871 in the plan, 3879 here). The note at line 15 now gives the moved file.
+- **The CHANGELOG preamble** still says breaking changes are "recorded in the alpha entries below". Editing it would break the byte-for-byte acceptance, so it is left for the author.
+- **`git status --short`** shows this plan file too, for this execution log, beside the files the step names and the two pre-existing ones.

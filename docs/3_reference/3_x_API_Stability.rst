@@ -102,4 +102,4 @@ Reading a version number
 
 Releases are ``MAJOR.MINOR.PATCH``. Against the **stable core**, a patch release fixes bugs, a minor release adds surface and does not break what is documented, and a breaking change waits for a major release after a deprecation period. Against the **provisional modules**, a minor release may break anything.
 
-Numerical results are a separate question from API stability. A correctness fix changes numbers within any release, and such changes are called out in the entry that makes them (``CHANGELOG.md`` in the source distribution) rather than held for a major version. A number that was wrong is not an interface to be preserved.
+Numerical results are a separate question from API stability. A correctness fix changes numbers within any release, and such changes are called out in the entry that makes them (``CHANGELOG.md`` in the repository) rather than held for a major version. A number that was wrong is not an interface to be preserved.

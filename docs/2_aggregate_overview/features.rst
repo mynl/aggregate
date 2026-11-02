@@ -12,8 +12,9 @@ vs 0.30.1 are flagged in each section, and there are many: pre-1.0 was the one
 chance to make the names right, and the project took it, generally without
 deprecated aliases.
 
-Maintained by ``dev/task-features.md``; the source of record for what shipped is
-``CHANGELOG.md``.
+Maintained by ``dev/task-features.md``; the source of record for what shipped in
+the ``1.0.0a*`` series is ``dev/done/CHANGELOG-before-1.0.md``, the entries moved
+out of ``CHANGELOG.md`` at 1.63.0.
 
 .. contents::
    :local:
@@ -3876,7 +3877,7 @@ Under the hood
 --------------
 
 Internal changes, named for the record, with no new user-facing surface. Versions
-refer to ``CHANGELOG.md`` sections.
+refer to sections of ``dev/done/CHANGELOG-before-1.0.md``.
 
 - **a2** :class:`Aggregate` surface privatization (``_audit_df``, ``_limits``,
   and the rest); FFT core extracted to ``_freq_sev_convolution``.

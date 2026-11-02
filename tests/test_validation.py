@@ -263,11 +263,13 @@ def test_a_real_skewness_survives_the_floor_at_a_far_shift():
 
 
 def test_a_skewness_the_grid_cannot_be_held_to_is_reported_and_not_tested():
-    """An exact law whose grid skewness is -0.040 against a true -0.022, from rounding at a mean of 1e5."""
+    """An exact law at a mean of 1e5, whose grid skewness moves with the rounding of the FFT.
+
+    -0.040 here and -0.016 in another numpy against a true -0.022, so the grid's value is not pinned.
+    """
     a = build('agg DISC.RoundedProbs 100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed')
     assert a.validation_description == 'not unreasonable'
     assert float(a.stats_df['mixed'][('agg', 'skew')]) == pytest.approx(-0.0213, abs=1e-3)
-    assert float(a.stats_df['empirical'][('agg', 'skew')]) == pytest.approx(-0.040, abs=2e-3)
     assert np.isnan(_validation.validation_score_terms(a)['u_agg_skew'])
 
 

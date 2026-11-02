@@ -1,0 +1,511 @@
+---
+title: "aggregate review answers at 1.43.1"
+subtitle: "Answers to Steve's ten questions on the priorities review, split by library and API, 2026-10-30"
+date: last-modified
+format:
+  html:
+    toc: true
+    embed-resources: true
+---
+
+## Plans
+
+
+| Order | Status | Plan | Bumps | File |
+|--|:--:|:--|--:|:--|
+| 1 | ✅ | `[Lattice-Grid-Sizing]` | 5 and the oracle step | `dev/plan-lattice-grid-sizing.md` |
+| 2 | ✅ | `[Shifted-Severity-Moments]` | 2 | `dev/plan-shifted-severity-moments.md` |
+| 3 | ✅ | `[Severity-Parameter-Count]` | 1 | `dev/plan-severity-parameter-count.md`, corrections applied |
+| 4 | ✅ | `[Using-Notes-Wrong-Answers]` | 2 | `dev/plan-using-notes-wrong-answers.md` |
+| 5 | ✅ | `[Validation-Verdict]` | 4 | `dev/plan-validation-verdict.md` |
+| 6 | ✅ | `[Using-Notes-Guards-And-Messages]` | 2 | `dev/plan-using-notes-guards-and-messages.md` |
+| 7 | ✅ | `[Rationalize-Tests]` | 1 | `dev/plan-rationalize-tests.md` |
+| 8 | ✅ | `[API-Editable-Aggregate-Source]` | 1, in the API | `V:\dev\aggregate-api\dev\plan-api-editable-aggregate-source.md` |
+| 9 | ✅ | `[Pre-2.0-Housekeeping]` | 2, and the split has no bump | `dev/plan-pre-release-housekeeping.md` |
+
+**Note**: #4 included an ad-hoc unplanned change to the occurrence re structure diagram that was incorrect and was backed out after implementation.
+
+The order is by dependency: everything after the lattice plan is measured against its oracle, the shifted moments and the wrong answers remove the false alarms the validation warning would otherwise raise, the guards plan's text follows the verdict's, and the test rationalization comes last when the corpora are stable. `[Pre-2.0-Housekeeping]` depends on none of them and can run at any time, but you must commit its `[Changelog-Split]` step before the next bump. The review document has the revised order, a dated update under item 1, and your rulings under item 11.
+
+---
+
+The numbers in the headings are the numbers of your questions, with 11 to 13 added since. Everything here was checked against the code at 1.43.1 unless marked otherwise. The only change to either repository since the parser fix is the `[Repair-Link]` entry in `dev/TODO.md`, left uncommitted. Each answer ends with a **Decision** line holding my recommendation: overwrite it with yours.
+
+**Updated 2026-10-31.** Item 1 is now a written plan, `dev/plan-lattice-grid-sizing.md`, built on a note and a study that superseded the figures below it; see the update at the head of item 1. The rulings asked for under item 11 are in, with one gap. The plans table and the execution order are revised at the end of "Plans and their contents".
+
+## Corrections to my last message
+
+Your questions exposed four recommendations that do not survive checking, and two statements that were wrong. I am withdrawing `[Grid-Law-Base]`, since `GridDistribution` already does the job. I am withdrawing moving `pedagogy.py` out, the research distortion namespace, and having the library declare capabilities. I made each of them from a count of lines or names, without checking what that count costs.
+
+The two wrong statements were these. `release-aggregate.ps1` does exist, at `V:\worktrees`, one folder above where I searched. And `format_program` dropping `note{}` does not cost a reader their text on Reformat, because the API passes `trailer=True`.
+
+My lattice table was also incomplete. It called the layer fix with the window check the best option, at 19 of 450 wrong, but that test compared only moments and contained no reinsurance. Item 1 has the fuller result, in which your idea of pooling gross, ceded and net makes the difference.
+
+## Replies to your comments
+
+I agree with all four comments you added to this document.
+
+- **The two `pedagogy.py` functions in this cycle.** Agreed.
+- **`cll` out of the default list.** Agreed, and it is smaller than I implied. `DEFAULT_CALIBRATION_DISTORTIONS` is already `('ccoc', 'ph', 'wang', 'dual', 'tvar')`, so calibration and its tables do not change. Inside the library the default of `available_distortions()` is used only by `distortions_from_params`, and the fast suite passes with the change.
+- **The scaffold.** Agreed: new programs go in `decl-testers.agg` from today, and it retires with `[Rationalize-Tests]`.
+- **The rest of the list of 8 in the next cycle.** Agreed.
+
+I read "this cycle" as before 2.0 and "the next cycle" as after it, and the plans table below uses that reading.
+
+## At a glance
+
+| # | Topic | Side | Answer | Status | Plan |
+|:--|:--|:--|:----|:--|:--|
+| 1 | Grid sizing | LIB | Size on every view, hold the severity in the window, one sizer for Aggregate and Portfolio, warn when infeasible | Plan written 2026-10-31 | `[Lattice-Grid-Sizing]` |
+| 2 | `pedagogy.py` | LIB | Harmless, as you said. Keep it, and fix three functions this cycle | Plan written 2026-10-31 | `[Pre-2.0-Housekeeping]` |
+| 3 | Research distortions | LIB | A docs heading, not a namespace. `cll` leaves the default list | Plan written 2026-10-31 | `[Pre-2.0-Housekeeping]` |
+| 4 | `_test_suite` scaffold | LIB | `decl-testers.agg` is the home, not `library.agg`. Stop adding now, retire with the test rework | Plan written 2026-10-31 | `[Rationalize-Tests]` |
+| 5 | Old CHANGELOG | LIB | About 12,400 of 12,972 lines move out | Plan written 2026-10-31 | `[Pre-2.0-Housekeeping]` |
+| 6 | Stable mean | LIB | The verdict uses the completed mean: works on all six laws tried | Plan written 2026-10-31 | `[Validation-Verdict]` |
+| 7 | Versions | API, some LIB | Editable through `[tool.uv.sources]`, no ceiling, publish when you choose | Plan written 2026-10-31, in the API | `[API-Editable-Aggregate-Source]` |
+| 8 | Capabilities | API | Should stay in the API | Withdrawn | None |
+| 9 | The list of 8 | LIB | Basic, as you said: 4 small items open, 4 no longer apply | Decided, after 2.0 | `[Library-Items-Raised-By-API]` |
+| 10 | Repair link | LIB and API | Pended, and added to `dev/TODO.md` as an idea | Pended | None |
+| 11 | Using notes list | LIB | Of 38 items: 2 fixed, 7 not reproduced, 29 open | Plans written 2026-10-31 | `[Using-Notes-Wrong-Answers]`, `[Using-Notes-Guards-And-Messages]` |
+| 12 | Shifted severity moments | LIB | Your method works, and a far-tail layer bug has to be fixed first | Plan written 2026-10-31 | `[Shifted-Severity-Moments]` |
+| 13 | Severity parameter count | LIB | Written and ready; the three corrections applied 2026-10-31 | Yours to run | `[Severity-Parameter-Count]` |
+
+## Plans and their contents
+
+**Answer:** nine plans before 2.0, all written: eight in the library and one in the API. Four more follow 2.0, all on the TODO since 2026-10-31. Your two priorities come first, and the library takes 19 version bumps to reach 2.0.
+
+| Order | Plan | Contents | Version bumps | Size |
+|:--|:----|:------|--:|:--|
+| Any time | `[Pre-2.0-Housekeeping]`, written | `cll` out of the default list and the docs heading on research distortions; the three broken `pedagogy.py` functions; then the CHANGELOG split | 2, and the split has no bump and is left for you to commit | Small |
+| 1 | `[Lattice-Grid-Sizing]`, written | Five bumps: `dsev` probabilities normalized; the lattice step over every view; the windowed grid holds the severity hull; a one-unit Portfolio takes its unit's grid and a larger one sizes by the same rule; `LatticeGridWarning` when the cap cannot hold the lattice. Then `[Correctness-Oracle]` moves the study into `tests/` | 5, and a test step | Medium |
+| 2 | `[Shifted-Severity-Moments]` | The far-tail layer fix, `[Analytic-Layer-Tail-Cancellation]`, then moments computed without the shift | 2 | Small |
+| 3 | `[Severity-Parameter-Count]`, written | Refuse numbers a family cannot take, and repair the zero-shape `mean cv` form | 1 | About 250 lines, by its own estimate |
+| 4 | `[Using-Notes-Wrong-Answers]` | `PricingBounds`, `convex_distortion`, `cede` beside `pc`, the bivariate limit, the structure chart axis | 2 | Medium, because the formulas need your review |
+| 5 | `[Validation-Verdict]` | Stable mean, net and ceded moments in the verdict, a `nan` moment and a near-zero skewness, then a warning when a build fails | 4 | Small to medium |
+| 6 | `[Using-Notes-Guards-And-Messages]` | `zm`, `help`, `Frequency.__repr__` and seven more guards, then message and docstring text | 2 | Small and mechanical |
+| 7 | `[Rationalize-Tests]` | Six new `decl-testers.agg` lines, the snapshot moved to that file, then `[Scaffold-Retirement]`; the oracle is already in place from plan 1 | 1, at `[Scaffold-Retirement]` | Large in files touched, simple in content |
+| 8 | `[API-Editable-Aggregate-Source]`, in the API repository | `[tool.uv.sources]`, no `<2` ceiling, a floor that means what the code needs. Any time, and it must land before the release because of the ceiling | 1, in the API | Small |
+| Last | Release 2.0 | `release-aggregate.ps1` and the release note | | |
+
+**After 2.0:**
+
+| Plan | Contents | Why it can wait |
+|:----|:------|:----|
+| `[Library-Items-Raised-By-API]` | The four open items on the list of 8 | You decided on the next cycle, and nothing in 2.0 depends on them |
+| `[Signed-And-Mixed-Book-Windows]` | `[Signed-Portfolio-Origin]`, the signed window, the book mixing light and thick units, two-unit books of fixed-count units, and large reinsured books, `[Windowed-Reinsured-Book]` | The verdict flags all of them as failing |
+| `[Padding-Discard-Measurement]`, on the TODO | The sharpen gate at 1e-12 | I could not make it choose a coarser grid in five tries |
+| `[Portfolio-Shared-Mixing-Dependence]`, on the TODO | The largest modeling gap, starting with a design plan | It is a feature, not a repair |
+
+**Three grouping choices you may want to change.** I merged `[Portfolio-Window-Severity-Reach]` and `[Aggregate-Ceded-At-Limit]` into the lattice plan, since all three put the distribution on a grid that can hold it. The oracle moved on 2026-10-31 from `[Rationalize-Tests]` into the lattice plan as its last step, because the plan's five bumps are each checked against it, so it has to exist first. And `[Validation-Verdict]` runs after the first two plans, since they remove most of the false alarms that a warning would otherwise raise.
+
+**Execution order, revised 2026-10-31.** The plans are written as `dev/plan-*.md` in the library and one in the API. The order is by dependency, then by the size of the wrong answers each one removes:
+
+The plan files: `dev/plan-lattice-grid-sizing.md`, `dev/plan-shifted-severity-moments.md`, `dev/plan-severity-parameter-count.md`, `dev/plan-using-notes-wrong-answers.md`, `dev/plan-validation-verdict.md`, `dev/plan-using-notes-guards-and-messages.md`, `dev/plan-rationalize-tests.md`, `dev/plan-pre-release-housekeeping.md` in the library, and `dev/plan-api-editable-aggregate-source.md` in the API. Each was written from a read of the code at 1.43.1 on 2026-10-31, and where that read changed a premise of the answer below, the plan says so and this document has a dated note.
+
+1. `[Lattice-Grid-Sizing]`: five bumps and the oracle. Everything after it is measured against the oracle.
+2. `[Shifted-Severity-Moments]`: two bumps, the far-tail layer first. Removes the false skewness failures that `[Validation-Verdict]` would otherwise warn on.
+3. `[Severity-Parameter-Count]`: one bump; before `[Rationalize-Tests]` because it edits `_test_suite.agg`.
+4. `[Using-Notes-Wrong-Answers]`: two bumps; wrong numbers, independent of the grid.
+5. `[Validation-Verdict]`: four bumps; after 1, 2 and 4 so the warning it adds is not noise.
+6. `[Using-Notes-Guards-And-Messages]`: two bumps; mechanical, any time after 5 so its message text follows the verdict's.
+7. `[Rationalize-Tests]`: one bump, at `[Scaffold-Retirement]`, which removes a public name; last, when the corpora are stable.
+8. `[API-Editable-Aggregate-Source]`: in the API, any time, before the release.
+9. `[Pre-2.0-Housekeeping]`: two bumps, any time before the release. You commit its `[Changelog-Split]` step before the next bump, because a bump stages all of `CHANGELOG.md`.
+
+Then the release. After 2.0, as before: `[Library-Items-Raised-By-API]`, `[Signed-And-Mixed-Book-Windows]`, `[Padding-Discard-Measurement]`, `[Portfolio-Shared-Mixing-Dependence]`.
+
+# LIB
+
+## 1. Grid sizing, the oracle, and `GridDistribution`
+
+**Update 2026-10-31.** The plan is written at `dev/plan-lattice-grid-sizing.md`, from the note `dev/note-lattice-grid-sizing.md` and the study under `dev/lattice-study/`, which stays in the tree so each bump is checked against it. The study replaced the three program sets below with one seeded set of 858 programs (fixed, `dfreq` and Poisson counts; occurrence and aggregate reinsurance; layered `dsev`; one-unit and two-unit Portfolios) against an oracle that enumerates every outcome and shares no code with the sizer, and `nttagg` validates the oracle to 3e-14 on every integer program in its scope. What it found, beyond the four defects below:
+
+- **Today**: 699 of 858 exact, 68 wrong with no flag, every one of them reinsured; 27 infeasible at `log2` 16, all flagged by the verdict, none warned. The prototype of the plan reaches 817 exact with no silent failure, and the twelve that remain are reinsured books that need a windowed grid, `[Windowed-Reinsured-Book]`, after 2.0.
+- **The rule is yours, and it is one line.** The `windowed` row is sized on the aggregate band alone, and the guard that then finds a claim does not fit rejects the row instead of growing `log2`. The correction is `need = max(need(band), need(severity hull))` inside `_size`, after which `100 claims dsev [1000 1001] fixed` takes `bs` 1, `log2` 10 on its own and the guard has nothing left to reject. No new method, and the `exact_discrete` row stays as it is.
+- **The Portfolio sizer is a second implementation.** Building 718 single-unit programs alone and as a one-unit Portfolio, the two grids agree in 117 and the laws differ materially in 127; the combine itself is sound, since whenever both grids hold the law the Portfolio reproduces the Aggregate to 1e-9. The plan makes a one-unit Portfolio take its unit's grid verbatim and a larger one size by the same rule.
+- **A new defect, found through the study's own artifact.** `dsev` probabilities that do not sum to 1 are used as given in the severity moments and normalized in the density, so six-digit probabilities summing to 1 minus 1e-6 took the sd of `100 claims dsev [999 1000 1001]` from 8.75 to 13.29 and the skewness from -0.02 to -42.6. The first bump normalizes them at construction.
+- **Infeasible is an answer.** `nttagg` already raises with the sentence to reuse (`the exact support 0..100100 needs log2 >= 17, got 16. Pass build(..., log2=17) ...`); `agg` will warn and build, per your ruling, with the verdict word.
+
+The text below is the position of 2026-10-30 and its figures are superseded by the note's.
+
+**Your summary is right.** There is a grid sizing issue to fix, the oracle adds tests, and the self-verifying grid is the structural fix. One refinement on the oracle: random programs are the cheap part. Its value is that every program is checked against an answer computed independently of the code under test, whereas the current snapshots can only show that something moved.
+
+**The fix lies in four places, not only in the Portfolio.** Many of the failures have no Portfolio in them: `agg L 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed` fails on its own. The four defects are separate:
+
+- **`Aggregate`, which atoms the lattice sees.** `_severity_atoms` and `_exact_discrete_window` use the atoms before any layer or reinsurance is applied. A `Portfolio` inherits the error because `_pooled_lattice` pools each unit's `_severity_atoms`, so the fix reaches it with no Portfolio code.
+- **`Portfolio`, the window.** `port_best_window` sizes a concentrated book to the total's band only, which is your `port MP` with `log2` 1. That defect is Portfolio code, and it has nothing to do with the lattice.
+- **`Aggregate`, a window rejected rather than widened.** `100 claims dsev [1000 1001] fixed` needs `log2` 17 from 0 at the lattice step of 1, over the cap of 16, so the sizer rounds the bucket up to 2. The window would hold the total at `bs` 1 and `log2` 6, but the severity-fit guard in `bs_window` rejects it, because 64 buckets cannot hold a loss of 1,001, where it could widen it. At `bs` 2 the atom at 1,001 splits between 1,000 and 1,002, and the variance triples from 25 to 75, with the right mean and the verdict `fails sev cv, agg cv`. Version 1.11.0 and the lattice switched off give the same `bs` and the same variance, so this one is not a lattice regression.
+- **`Aggregate`, the origin under an aggregate cover.** A concentrated book takes a window that starts above 0, and an aggregate cover can pay less than the window's start. `3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4` cedes 2 every time, its window starts at 12, and it returns 12 with no flag. Forcing the window to 0 gives 2. The gate in `bs_window` at `_bucket_window.py:1258` already excludes occurrence reinsurance, so the fix is one more condition on that line.
+
+**Your gross, ceded and net idea is right, and it matters more than I had realized.** Pool the atoms of every view: gross after the layer, ceded and net of each occurrence layer, and the attachment and limit of any aggregate cover. Take the dyadic step of that pool, then the first bucket from `_lattice_candidates` that fits the `log2` cap. Every view then lands on the grid. `_netceded_exact_bs` in `bivariate.py` already applies the same rule to the netceded joint grid, so the idea has a precedent in the code.
+
+**Today a reinsured discrete program can have the right mean and the wrong distribution, with no flag.** `3 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` has outcomes on multiples of 250, a variance of 875,000 and a median of 2,250. Today it takes `bs` 1000 and puts the mass on multiples of 1,000, for a variance of 1,562,500 and a median of 2,000, with the correct mean of 2,250 and the verdict `reinsurance; subject not unreasonable`. With the pooled atoms it takes `bs` 50 and `log2` 8, and it matches.
+
+**The test.** I built 240 random programs, each a discrete severity with occurrence or aggregate reinsurance, and worked out each true distribution by listing every outcome. A program counts as wrong when more than one part in a million of its probability sits on the wrong outcomes. A wrong program counts as missed when its verdict does not say `fails`. The last column is the typical number of buckets in the grid.
+
+| What the library does | Wrong, of 240 | Wrong and missed by validation | Typical grid, buckets |
+|:----|--:|--:|--:|
+| Version 1.11.0, the last release | 59 | 46 | 128 |
+| Version 1.43.1, today | 116 | 91 | 64 |
+| Lattice switched off, your earlier suggestion | 2 | 2 | 65,536 |
+| Lattice on, sized on the atoms after the layer, ignoring the reinsurance, my earlier suggestion | 107 | 107 | 64 |
+| Lattice on, sized on gross, ceded and net, your idea | 2 | 2 | 128 |
+| The same, with the aggregate cover origin fixed, the proposed plan | 0 | 0 | 128 |
+
+Today about half of these programs are wrong, and validation misses most of them. Your idea is as accurate as switching the lattice off and keeps the grid small, and the origin fix clears the last two. My earlier suggestion was barely better than today, and it hid the errors, because it cleared the failures on the gross without fixing the reinsured views. The last four rows include the window check.
+
+The earlier programs with no reinsurance are 150 programs run three ways, as an `Aggregate`, as a one-unit Portfolio, and inside a two-unit Portfolio, which is the 450 I have been quoting. Under the proposed plan 20 are wrong against 101 today, and the one-unit Portfolios go from 47 wrong to 1, unit means included. Of the 20, 18 are flagged as failing: 15 are two-unit books of fixed-count units, and the signed ones include `1 claim dsev [-5 -4] fixed`. They go to `[Signed-And-Mixed-Book-Windows]`. Under a scratch version the fast suite moves four tests, all `bs_window` snapshots of reinsured fixtures, as expected. These results come from monkeypatches rather than finished code, and the slow tier has not run.
+
+**The minimum size has to come from the program, and it must keep the window.** You asked for a minimum to stop `log2` getting too small, and that is right in effect, but a fixed number does not do it. I tried three on one-unit Portfolios:
+
+| Program | Today | Minimum `log2` 4 | Minimum `log2` 8 | Minimum `log2` 12 | Window widened to hold the largest loss |
+|:----|:--|:--|:--|:--|:--|
+| `agg A dfreq[1] dsev[3]` | wrong | right | right | right | right |
+| `agg A 100 claims dsev [1000 1001] fixed` | wrong | wrong | wrong | right | right, `log2` 10 |
+| `agg A 100 claims dsev [1000 1003] fixed` | wrong | wrong | wrong | right | right, `log2` 10 |
+
+A larger severity would simply need a larger constant, while every small program would pay for it. So the rule is: leave a window alone unless it cannot hold a severity outcome, and then raise `log2` just enough, keeping `x_min`. When even the cap cannot hold it, today's fallback stays, and the verdict flags it. `30 claims dsev [100001 100002] fixed` is an example.
+
+**I have withdrawn the rule I wrote here first,** which took a plain grid from 0 whenever one fit under the cap. That was not window aware: `10 claims dsev [1000 1001] fixed` went from 0 at `log2` 14 where a window needs `log2` 10. Three kinds of book still run from 0 under the new rule. A single-outcome book, such as `dfreq [3] dsev [70]` at 32 buckets, because the `sd > 0` test keeps its unit off the window. A book with an aggregate cover, because a ceded amount near 0 must be on the grid. And a book with occurrence reinsurance, which the code already excludes, because the reinsured severity is carried on the output grid.
+
+**Programs at the scale of your example.** Your `100 claims dsev [1000 1001] fixed` exposed a gap in my testing. The largest count times the largest atom, over the atoms' spacing, is 33 in the 240 reinsured programs, 14,000 in the 150 others, and 100,100 in yours, so no program in either set needs more than 65,536 buckets from 0. They say nothing about large books. So I built a third set: 120 programs, each run as an `Aggregate` and as a one-unit Portfolio, with atoms such as 10,002 and 10,007, counts from 3 to 10,000, and reinsurance on 4 in 11. Fixed counts are checked on the whole distribution and Poisson counts on moments.
+
+| What the library does | Wrong, of 240 | Wrong and missed by validation |
+|:----|--:|--:|
+| Version 1.11.0, the last release | 130 | 4 |
+| Version 1.43.1, today | 133 | 8 |
+| Lattice switched off | 135 | 4 |
+| My withdrawn rule, from 0 when it fits | 92 | 2 |
+| Window widened to hold the largest loss, the proposed plan | 79 | 2 |
+
+Most of what remains is large reinsured books, 56 of the 79, which stay on a coarse grid from 0. Almost all are flagged, and they go to `[Signed-And-Mixed-Book-Windows]`. The plain `Aggregate` count falls from 24 to 8. The plain one-unit count falls from 37 to 15, and those 15 are undiagnosed, for example `100 claims dsev [115 120 125] fixed`, so the plan has to look at them. Another 58 right answers report a failing verdict, also undiagnosed, which `[Validation-Verdict]` has to address. Under this rule the fast suite still moves only the four `bs_window` snapshots of reinsured fixtures.
+
+**Share `po` falls back the way you expected.** A share produces odd-sized losses, and one of two things then happens. If the ceded and net amounts still sit on a dyadic lattice, the rule takes a fine bucket and the answer is exact: on `dsev [1000 2000 3000]`, 33.3% of 750 is 249.75, so it takes `bs` 1/4 at `log2` 16. If they do not, no step is found and sizing falls back to the general bucket estimator, the one a continuous severity uses. That is not literally the 1.11.0 path, but it is very accurate. I said earlier that 1.11.0 hard-coded `bs` 1 for fixed counts, which was wrong: it takes `bs` 1 only when that fits, and `100 claims dsev [1000 1001] fixed` gets `bs` 2 there too. `3 claims dsev [7 11 13] occurrence net of 30% po 5 xs 3 fixed` takes `bs` 1/1024 at `log2` 16, with the variance within 1e-8 of exact, where today it takes `bs` 1 and the variance is 3.9% out. On `dsev [1000 2000 3000]` the same 30% share has its variance 42% out today, and exact with the fix.
+
+**The verdict has a gap.** On a reinsured program it covers only the subject. For a discrete severity the net and ceded moments are exact and cheap, so the verdict could check them too, which would have flagged the example above.
+
+**My recommendation has changed, and is now smaller.** Last time I put the structural fix second and called it a large refactor. In line with KISS, I would now start with the direct fixes and let the oracle decide whether anything larger is needed:
+
+1. **`[Lattice-Gross-Ceded-Net]`**, replacing `[Layered-Dsev-Lattice]`. One function returns the atoms of every view, and `_severity_atoms` and `_exact_discrete_window` both use it. Then the window and the origin. Two bumps.
+2. **A warning when a build fails validation, and a verdict covering reinsured views**, in `[Validation-Verdict]`. `1500 xs 250` returns a mean of 3,000 against 3,750 with no warning and no log line. The first scratch run flagged 87 of 88 wrong answers but also 30 right ones, so the false alarms need reducing first or the warning becomes noise. Of those 30, 25 were on one-unit Portfolios with no layer.
+3. **`[Correctness-Oracle]`**, in `[Rationalize-Tests]`. The scratch checks, made permanent and seeded, with the relations from my last message added, and run in CI. It must compare whole distributions as well as moments: my first test compared only moments, and missed the largest bug for that reason.
+4. **`[Self-Verifying-Grid]`, only if needed.** If the oracle keeps finding grid failures after those fixes, the admissibility predicate and the retry are justified. If it does not, we will have saved a large refactor of `_bucket_window.py`.
+
+**`GridDistribution`: you are right, and I had missed it.** It is the shared kernel for `q`, `tvar`, `cdf`, `sf`, `pmf`, `lev` and the rest, and `Aggregate`, `Portfolio`, `PnL`, `AggregateCHF`, `Bounds` and the bivariate code all use it.
+
+**Deriving from it would be a mistake.** The classes hold a `GridDistribution` rather than being one, and that is the right relation for three reasons. It is a read-only value type, rebuilt whenever the density changes, so it has no cache to invalidate, while an `Aggregate` is mutable through `update`. One `Aggregate` holds two of them, for the aggregate and for the severity. And the design requires the module to remain a leaf that never imports `distributions` or `portfolio`.
+
+What I saw as duplication is one level up. The 57 names shared by `Aggregate` and `AggregateCHF` are mostly reports (`stats_df`, `validation_df`, `bs_window_df`, `sharpen`), which already share `_validation` and `_pricing`. There is no base class to add.
+
+**Decision (2026-10-30):** `[Lattice-Gross-Ceded-Net]` first, then the warning, then the oracle. `[Grid-Law-Base]` is withdrawn. **Revised 2026-10-31:** the plan is `[Lattice-Grid-Sizing]` with the oracle as its last step; the lattice warning is in it, the validation warning stays in `[Validation-Verdict]`.
+
+## 2. `pedagogy.py`
+
+It is harmless, and my recommendation was wrong. `import aggregate` does not load it. Nothing in the core imports it at load time: the only references are lazy ones in `tweedie.py`, `plots/_fourier.py` and the `ft.py` shim. The cost is 2,415 lines on disk and nothing at run time. Moving it would break the monograph's imports and add a package to maintain, with no gain for any user. I recommended it because the file is long, which is not a reason. The only real item is the two broken functions in your Using notes, one of which is `similar_risks_example` under `[Plot-Argument-Warts]`.
+
+**Decision:** keep it, and fix the two functions **in this cycle**.
+
+**Updated 2026-10-31.** Calling every function in the module found three that fail, not two: `similar_risks_example`, `plot_similar_risks_graphs` with `p_reg < 1`, and `ClassicalPremium.calibrate`, which cannot run because `self.p` is set nowhere. `dev/plan-pre-release-housekeeping.md` repairs all three, adding a keyword `fischer_power` with a default of 2, since a power of 1 reproduces the Dutch method.
+
+## 3. Research distortions
+
+The items are the ones you named: `cll`, `clin`, `lep` and `ly`. A namespace could mean either of two things. Moving the classes to a separate module, with `Distortion('cll', ...)` unchanged, tidies about 500 lines of `spectral.py` and nothing a user would notice. Changing the spelling to something like `research.cll` breaks DecL and Python callers for no benefit.
+
+The mechanism already exists. The `Distortion` registry has `documented`, `pricing_ok` and `strict_pricing` flags on every class, and `available_distortions()` already filters on them. So the original `[Distortion-Production-vs-Research]` item reduces to one heading in the docs and a note in the `Distortion` docstring.
+
+You have also decided to take `cll` out of the default list of `available_distortions()`, currently `('ccoc', 'ph', 'wang', 'dual', 'tvar', 'cll')`. It is one line, setting `strict_pricing` to false on `CLLDistortion`, after which the list equals `DEFAULT_CALIBRATION_DISTORTIONS`.
+
+**Decision:** docs heading only. `cll` removed from default list.
+
+## 4. The `_test_suite.agg` scaffold
+
+**What it is.** A file of 209 DecL programs, plus 12 in `_test_suite2.agg`, built to prove that the move from the old SLY parser to Lark changed nothing. Every line runs two tests: `test_line_parses`, and `test_spec_matches_snapshot` against `tests/data/expected_specs.json`. Thirteen test files refer to it, some using it as a ready-made set of recipes rather than as a parser test, and so do about five other files, including the config default that `Underwriter(databases='_test_suite')` resolves.
+
+**Does `library.agg` cover it?** Not on its own, and it should not. I parsed all the corpora and counted the grammar rules each one exercises:
+
+| Corpus | Statements | Distinct grammar rules |
+|:--|--:|--:|
+| `_test_suite.agg` | 209 | 165 |
+| `library.agg` | 206 | 214 |
+| `decl-testers.agg` | 547 | 261 |
+
+Of the scaffold's 165 rules, 39 are not in `library.agg`, because a curated file for users should not carry every spelling. Only 6 rules are not in `decl-testers.agg`, or in any other corpus: `chf_stable_param`, `chf_tweedie_cv`, `ntt_doutcomes_range_step`, `ntt_multiply`, `numbers_range_step` and `stable_shift_down`. So your instinct is close: `decl-testers.agg` is the natural home, and six new lines there finish the grammar coverage. `test_agg_libraries.py` was written as the lasting replacement, as its docstring records.
+
+**What retiring it takes.** Add those six lines, re-base the snapshot on `decl-testers.agg` (which improves it, from 209 programs to 547), and repoint the thirteen test files and the other consumers. The October review counted 1,614 test cases touching it, and keeping the file costs only 27 KB in the wheel. So there is no hurry, but `[Characteristic-Function-Statement]` and later work were still adding lines to it, which is the part to stop.
+
+`dev/TODO.md` lists `[Rationalize-Tests]` and then `[Scaffold-Retirement]`. The one plan covers both. The oracle moved on 2026-10-31 to the last step of `[Lattice-Grid-Sizing]`.
+
+**Decision:** new programs go in `decl-testers.agg` from today. Retire the scaffold alongside the oracle work, in `[Rationalize-Tests]`. ***STRONG YES! AGREE***
+
+## 5. Old CHANGELOG
+
+The 1.0.0 entry begins at line 528 of 12,968. I propose moving everything below it to `dev/done/CHANGELOG-before-1.0.md`, with one line in `CHANGELOG.md` pointing there. That leaves about 530 lines, including the API stability section. No test reads the file, and the release script only needs the section for the version being released, which stays in place. It is pure tidying, so there is no bump and, under the project's rule, it is left for you to commit.
+
+**Decision:** agreed. I run it on your word. **Updated 2026-10-31:** it is the `[Changelog-Split]` step of `dev/plan-pre-release-housekeeping.md`, so approving that plan gives that word. At 1.43.1 the file has 12,972 lines, and 12,439 of them move.
+
+## 6. Stable law mean
+
+`_completed_mean` already adds the closed-form tail to the window mean for `validation_explanation`, but the verdict compares the raw window mean with the true mean. Using the completed mean in the verdict clears the false failure. The tolerance is 1e-4:
+
+| Law | Window mean | True mean | Error now | Error with the fix |
+|:--|--:|--:|--:|--:|
+| `stable 1.5 1` | -0.02652 | 0 | 2.7e-2 | 4.9e-7 |
+| `2 * stable 1.5 0.5 + 10` | 9.97678 | 10 | 2.3e-3 | 8.0e-8 |
+| `stable 1.5 0.5` | -0.01160 | 0 | 1.2e-2 | 3.9e-7 |
+| `stable 1.2 1` | -0.63220 | 0 | 6.3e-1 | 3.0e-6 |
+| `stable 1.9 -0.5` | -0.00005 | 0 | 5.3e-5 | 2.2e-7 |
+| `stable 1.5 0` | -0.00441 | 0 | 4.4e-3 | below 1e-7 |
+
+The fix is a small bump. The rest of `[CHF-Tail-Completion]`, namely `tvar` and `lev` beyond the window, stays on the TODO.
+
+**Decision:** agreed. One small bump, the first step of `[Validation-Verdict]`.
+
+## 9. The list of 8 raised with the library
+
+You are right that the list is basic. It is in the API's `dev/TODO.md` under "Raised with `aggregate`", but every item is a library fix. I tested each one at 1.43.1, and four no longer apply, so the list needs pruning before it needs work.
+
+| Item | At 1.43.1 | Fix |
+|:----|:----|:----|
+| `chart_envelope` resamples without a seed, so its document hash changes and an ETag never revalidates | **Open.** `.sample(n=n_resamples, replace=True)` with no `random_state` | Pass a fixed `random_state` at `charts/_emit_bounds.py:123`, with a test that two calls give one hash. One line |
+| `Recipe.decl` is empty for `MinimumDistortion` | **Open.** Returns `''`, and so does `mixture`, worked around with a stored-program fallback. The child names are not retained on the spec | Keep the child names on the spec and render them in `decl_writer`. About 20 lines, and the spec snapshot moves for those lines |
+| `format_program`'s fallback returns a program collapsed onto one line | **Open** for text callers such as `pprogram`. aLL no longer reaches it | Keep the original line breaks in the fallback. A few lines |
+| `format_program` drops `note{}` and `tags{}` | **Resolved for aLL.** `trailer=True` keeps them; the default still drops them | None. Tick it |
+| The Portfolio density chart should declare its full extent | **Open.** The `mass` axis has only `suggested_range`, where the `Aggregate` emitter also publishes `full_range`. aLL falls back to the drawn extent, so nothing is broken | Add `full_range` at `charts/_emit_portfolio.py:205`. One line |
+| `TwoLineBook` and `BodoffWindQuake` carry a misplaced `note{}` | **Done.** `TwoLineBook` has no trailing note, and `BodoffWindQuake` is no longer in any corpus | None. Tick it |
+| `DefectivePareto` has no `topic:` tag | **Done.** It has `topic:numerics` | None. Tick it |
+| A `BivariateAggregate` has no `validation_description` | **Done.** It returns `not unreasonable` | None. Tick it |
+
+The seed is the only open item with a real effect. Together the four open items are `[Library-Items-Raised-By-API]`, one bump and about 30 lines plus tests. The API side should tick the four that no longer apply.
+
+**Decision:** tick the four, and **fix the rest in the next cycle**.
+
+## 11. Using notes list
+
+**Answer:** every item has now been tested at 1.43.1, and most are still open.
+
+| Status at 1.43.1 | Items, of 38 | Where it goes |
+|:----|--:|:----|
+| Fixed | 2 | The long vector at 1.43.1, ambiguous names at 1.42.0 |
+| Did not reproduce on my examples | 7 | Listed below |
+| Wrong answer | 5 | `[Using-Notes-Wrong-Answers]` |
+| Guard or crash | 8 | `[Using-Notes-Guards-And-Messages]` |
+| Text only | 6 | `[Using-Notes-Guards-And-Messages]` |
+| Shifted severity moments | 1 | `[Shifted-Severity-Moments]`, item 12 |
+| The two `pedagogy.py` functions | 1 | `[Pre-2.0-Housekeeping]` |
+| Flagged grid failure | 2 | `[Signed-And-Mixed-Book-Windows]`, after 2.0 |
+| Needs your ruling | 6 | Listed below |
+
+The tables also hold two items that are not in the 38: an unclosed bracket I found, and the `p_total` warning at the foot of the note. None of the list is in `dev/TODO.md`, so nothing was scheduling it. It exists only in the untracked `dev/issues-arising-from-using-notes.md`.
+
+**`[Using-Notes-Wrong-Answers]`.** These give a wrong number, all but the bivariate limit with no flag or warning, and the formulas need your review.
+
+| Item | Today | Fix |
+|:----|:----|:----|
+| `PricingBounds` upper bound | `[1.125, 1.125]` where the correct range is `[1.125, 1.375]`. `port.pricing_bounds` with a finite cap is always affected | `bounds.py`, about lines 1701 to 1708, keeps only vertices where TVaR of X strictly increases. Keep the others, and test on the small example worked by hand |
+| `convex_distortion` mass at zero | On (0, 0), (1/2, 0.8), (1, 1) it gives a mass of 0.3 and $g(1/4) = 0.55$. The correct value is 0.4, with no mass. `Bounds.min_envelope`, `bagged_distortion` and the EL and ROL distortions all call it | Correct the envelope at 0, and test by hand |
+| `cede` beside `pc` | The result is identical to `pc` alone | Refuse it, as `slide` with `cede` is refused. Booking it would be a feature |
+| Bivariate component limit | A `100 xs 0` component takes the same `bs` of 20 as no limit, with a warning that the sizing mean is 125 against an analytic mean of about 87 | Size the axis on the marginal after its layer |
+| Structure chart return period | On the occurrence stage the axis is one over the per-claim exceedance, so a 250 attachment shows 11.6 where it is a 1.2-year event. I read the code for this one and did not rerun the example | Compute it from the annual occurrence exceedance |
+
+**`[Using-Notes-Guards-And-Messages]`, the guards.**
+
+| Item | Today | Fix |
+|:----|:----|:----|
+| `zm` outside $[0, 1)$ | `zm 1.5` raises `failed to bracket a base mean`. `zm 1.5 !` gives $p(1) = -0.1775$ and `fails agg mean`. `zm -0.2`, with or without `!`, gives a mass of $-0.2$ and `not unreasonable`. `zm 1` raises the same bracket message, and `zm 1 !` gives `nan` | Refuse when `Frequency` is constructed, with a message naming $P(N = 0)$ and the value given |
+| `help(values=...)` | Calls every method that takes no arguments, including `write_default_config()` and `reload()` on an `Underwriter` | Call nothing, as you decided. A method shows its name and signature. Plain attributes and properties still show values |
+| `Frequency.__repr__` | Raises `ValueError` on a `dfreq` with more than one outcome, from `if self.freq_a:` on an array | Format the array. A few lines |
+| `pollaczeck_khinchine` with a negative `rho` | Returns a ruin probability of 2 at `rho` of -0.5. `rho` of 0 correctly gives 1 | Refuse, with the net profit message `wiener_hopf` already gives |
+| `Aggregate.price` with `p` of 1 or more | 5 and 1000 both silently use the last bucket, 2,048, as the assets | Refuse. The note suggests reading it as capital, but a `p` of 1 cannot mean both, and `price(p, g, kind)` has no capital argument |
+| `po` above 100% | `150% po 5` and `6 po 5` are accepted, the second ceding 6 from a layer of 5. A number of 1 or more is an amount, so `1.5 po 5` is 30%, which the hint misdescribes | Refuse above 100%, and correct the hint |
+| Pinned `bs` with a per-axis `log2` | `bs=1, log2=(4, 4)` on a bivariate raises a raw `IndexError` | Refuse, giving the size needed |
+| `sev lognorml` | Raises a raw `AttributeError` | Refuse, with the closest family name |
+| Unclosed bracket, `dsev [1 2 fixed`, new | Raises an `AssertionError` with no message | A parse error with its position |
+| `p_total has 0 negative values`, from the foot of the note | Warns with a count of 0 on rounding noise, at `_portfolio_density.py:160` | Warn only when the count is positive |
+
+Two points on your rulings. **`zm`:** you are right that the `!` is irrelevant, and I read your `zt 1.5` as `zm 1.5`, since `zt` takes no number and `zt 1.5` is already a parse error. I would also refuse the endpoint 1, because `zm 1` and `zm 1 !` both fail for the reasons above, which is why the range is $[0, 1)$ rather than $[0, 1]$. `zm 0` equals `zt` and stays. **`help`:** "call nothing" has a second part you may not have seen. The walk runs `getattr` on every name even at `values='none'`, so `help()` evaluates every property just to classify it. Classifying from the class and reading a property only when `values` asks makes "call nothing" true at the default.
+
+**`[Using-Notes-Guards-And-Messages]`, the text.** No number moves:
+
+- Dashes in `bs_explanation`, `Portfolio.tail_explanation`, `PnL.construction_explanation` and the `IgnoredDecLClauseWarning` text.
+- Internal labels in refusals: "decision 0: no stacking", "[reins-premium]", "[reins-single-layer]", "the engine ceiling".
+- Text looking forward or back: "is a follow-up", "not yet supported", the `tweedie` history note, "reproduces the old number".
+- Verbs of a person, such as "does not name an asset level" and "tail_behavior_df says what the tail is".
+- The `grossnet` refusal, which names `netceded`.
+- Docstrings and docs: `PnL.tvar` on the tail, `Aggregate.price` on calibration, and the docs on top-level `Bounds` exports.
+
+**Needs your ruling.**
+
+| Item | Today | My recommendation |
+|:----|:----|:----|
+| `log2` without `bs` on a discrete severity | Acts as a cap: `log2=19` on `dsev [1 2 3]` builds at 4, and is exact | Keep it and document it, since an exact grid gains nothing from more buckets |
+| `ccoc` on an unbounded book at a finite `p` | Refused | Allow it. The assets are finite at `p`, so the price is too |
+| `cede` with `swing` | A parse error, `Unexpected 'cede'` | Keep refusing, with a proper message |
+| `gini_p` for `bitvar`, `minimum` and `mixture` | `nan` | Compute it numerically from $g$ as a fallback |
+| DecL distortion name | `distortion TDn ph 0.5` has `name` `ph` and `label` `PH(0.5)` | Keep `name` as the family and put the declared name in `label` |
+| `Distortion.ccoc(d)` against `Distortion('ccoc', r=...)` | One takes a discount, the other a return | Make them keyword-only, `d=` or `r=`. 2.0 is the time to break it |
+
+**Rulings, 2026-10-31.** Your answers, by the rows of the table above:
+
+1. `log2` without `bs`: agreed, keep it as a cap and document it.
+2. `ccoc` at a finite `p`: agreed, allow it. Your question on the `p` convention: the code still has the dual reading in `Portfolio.price(p, distortion=None, *, allocation=None, view='ask')`, where `p <= 1` is a probability converted through VaR and anything larger is an asset level, and `Aggregate.price(p, g, kind='var')` has only `p` with no asset reading at all, which is why `p` of 5 silently uses the last bucket. The two explicit arguments you remember are not in either method (they are in `price_pentagon(a=..., LR=...)` and the `pricing_at` family). The guard plan proposes `Aggregate.price` refuse `p >= 1` as the table says; if you would rather have explicit `p=` and `a=` keywords on both methods, that is a 2.0 change and the plan has it as a question.
+3. `cede` with `swing`: agreed, keep refusing with a proper message, as `slide` with `cede` is refused.
+4. `gini_p` for `bitvar`, `minimum` and `mixture`: **no ruling received**; your 4 and 5 read as the next two rows. The plan takes the recommendation, a numeric fallback from $g$, until you say otherwise.
+5. The DecL distortion name: agreed, with an `as` clause: `distortion myd as "my distortion" ph 0.6`, the same `as_label` the other statements take. `name` stays the family and the declared name goes in `label`.
+6. `Distortion.ccoc(d)` against `Distortion('ccoc', r=...)`: agreed, keyword-only `d=` or `r=`, at 2.0.
+
+**Did not reproduce on my examples:**
+
+- The automatic grid for `geometric zt`.
+- `q(0.99)` on a jump.
+- Raw terminal names in a parse message, although the `expected_terminals` field of the report still holds them.
+- A ragged `dbvsev`, which now gives a parse error.
+- `wiener_hopf(0)`, which now refuses with the net profit message.
+- The "raise `log2` to 19" advice: `log2=19` alone cleared `10 claims sev lognorm 10 cv 3 poisson`.
+- The sharpen gate choosing a coarser grid, in five tries. The gate itself is at `_bucket_window.py:2452`, and `[Padding-Discard-Measurement]` retires it.
+
+**Flagged grid failures, after 2.0.** The signed window, where `10 claims ssev 100 - lognorm 10 cv 2.5 poisson` has a mean of 900.36 against 900. And the mixed book, where `10000 claims sev gamma 10 cv 0.1 poisson` beside `1 claim sev 100 * pareto 2.5 - 100 poisson` reports `grid infeasible` and holds almost no mass. The window fix does not cure the mixed book. It needs `bs` 1 at `log2` 20 to reach the right mean.
+
+**Decision:** two plans before 2.0, as above. The rulings of 2026-10-31 go in `[Using-Notes-Guards-And-Messages]`, with the `gini_p` row still open.
+
+**Corrected 2026-10-31, in the plans.** Two premises in the guards table were wrong. Every bare number before `po` is read as an amount of the limit, not only numbers of 1 or more, and no hint describes a threshold; the guard refuses a share above 100% from either spelling. The pinned `bs` with a per-axis `log2` raises only in the discrete `dbvsev` mode; the copula, clash and `dsev` forms clip with a warning. Two more things the read found: `help(values=...)` would call `update()` and `sharpen()`, since neither has a required argument, and the `bitvar` and `wtdtvar` families already have the closed-form `gini_p` in `_describe_closed_form` without feeding it.
+
+## 12. Shifted severity moments
+
+**Answer:** your method is right, and better than the one I proposed. Compute the moments of the law without its shift, then add the effect of the shift, and the closed forms stay in use. It needs one other fix to land first.
+
+**The method.** Let $X$ be the law before the shift, $b$ the shift, and take a layer $y$ xs $a$ on $X + b$, with $a' = a - b$. If $a' \ge 0$, the layer is $y$ xs $a'$ on $X$, which `_moms_analytic` handles directly. If $a' < 0$, let $d = -a'$. The layer is then the constant $y$ when $y \le d$, and otherwise $d + W$ with $W = \min(y - d, X)$, so
+
+$$
+\mathsf{P}[(d + W)^n] = \sum_{k=0}^{n} \binom{n}{k} d^{\,n-k}\, \mathsf{P}[W^k].
+$$
+
+No layer is the case $a = 0$, $y = \infty$. A family with no closed form uses the same reduction on its unshifted quantile, and a law with support below zero integrates that quantile over the range where $X + b > a$.
+
+**The result,** from a scratch prototype:
+
+| Severity | Skewness today | Shift removed | Exact |
+|:----|--:|--:|--:|
+| `100 * gamma 2 + 10000` | 1.38706 | 1.41421 | 1.41421 |
+| `100 * gamma 2 + 100000` | 31.29741 | 1.41421 | 1.41421 |
+| `100 * gamma 2 + 1000000` | `nan` | 1.41430 | 1.41421 |
+| `100 * lognorm 1 + 10000` | 6.26284 | 6.18488 | 6.18488 |
+| `100 * weibull_min 2 + 10000` | 0.10181 | 0.63111 | 0.63111 |
+| `100 * weibull_min 2 + 100000` | 2,602.30122 | 0.63111 | 0.63111 |
+| `100 * beta 2 3 + 10000` | 21.97836 | 0.28571 | 0.28571 |
+| `100 * invgamma 5 + 10000` | -12.68328 | 3.46410 | 3.46410 |
+| `100 * gumbel_r + 10000` | 1.12616 | 1.13955 | 1.13955 |
+| `100 * norm + 10000` | 0.96328 | 0.00000 | 0 |
+
+Over six laws at five shifts each, one of them zero, 13 of 30 report a false failure today, and 6 more have a `nan` skewness and report `not unreasonable`. With the shift removed, 4 of 30 fail, all at a shift of 1,000,000. Seven shifted layers go from 3 false failures to none, with third moments within 2e-15 of quadrature. On six sample programs `bs` and `log2` do not move, which settles the question I had left open: the bad skewness changes the verdict, not the grid. The fast suite passes with the prototype loaded, 7,466 tests with no snapshot moving. I have not run the slow tier.
+
+**Why the far-tail layer has to go first.** Moving the shift out also moves the attachment down the law, and a thin layer far in the tail makes `_moms_analytic` cancel. `100 xs 100000 sev 100 * lognorm 1 + 10000` is right today, by quadrature, with moments of 99.6, 9,949 and 994,234. With the shift removed it becomes 90,000 up a `100 * lognorm 1` and returns 99.6, 15,531 and -5.3e8: a second moment above the largest possible, 10,000, and a negative third moment. So your method alone would trade one bug for another. The cancellation is `[Analytic-Layer-Tail-Cancellation]`, already on the TODO, and it is live today with no shift at all: `10 xs 1000 sev lognorm 1` gives a second moment of 111 where the largest possible is 100, and a third of -14,784, against exact values of 95.4 and 949. The TODO has the cure, differencing upper partial expectations in the tail.
+
+**The limit that remains.** Skewness computed from raw moments loses about $\epsilon (b/\sigma)^3$ to rounding, so a shift near 10,000 times the scale is where it starts to go, on the grid as much as in the severity. Those are the 4 failures above. Today `nan` hides them. Going further would mean carrying central moments through the whole library, and I would not do that for a shift that large.
+
+**Scope for the plan.** The prototype leaves out splices, reflected and signed severities, retention forms and `cantor`, which keep today's path. The plan has to say what each one does, and the retention forms in particular test the same closed-form condition.
+
+**Decision:** `[Shifted-Severity-Moments]`, right after the lattice. Two bumps: the far-tail layer, then the shift.
+
+**Corrected 2026-10-31, in the plan.** A shifted law never reaches the closed form today: `_uses_closed_form_moments` requires a zero shift, so `100 * gamma 2 + 10000` goes to quadrature, and the 1.387 and the `nan` are the quadrature's tolerances (relative 1e-6 and 1e-4, accepted at 1e-3) on raw moments that carry the shift. The method above is still the fix; the closed form has to be handed the unshifted law (`_partial_e` reads the shift as part of the mean), and the quadrature path takes the same reduction for families with no closed form. Two more things the read found: `feasible_bucket` ignores the shift and reads a shifted gamma as an unshifted one with scale 5,100, and `_moms_analytic` with a zero limit returns three values instead of four and raises in `moms()`.
+
+## 13. Severity parameter count
+
+**Answer:** the plan is written at `dev/plan-severity-parameter-count.md` and yours to run. It changes `_build` and the parser callbacks, and the first two plans change the atoms, the window and `moms()`, so it can land before or after them. It should land before `[Rationalize-Tests]`, because it edits `_test_suite.agg`.
+
+Checking it against today's code turned up three things:
+
+- **One acceptance check holds only for the frozen law.** It asks that `norm 100 cv 0.3` has the declared mean and CV to 1e-12. That holds for the frozen law but not for the severity's moments, because 0.04% of the law sits below zero and the severity clamps it. `30 * norm + 100`, the same law, has `sev_m` 100.0034 and `sev_cv` 0.29987. The check should read the frozen law, as the plan's measurements do, and the run should confirm that the existing achieved-CV warning stays quiet on it.
+- **Blessing `norm 100 cv 0.3` makes a false failure more visible.** `100 * norm + 1000`, the same law as `norm 1000 cv 0.1`, reports `fails sev skew, agg skew` today and still does with the shift removed. Validation skips the skewness test only when the exact value is below 1e-12, and a skewness that is zero to rounding can sit above that. `[Validation-Verdict]` covers it, so until then a correct symmetric program shows a failure.
+- **It was drafted at 1.34.0.** The line numbers have moved, its status line still says draft, the question at the end on mixed vectors is unanswered in the file, and its corpus scan should be rerun, since the corpora have grown.
+
+**Decision:** run it as written, with those three corrections.
+
+# API
+
+## 7. Version management
+
+**The irritation comes from one word meaning three things.** They separate cleanly:
+
+- **A version number** labels a build. It goes up with every bump, costs nothing, and needs nothing published.
+- **A release** is an upload to PyPI, a deliberate act you do when you want outsiders to have the code. `V:\worktrees\release-aggregate.ps1` already handles it in eleven steps, with `RELEASE.md` beside it. `RELEASE-PROCESS.md`'s complaint that the publish command was never written down is out of date.
+- **A dependency declaration** in `pyproject.toml` says what the API needs. It should not decide what runs on your own machines, and today it does: that is the source of the owed floors, the `<2` ceiling, and the editable install that `uv sync` silently replaces.
+
+**The plan is one rule per audience:**
+
+| Audience | Gets `aggregate` from | What you type |
+|:----|:----|:----|
+| DOOB | Editable from the worktree, permanently | `uv sync`, now safe |
+| Linux box | Editable from its clone, on `dev` | `git pull` in both repositories, then `refresh.sh` |
+| Everyone else | The PyPI wheel | `pip install aggregate`, and the README |
+
+**Three changes make that true, all in the API's `pyproject.toml`:**
+
+1. **Add `[tool.uv.sources]`** with `aggregate = { path = "../../worktrees/aggregate_REFACTOR", editable = true }`. PMIR already does exactly this, and its `uv.lock` records the editable path. The swap by hand, and its loss at every sync, both go away.
+2. **Remove the `<2` ceiling.** It was caution about two private names, `parser._PARSER` and `parser_errors._TERMINAL_LABELS`. A test that imports them is a better guard, and it means 2.0 cannot break an install.
+3. **Let the floor mean what the code needs.** Set it to what the API actually uses, today about 1.43, and raise it only when the API starts using something newer. Nothing is then "owed" until you publish, and the order at release is simply library first, then API.
+
+**One setup step on the Linux box.** According to `dev/done/plan-misc-03.md` the service runs from `~/hacking/aggregate_api`, and the library clone is at `~/hacking/aggregate_REFACTOR`, so the relative path above would not resolve there. One symlink fixes that: `ln -s ~/hacking/aggregate_REFACTOR ~/worktrees/aggregate_REFACTOR`.
+
+**What the plan gives up.** The comment in `pyproject.toml` records why the table was removed: `uv pip install git+...` of the API fails on the relative path. `RELEASE-PROCESS.md` records that a `git+` install already gives an API with a dead page, because the web bundle is not in git, so that route was never usable. Published wheels never contain `[tool.uv.sources]`, so `pip install` from PyPI is unaffected, and the release check can still prove the PyPI route with `uv sync --no-sources`.
+
+**Corrected 2026-10-31.** The table was not merely unhelpful to a git installer, it was fatal to one: uv honors `[tool.uv.sources]` for a git-installed project and looks for the sibling worktree path inside the GitHub repository, which is why it was removed at the API's 1.0.0 (`pyproject.toml` 153 to 187, `scripts/release-check.ps1` 15 to 17). Since the git route served a 404 page anyway, nothing that worked is lost, and the plan says so in the README. Two other facts from the read: the API's `.venv` is already the hand-swapped editable install (its `direct_url.json` points at the worktree), so the pain is only that `uv sync` undoes it; and the code needs 1.43.1, not 1.11.0 (the word list is 1.41.0, four tests skip below 1.42.0 and 1.43.0), so the floor in the plan is `aggregate[elt]>=1.43.1`. `refresh.sh` is on the VPS at `~/hacking/refresh.sh` and in no repository; the plan still needs it pasted.
+
+**Why the Lab is at 1.18.2.** `~/hacking/refresh/refresh.sh` updates it, so it has presumably not been run since 2026-10-28. No version machinery is involved, and running it should cure that.
+
+**Not tested.** I have not tried this in the API, only observed it working in PMIR. I have not seen `refresh.sh`, which is on the box. The same plan shows the service started by `uv run aggregate-api`, which syncs at startup, so with the source table in place it should keep the editable install rather than fight it. All of those need confirming when we do it.
+
+**Decision:** agreed, as `[API-Editable-Aggregate-Source]`. Please paste `refresh.sh` when we start.
+
+## 8. Capabilities
+
+**Answer:** it should stay in the API.
+
+Capabilities is the block the API adds to every build response, listing what the web app can offer for that object: the exhibits and charts that exist, and flags such as `can_sharpen` and `can_price` that light its tabs, leaves and buttons. The app therefore holds no table of its own of what each kind can do. For `agg CapA 10 claims sev lognorm 100 cv 2 poisson` the block is:
+
+```json
+{"exhibits": ["summary", "tail", "stats", "validation", "bs_window", "tail_behavior"],
+ "charts": ["agg", "approximation", "approximation_tails", "ruin"],
+ "primary_chart": "agg", "has_premium": false, "premium": null,
+ "can_sharpen": true, "has_sharpen": false, "can_pnl": true, "can_pnl_rate": true,
+ "can_pnl_pentagon": false, "can_xpnl": true, "can_explode": false, "can_hints": true,
+ "can_reins": true, "can_views": false, "reins_bases": [], "can_price": true,
+ "can_evaluate": true, "can_bounds": true, "can_allocate": false,
+ "can_natural_allocation": false, "needs_premium": true}
+```
+
+It currently lives in the API, in `capability.py`, and should stay there. I thought about moving it to the library for two reasons: the flags are statements about library objects, and the file looked large at 824 lines, while about a third of the CHANGELOG entries since 1.11.0 carry a downstream chore.
+
+I changed my mind for three reasons. The file holds only 134 lines of code against 532 of docstring, and most flags are one line such as `hasattr(obj, "evaluate")`. The facts that belong to the library already come from it, through `available_exhibits` and `available_charts`, and the remaining flags gate pieces of app behavior such as the Narrative pane and the pricing forms, which are the API's business. And the downstream chores are mostly word lists and test fixtures, which moving this file would not touch.
+
+One small item remains: `has_premium` mirrors a private test, `aggregate._program._pnl_consideration`, and a public property would retire that if the two ever drift.
+
+**Decision:** leave it in the API.
+
+# LIB and API together
+
+## 10. The Repair link
+
+**Your idea is the right shape.** The status strip shows the failure and a `(Repair)` link, and a click rewrites the DecL in the editor and rebuilds. The program text remains the record of what ran, so the reader can see and undo the change. The name `repair` is free in the library and the grammar.
+
+**Examples:**
+
+| Program | Strip today | Repair writes | Result |
+|:----|:--|:----|:--|
+| `port MP` / `agg A dfreq[1] dsev[3]` | `fails pmf deficit 1.000e+00, sev mean, agg mean` | `port MP hints{log2=2; bs=1}` with its unit | `not unreasonable`, mean 3 |
+| `agg L 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed` | `fails sev mean, agg mean` | the same with `hints{bs=250}` | `not unreasonable`, mean 3,750 |
+| `chfagg C gamma 4 25` | refused | `chfagg C 25 * gamma 4` | builds |
+| `agg B 2 claims dsev [1] poison` | `Unexpected 'poison'` | `... poisson` | builds |
+
+**LIB side.** One call returns a verified rewrite or nothing, for example `build.repair(program)` returning the new program, a short label such as `bs 1000 to 250`, and the verdict after. The rule that makes it trustworthy is that a repair is offered only after the rewritten program has been built and has passed. It covers three cases, at different stages of readiness:
+
+- **Failed grid.** `sharpen` already repairs `port MP`, in 0.07 s. It does not repair the layered case: its description shows "bucket pinned, grid size only", it keeps `bs` 1000, and writes `note{sharpen: grid confirmed, no change}` onto a program failing its mean. That message is a bug in its own right and should be fixed anyway. The direct fixes under item 1 remove these two examples, leaving this case for grids a reader has pinned badly and books too large for the default `log2`.
+- **Refused spelling.** The refusal text already contains the rewrite (`write 'gamma 4 25' as '25 * gamma 4'`), but only in prose. The exception needs to carry it as a field, and `[Severity-Parameter-Count]` is the natural place to start, since its refusals are about to be written.
+- **Typing error.** `ErrorReport` has a `suggestions` field, but today it is not good enough: `poison` suggests nothing, `fixd` suggests `mixed`, and `sev lognrom` raises a raw `AttributeError` with no report at all. Matching against the word lists in `decl_words` by edit distance would cure that, a small job.
+
+A failing check that is not about the grid gets no link. The shifted gamma's false skewness failure is the test case: `sharpen` moves its grid today with no benefit, and a repair must return nothing.
+
+**API side.** The plumbing mostly exists. `runDerivation` in `web/src/main.js` is what the Sharpen and Hints buttons use: it calls a route, then runs `editor.setText(res.program)`, `recordProgram(res.program)` and `adoptBuild(res)`. So the undo history and rebuild come for free, and a Repair link is one more `runDerivation` call against a new route. To protect build speed, a grid repair runs on click, with "no repair found" as a possible answer. A typing or spelling repair is cheap enough to show directly on the error.
+
+**Sequence.** The refused-spelling and typing cases need no grid work and could come first, and the grid case can follow the direct fixes. Python users get the same call, and a failed-validation warning can print the verified rewrite to paste.
+
+**Decision:** NO. Pend and note as an idea in TODO. Done: `[Repair-Link]` is under "Ideas, not commitments" in `dev/TODO.md`, left uncommitted.

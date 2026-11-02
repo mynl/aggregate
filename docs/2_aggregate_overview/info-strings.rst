@@ -30,7 +30,7 @@ loss table                   ``elt`` / ``yelt`` source: form, event or year     
                              uncertainty``, ``secondary uncertainty`` (ELT6),
                              or ``secondary uncertainty, {k} shared events
                              rolled up`` (an ELT6 with shared events)
-approximate                 method-of-moments marker; one row, no continuation
+approximate                  method-of-moments marker; one row, no continuation
                              (fit detail lives in the note)
 bs                           bucket size (``1/n`` form for ``bs < 1``)                 not updated
 log2                         log2 of the number of buckets                             not updated

@@ -265,7 +265,7 @@ and the layer ``y xs d1`` pays :math:`g(x) = \min(x - r(x), y)`. Setting :math:`
 .. _loss tables:
 
 Event and Year Loss Tables (elt, yelt)
-=====================================
+=======================================
 
 An aggregate can be declared directly from a catastrophe model's event loss table (ELT) or from a year loss table (YELT) of simulated annual outcomes. The table replaces the exposure, severity and frequency clauses; occurrence and aggregate reinsurance, orientation and the trailer follow as usual, and the result is an ordinary :class:`~aggregate.Aggregate`::
 

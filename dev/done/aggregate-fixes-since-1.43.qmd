@@ -1,0 +1,466 @@
+---
+title: "aggregate fixes from 1.43.1 to 1.63.1"
+subtitle: "Defects removed in the correctness pass before release 2.0: what each did at 1.43.1, and the same code run on the current library"
+date: last-modified
+format:
+  house-html:
+    theme: litera
+    toc: true
+    embed-resources: true
+  house-pdf:
+    toc: true
+jupyter:
+  jupytext:
+    text_representation:
+      extension: .qmd
+      format_name: quarto
+      format_version: '1.0'
+  kernelspec:
+    display_name: Python 3 (ipykernel)
+    language: python
+    name: python3
+---
+
+<!--
+quarto render dev/done/aggregate-fixes-since-1.43.qmd --to house-pdf
+
+and the same with house-html, with QUARTO_PYTHON pointing at .venv. A bare --to pdf skips the kit.
+-->
+
+The run from 1.43.1 to 1.63.1 was a correctness pass. Most of the defects it removed gave a wrong number with no warning, and several gave a wrong distribution with the right mean. Each section below covers one defect: what it did at 1.43.1, the version that fixed it, and the same code run on the current library. The statements about 1.43.1 come from running the code of each section on that version (1.43.0 for the long DecL list, which 1.43.1 fixed). The results of the old runs are quoted in the text rather than computed here, since the two versions cannot share a session.
+
+The helpers in the next block print warnings and errors as text, wrapped, so that a warning shows beside the result it belongs to. The library also logs each refusal before raising it, and the block turns that log off so each message appears once. Tables come from `GT` in the house kit, which `dev/_quarto.yml` makes available to every note under `dev`. The function `grid` prints the validation verdict of each program and tabulates its grid with the theoretical and estimated mean and standard deviation, and `outcomes` lists the outcomes of a discrete aggregate with positive probability.
+
+```{python}
+import logging
+import os
+import sys
+import textwrap
+import warnings
+from pathlib import Path
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from aggregate import build, Severity, Distortion, __version__
+
+# The house kit's Python ships in dev/_extensions/house, and Quarto sets
+# QUARTO_PROJECT_ROOT to dev/ for the kernel.
+_root = Path(os.environ.get('QUARTO_PROJECT_ROOT', Path.cwd().parent))
+sys.path.insert(0, str(_root / '_extensions' / 'house'))
+from house import GT
+
+logging.getLogger('aggregate').setLevel(logging.CRITICAL)
+print(__version__)
+
+
+def g6(x):
+    """Format a number to six significant figures."""
+    return f'{x:.6g}'
+
+
+def wrap(text, width=88):
+    """Print text wrapped at width, keeping its own line breaks."""
+    for line in str(text).splitlines() or ['']:
+        print(textwrap.fill(line, width, subsequent_indent='    ') if len(line) > width else line)
+
+
+def run(fn):
+    """Call fn and return its result; print each warning it raises, or its error."""
+    result = None
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter('always')
+        try:
+            result = fn()
+        except Exception as e:
+            wrap(f'{type(e).__name__}: {e}')
+    for w in caught:
+        wrap(f'{w.category.__name__}: {w.message}')
+    return result
+
+
+def grid(*programs, **kwargs):
+    """Build each program, print its verdict, and tabulate its grid and moments."""
+    rows = {}
+    for program in programs:
+        a = run(lambda: build(program, **kwargs))
+        wrap(f'{a.name} verdict: {a.validation_description}')
+        rows[a.name] = {'bs': a.bs, 'log2': a.log2, 'mean': a.actual_m, 'est mean': a.est_m,
+                        'sd': a.actual_sd, 'est sd': a.est_sd}
+    df = pd.DataFrame.from_dict(rows, orient='index').rename_axis('name')
+    return GT(df, formatters={c: g6 for c in ['bs', 'mean', 'est mean', 'sd', 'est sd']})
+
+
+def outcomes(a):
+    """The outcomes of a discrete aggregate with positive probability."""
+    p = a.density_df.p_total
+    return GT(p[p > 1e-12].rename('probability').rename_axis('outcome').to_frame())
+```
+
+## Grids for discrete severities
+
+A discrete severity (`dsev`) whose atoms lie on a common lattice can be computed exactly on a grid whose bucket divides the lattice step. At 1.43.1 the library took the step from the gross atoms, before any layer or reinsurance. It sized a windowed grid on the aggregate band alone, and it sized a Portfolio by a second rule of its own. A study of 858 seeded programs, checked against an oracle that enumerates every outcome and shares no code with the sizer, found 699 exact, 68 wrong with no flag (all 68 reinsured), and 27 infeasible at `log2` 16. The fixes in this section landed between 1.44.0 and 1.48.0, and the oracle now runs in the test suite.
+
+### Reinsured discrete severity on the gross lattice
+
+At 1.43.1 the program `agg X 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed` took `bs` 1000, the step of the gross atoms. The net losses are 250, 500, and 1,500, which are not on that grid, and the library returned 0, 1,000, and 2,000 with probabilities 5/12, 5/12, and 1/6. The mean was right at 750. With three claims the variance was 1,562,500 against 875,000 and the median 2,000 against 2,250. The verdict was `reinsurance; subject not unreasonable`, because it checked only the gross. From 1.45.0 the lattice step is taken over every view: gross after any layer, ceded and net of each occurrence layer, and the points of an aggregate cover. The one-claim program now has the three net outcomes:
+
+```{python}
+net1 = build('agg Net.One 1 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed')
+print(f'bs {net1.bs}, log2 {net1.log2}')
+outcomes(net1)
+```
+
+The three-claim program has the exact variance and median:
+
+```{python}
+net3 = build('agg Net.Three 3 claims dsev [1000 2000 3000] occurrence net of 1500 xs 250 fixed')
+print(f'bs {net3.bs}, log2 {net3.log2}, variance {net3.est_var:,.0f}, median {net3.q(0.5):,.0f}')
+wrap(net3.validation_description)
+```
+
+### Layered discrete severity collapsed onto one point
+
+At 1.43.1 the program `agg L 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed` also took `bs` 1000. The layered losses are 750, 1,500, and 1,500, so the whole severity was rounded onto one point and the aggregate was 3,000 with certainty, against a true mean of 3,750 and a standard deviation of 612. The verdict was `fails sev mean, agg mean`, and nothing warned. The fix of 1.45.0 takes the step after the layer, giving `bs` 50 and the exact distribution:
+
+```{python}
+layered = build('agg Layered 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed')
+print(f'bs {layered.bs}, log2 {layered.log2}, mean {layered.est_m:,.1f}, sd {layered.est_sd:,.1f}')
+outcomes(layered)
+```
+
+### Atom split between grid points by a narrow window
+
+At 1.43.1 the program `agg W 100 claims dsev [1000 1001] fixed` needed `log2` 17 from zero at a bucket of 1, above the cap of 16, so the sizer took `bs` 2. A window holding the total at `bs` 1 needs only 64 buckets, but it was rejected because 64 buckets cannot hold a single claim of 1,001. At `bs` 2 the atom at 1,001 was split between 1,000 and 1,002, the variance was 75 against 25, and the verdict was `fails sev cv, agg cv`. From 1.46.0 a windowed grid must span a claim as well as the aggregate band, and `log2` grows until it does:
+
+```{python}
+w = build('agg Window 100 claims dsev [1000 1001] fixed')
+print(f'bs {w.bs}, log2 {w.log2}, grid from {w.density_df.loss.iloc[0]:,.0f}, '
+      f'variance {w.est_var:.6f} against {w.actual_var}')
+wrap(w.validation_description)
+```
+
+### Aggregate cover outside the window
+
+At 1.43.1 the program `agg C 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4` took a window starting at 12, because the subject total lies between 24 and 30. The cover pays 2 in every outcome, which is below the start of the window, and the library returned 12 with probability one. The verdict was `reinsurance; subject not unreasonable`. From 1.46.0 a book under an aggregate cover is not windowed:
+
+```{python}
+c = build('agg Cover 3 claims dsev [8 10] fixed aggregate ceded to 2 xs 4')
+print(f'bs {c.bs}, log2 {c.log2}, ceded mean {c.est_m:.4f}')
+outcomes(c)
+```
+
+### One-unit Portfolio with no mass
+
+At 1.43.1 the program `port P agg A dfreq [1] dsev [3]` was sized by the Portfolio rule, which gave `bs` 1 and `log2` 1: two buckets, at 0 and 1, and none at 3. The density held no mass at all, and the verdict was `fails pmf deficit 1.000e+00, sev mean, agg mean`, although the unit built alone was exact. In the study, a single-unit program built alone and as a one-unit Portfolio gave materially different distributions in 127 of 718 cases. From 1.47.0 a one-unit Portfolio takes its unit's grid unchanged, and a larger one sizes its window to hold its largest severity:
+
+```{python}
+p = build('port OneUnit agg OneUnit.A dfreq [1] dsev [3]')
+print(f'bs {p.bs}, log2 {p.log2}, verdict: {p.validation_description}')
+outcomes(p)
+```
+
+### Lattice too fine for the log2 cap
+
+At 1.43.1 the program `agg AWK dfreq [1:100] dsev [1000 1001]` needed `log2` 17 to hold its lattice of step 1. It was built at `bs` 2 and `log2` 16, splitting every atom at an odd amount, with the verdict `fails sev cv, agg skew` and no warning. From 1.48.0 the same build raises `LatticeGridWarning` giving the `log2` that passes, and the verdict begins `grid infeasible for this lattice`. Passing `log2=17` gives the exact distribution:
+
+```{python}
+grid('agg AWK dfreq [1:100] dsev [1000 1001]')
+```
+
+```{python}
+grid('agg AWK.17 dfreq [1:100] dsev [1000 1001]', log2=17)
+```
+
+### `dsev` probabilities that do not sum to 1
+
+At 1.43.1 the severity moments used `dsev` probabilities as given, while the density normalized them. Six-digit probabilities summing to 0.999999 gave `agg N 100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed` a theoretical standard deviation of 13.29 and a skewness of -42.6, against 8.749 and -0.0213, and the verdict was `fails pmf deficit 9.322e-03, sev cv, agg cv`. Probabilities summing to 0.6 built without complaint, with a theoretical mean of 0.9 against 1.5 on the grid. From 1.44.0 a sum within a relative 1e-5 of 1 is normalized when the severity is built, and any other sum is refused:
+
+```{python}
+n = build('agg Normalized 100 claims dsev [999 1000 1001] [0.333333 0.222222 0.444444] fixed')
+print(f'sd {n.actual_sd:.4f}, skewness {n.actual_skew:.4f}, verdict: {n.validation_description}')
+run(lambda: build('agg NotNormalized 1 claim dsev [1 2] [0.3 0.3] fixed'))
+```
+
+## Severity moments
+
+### Thin layer far in the tail
+
+At 1.43.1 the closed-form moments of a layer cancelled catastrophically when the layer attached far in the tail. The layer `10 xs 1000` on `lognorm 1` had conditional moments 9.64, 111.2, and -14,784. A payment between 0 and 10 has a second moment of at most 100 and a positive third moment, so both values were impossible. On `100 * lognorm 1` the layer `10 xs 1e5` had moments 8.28, 171,386, and -1.7e10, which fail the same bounds by orders of magnitude. From 1.49.0 the layer moments of `lognorm`, `gamma`, `expon`, `pareto`, `lomax`, and `beta` are right wherever the layer attaches. The next table shows the first three conditional moments of each layer:
+
+```{python}
+rows = {}
+for layer, law in [('10 xs 1000', 'lognorm 1'), ('10 xs 1e5', '100 * lognorm 1')]:
+    sev = build(f'agg Tail 1 claim {layer} sev {law} fixed', update=False).sevs[0]
+    rows[f'{layer} on {law}'] = [float(m) for m in sev.moms()]
+GT(pd.DataFrame(rows, index=['first', 'second', 'third']).T.rename_axis('layer'))
+```
+
+### Shifted severity
+
+At 1.43.1 the moments of a shifted severity `c * law + b` were integrated numerically with the shift included, so the raw moments carried the shift and the skewness lost precision as the shift grew. The skewness of `100 * gamma 2 + 10000` was 1.387, against $2/\sqrt{2} = 1.41421$, and validation failed a correct grid. At a shift of 1,000,000 the skewness was `nan` and the verdict passed. `100 * weibull_min 2 + 100000` had a skewness of 2,602 and failed on its CV, and `100 * norm + 500` had a mean of 499.99995 and failed on its skewness. From 1.50.0 the moments are those of the law, with the shift applied after. The table shows the severity mean, the severity skewness, and the verdict for each:
+
+```{python}
+rows = {}
+for clause in ['100 * gamma 2 + 10000', '100 * gamma 2 + 1000000',
+               '100 * weibull_min 2 + 100000', '100 * norm + 500']:
+    a = build(f'agg Shift 1 claim sev {clause} fixed')
+    rows[clause] = {'mean': a.sev_m, 'skewness': a.sev_skew, 'verdict': a.validation_description}
+GT(pd.DataFrame.from_dict(rows, orient='index').rename_axis('severity'),
+   formatters={'mean': lambda x: f'{x:,.8f}', 'skewness': g6})
+```
+
+The skewness at a shift of 1,000,000 is 1.41430 rather than 1.41421. Skewness computed from raw moments loses about $\epsilon (b/\sigma)^3$ to rounding, so a shift near 10,000 times the scale is where it starts to go, on the grid as much as in the severity.
+
+### Skewness that is zero up to rounding
+
+At 1.43.1 the verdict tested a skewness that was zero up to rounding. The program `agg R 1 claims dsev [115 120 125] fixed` is symmetric, its computed skewness was 1.4e-11, and the verdict was `fails sev skew, agg skew`. The theoretical skewness of `1000 claims dsev [999 1000 1001] fixed` was 0.0149, against an exact 0, from cancellation in the third central moment. From 1.57.0 a third central moment within 1e-15 of the terms subtracted is set to 0, and a skewness below 1e-12 is reported but not tested:
+
+```{python}
+rows = {}
+for program in ['agg R1 1 claims dsev [115 120 125] fixed', 'agg R2 1000 claims dsev [999 1000 1001] fixed']:
+    a = build(program)
+    rows[program] = {'skewness': a.actual_skew, 'verdict': a.validation_description}
+GT(pd.DataFrame.from_dict(rows, orient='index').rename_axis('program'), formatters={'skewness': g6})
+```
+
+## Severity parameters
+
+At 1.43.1 a `sev` clause dropped any number its family did not take, with no error, and the `mean cv` form went wrong on a family with no shape parameter. `norm 100 cv 0.3` built $N(100, 1)$, logging that the achieved CV of 0.01 was not close to 0.3. `expon 10 cv 1` had mean 11, and `uniform 10 cv 0.2` had mean 10.5 and standard deviation 0.29. The positional forms were worse: `norm 100 30` built the standard normal, `gamma 4 25` a gamma with scale 1, `beta 2` a beta with second shape 0, and `[lognorm expon] [0.5 1]` dropped the 1. From 1.51.0 positional numbers are the family's shape parameters, scale and location are arithmetic around the law (`c * law + b`), and the `mean cv` form works on every family. The mean and standard deviation of the frozen `scipy.stats` law behind each clause:
+
+```{python}
+rows = {}
+for clause in ['norm 100 cv 0.3', 'expon 10 cv 1', 'uniform 10 cv 0.2', '30 * norm + 100', '25 * gamma 4']:
+    fz = build(f'agg Law 1 claim sev {clause} fixed', update=False).sevs[0].fz
+    m, v = map(float, fz.stats(moments='mv'))
+    rows[clause] = {'mean': m, 'sd': v ** 0.5}
+GT(pd.DataFrame.from_dict(rows, orient='index').rename_axis('clause'))
+```
+
+A number the family cannot take is refused, and the message gives the form to use. The published paper's `[expon pareto] [1 2.5]` is one of these, and it is now written `[expon pareto] [_ 2.5]`.
+
+```{python}
+for clause in ['norm 100 30', 'gamma 4 25', 'beta 2', '[lognorm expon] [0.5 1]']:
+    run(lambda: build(f'agg Refused 1 claim sev {clause} fixed', update=False))
+```
+
+## Pricing bounds and distortions
+
+### Upper bound from `PricingBounds` lost at a tie
+
+The class `PricingBounds` brackets the price of a risk $Y$ over all distortions that price a reference risk $X$ at $P$, using the convex hull of the curve $(\mathrm{TVaR}_p(X), \mathrm{TVaR}_p(Y))$. In a small example $X$ is 0 or 1 with probability 1/2 each, and $Y$ is 0, 1, or 2 with probabilities 1/2, 1/4, and 1/4. The curve has vertices $(1/2, 3/4)$, $(1, 3/2)$, and $(1, 2)$, because $X$ reaches its maximum at $p = 1/2$ while $Y$ keeps rising. At 1.43.1 the filter kept only the first vertex of a tie, so $(1, 2)$ was lost and the range at $P = 3/4$ collapsed to the single value 1.125. Every `Portfolio` with a finite cap meets the same tie, since a capped total reaches its maximum before $p = 1$. From 1.52.0 the vertical segment is kept, the upper bound rises to the correct 1.375, and lower bounds do not move:
+
+```{python}
+from aggregate.bounds import PricingBounds
+
+X = pd.Series({0: 1/2, 1: 1/2})
+Y = pd.Series({0: 1/2, 1: 1/4, 2: 1/4})
+pb = PricingBounds(X, Y)
+print(pb.curve_df, '\n')
+print(pb.bounds(3/4))
+```
+
+### Mass at zero from `convex_distortion`
+
+The function `convex_distortion` builds the piecewise linear distortion through a set of points. Through $(0, 0)$, $(1/2, 0.8)$, and $(1, 1)$ the correct function is $g(s) = 1.6s$ on $[0, 1/2]$, with $g(1/4) = 0.4$ and no jump at zero. At 1.43.1 it returned $g(1/4) = 0.55$ and a mass of 0.3 at zero, so a risk with a one in a billion chance of a loss of 1 was priced at 0.3. `Bounds.min_envelope`, `bagged_distortion`, and `convex_example` inherited the mass. From 1.52.0 the function returns the upper concave envelope, with no mass at zero:
+
+```{python}
+from aggregate.spectral import convex_distortion
+
+s, gs = np.array([0, 0.5, 1]), np.array([0, 0.8, 1])
+g = convex_distortion(s, gs)
+points = np.array([1e-9, 0.25, 0.5, 0.75, 1])
+print(f'mass = {g.mass}')
+GT(pd.DataFrame({'s': points, 'g(s)': g.g(points), 'correct': np.interp(points, s, gs)}),
+   formatters={'s': g6, 'g(s)': g6, 'correct': g6})
+```
+
+### `gini_p` of a distortion with no closed form
+
+The property `gini_p` is twice the area between a distortion $g$ and the diagonal. It increases from 0 for risk-neutral pricing to 1 for pricing at the maximum, and it puts families with incomparable parameters on one scale. At 1.43.1 it was `nan` for `bitvar`, `wtdtvar`, `beta`, `minimum`, `mixture`, and the other families with no closed form in the code. From 1.59.0 it is finite for every family:
+
+```{python}
+for d in [Distortion('bitvar', p0=0.2, p1=0.9, w1=0.3), Distortion('ph', 0.5)]:
+    print(f'{d.name:8s} gini_p = {d.gini_p:.6f}')
+```
+
+### Pricing by `ccoc` at a finite probability
+
+At 1.43.1 the method `Aggregate.price` refused the constant cost of capital distortion `ccoc` on any unbounded aggregate, with the message `mass distortion (ccoc(0.1)) on an unbounded aggregate`, even at a finite `p` where the assets, and so the price, are finite. From 1.59.0 it prices at $P = (L + ra)/(1 + r)$, and only `p = 1` on an unbounded law is still refused. The last line checks the identity:
+
+```{python}
+agg = build('agg Priced 2 claims sev lognorm 10 cv 1 poisson')
+pr = agg.price(0.99, Distortion('ccoc', r=0.1))
+print(pr.round(4).to_string())
+L, a = pr['L'].iloc[0], pr['a'].iloc[0]
+print(f'\n(L + r a) / (1 + r) = {(L + 0.1 * a) / 1.1:.4f}')
+```
+
+### Pricing at `p` above 1
+
+At 1.43.1 `Aggregate.price(5, ...)` used the last bucket of the grid as the assets, with no warning, and `Portfolio.price` read a `p` above 1 as an asset level. On the aggregate above, a call at `p` 5 returned a premium of 40.82, priced at the top of the grid. From 1.59.0 `price` takes exactly one of `p` and the new keyword `a`, and a `p` above 1 is refused with the remedy:
+
+```{python}
+run(lambda: agg.price(5, Distortion('ph', 0.5)))
+print()
+print(agg.price(a=60, g=Distortion('ph', 0.5)).round(4).to_string())
+```
+
+## Reinsurance clauses
+
+### `cede` beside `pc` on the same layer
+
+The clause `cede` returns a ceding commission on the ceded premium, and `pc` adds a profit commission. At 1.43.1 a layer carrying both built without complaint, and the result equaled `pc` alone to every digit, so the ceding commission had disappeared. From 1.53.0 the combination is refused at parse time, as `slide` beside `cede` already was. The block builds the same layer with neither, each, and both:
+
+```{python}
+program = """
+pnl PC.{name} 10000 premium
+    less agg PC.{name}.Subject 10000 prem at 85% lr sev lognorm 500 cv 2 poisson
+    aggregate net of 5000 xs 4000 deposit 1500 {feature}
+"""
+features = {'None': '', 'Cede': 'cede 10%', 'PC': 'pc 25% after 10%', 'Both': 'cede 10% pc 25% after 10%'}
+for name, feature in features.items():
+    pnl = run(lambda: build(program.format(name=name, feature=feature)))
+    if pnl is not None:
+        print(f'{feature or "none":20s} mean {pnl.est_m:,.4f}')
+```
+
+### Share above 100% before `po`
+
+A share of a layer is written either as a percentage or as an amount of the limit, so `30% po 5 xs 0` and `1.5 po 5 xs 0` both cede 30%. At 1.43.1 a share above 100% was accepted from either form. The program `agg PO 2 claims dsev [3 6] occurrence ceded to 6 po 5 xs 0 poisson` ceded 120% of the layer, with a ceded mean of 9.6 against a gross mean of 9. From 1.59.0 a share above 100% is refused:
+
+```{python}
+run(lambda: build('agg PO 2 claims dsev [3 6] occurrence ceded to 6 po 5 xs 0 poisson'))
+```
+
+### Limited component of a bivariate aggregate
+
+At 1.43.1 a bivariate component with a layer was sized on the marginal before the layer. In the next program the first component is limited to `100 xs 0`, and at 1.43.1 its axis ran from 0 to 20,470 at `bs` 10. The build raised a `DefectiveDistributionWarning` that the sizing marginal had mean 625 against an analytic mean of 485. From 1.53.0 the axis is sized on the marginal after its layer, and the warning is gone:
+
+```{python}
+b = run(lambda: build('bivariate Limited 25 claims '
+                      'agg A dfreq [0 1] [.5 .5] 100 xs 0 sev lognorm 50 cv 1.5 '
+                      'agg B dfreq [0 1] [.5 .5] sev gamma 50 cv 1.0 poisson'))
+for name, bs, xs in zip('AB', b.bs, b.axis_xs):
+    print(f'axis {name}: bs {bs}, from {xs.min():,.0f} to {xs.max():,.0f}, {len(xs)} buckets')
+```
+
+## Validation verdict
+
+### Stable law with a mean
+
+At 1.43.1 the verdict compared the mean of the grid window of a tilted stable law with the true mean, although the window omits the part of the mean contributed by the power tail beyond it. `chfagg X stable 1.5 1`, `2 * stable 1.5 1 + 10`, and `stable 1.1 1` all had the verdict `fails agg mean`. From 1.55.0 the verdict uses the completed mean, the window mean plus the closed-form tail beyond it:
+
+```{python}
+for program in ['chfagg Stable.A stable 1.5 1', 'chfagg Stable.B 2 * stable 1.5 1 + 10',
+                'chfagg Stable.C stable 1.1 1']:
+    print(f'{program:40s} {build(program).validation_description}')
+```
+
+### Reinsured views in the verdict
+
+At 1.43.1 the verdict of a reinsured aggregate checked the subject only. With `bs` pinned at 1000, the net program of the first section put its mass on 0, 1,000, and 2,000 (the wrong distribution, with the right mean) and the verdict was `reinsurance; subject not unreasonable`. From 1.56.0 the verdict checks each reinsured view against the exact image of the subject on its grid. The same pinned build has the same wrong outcomes, but now it fails, and it warns:
+
+```{python}
+pinned = run(lambda: build('agg Net.Pinned 1 claims dsev [1000 2000 3000] '
+                           'occurrence net of 1500 xs 250 fixed', bs=1000))
+wrap(pinned.validation_description)
+outcomes(pinned)
+```
+
+### Warning when a build fails validation
+
+At 1.43.1 a failing verdict was recorded on the object and nothing more, so a wrong answer reached the reader unless the reader asked for the verdict. The layered program of the first section, pinned at `bs` 1000, returned 3,000 against 3,750 in silence. From 1.58.0 a build whose verdict fails emits one `ValidationWarning` (from `aggregate.constants`), once a session for a name and its flags, and `aggregate.utilities.silence_warnings(ValidationWarning)` turns it off. Of the 338 entries in `library.agg` and `reproductions.agg`, 56 now warn, all failures that were silent before.
+
+```{python}
+grid('agg Layered.Pinned 3 claims 1500 xs 250 dsev [1000 2000 3000] fixed', bs=1000)
+```
+
+## Input guards
+
+At 1.43.1 the inputs in the next table gave a wrong answer or a raw error. From 1.59.0 each is refused with a message.
+
+| Input | At 1.43.1 |
+|:--|:--|
+| `poisson zm -0.2` | a probability of -0.2 at zero, and the verdict `not unreasonable` |
+| `pollaczeck_khinchine(-0.5)` | a ruin probability near 2 |
+| `sev lognorml 0.5` | `AttributeError: module 'scipy.stats' has no attribute 'lognorml'` |
+| `dsev [1 2 fixed` | an `AssertionError` with no message |
+
+The block runs the four inputs on the current library:
+
+```{python}
+run(lambda: build('agg ZM 2 claims dsev [1] poisson zm -0.2'))
+run(lambda: build('agg PK 2 claims sev lognorm 10 cv 1 poisson').pollaczeck_khinchine(-0.5))
+run(lambda: build('agg Family 1 claim sev lognorml 0.5 fixed'))
+run(lambda: build('agg Bracket 1 claim dsev [1 2 fixed'))
+```
+
+### Methods called by `help(values=...)`
+
+At 1.43.1 the method `help`, with `values` other than `'none'`, called every matching method with no required arguments in order to show its result. On an `Underwriter` that included `write_default_config` and `reload`, so `build.help('^reload$', values='short')` discarded every recipe built in the session, and on an `Aggregate` it would call `update` and `sharpen`. From 1.59.0 `help` calls no method: a method shows its name and signature, and only properties show values. The recipe built before the call is still there after it:
+
+```{python}
+build('agg HelpProbe 1 claim dsev [1] fixed')
+build.help('^reload$', values='short')
+print('recipe present after help:', build('HelpProbe').name == 'HelpProbe')
+```
+
+### DecL list of any length
+
+At 1.43.0 a DecL list of about 500 numbers or more, such as a long `dsev` vector or inline `elt` rows, raised `RecursionError`, because the transformer walked the parse tree recursively. From 1.43.1 the transformer walks the tree without recursion. A `dsev` of 2,000 atoms:
+
+```{python}
+long = build(f"agg Long 1 claim dsev [{' '.join(map(str, range(1, 2001)))}] fixed")
+print(f'mean {long.est_m:,.4f} against {long.actual_m:,.4f}')
+```
+
+## Repaired functions
+
+### `pedagogy.py` functions
+
+At 1.43.1 three functions in `aggregate.pedagogy` failed on any input. `similar_risks_example` raised `TypeError: Bounds.plot_envelope() got an unexpected keyword argument 'axs'`. `plot_similar_risks_graphs` with `p_reg` below 1 raised `AttributeError`, calling a method of `Bounds` that no longer exists. `ClassicalPremium.calibrate` raised `AttributeError: 'ClassicalPremium' object has no attribute 'p'`, because the Fischer premium used an attribute that nothing set. From 1.63.0 all three run. The Fischer premium is $\mathsf{P}X + c\,(\mathsf{P}[(X - \mathsf{P}X)_+^r])^{1/r}$, where $r$ is the new keyword `fischer_power` with default 2, and a power of 1 gives the `Dutch` premium. The calibrated parameter of each classical premium on a thick-tailed limited unit:
+
+```{python}
+import aggregate.pedagogy as pg
+
+classical = build('port Classical agg Limit1 0.1 claims 1000000 xs 0 sev lognorm 50000 cv 10 poisson')
+cp = pg.ClassicalPremium({'gross': classical}, 8000)
+GT(pd.Series(cp.calibrate('gross', 'Limit1', 8000), name='parameter').rename_axis('method').to_frame(),
+   formatters={'parameter': g6})
+```
+
+The function `similar_risks_example` returns its frame and draws three figures, which the block closes:
+
+```{python}
+df = pg.similar_risks_example()
+plt.close('all')
+print(df.shape)
+```
+
+### Layer density at the limit
+
+A layer `y xs a` pays $\min(\max(X - a, 0), y)$, so its payment has a point mass $S(a + y)$ at $y$, which the method `Severity.pdf` marks with `inf`. At 1.43.1, for `1000 xs 50` on a lognormal, the conditional form returned 0 at the limit 1,000. The unconditional form put the marker at the detachment 1,050, a ground-up loss, and returned a positive density between 1,000 and 1,050, where the payment has none. From 1.63.1 both forms mark the limit and return 0 beyond it. The rows evaluate the density just below the limit, at it, between the limit and the detachment, and at the detachment:
+
+```{python}
+x = np.array([999.0, 1000.0, 1020.0, 1050.0])
+rows = {}
+for conditional in [True, False]:
+    sev = Severity(sev_name='lognorm', sev_mean=100, sev_cv=2, exp_attachment=50, exp_limit=1000,
+                   sev_conditional=conditional)
+    rows['conditional' if conditional else 'unconditional'] = sev.pdf(x)
+df = pd.DataFrame.from_dict(rows, orient='index', columns=[f'{v:,.0f}' for v in x]).rename_axis('form')
+GT(df, formatters={c: g6 for c in df.columns})
+```
+
+## Changed default distortion list
+
+The function `Distortion.available_distortions()` lists the distortion families used by default. At 1.43.1 it included the research family `cll`, which the default calibration set did not. From 1.62.0 the two lists are the same, and `cll` remains available by name, in DecL, and under `available_distortions(pricing=True, strict=False)`:
+
+```{python}
+print(Distortion.available_distortions())
+print('cll' in Distortion.available_distortions(pricing=True, strict=False))
+```
+
+## Checks behind the fixes
+
+The fixes of this run are guarded by tests that compare with an independent answer, where the earlier tests could show only that a number had moved. The file `tests/lattice_oracle.py` enumerates the distribution of a discrete program and gives the smallest `log2` that holds it, with `nttagg` as the reference where a program is within its scope. About 120 programs run in the fast suite, and the full 858, with a 718-program comparison of each unit alone and as a one-unit Portfolio, run under `slow`. Seven reinsured programs that need a window are named as known residuals, so any new wrong answer fails a test. Separately, the DecL snapshot now covers the 650 programs of `decl-testers.agg`, up from 209 in the retired SLY-parity scaffold, and message text across the library was rewritten without dashes or internal labels, so code that matches on a message needs the new text.

@@ -1,0 +1,9 @@
+# Makes dev/ a Quarto project, so that a note anywhere under it finds the
+# house kit in dev/_extensions. Quarto looks for a standalone document's
+# extensions only in the document's own folder. The kit is gitignored here:
+# install or update it from this folder with `quarto add <house-style repo>`.
+# Only .qmd files are rendered, so a bare `quarto render` leaves the plans alone.
+project:
+  type: default
+  render:
+    - "**/*.qmd"

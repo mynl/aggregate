@@ -3163,7 +3163,7 @@ what it chose. The measured case returned a 512 by 2,048 joint carrying a mass
 deficit of 0.535 and a correlation of -0.2225, all three of them silent.
 
 The probability accessors: ``marginal``, ``conditional``, ``total`` (a328)
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 Three accessors turn the joint into laws that can be asked questions, each
 returning a ``GridDistribution``, the shared discrete-grid value type. All three

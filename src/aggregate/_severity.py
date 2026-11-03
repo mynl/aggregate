@@ -775,7 +775,7 @@ def _layered_lev(severity, t):
     Parameters
     ----------
     severity : Severity
-        Reads ``fz``, ``attachment`` and ``limit``.
+        Reads ``fz``, ``attachment``, ``limit`` and ``retention_end``.
     t : float
         Layer-space point, measured up from the attachment.
 
@@ -792,8 +792,21 @@ def _layered_lev(severity, t):
     ``pattach`` divisor cancels. A shifted law is given to it without its shift
     (:meth:`Severity._law_without_shift`), since :func:`_partial_e` would take
     the shift for part of the mean.
+
+    A franchise or disappearing deductible (finite ``retention_end``) pays
+    ``g(X) = min(u(X), y)`` with ``u`` non-decreasing, so for ``t <= y`` the
+    censored payment ``min(g(X), t)`` is the same deductible with its limit
+    lowered to ``t``. Its mean is the first moment from
+    :func:`_moms_retention`, in the same closed form that
+    :meth:`Severity._retention_moms` uses ([Deductible-Forms-Follow-Ups]).
     """
     fz, shift = severity._law_without_shift()
+    if np.isfinite(getattr(severity, 'retention_end', np.inf)):
+        def excess(lo, width):
+            return _excess_moments(severity.sev_name, fz, lo, width, 1)
+        return float(_moms_retention(excess, fz.sf, severity.attachment,
+                                     severity.retention_end,
+                                     min(t, severity._exp_limit), 1, shift)[1])
     return float(_moms_analytic(fz, min(t, severity.limit),
                                 severity.attachment - shift, 1)[1])
 
@@ -833,12 +846,11 @@ def size_biased_cdf(severity, t):
     A finite layer limit puts an atom at the top of the layer, and this
     returns 1 at and above it: everything at or beyond the limit is the limit.
 
-    Returns ``nan`` for a franchise or disappearing deductible (finite
-    ``retention_end``), whose payment is not the ordinary layer that
-    :func:`_layered_lev` describes.
+    A franchise or disappearing deductible (finite ``retention_end``) has
+    ``S(t) = S_X(u^{-1}(t))`` below the limit, with :func:`_retention_inverse`,
+    and its ``LEV`` from :func:`_layered_lev`. A franchise pays nothing
+    strictly between 0 and the attachment, so its size biased law is 0 there.
     """
-    if np.isfinite(getattr(severity, 'retention_end', np.inf)):
-        return np.nan
     ey = _layered_lev(severity, severity.limit)
     if not (np.isfinite(ey) and ey > 0):
         return np.nan
@@ -846,8 +858,11 @@ def size_biased_cdf(severity, t):
         return 1.0
     if t <= 0:
         return 0.0
-    sf = float(np.asarray(
-        severity.fz.sf(severity.attachment + t)).reshape(-1)[0])
+    if np.isfinite(getattr(severity, 'retention_end', np.inf)):
+        x = _retention_inverse(t, severity.attachment, severity.retention_end)
+    else:
+        x = severity.attachment + t
+    sf = float(np.asarray(severity.fz.sf(x)).reshape(-1)[0])
     return float(np.clip((_layered_lev(severity, t) - t * sf) / ey, 0.0, 1.0))
 
 
@@ -933,10 +948,13 @@ def feasible_bucket(severity, delta):
     :data:`_FEASIBILITY_KINDS`, each with closed form partial expected values
     from :func:`_partial_e`. The alternative was
     quadrature inside a bisection at sizing time, which is both slow and
-    fragile on exactly the heavy tails the reading is for. A franchise or
-    disappearing deductible (finite ``retention_end``) also returns ``None``:
-    :func:`_layered_lev` is the ordinary layer's, and the payment there is a
-    different function of the loss.
+    fragile on exactly the heavy tails the reading is for.
+
+    A franchise or disappearing deductible (finite ``retention_end``) is read
+    the same way, through the size biased law of its own payment
+    (:func:`size_biased_cdf`). A franchise pays nothing below its attachment
+    ``d1``, so its bottom bucket can be as wide as ``2 d1`` before it loses
+    any mean, and ``bs_max`` is at least that.
 
     A shifted law goes through :func:`_layered_lev`, which removes the shift.
     All of its mean lies above the shift, so ``bs_max`` is about twice the shift
@@ -945,8 +963,6 @@ def feasible_bucket(severity, delta):
     top are considered, so with a narrow law far from 0 the reading is optimistic
     about ``bs``. It can miss an infeasible grid, and does not invent one.
     """
-    if np.isfinite(getattr(severity, 'retention_end', np.inf)):
-        return None
     if getattr(severity, 'sev_kind', '') != 'scipy':
         return None
     if severity.signed or severity.sev_reflect:

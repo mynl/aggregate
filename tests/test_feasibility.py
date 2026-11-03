@@ -384,3 +384,80 @@ def test_no_program_gains_the_flag_without_a_failing_severity_mean():
                 'would mean the reading is firing on a grid that works')
     assert set(flagged) == {'CurvePareto', 'GrossCatXOL',
                             'USXOLTower'}, sorted(flagged)
+
+
+# ---------------------------------------------------------------------------
+# A franchise or disappearing deductible ([Deductible-Forms-Follow-Ups])
+# ---------------------------------------------------------------------------
+
+def _retention_sev(retention_end, conditional=True):
+    """``1000 xs 50`` on ``lognorm 100 cv 2``, retention ending at ``retention_end``."""
+    return Severity(sev_name='lognorm', sev_mean=100, sev_cv=2, exp_attachment=50,
+                    exp_limit=1000, exp_retention_end=retention_end,
+                    sev_conditional=conditional)
+
+
+@pytest.mark.parametrize('retention_end', [50, 200, 2000],
+                         ids=['franchise', 'ramp-below-limit', 'ramp-past-limit'])
+def test_size_biased_cdf_of_a_retention_payment(retention_end):
+    """``P_1(g <= t)`` against direct quadrature of ``g f`` on the ground-up law.
+
+    Below the limit ``g <= t`` exactly when ``X <= u^{-1}(t)``, so the size
+    biased mass is the integral of ``g f`` from the attachment to there.
+    """
+    from scipy.integrate import quad
+
+    from aggregate._severity import _retention_inverse, _retention_payment
+    sev = _retention_sev(retention_end)
+    a, r, y = 50.0, float(retention_end), 1000.0
+    cuts = sorted({a, r, float(_retention_inverse(y, a, r))})
+
+    def mass(hi):
+        edges = [a] + [c for c in cuts if a < c < hi] + [hi]
+        return sum(quad(lambda x: float(_retention_payment(x, a, r, y)) * sev.fz.pdf(x),
+                        lo, up, limit=200)[0] for lo, up in zip(edges, edges[1:]))
+
+    ey = mass(cuts[-1]) + y * sev.fz.sf(cuts[-1])
+    assert _layered_lev(sev, y) == pytest.approx(ey, rel=1e-9)
+    for t in (10.0, 60.0, 150.0, 500.0, 999.0):
+        expected = mass(float(_retention_inverse(t, a, r))) / ey
+        assert size_biased_cdf(sev, t) == pytest.approx(expected, rel=1e-9, abs=1e-12)
+    assert size_biased_cdf(sev, y) == 1.0
+
+
+def test_a_franchise_has_no_size_biased_mass_below_its_attachment():
+    """No payment lies strictly between 0 and ``d1``, so the bottom bucket may be ``2 d1``."""
+    sev = _retention_sev(50)
+    assert size_biased_cdf(sev, 49.9) == 0
+    assert size_biased_cdf(sev, 50.1) > 0
+    bs_max, reach = feasible_bucket(sev, 1e-4)
+    assert 100 <= bs_max < 101
+    assert reach == pytest.approx(1000, rel=1e-6)
+
+
+def test_retention_reading_does_not_depend_on_conditioning():
+    """``pattach`` cancels in the ratio, as it does for the ordinary layer."""
+    assert feasible_bucket(_retention_sev(200, True), 1e-4) == pytest.approx(
+        feasible_bucket(_retention_sev(200, False), 1e-4), rel=1e-12)
+
+
+def test_a_distant_retention_end_reads_as_the_ordinary_layer():
+    """``d2 -> inf`` is the ordinary deductible, so the reading converges to it."""
+    ordinary = Severity(sev_name='lognorm', sev_mean=100, sev_cv=2,
+                        exp_attachment=50, exp_limit=1000)
+    assert feasible_bucket(_retention_sev(1e15), 1e-4) == pytest.approx(
+        feasible_bucket(ordinary, 1e-4), rel=1e-9)
+    for t in (10.0, 500.0):
+        assert size_biased_cdf(_retention_sev(1e15), t) == pytest.approx(
+            size_biased_cdf(ordinary, t), rel=1e-9)
+
+
+@pytest.mark.parametrize('layers', ['inf xs 1000 to 5000 disappearing',
+                                    'inf xs 1000 franchise'],
+                         ids=['disappearing', 'franchise'])
+def test_a_thick_retention_law_warns_like_the_ordinary_layer(layers):
+    """It returned no reading, so an infeasible grid went unreported."""
+    reset_warn_once()
+    with pytest.warns(InfeasibleGridWarning):
+        a = build(f'agg R 5 claims {layers} sev lognorm 1000 cv 20 poisson')
+    assert grid_is_infeasible(a._bs_feasibility)

@@ -19,7 +19,7 @@
 # curves are exempt from the sampling, each being its own curve rather
 # than an arithmetic variant of the one above it.
 #
-# 143 programs from 29 chapters.
+# 145 programs from 30 chapters.
 #
 # Read it back with `build.load("reproductions.agg")`, or parse it
 # without loading with `build.interpret_file("reproductions.agg")`.
@@ -36,7 +36,7 @@
 # Bibliography
 # ----------------------------------------------------------------------
 #
-# The 30 works the notes below cite, read from the library
+# The 31 works the notes below cite, read from the library
 # the book itself cites, D:/Projects/Biblio/uber-library.bib.
 #
 # @Asmussen2016a
@@ -131,6 +131,11 @@
 #     of Bivariate Distributions. Proceedings of the Casualty Actuarial
 #     Society 90(iid), 274-307.
 #     http://www.casact.org/pubs/proceed/proceed03/03274.pdf
+#
+# @Homer2017a
+#     Homer, David L. and Li, Ming (2017). Notes on using property
+#     catastrophe model results. Casualty Actuarial Society E-Forum 2,
+#     1-15.
 #
 # @Jin2016
 #     Jin, Tao and Provost, Serge B. and Ren, Jiandong (2016). Moment-
@@ -1168,6 +1173,21 @@ agg Gollini2016.Hurricane.Gamma
   sev gamma [1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 20 24] cv 0.5 wts [0.58889746 0.21928748 0.0672295 0.05374453 0.01379374 0.01411 0.00846236 0.0061182 0.00446063 0.00941256 0.00198404 0.00452247 7.436e-05 0.00025122 0.00253892 0.00435067 0.0007371 1.486e-05 4.95e-06 4.95e-06]
   poisson
   note{@Gollini2016, the same table with each event loss gamma, coefficient of variation 0.5.} tags{topic:Gollini2016}
+
+
+# Homer and Li on secondary uncertainty in an event loss table  [Homer2017a.qmd]
+# ----------------------------------------------------------------------
+
+agg Homer2017a.Table4
+  dfreq [0 1 2] [0.25 0.5 0.25]
+  dsev [100 300 500] [0.5 0.25 0.25]
+  note{@Homer2017a, the collective risk model of the paper's Table 4 marginals.} tags{topic:Homer2017a}
+
+agg Homer2017a.Table3
+  0.7 claims
+  sev [10000 5000 4000] * beta [0.05 0.06 0.05] cv [2 3.9542 3.5] wts [0.14285714285714285 0.14285714285714285 0.7142857142857143]
+  poisson
+  note{@Homer2017a, the paper's Table 3 ELT with beta secondary uncertainty, event 2 clamped.} tags{topic:Homer2017a}
 
 
 # Wilson and Keich on accurate FFT convolution  [Wilson2016a.qmd]

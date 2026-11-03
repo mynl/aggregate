@@ -81,3 +81,32 @@ def test_error_analysis_quadratic_term_reads_the_density_part():
     expected = a.bs ** 2 / 24 * (sev.pdf(1000 - 1e-9) - sev.pdf(1e-9))
     got = a.severity_error_analysis().loc[0, 'h2_adj']
     assert got == pytest.approx(expected, rel=0.02)
+
+
+@pytest.mark.parametrize('conditional', [True, False],
+                         ids=['conditional', 'unconditional'])
+def test_cdf_and_sf_take_the_mass_at_the_limit(conditional):
+    """No payment exceeds the limit, so ``cdf(limit) = 1`` and ``sf(limit) = 0``.
+
+    The step at the limit is the exhaustion mass ``S(a + y)``, divided by
+    ``S(a)`` when conditional. The unconditional form read the ground-up
+    ``F(a + y)`` at ``x == limit`` and left that mass out.
+    """
+    sev = Severity(exp_attachment=50, exp_limit=1000, sev_conditional=conditional,
+                   **LOGNORM)
+    x = np.array([0.0, 10.0, 999.0, 1000.0, 1001.0])
+    np.testing.assert_array_equal(sev.cdf(x[3:]), 1)
+    np.testing.assert_array_equal(sev.sf(x[3:]), 0)
+    np.testing.assert_allclose(sev.cdf(x) + sev.sf(x), 1, rtol=1e-12)
+    scale = sev.fz.sf(50) if conditional else 1.0
+    step = sev.cdf(1000.0) - sev.cdf(1000.0 - 1e-9)
+    assert step == pytest.approx(sev.fz.sf(1050) / scale, rel=1e-6)
+
+
+def test_ordinary_cdf_at_the_limit_matches_the_retention_wrapper():
+    """An ordinary layer and a franchise both reach one at the limit."""
+    for retention_end in (None, 50):
+        kw = {} if retention_end is None else {'exp_retention_end': retention_end}
+        sev = Severity(exp_attachment=50, exp_limit=1000, sev_conditional=False,
+                       **kw, **LOGNORM)
+        assert sev.cdf(1000.0) == 1 and sev.sf(1000.0) == 0

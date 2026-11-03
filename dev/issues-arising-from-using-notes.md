@@ -88,3 +88,8 @@ Then rebuild and reupload.
 * **History.** The `tweedie` refusal for a bad power ends "(It read `<mean> <p> <dispersion>` before 1.0.0a231, so an older program needs its first two numbers swapped.)". On `price-evaluate`, "reproduces the old number".
 * **Verbs of a person.** On `price-evaluate`, "does not name an asset level" and "tail_behavior_df says what the tail is". On `elt`, "unit rows carry different rates".
 * **`--` used as a dash.** In `bs_explanation` and `construction_explanation`, and in messages on `pnls` and `pk-wh`.
+
+**Found on the unconditional layers page of Using aggregate, 2026-11-02, at 1.63.2.** Two small items, neither visible on the page.
+
+* **`qd` of an `Aggregate` raises `Pandas4Warning`.** `utilities.py` line 577 calls `summary_df.fillna('')` on a float frame. Default filters hide it, so no page shows it, but a future pandas raises an error there.
+* **`Aggregate.program` doubles some spaces.** `build('agg Eg dfreq [1] 3 xs 0 dsev [0:4] !')` gives `program` equal to `agg Eg dfreq  [1]  3 xs 0 dsev  [0:4]  !`, with two spaces after `dfreq`, `[1]`, `dsev` and `[0:4]`. Cosmetic.

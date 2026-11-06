@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a5 - 2026-11-06
+
+**[Extended-Calibration-Set] `calibrate_distortions(..., extended=True)` calibrates the standard set with `tsallis` between `wang` and `dual`**, on `Aggregate`, `Portfolio` and `AggregateCHF`. `names` now defaults to `None`, which resolves to the standard five, and `names` given with `extended=True` raises `ValueError`. A call that passes neither is unchanged. The envelope chart of `Bounds` draws a calibrated `tsallis` as `Tsallis`.
+
 ## 2.1.0a4 - 2026-11-06
 
 **[Distortion-From-Gini] `Distortion.from_gini(kind, gini)` builds the member of a one-parameter family with a given Gini index**, for `ccoc`, `ph`, `wang`, `tsallis`, `dual` and `tvar`: `Distortion.from_gini('tsallis', 0.25)` is `alpha = 3`. Any other kind raises `ValueError` listing its parameters, and so does an index outside `(0, 1)`. `p_to_parameters` and `consistent_distortions` take `extended=False`, and `extended=True` adds `tsallis` between `wang` and `dual`; their default output is unchanged. `_pricing.EXTENDED_CALIBRATION_DISTORTIONS` is the six-family tuple. A `mixture` has its Gini index in closed form, the weighted sum of its members', so its `gini` moves by about 1e-11 and its describe table shows the closed form beside the grid value.

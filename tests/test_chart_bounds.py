@@ -104,11 +104,26 @@ def test_the_envelope_is_one_band_not_two_curves(bounds):
 
 
 def test_all_five_calibrated_distortions_share_one_band(bounds):
-    """Where the compositor split them across two panels."""
+    """Where the compositor split them across two panels.
+
+    ``CALIBRATED`` also lists ``tsallis``, drawn only when it was calibrated,
+    which the default set does not do.
+    """
     names = [s.name for s in series_on(chart_envelope(bounds), 'calibrated')]
-    for label in CALIBRATED.values():
-        assert label in names
+    for key, label in CALIBRATED.items():
+        assert (label in names) == (key in bounds._obj.distortions), key
+    assert 'Tsallis' not in names
     assert 'Envelope' in names and 'Avg extreme' in names
+
+
+def test_an_extended_calibration_draws_its_tsallis_curve():
+    port = build(_PORT)
+    prem = float(port.tvar(0.5))
+    coc = (prem - port.actual_m) / (port.q(1) - prem)
+    port.calibrate_distortions(coc, a=port.q(1), extended=True)
+    names = [s.name for s in series_on(chart_envelope(Bounds(port, premium=prem)),
+                                       'calibrated')]
+    assert set(CALIBRATED.values()) <= set(names)
 
 
 def test_a_cloud_curve_carries_its_weight(bounds):

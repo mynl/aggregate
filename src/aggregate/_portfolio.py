@@ -3563,8 +3563,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         return _density.add_exa(self, df, unit_state)
 
     def calibrate_distortions(self, coc=None, *, lr=None, p=None, a=None,
-                              kind='lower',
-                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS,
+                              kind='lower', names=None, extended=False,
                               reins_view=None):
         """
         Calibrate the standard pricing distortion set to a pricing target.
@@ -3587,6 +3586,12 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             must be provided.
         kind : {'lower', 'upper'}, optional
             VaR kind when ``p`` is provided. Default ``'lower'``.
+        names : sequence of str, optional
+            The distortion families to calibrate, in order. Default ``None``,
+            the standard set ``ccoc``, ``ph``, ``wang``, ``dual``, ``tvar``.
+        extended : bool, default False
+            Calibrate the extended set, the standard set with ``tsallis``
+            between ``wang`` and ``dual``. Raises ``ValueError`` with ``names``.
         reins_view : str, optional
             Which of the book's reinsurance views to calibrate on, one of
             :attr:`reins_views` (``gross`` / ``ceded`` / ``net``). The default
@@ -3598,8 +3603,8 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         -------
         CalibrationResult
             Carrying the per-distortion calibration receipt ``distortion_df``
-            (also stored on ``self.distortion_df``): one row per distortion in
-            ``[ccoc, ph, wang, dual, tvar]``, index named ``distortion`` (an
+            (also stored on ``self.distortion_df``): one row per calibrated
+            family, by default ``[ccoc, ph, wang, dual, tvar]``, index named ``distortion`` (an
             ordered categorical, canonical sort), columns
             ``[param_name, param, error, gini, area]``. ``param`` is the raw
             shape (``param_name`` says what it is per family); ``error`` is the
@@ -3637,6 +3642,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _pricing.calibrate_distortions(self, coc, lr=lr, p=p, a=a,
                                               kind=kind, names=names,
+                                              extended=extended,
                                               reins_view=reins_view)
 
     def evaluate(self, P=None, *, unit='total', p=None, a=None, names=None,

@@ -2518,20 +2518,20 @@ class AggregateCHF(HelpMixin, LabeledMixin, ProgramMixin):
                                        PQ=PQ, ROE=ROE)
 
     def calibrate_distortions(self, coc=None, *, lr=None, p=None, a=None,
-                              kind='lower', names=None):
+                              kind='lower', names=None, extended=False):
         """Calibrate the standard distortion set to a pricing target on this grid.
 
         The ``Aggregate`` method over this grid; see
         :meth:`aggregate.Aggregate.calibrate_distortions` for the arguments
         and the result. ``names`` defaults to
-        ``_pricing.DEFAULT_CALIBRATION_DISTORTIONS``. The cautions under
-        :meth:`price_pentagon` apply.
+        ``_pricing.DEFAULT_CALIBRATION_DISTORTIONS``, and ``extended=True``
+        selects ``_pricing.EXTENDED_CALIBRATION_DISTORTIONS``. The cautions
+        under :meth:`price_pentagon` apply.
         """
         from . import _pricing
-        if names is None:
-            names = _pricing.DEFAULT_CALIBRATION_DISTORTIONS
         return _pricing.calibrate_distortions(self, coc, lr=lr, p=p, a=a,
-                                              kind=kind, names=names)
+                                              kind=kind, names=names,
+                                              extended=extended)
 
     # ---- moments ----------------------------------------------------------
     def _theoretical_moments(self):

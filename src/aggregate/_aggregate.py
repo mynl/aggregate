@@ -8477,8 +8477,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             reins_view=reins_view)
 
     def calibrate_distortions(self, coc=None, *, lr=None, p=None, a=None,
-                              kind='lower',
-                              names=_pricing.DEFAULT_CALIBRATION_DISTORTIONS,
+                              kind='lower', names=None, extended=False,
                               reins_view=None):
         """Calibrate the standard pricing distortion set to a pricing target.
 
@@ -8505,6 +8504,12 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             Asset level; snapped to the grid. Exactly one of ``p`` or ``a``.
         kind : {'lower', 'upper'}, optional
             VaR kind when ``p`` is provided. Default ``'lower'``.
+        names : sequence of str, optional
+            The distortion families to calibrate, in order. Default ``None``,
+            the standard set ``ccoc``, ``ph``, ``wang``, ``dual``, ``tvar``.
+        extended : bool, default False
+            Calibrate the extended set, the standard set with ``tsallis``
+            between ``wang`` and ``dual``. Raises ``ValueError`` with ``names``.
         reins_view : str, optional
             Which of a cession's distributions to calibrate on, one of
             :attr:`reins_views`. The default ``None`` is this aggregate's own
@@ -8515,8 +8520,8 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Returns
         -------
         CalibrationResult
-            Carrying ``distortion_df`` (one row per distortion in
-            ``[ccoc, ph, wang, dual, tvar]``), the shared one-row
+            Carrying ``distortion_df`` (one row per calibrated family, by
+            default ``[ccoc, ph, wang, dual, tvar]``), the shared one-row
             ``calibration_df`` target, the ``distortions`` themselves, and the
             inputs they were fitted at. The same three are stored on
             ``self.distortion_df`` / ``self.calibration_df`` /
@@ -8555,6 +8560,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         """
         return _pricing.calibrate_distortions(self, coc, lr=lr, p=p, a=a,
                                               kind=kind, names=names,
+                                              extended=extended,
                                               reins_view=reins_view)
 
     def evaluate(self, P=None, *, p=None, a=None, names=None,

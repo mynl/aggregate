@@ -42,10 +42,11 @@ __all__ = ['chart_envelope']
 CURVE_POINTS = 1001
 
 #: The calibrated distortions, in the order a reader compares them, with
-#: the names they are known by. All five on one band: which of them prices
+#: the names they are known by. All of them on one band: which of them prices
 #: highest where is the question, and it cannot be read off two panels.
+#: ``tsallis`` is drawn when calibrated, by ``extended=True`` or by name.
 CALIBRATED = {'ccoc': 'CCoC', 'tvar': 'TVaR(p*)', 'ph': 'PH',
-              'wang': 'Wang', 'dual': 'Dual'}
+              'wang': 'Wang', 'tsallis': 'Tsallis', 'dual': 'Dual'}
 
 chart_envelope = _emitter_base('envelope')
 

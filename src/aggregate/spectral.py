@@ -641,7 +641,8 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     is a production family with one shape parameter and no mass, declared
     between ``wang`` and ``dual``. Its ``strict_pricing`` flag is False, so it
     too is absent from the default list and the default calibration set;
-    ``calibrate_distortions(..., names=)`` calibrates it. See
+    ``calibrate_distortions(..., extended=True)`` calibrates it with the five
+    standard families, and ``names=`` calibrates it alone. See
     :class:`TsallisDistortion`.
     """
 

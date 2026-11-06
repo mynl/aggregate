@@ -820,11 +820,17 @@ def _coc_from_lr(L, a, lr):
 
 
 def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
-                          kind='lower',
-                          names=DEFAULT_CALIBRATION_DISTORTIONS,
+                          kind='lower', names=None, extended=False,
                           reins_view=None):
     """Calibrate the standard pricing distortion set to a pricing target on a
     single distribution (an ``Aggregate`` or a ``Portfolio`` total).
+
+    **The families** are ``names`` when given, and otherwise
+    :data:`DEFAULT_CALIBRATION_DISTORTIONS`, or
+    :data:`EXTENDED_CALIBRATION_DISTORTIONS` with ``extended=True``, which adds
+    ``tsallis`` between ``wang`` and ``dual``. ``names`` together with
+    ``extended=True`` raises ``ValueError``: the two choose the same thing, and
+    ignoring either would hide a mistake.
 
     Resolves the asset level ``a`` (from ``p`` or given), the expected loss
     ``exa = E[min(X, a)]`` and the premium target ``P`` (from ``coc`` via the
@@ -916,6 +922,13 @@ def calibrate_distortions(obj, coc=None, *, lr=None, p=None, a=None,
     artifact of the grid, so the reader means the loss ratio on the premium
     they are shown.
     """
+    if names is None:
+        names = (EXTENDED_CALIBRATION_DISTORTIONS if extended
+                 else DEFAULT_CALIBRATION_DISTORTIONS)
+    elif extended:
+        raise ValueError(
+            'calibrate_distortions takes names= or extended=True, not both: '
+            f'extended=True is the families {EXTENDED_CALIBRATION_DISTORTIONS}.')
     if (p is None) == (a is None):
         raise ValueError(
             'calibrate_distortions requires exactly one of p= (probability) '

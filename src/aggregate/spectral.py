@@ -11,6 +11,7 @@ instance of the appropriate subclass; existing call sites are unchanged.
 from collections import namedtuple
 from functools import cached_property
 from io import StringIO
+import inspect
 import logging
 
 import numpy as np
@@ -559,6 +560,37 @@ def _root_of_variance(var):
     the power 1/2 as a complex number, which no comparison downstream accepts.
     """
     return var ** 0.5 if var >= 0 else np.nan
+
+
+def _constructor_parameters(subclass):
+    """The parameters a distortion family's constructor takes, as message text.
+
+    Parameters
+    ----------
+    subclass : type
+        A registered ``Distortion`` subclass.
+
+    Returns
+    -------
+    str
+        ``"parameters ('r0', 'b')"`` and the like, read from the constructor
+        signature, or ``'distortion references'`` for the combinators.
+
+    Notes
+    -----
+    Taken from the signature rather than :attr:`Distortion.decl_params`, which
+    lists only the numbers of the DecL form: ``cll`` has ``decl_params``
+    ``('b',)`` and takes ``r0`` as well, and ``r0`` is the reason
+    :meth:`Distortion.from_gini` refuses it.
+    """
+    skip = {'self', 'name', 'shape', 'label'}
+    names = [k for k, v in inspect.signature(subclass.__init__).parameters.items()
+             if k not in skip and v.kind is not inspect.Parameter.VAR_KEYWORD]
+    if 'distortions' in names:
+        return 'distortion references'
+    if not names and subclass.param_name is not None:
+        names = [subclass.param_name]
+    return f'parameters {tuple(names)}'
 
 
 class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
@@ -1230,8 +1262,8 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         Keys may include ``'mean'``, ``'var'``, ``'std'``, ``'cv'``,
         ``'skew'``, ``'p_equiv'``. Missing keys show as ``NaN`` in the
         closed-form column, and :attr:`gini` integrates ``g`` when
-        ``'p_equiv'`` is missing. The combinators ``minimum`` and ``mixture``
-        return ``{}``.
+        ``'p_equiv'`` is missing. The combinator ``minimum`` returns ``{}``,
+        and ``mixture`` returns ``'p_equiv'`` alone.
         """
         return {}
 
@@ -1251,7 +1283,8 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         one, and otherwise an adaptive quadrature of ``g``. A jump of ``g`` at 0
         is a single point to the integral. A combinator has kinks, which is the
         reason for the large subdivision limit. Not cached: calibration changes
-        ``shape`` on an existing object.
+        ``shape`` on an existing object. :meth:`from_gini` inverts the index
+        for the one-parameter families.
         """
         closed_form = self._describe_closed_form().get('p_equiv', np.nan)
         if not np.isnan(closed_form):
@@ -1259,6 +1292,94 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         area, _ = quad(lambda s: float(self.g(np.float64(s))), 0, 1, limit=500,
                        epsabs=1e-11, epsrel=1e-11)
         return 2 * area - 1
+
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """Subclass hook: the natural keyword arguments of the member with Gini index ``gini``.
+
+        Parameters
+        ----------
+        gini : float
+            The Gini index :math:`2\\int_0^1 g - 1`.
+
+        Returns
+        -------
+        dict or None
+            Keyword arguments for the subclass constructor, or ``None``, the
+            base value, for a family that has no one-parameter inverse.
+            :meth:`from_gini` refuses a ``None``.
+        """
+        return None
+
+    @classmethod
+    def from_gini(cls, kind, gini, *, label=None):
+        r"""Construct the member of a one-parameter family with a given Gini index.
+
+        Parameters
+        ----------
+        kind : str
+            A one-parameter family: ``ccoc``, ``ph``, ``wang``, ``tsallis``,
+            ``dual`` or ``tvar``. ``'roe'`` is accepted for ``'ccoc'``.
+        gini : float
+            The Gini index :math:`2\int_0^1 g - 1`, in the open interval
+            ``(0, 1)``: 0 is the mean and 1 the maximum, which no member of
+            these families reaches at a finite parameter.
+        label : str, optional
+            Explicit label, as in the constructor.
+
+        Returns
+        -------
+        Distortion
+            The member of ``kind`` whose :attr:`gini` is ``gini``.
+
+        Raises
+        ------
+        ValueError
+            An unknown ``kind``; a ``gini`` outside ``(0, 1)``; or a family
+            with more than one parameter, named with its parameters.
+
+        Notes
+        -----
+        Each one-parameter family supplies the inverse of its closed-form Gini
+        index through :meth:`_params_from_gini`:
+
+        ===========  ============  ===========================================
+        kind         parameter     from Gini :math:`G`
+        ===========  ============  ===========================================
+        ``ccoc``     ``d``         :math:`G`
+        ``ph``       ``a``         :math:`(1-G)/(1+G)`
+        ``wang``     ``lam``       :math:`\sqrt2\,\Phi^{-1}((1+G)/2)`
+        ``tsallis``  ``alpha``     :math:`1/G - 1`
+        ``dual``     ``b``         :math:`(1+G)/(1-G)`
+        ``tvar``     ``p``         :math:`G`
+        ===========  ============  ===========================================
+
+        Since :math:`\rho_g(U) = \int_0^1 g = (1 + G)/2` for a uniform
+        :math:`U`, these are the members that price the uniform alike, and
+        :math:`G` is the TVaR level with the same price. A family with more
+        than one parameter, such as ``bitvar`` or the research families,
+        which take ``r0`` as well as their shape, has a curve of members at
+        each index rather than one, and is refused.
+        """
+        lookup = 'ccoc' if kind == 'roe' else kind
+        subclass = Distortion._registry.get(lookup)
+        if subclass is None:
+            raise ValueError(
+                f"Unknown distortion kind {kind!r}; "
+                f"available: {sorted(Distortion._registry)}")
+        if not 0.0 < float(gini) < 1.0:
+            raise ValueError(
+                f'from_gini needs a Gini index in the open interval (0, 1), '
+                f'got {gini!r}.')
+        params = subclass._params_from_gini(float(gini))
+        if params is None:
+            one = [k for k, v in Distortion._registry.items()
+                   if v._params_from_gini(0.5) is not None]
+            raise ValueError(
+                f'from_gini builds a one-parameter family; {lookup!r} takes '
+                f'{_constructor_parameters(subclass)}. The one-parameter '
+                f'families are {", ".join(one)}.')
+        return Distortion(lookup, label=label, **params)
 
     def _kusuoka_summary(self):
         """Subclass hook: ``(mu_atom_0, mu_atom_1, has_interior_atoms)``.
@@ -2449,6 +2570,11 @@ class CCoCDistortion(Distortion):
         return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
                 'skew': skew, 'p_equiv': d, 'loading': d / 2.0}
 
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """The discount ``d`` is the Gini index."""
+        return {'d': gini}
+
     def _kusuoka_summary(self):
         # CCoC: rho(X) = (1-d)*E(X) + d*ess_sup(X). mu = (1-d) delta_0 + d delta_1.
         d = float(self.d)
@@ -2547,6 +2673,11 @@ class PHDistortion(Distortion):
         return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
                 'skew': skew, 'p_equiv': p_eq,
                 'loading': 1.0 / (a + 1.0) - 0.5}
+
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """``a = (1 - G)/(1 + G)``, inverting ``G = (1 - a)/(1 + a)``."""
+        return {'a': (1 - gini) / (1 + gini)}
 
     def _kusuoka_summary(self):
         # mu = atom of size a at p=0 plus continuous density a(1-a)(1-p)^(a-1)
@@ -2660,6 +2791,11 @@ class WangDistortion(Distortion):
         int_g = float(norm.cdf(lam / 2 ** 0.5))
         return {'mean': 1.0 - int_g, 'p_equiv': 2.0 * int_g - 1.0,
                 'loading': int_g - 0.5}
+
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """``lam = sqrt(2) Phi^-1((1 + G)/2)``, inverting ``G = 2 Phi(lam/sqrt(2)) - 1``."""
+        return {'lam': 2 ** 0.5 * phi_inv((1 + gini) / 2)}
 
     def _kusuoka_atoms(self):
         # Wang's Kusuoka measure is continuous; no atoms. The density has
@@ -2912,6 +3048,11 @@ class TsallisDistortion(Distortion):
                 'skew': skew, 'p_equiv': 1.0 / (a + 1.0),
                 'loading': 1.0 / (2.0 * (a + 1.0))}
 
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """``alpha = 1/G - 1``, inverting ``G = 1/(alpha + 1)``."""
+        return {'alpha': 1 / gini - 1}
+
     def _kusuoka_atoms(self):
         # Beta(1, alpha) on p is continuous: no atoms
         return []
@@ -3014,6 +3155,11 @@ class DualDistortion(Distortion):
                 'skew': skew, 'p_equiv': 2.0 * int_g - 1.0,
                 'loading': int_g - 0.5}
 
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """``b = (1 + G)/(1 - G)``, inverting ``G = (b - 1)/(b + 1)``."""
+        return {'b': (1 + gini) / (1 - gini)}
+
     def _kusuoka_atoms(self):
         # Dual has no atoms in mu; the density b(b-1)(1-p)p^(b-2)
         # integrates to 1.
@@ -3044,6 +3190,11 @@ class TVaRDistortion(Distortion):
 
     def _label_default(self):
         return f'TVaR({self.shape:.3g})'
+
+    @classmethod
+    def _params_from_gini(cls, gini):
+        """The level ``p`` is the Gini index."""
+        return {'p': gini}
 
     @property
     def p(self):
@@ -3809,6 +3960,22 @@ class MixtureDistortion(Distortion):
     def g_inv(self, y):
         raise NotImplementedError('Inverse of mixture not implemented')
 
+    def _describe_closed_form(self):
+        r"""The Gini index of the mixture from its members' indices.
+
+        Notes
+        -----
+        The index is linear in ``g``: with :math:`g = \sum_i w_i g_i`,
+        :math:`2\int g - 1 = \sum_i w_i (G_i + 1) - 1`, which is
+        :math:`\sum_i w_i G_i` when the weights sum to 1. Each :math:`G_i`
+        is the member's :attr:`gini`, a closed form where the member has
+        one. The moments of ``D_g`` are left to the grid, so only
+        ``'p_equiv'`` is returned.
+        """
+        total = sum(float(w) * (d.gini + 1.0)
+                    for d, w in zip(self._distortions, self._wts))
+        return {'p_equiv': total - 1.0}
+
     def _density_knots(self):
         knots = []
         for d in self._distortions:
@@ -4566,35 +4733,66 @@ def tvar_weights(d):
     return wf
 
 
-def p_to_parameters(p):
+def _calibration_names(extended):
+    """The default or the extended calibration set, from ``_pricing``.
+
+    Imported at call time: ``_pricing`` imports this module.
     """
-    Standard distortion parameters equivalent to TVaR at level ``p``.
+    from ._pricing import (DEFAULT_CALIBRATION_DISTORTIONS,
+                           EXTENDED_CALIBRATION_DISTORTIONS)
+    return (EXTENDED_CALIBRATION_DISTORTIONS if extended
+            else DEFAULT_CALIBRATION_DISTORTIONS)
 
-    Returned dict has entries for ``ccoc``, ``ph``, ``wang``, ``dual``,
-    and ``tvar``.
+
+def p_to_parameters(p, extended=False):
     """
-    ans = {}
-    ans['ccoc'] = p
-    ans['ph'] = (1 - p) / (1 + p)
-    ans['wang'] = 2 ** 0.5 * phi_inv((1 + p) / 2)
-    ans['dual'] = (1 + p) / (1 - p)
-    ans['tvar'] = p
-    return ans
+    Standard distortion parameters with Gini index ``p``, the level of the TVaR with the same area.
+
+    Parameters
+    ----------
+    p : float
+        The Gini index, a TVaR level.
+    extended : bool, default False
+        Add ``tsallis``, in calibration-set order between ``wang`` and
+        ``dual``.
+
+    Returns
+    -------
+    dict
+        One shape per family of the calibration set, ``ccoc``, ``ph``,
+        ``wang``, ``dual`` and ``tvar``, keyed by kind. ``ccoc`` gives the
+        discount ``d``, not the return.
+
+    Notes
+    -----
+    Each value is the single entry of the family's
+    :meth:`Distortion._params_from_gini`, the inverse
+    :meth:`Distortion.from_gini` uses, called directly so that ``p`` is not
+    range-checked here.
+    """
+    return {k: next(iter(Distortion._registry[k]._params_from_gini(p).values()))
+            for k in _calibration_names(extended)}
 
 
-def consistent_distortions(p):
-    """Five representative distortions, calibrated to TVaR-p."""
-    params = p_to_parameters(p)
-    ans = {}
-    for k, sh in params.items():
-        if k == 'ccoc':
-            # p_to_parameters returns the discount d for ccoc; convert to
-            # return r so the natural-kwarg constructor takes r directly.
-            ans[k] = Distortion('ccoc', r=sh / (1 - sh))
-        else:
-            pn = Distortion._registry[k].param_name
-            ans[k] = Distortion(k, **{pn: sh})
-    return ans
+def consistent_distortions(p, extended=False):
+    """
+    One distortion of each calibration-set family, all with Gini index ``p``.
+
+    Parameters
+    ----------
+    p : float
+        The Gini index, a TVaR level.
+    extended : bool, default False
+        Add ``tsallis``, in calibration-set order between ``wang`` and
+        ``dual``.
+
+    Returns
+    -------
+    dict[str, Distortion]
+        Keyed by kind: ``ccoc``, ``ph``, ``wang``, ``dual``, ``tvar``.
+    """
+    return {k: Distortion(k, **Distortion._registry[k]._params_from_gini(p))
+            for k in _calibration_names(extended)}
 
 
 # ===========================================================================

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a4 - 2026-11-06
+
+**[Distortion-From-Gini] `Distortion.from_gini(kind, gini)` builds the member of a one-parameter family with a given Gini index**, for `ccoc`, `ph`, `wang`, `tsallis`, `dual` and `tvar`: `Distortion.from_gini('tsallis', 0.25)` is `alpha = 3`. Any other kind raises `ValueError` listing its parameters, and so does an index outside `(0, 1)`. `p_to_parameters` and `consistent_distortions` take `extended=False`, and `extended=True` adds `tsallis` between `wang` and `dual`; their default output is unchanged. `_pricing.EXTENDED_CALIBRATION_DISTORTIONS` is the six-family tuple. A `mixture` has its Gini index in closed form, the weighted sum of its members', so its `gini` moves by about 1e-11 and its describe table shows the closed form beside the grid value.
+
 ## 2.1.0a3 - 2026-11-06
 
 **[Tsallis-Distortion] A new distortion family, `tsallis`, the Beta(alpha, 1) mixture of TVaRs, with `g(u) = (alpha u - u^alpha)/(alpha - 1)` and `u(1 - log u)` at `alpha = 1`.** Build it as `Distortion('tsallis', alpha=3)`, `Distortion.tsallis(3)`, or `distortion D tsallis 3` in DecL. Its Gini index is `1/(alpha + 1)` in closed form, `alpha = 2` is `dual(2)`, and its `calibrate` solves in the Gini index by a bracketed root. It is outside the default lists: `available_distortions()` and the default calibration set stay the five standard families, and `calibrate_distortions(..., names=['tsallis'])` calibrates it. `available_distortions(pricing=True, strict=False)` and `DISTORTION_ORDER`, which orders every pricing frame, place it between `wang` and `dual`. No existing number moves.

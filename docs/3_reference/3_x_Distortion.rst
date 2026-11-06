@@ -43,6 +43,11 @@ The Tsallis distortion family
 
 ``tsallis`` is the Beta(:math:`\alpha`, 1) mixture of TVaRs, :math:`g_\alpha(u) = (\alpha u - u^\alpha)/(\alpha - 1)` with :math:`g_1(u) = u(1 - \log u)`, built as ``Distortion('tsallis', alpha=3)`` in Python and ``distortion D tsallis 3`` in DecL. Its Gini index is :math:`1/(\alpha+1)`, it runs from the maximum at :math:`\alpha \to 0` to the mean at :math:`\alpha \to \infty`, and :math:`\alpha = 2` is ``dual(2)``. Its distorted expectation is the mean plus the cumulative residual Tsallis entropy of order :math:`\alpha`. It is a production family with one parameter and no mass, listed between ``wang`` and ``dual`` in ``available_distortions(pricing=True, strict=False)``, and like the research families it is absent from the default list and the default calibration set: ``calibrate_distortions(..., names=['tsallis'])`` calibrates it. See :class:`TsallisDistortion`.
 
+Distortions with a given Gini index
+-----------------------------------
+
+The Gini index :math:`2\int_0^1 g - 1` of a distortion is its :attr:`~Distortion.gini`, twice the margin it puts on a standard uniform, from 0 for the mean to 1 for the maximum. :meth:`Distortion.from_gini` builds the member of a one-parameter family with a given index, ``Distortion.from_gini('tsallis', 0.25)`` for :math:`\alpha = 3`, for ``ccoc``, ``ph``, ``wang``, ``tsallis``, ``dual`` and ``tvar``. A family with more than one parameter raises ``ValueError``. :func:`p_to_parameters` and :func:`consistent_distortions` give the five standard families at one index, and the six with ``extended=True``.
+
 Spectral functions
 ------------------
 

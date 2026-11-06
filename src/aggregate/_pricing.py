@@ -23,6 +23,9 @@ from .results import CalibrationResult
 
 # The standard pricing distortion set calibrated by ``calibrate_distortions``.
 DEFAULT_CALIBRATION_DISTORTIONS = ('ccoc', 'ph', 'wang', 'dual', 'tvar')
+# The standard set with ``tsallis`` in registry order, between ``wang`` and
+# ``dual``.
+EXTENDED_CALIBRATION_DISTORTIONS = ('ccoc', 'ph', 'wang', 'tsallis', 'dual', 'tvar')
 
 
 def guard_unbounded_anchor(obj, p, *, where):

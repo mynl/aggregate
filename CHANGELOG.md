@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a1 - 2026-11-06
+
+**[Reference-Label-Leak] A DecL reference no longer overrides the label and tags of the statement that refers to it.** `agg B as "b" agg.A` has label `b`, and `agg C agg.A` has label `C` (it was `A`'s); neither takes `A`'s tags. The same holds for `2 @ agg.A`, for a pnl engine written `agg E agg.A` (the loss leg is `E`'s), for an aggregate whose severity is `sev.S`, and for `sev S2 sev.S`. The severity inside an aggregate written with `sev sev.S` or `sev.S` takes `S`'s stored label as `labels.severity` unless the clause has its own `as`. `agg.A` with its own reinsurance, `less agg.A` in a pnl, and a portfolio unit written `agg.A` are `A` and keep its label. No `library.agg` entry changes label or tags.
+
 ## 2.0.0 - 2026-11-03
 
 **Release 2.0.0, the first since 1.11.0, covers 1.11.1 to 1.63.2.** New: event and year loss tables (`elt`, `yelt`) as direct Aggregate input, inline or from CSV, TSV, Parquet or Feather, with secondary uncertainty quantized by the Rust `eltq` through `pip install aggregate[elt]` (1.12.0 to 1.21.0); `chfagg` and `AggregateCHF`, a law computed directly from its characteristic function, covering stable (with tilting), Tweedie, normal inverse Gaussian, variance gamma and tempered stable, with pricing, sharpen, and use as a severity through `sev chfagg.NAME` (1.27.0 to 1.41.0); `stable` and `tweedie` statements that translate parameterizations and store named laws, with arithmetic on stable laws (1.22.0, 1.23.0, 1.42.0, 1.43.0); exact dyadic lattice buckets for discrete severities, Portfolios and bivariate axes (1.24.0 to 1.26.0); closed-form layered moments for beta, Lomax and a shifted Pareto (1.17.0); `library.agg` examples of event and year loss tables and two more characteristic function laws (1.63.2). Changed: `bs` and `log2` move for discrete books on a lattice, and `density` values scale with `bs`, with probabilities at the atoms unchanged. Thanks to @KasraBashirioskooei for two pull requests: the deductible form in the layer phrase (#23) and the layer pdf at the limit (#24).

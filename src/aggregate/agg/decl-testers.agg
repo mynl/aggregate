@@ -857,6 +857,19 @@ agg LB.Claims 100 claims as "Claim count" sev lognorm 100 cv 2 poisson          
 agg LB.Layer 100 claims 1000 xs 500 as "Working Layer" sev lognorm 100 cv 2 poisson                                    note{layer label -> label_map[layer]; S2 ambiguity guard vs following sev};
 agg LB.SevClause 100 claims sev lognorm 100 cv 2 as "ISO ME B" poisson                                                 note{inline severity-clause label -> label_map[severity]};
 agg LB.AllInterior 10000 premium as GWP at 0.65 lr 1000 xs 500 as "Layer 1" sev lognorm 100 cv 2 as "ISO" poisson      note{all three interior labels combine};
+# [Reference-Label-Leak]: a reference contributes its body and the statement its
+# presentation, so a rename or a severity reference takes neither the referenced
+# entry's label nor its tags. The severity inside an aggregate is the referenced
+# one, so its interior label defaults to the stored label. See
+# dev/done/plan-reference-labels.md.
+sev LB.RefSev as "Ref Severity" lognorm 10 cv 1 tags{reftag}                                                          note{a labeled, tagged severity to reference};
+agg LB.RefBase as "Ref Base" 1 claim dsev [1:4] fixed tags{reftag}                                                    note{a labeled, tagged aggregate to rename};
+agg LB.Rename agg.LB.RefBase                                                                                          note{rename without as: label falls back to the name, no tags};
+agg LB.RenameAs as "Renamed" agg.LB.RefBase                                                                           note{rename with as: its own label, no tags};
+agg LB.SevRef 1 claim sev sev.LB.RefSev fixed                                                                         note{severity reference: label_map[severity] is the stored label};
+agg LB.SevRefAs 1 claim sev sev.LB.RefSev as "Own Sev" fixed                                                         note{severity reference with as: label_map[severity] is the clause label};
+agg LB.SevRefBare 1 claim sev.LB.RefSev fixed                                                                         note{bare sev.NAME clause: same rule};
+sev LB.SevRename sev.LB.RefSev                                                                                        note{severity declared as a reference: label falls back to the name};
 
 # ============================================================
 # IG. Reins economics on a plain agg (ignored + warned)

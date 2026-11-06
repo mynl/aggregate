@@ -998,6 +998,42 @@ class UnderwritingTransformer(Transformer_NonRecursive):
                     label_map[site] = val
         return label_map
 
+    #: The keys a statement owns about itself: its identity and presentation.
+    _PRESENTATION_KEYS = ("name", "label", "note", "tags", "hints")
+
+    def _strip_presentation(self, spec):
+        """Pop the identity and presentation keys from a looked-up spec.
+
+        Parameters
+        ----------
+        spec : dict
+            A deep copy of a stored spec, returned by ``safe_lookup``. Mutated
+            in place.
+
+        Returns
+        -------
+        dict
+            The popped keys and their values, so a caller can use the stored
+            label as a default.
+
+        Notes
+        -----
+        A reference contributes the referenced entry's body, and the statement
+        it is written in contributes the presentation. ``agg B as "b" agg.A``
+        has label ``b``, and ``agg C agg.A`` has label ``C`` through the
+        ordinary fallback to the name; neither takes ``A``'s label or tags.
+        Until 2.1.0a1 only ``name`` was deleted, so a stored ``label`` and
+        ``tags`` were merged after the statement's own ``as`` clause and won
+        ([Reference-Label-Leak], ``dev/done/plan-reference-labels.md``).
+        ``note`` and ``hints`` never leaked, since the trailer seeds both and
+        is merged last, but popping them keeps the rule in one place.
+
+        The forms that are the referenced object itself, ``agg.A`` with its
+        own reinsurance and the engine reference of a ``pnl``, do not call
+        this and keep the stored presentation.
+        """
+        return {k: spec.pop(k) for k in self._PRESENTATION_KEYS if k in spec}
+
     def agg_body_full(self, c):
         (exposures, layers, sev_clause, occ_reins, freq, agg_reins, approx,
          orientation) = c
@@ -1142,8 +1178,10 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         return ("conversion", "tweedie", TweedieConversion.from_cv(pp, mu, cv))
 
     #: Keys a parsed severity carries that say nothing about the law: the
-    #: trailer of a stored ``sev.NAME`` the compound form may reference.
-    _SEV_METADATA_KEYS = frozenset({"note", "tags", "hints", "label"})
+    #: trailer of a stored ``sev.NAME`` the compound form may reference, and
+    #: the stored label ``sev_builtin`` passes on as ``_severity_label``.
+    _SEV_METADATA_KEYS = frozenset({"note", "tags", "hints", "label",
+                                    "_severity_label"})
 
     def conversion_tweedie_compound(self, c):
         """``tweedie <count> claims sev <gamma>`` standing alone.
@@ -1428,9 +1466,15 @@ class UnderwritingTransformer(Transformer_NonRecursive):
                 TweedieConversion.from_spec(self.safe_lookup(str(c[0]))))
 
     def agg_body_rename(self, c):
+        """``agg NAME [as LABEL] agg.A <reinsurance>``: ``A``'s body, renamed.
+
+        The stored spec's identity and presentation are stripped, so the new
+        statement's name, ``as`` label and trailer are its own and ``A``'s
+        label and tags are not inherited. Interior labels (``label_map``)
+        describe the body and are kept. See :meth:`_strip_presentation`.
+        """
         bagg, occ_reins, agg_reins = c
-        if "name" in bagg:
-            del bagg["name"]
+        self._strip_presentation(bagg)
         return {**bagg, **occ_reins, **agg_reins}
 
     # ----- event and year loss tables ([DecL-Loss-Tables]) -------------
@@ -2137,6 +2181,9 @@ class UnderwritingTransformer(Transformer_NonRecursive):
     # ----- severity output ------------------------------------------
     def sev_out_sev(self, c):
         _, name, as_label, sev, trailer = c
+        # ``sev S2 sev.S`` is a new object: its label is its own ``as`` or
+        # its name, never ``S``'s (see ``sev_builtin``)
+        sev.pop("_severity_label", None)
         sev["name"] = name
         sev.update(as_label)
         sev.update(trailer)
@@ -2716,8 +2763,10 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         # does reach below zero the Severity warns, names the clamped mass, and
         # points at ``ssev``. See dev/done/plan-reflected-loss-severity.md; the
         # rejection this replaced is in dev/done/plan-decl-sev-unary-minus.md.
+        # A ``sev.NAME`` leaf has already set its stored label as the default
+        # (``sev_builtin``); a written ``as`` clause overrides it.
         _sev, sev, as_label = c
-        sev["_severity_label"] = as_label.get("label")
+        sev["_severity_label"] = as_label.get("label", sev.get("_severity_label"))
         return sev
 
     def sev_clause_ssev(self, c):
@@ -2727,7 +2776,7 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         # value_type (does NOT imply payoff). See dev/plan-negative-x-agg.md.
         _ssev, sev, as_label = c
         sev['sev_signed'] = True
-        sev["_severity_label"] = as_label.get("label")
+        sev["_severity_label"] = as_label.get("label", sev.get("_severity_label"))
         return sev
 
     def sev_clause_dsev(self, c):
@@ -2736,11 +2785,18 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         return dsev
 
     def sev_clause_builtin(self, c):
+        """``sev.S [as LABEL]`` as the severity clause, without the ``sev`` keyword.
+
+        The stored spec's presentation is stripped (see
+        :meth:`_strip_presentation`), so ``S``'s label and tags do not become
+        the aggregate's. The severity inside the aggregate is ``S``, so its
+        interior label is the clause's ``as`` label when written, otherwise
+        ``S``'s stored label ([Sev-Reference-Label]).
+        """
         builtin, as_label = c
         b = self.safe_lookup(builtin)
-        if "name" in b:
-            del b["name"]
-        b["_severity_label"] = as_label.get("label")
+        stored = self._strip_presentation(b)
+        b["_severity_label"] = as_label.get("label", stored.get("label"))
         return b
 
     # ----- severity reference (agg.NAME / port.NAME) ------------------
@@ -2810,9 +2866,19 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         return sev2
 
     def sev_builtin(self, c):
+        """A ``sev.S`` leaf of the ``sev`` rule: ``S``'s body, without its presentation.
+
+        The stored label, when ``S`` has one, rides the ``_severity_label``
+        temp key as the default for the severity clause that wraps the leaf
+        ([Sev-Reference-Label]); ``sev_clause_sev`` and ``sev_clause_ssev``
+        let a written ``as`` override it. The other consumers of ``sev`` drop
+        the key: ``sev_out_sev`` (``sev S2 sev.S`` is a new object labeled
+        ``S2``), the wait clause, and the tweedie and stable compound forms.
+        """
         b = self.safe_lookup(c[0])
-        if "name" in b:
-            del b["name"]
+        stored = self._strip_presentation(b)
+        if stored.get("label") is not None:
+            b["_severity_label"] = stored["label"]
         return b
 
     def sev2_add(self, c):
@@ -3376,8 +3442,9 @@ class UnderwritingTransformer(Transformer_NonRecursive):
         The ``wait`` clause reuses the full severity mini-language, so the
         sub-parse arrives as ``sev_*`` keys; the wait law stores them as the
         mirrored ``wait_*`` family. A ``sev.NAME`` lookup's identity baggage
-        (``name``/``note``/``hints``/``label``/``label_map``) is dropped --
-        the wait borrows the distribution, not the object. Picks and
+        (``name``/``note``/``hints``/``label``/``label_map``, and the stored
+        label ``sev_builtin`` sets as ``_severity_label``) is dropped: the
+        wait borrows the distribution, not the object. Picks and
         signed/reflected forms are rejected: neither is meaningful for a
         non-negative waiting time.
         """
@@ -3389,7 +3456,7 @@ class UnderwritingTransformer(Transformer_NonRecursive):
                 "DecL: a wait clause cannot be signed or reflected "
                 "(waiting times are non-negative)")
         drop = {"name", "note", "hints", "label", "label_map",
-                "sev_signed", "sev_reflect"}
+                "_severity_label", "sev_signed", "sev_reflect"}
         out = {}
         for k, v in d.items():
             if k in drop or k.startswith("sev_pick"):

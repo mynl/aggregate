@@ -8296,6 +8296,182 @@
       "hints": ""
     }
   },
+  "sev LB.RefSev": {
+    "kind": "sev",
+    "name": "LB.RefSev",
+    "spec": {
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "name": "LB.RefSev",
+      "label": "Ref Severity",
+      "note": "a labeled, tagged severity to reference",
+      "hints": "",
+      "tags": [
+        "reftag"
+      ]
+    }
+  },
+  "agg LB.RefBase": {
+    "kind": "agg",
+    "name": "LB.RefBase",
+    "spec": {
+      "name": "LB.RefBase",
+      "label": "Ref Base",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0
+      ],
+      "sev_ps": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "freq_name": "fixed",
+      "note": "a labeled, tagged aggregate to rename",
+      "hints": "",
+      "tags": [
+        "reftag"
+      ]
+    }
+  },
+  "agg LB.Rename": {
+    "kind": "agg",
+    "name": "LB.Rename",
+    "spec": {
+      "name": "LB.Rename",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0
+      ],
+      "sev_ps": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "freq_name": "fixed",
+      "note": "rename without as: label falls back to the name, no tags",
+      "hints": ""
+    }
+  },
+  "agg LB.RenameAs": {
+    "kind": "agg",
+    "name": "LB.RenameAs",
+    "spec": {
+      "name": "LB.RenameAs",
+      "label": "Renamed",
+      "exp_en": 1.0,
+      "sev_name": "dhistogram",
+      "sev_xs": [
+        1.0,
+        2.0,
+        3.0,
+        4.0
+      ],
+      "sev_ps": [
+        0.25,
+        0.25,
+        0.25,
+        0.25
+      ],
+      "freq_name": "fixed",
+      "note": "rename with as: its own label, no tags",
+      "hints": ""
+    }
+  },
+  "agg LB.SevRef": {
+    "kind": "agg",
+    "name": "LB.SevRef",
+    "spec": {
+      "name": "LB.SevRef",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "label_map": {
+        "severity": "Ref Severity"
+      },
+      "note": "severity reference: label_map[severity] is the stored label",
+      "hints": ""
+    }
+  },
+  "agg LB.SevRefAs": {
+    "kind": "agg",
+    "name": "LB.SevRefAs",
+    "spec": {
+      "name": "LB.SevRefAs",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "label_map": {
+        "severity": "Own Sev"
+      },
+      "note": "severity reference with as: label_map[severity] is the clause label",
+      "hints": ""
+    }
+  },
+  "agg LB.SevRefBare": {
+    "kind": "agg",
+    "name": "LB.SevRefBare",
+    "spec": {
+      "name": "LB.SevRefBare",
+      "exp_en": 1.0,
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "freq_name": "fixed",
+      "label_map": {
+        "severity": "Ref Severity"
+      },
+      "note": "bare sev.NAME clause: same rule",
+      "hints": ""
+    }
+  },
+  "sev LB.SevRename": {
+    "kind": "sev",
+    "name": "LB.SevRename",
+    "spec": {
+      "sev_name": "lognorm",
+      "sev_mean": 10.0,
+      "sev_cv": 1.0,
+      "sev_scale": 1.0,
+      "sev_wt": 1.0,
+      "sev_lb": 0.0,
+      "sev_ub": "__inf__",
+      "name": "LB.SevRename",
+      "note": "severity declared as a reference: label falls back to the name",
+      "hints": ""
+    }
+  },
   "agg IG.Deposit": {
     "kind": "agg",
     "name": "IG.Deposit",
@@ -20104,10 +20280,10 @@
       "sev_ps": [
         1.0
       ],
-      "note": "",
-      "hints": "",
       "freq_name": "ig",
-      "freq_a": 0.65
+      "freq_a": 0.65,
+      "note": "",
+      "hints": ""
     }
   },
   "agg Cc.Freq24.Binomial": {

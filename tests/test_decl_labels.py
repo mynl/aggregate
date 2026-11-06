@@ -392,3 +392,111 @@ def test_portfolio_pricing_df_relabels_unit_columns():
     r = p.analyze_distortions(p=0.99)
     assert 'Line A' in r.pricing_df.columns
     assert 'total' in r.pricing_df.columns
+
+
+# ----------------------------------------------------------------------
+# A reference contributes its body and the statement its presentation
+# ([Reference-Label-Leak], dev/done/plan-reference-labels.md). Up to 2.0.0 a
+# referenced entry's label and tags overrode the referring statement's.
+# ----------------------------------------------------------------------
+_REF_PROGRAM = '''
+sev LblSevS as "s label" lognorm 10 cv 1 note{sev note} tags{sevtag};
+agg LblX 1 claim sev sev.LblSevS fixed;
+agg LblY as "y label" 1 claim sev sev.LblSevS fixed;
+agg LblA as "a label" 1 claim dsev [1:4] fixed note{a note} tags{atag};
+agg LblB as "b label" agg.LblA;
+agg LblC agg.LblA;
+agg LblD as "d label" 2 @ agg.LblA;
+agg LblE agg.LblA tags{etag};
+agg LblW 1 claim sev.LblSevS fixed;
+agg LblZ 1 claim sev sev.LblSevS as "zsev" fixed;
+sev LblS2 sev.LblSevS
+'''
+
+
+@pytest.fixture(scope="module")
+def ref_objects(uw):
+    """The reference programs, built once into the module's Underwriter."""
+    return {r.object.name: r.object
+            for r in uw.build_many(_REF_PROGRAM, update=False)}
+
+
+@pytest.mark.parametrize('name, label, tags', [
+    ('LblX', 'LblX', ()),
+    ('LblY', 'y label', ()),
+    ('LblB', 'b label', ()),
+    ('LblC', 'LblC', ()),            # [Rename-Label-Default]: the name, not A's label
+    ('LblD', 'd label', ()),
+    ('LblE', 'LblE', ('etag',)),
+    ('LblW', 'LblW', ()),            # the bare sev.NAME clause, no sev keyword
+    ('LblS2', 'LblS2', ()),          # a severity declared as a reference
+])
+def test_reference_does_not_override_label_or_tags(ref_objects, name, label, tags):
+    obj = ref_objects[name]
+    assert obj.label == label
+    assert tuple(obj.tags) == tags
+    assert obj.note == ''
+
+
+def test_referenced_entries_keep_their_own_presentation(ref_objects):
+    assert ref_objects['LblSevS'].label == 's label'
+    assert ref_objects['LblA'].label == 'a label'
+    assert tuple(ref_objects['LblA'].tags) == ('atag',)
+
+
+def test_severity_reference_label_defaults_to_stored_label(ref_objects):
+    # [Sev-Reference-Label]: the severity inside the aggregate is S, so it
+    # takes S's label unless the clause has its own
+    assert ref_objects['LblZ'].label == 'LblZ'
+    assert ref_objects['LblZ'].label_map['severity'] == 'zsev'
+    assert ref_objects['LblX'].label_map['severity'] == 's label'
+    assert ref_objects['LblY'].label_map['severity'] == 's label'
+    assert ref_objects['LblW'].label_map['severity'] == 's label'
+
+
+def test_unlabeled_severity_reference_leaves_site_unlabeled(uw):
+    uw.build_many('sev LblSevN lognorm 10 cv 1 tags{ntag}', update=False)
+    _kind, _name, spec = _parse(uw, 'agg LblU 1 claim sev sev.LblSevN fixed')
+    assert 'label_map' not in spec
+    assert 'label' not in spec and 'tags' not in spec
+
+
+def test_signed_severity_reference_takes_stored_label(uw, ref_objects):
+    _kind, _name, spec = _parse(uw, 'agg LblSS 1 claim ssev sev.LblSevS fixed')
+    assert spec['label_map'] == {'severity': 's label'}
+    assert 'tags' not in spec
+
+
+def test_builtin_agg_with_reinsurance_keeps_its_label(uw, ref_objects):
+    # ``agg.A <reinsurance>`` is the object A itself
+    a = uw.build('agg.LblA aggregate net of 1 xs 1', update=False)
+    assert a.label == 'a label'
+    assert tuple(a.tags) == ('atag',)
+
+
+def test_portfolio_units_by_reference_keep_their_labels(uw, ref_objects):
+    p = uw.build('port LblP agg.LblA agg.LblB', update=False)
+    assert p.renamer == {'LblA': 'a label', 'LblB': 'b label', 'total': 'total'}
+
+
+def test_pnl_engine_rename_takes_no_presentation(uw, ref_objects):
+    # the engine reference ``less agg.A`` is A and names the loss leg with
+    # A's label; a renamed engine ``less agg E agg.A`` is E
+    _k, _n, spec = _parse(uw, 'pnl LblPnl 10 premium less agg LblPnlE agg.LblA')
+    assert 'engine_label' not in spec and 'engine_note' not in spec
+    _k, _n, spec = _parse(uw, 'pnl LblPnl 10 premium less agg LblPnlE as "e label" agg.LblA')
+    assert spec['engine_label'] == 'e label'
+    _k, _n, spec = _parse(uw, 'pnl LblPnl 10 premium less agg.LblA')
+    assert spec['engine_label'] == 'a label'
+
+
+def test_wait_clause_reference_drops_stored_label(uw, ref_objects):
+    _k, _n, spec = _parse(uw, 'agg LblRen 5 years sev lognorm 10 cv .3 wait sev.LblSevS')
+    assert 'label_map' not in spec
+    assert 'label' not in spec and 'tags' not in spec
+
+
+def test_tweedie_compound_accepts_labeled_severity_reference(uw):
+    uw.build_many('sev LblGam as "g label" gamma 10 cv 1', update=False)
+    kind, _name, law = _parse(uw, 'tweedie 10 claims sev sev.LblGam')
+    assert kind == 'conversion'

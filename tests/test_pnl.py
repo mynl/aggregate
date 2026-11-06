@@ -347,12 +347,12 @@ def test_evaluate_panel_shape_and_breakeven():
     assert ev.index.names == ['Step', 'distortion']
     assert list(ev.index.get_level_values('Step').unique()) == ['margin']
     assert list(ev.index.get_level_values('distortion')) == _FAMS
-    assert list(ev.columns) == ['role', 'param_name', 'param', 'gini_p',
+    assert list(ev.columns) == ['role', 'param_name', 'param', 'gini',
                                 'error', 'status']
     # a plain sold position is read as booked
     assert (ev.role == 'sell').all()
-    # gini_p is the family-agnostic acceptability index in [0, 1]
-    assert (ev.gini_p >= 0).all() and (ev.gini_p <= 1).all()
+    # gini is the family-agnostic acceptability index in [0, 1]
+    assert (ev.gini >= 0).all() and (ev.gini <= 1).all()
     # every family hit its breakeven target (calibration residual ~ 0)
     assert (ev.error.abs() < 1e-2).all()
     assert (ev.status == 'ok').all()
@@ -368,22 +368,22 @@ def test_evaluate_matches_the_constant_premium_price_form():
     """
     a = build('pnl B 1000 prem less agg B_e 1000 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     ev = a.evaluate().evaluation_df.droplevel('Step')
-    for fam, param, gini_p in [('ph', 0.425679, 0.402840),
+    for fam, param, gini in [('ph', 0.425679, 0.402840),
                                ('wang', 0.945893, 0.496407),
                                ('dual', 3.696140, 0.574118),
                                ('tvar', 0.616007, 0.616007)]:
         assert ev.loc[fam, 'param'] == pytest.approx(param, rel=1e-5)
-        assert ev.loc[fam, 'gini_p'] == pytest.approx(gini_p, rel=1e-5)
+        assert ev.loc[fam, 'gini'] == pytest.approx(gini, rel=1e-5)
 
 
-def test_evaluate_gini_p_monotone_in_profit():
-    """A more profitable position survives a larger stress -> larger gini_p."""
+def test_evaluate_gini_monotone_in_profit():
+    """A more profitable position survives a larger stress -> larger gini."""
     lo = build('pnl L 800 prem less agg L_e 800 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     hi = build('pnl H 1200 prem less agg H_e 1200 prem at 70% lr sev gamma 100 cv 0.5 poisson')
     evl = lo.evaluate().evaluation_df.droplevel('Step')
     evh = hi.evaluate().evaluation_df.droplevel('Step')
     for fam in _FAMS:
-        assert evl.loc[fam, 'gini_p'] < evh.loc[fam, 'gini_p']
+        assert evl.loc[fam, 'gini'] < evh.loc[fam, 'gini']
 
 
 def test_evaluate_solves_rho_of_the_margin_to_zero():
@@ -436,7 +436,7 @@ def test_evaluate_profitable_variable_premium_solves():
         lambda x: 700.0 + 0.2 * x)
     ev = pnl.evaluate().evaluation_df.droplevel('Step')
     assert (ev.status == 'ok').all()
-    assert (ev.gini_p > 0).all()
+    assert (ev.gini > 0).all()
 
 
 def test_evaluate_arbitrage_and_no_downside_report_nan():
@@ -495,7 +495,7 @@ def test_evaluate_prices_every_ceded_layer():
     ev = p.evaluate().evaluation_df
     assert (ev.loc[_CEDED_STEPS, 'role'] == 'buy').all()
     assert (ev.loc[_CEDED_STEPS, 'status'] == 'ok').all()
-    assert (ev.loc[_CEDED_STEPS, 'gini_p'] > 0).all()
+    assert (ev.loc[_CEDED_STEPS, 'gini'] > 0).all()
     assert (ev.loc[_SOLD_STEPS, 'role'] == 'sell').all()
     # a running net and the grand result net buying against selling, which is
     # neither side, so they are their own role
@@ -518,7 +518,7 @@ def test_evaluate_ceded_layer_equals_the_negated_margin_solve():
     got = ev.loc['Occ2 result']
     for fam in _FAMS:
         assert got.loc[fam, 'param'] == direct.loc[fam, 'param']
-        assert got.loc[fam, 'gini_p'] == direct.loc[fam, 'gini_p']
+        assert got.loc[fam, 'gini'] == direct.loc[fam, 'gini']
 
 
 def test_evaluate_compares_a_layer_against_the_net_above_it():
@@ -529,7 +529,7 @@ def test_evaluate_compares_a_layer_against_the_net_above_it():
     just its risk relief.
     """
     p = build(_CEDED_TOWER)
-    gini = p.evaluate().evaluation_df.unstack('distortion')['gini_p']
+    gini = p.evaluate().evaluation_df.unstack('distortion')['gini']
     for fam in _FAMS:
         assert gini.loc['Occ2 result', fam] > gini.loc['Gross result', fam]
         assert (gini.loc['net through Occ2', fam]

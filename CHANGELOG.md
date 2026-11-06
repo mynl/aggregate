@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a2 - 2026-11-06
+
+**[Gini-Rename] `Distortion.gini_p` is renamed `gini`, with no alias.** The property, the `gini_p` column of `distortion_df` and of every `evaluation_df`, the `gini_p` block of the evaluate exhibit and its captions, the `formats-*.yaml` keys and the row of `Distortion.info` all read `gini`, and `gini_p` raises `AttributeError`. This breaks the stable `Distortion` surface inside a minor series, deliberately and with no deprecation period, because nothing outside the author's own work reads the name yet. Code that reads `gini_p` changes to `gini`; no number moves.
+
 ## 2.1.0a1 - 2026-11-06
 
 **[Reference-Label-Leak] A DecL reference no longer overrides the label and tags of the statement that refers to it.** `agg B as "b" agg.A` has label `b`, and `agg C agg.A` has label `C` (it was `A`'s); neither takes `A`'s tags. The same holds for `2 @ agg.A`, for a pnl engine written `agg E agg.A` (the loss leg is `E`'s), for an aggregate whose severity is `sev.S`, and for `sev S2 sev.S`. The severity inside an aggregate written with `sev sev.S` or `sev.S` takes `S`'s stored label as `labels.severity` unless the clause has its own `as`. `agg.A` with its own reinsurance, `less agg.A` in a pnl, and a portfolio unit written `agg.A` are `A` and keep its label. No `library.agg` entry changes label or tags.

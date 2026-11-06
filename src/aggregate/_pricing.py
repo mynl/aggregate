@@ -702,12 +702,12 @@ def _calibration_frames(dists, coc, p_val, Fa, exa, P, a):
     for dname in names:
         dist = dists[dname]
         # param_name is the family's natural parameter ('a', 'lam', 'b', 'p');
-        # ccoc has none -> 'r'. gini_p = 2∫g - 1 (= p_equiv); area = ∫g.
-        rows.append([_param_name(dist), dist.shape, dist.error, dist.gini_p,
-                     (dist.gini_p + 1) / 2])
+        # ccoc has none -> 'r'. gini = 2∫g - 1 (= p_equiv); area = ∫g.
+        rows.append([_param_name(dist), dist.shape, dist.error, dist.gini,
+                     (dist.gini + 1) / 2])
     distortion_df = pd.DataFrame(
         rows,
-        columns=['param_name', 'param', 'error', 'gini_p', 'area'],
+        columns=['param_name', 'param', 'error', 'gini', 'area'],
         index=pd.CategoricalIndex(names, dtype=DISTORTION_DTYPE, name='distortion'),
     )
     calibration_df = complete_pentagon(
@@ -1087,8 +1087,8 @@ EVAL_SIGN = {'sell': 1.0, 'buy': -1.0, 'net': 1.0}
 #: ``(step, family)``: ``param`` holds each family's own natural parameter, so
 #: it is a pure column only at this grain. ``role`` leads because it qualifies
 #: the whole row, naming whose position the parameters describe.
-#: ``area = (gini_p + 1) / 2`` is not carried, being a restatement of ``gini_p``.
-EVAL_COLS = ['role', 'param_name', 'param', 'gini_p', 'error', 'status']
+#: ``area = (gini + 1) / 2`` is not carried, being a restatement of ``gini``.
+EVAL_COLS = ['role', 'param_name', 'param', 'gini', 'error', 'status']
 
 
 def _eval_sign(role):
@@ -1118,7 +1118,7 @@ def evaluate_margin(gd, *, role='sell', names=None):
 
     Solves, per distortion family, for the shape at which the risk-adjusted
     margin reaches 0: the most stress the position survives. The breakeven
-    ``gini_p`` is the family-agnostic acceptability index.
+    ``gini`` is the family-agnostic acceptability index.
 
     Parameters
     ----------
@@ -1329,7 +1329,7 @@ def _evaluate_margin_arrays(x, p, bs, *, role='sell', names=None):
     rows = []
     for nm in names:
         d = dists[nm]
-        rows.append([role, _param_name(d), d.shape, d.gini_p, d.error, 'ok'])
+        rows.append([role, _param_name(d), d.shape, d.gini, d.error, 'ok'])
     return _eval_panel(rows, names)
 
 

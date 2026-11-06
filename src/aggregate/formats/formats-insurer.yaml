@@ -51,7 +51,7 @@ columns:
   'F(a)': '.5f'
   param: '.5f'
   error: '.5f'
-  gini_p: '.5f'
+  gini: '.5f'
   area: '.5f'
 
   # Grid sizing and the probe audit. The same trade as above: the probe's

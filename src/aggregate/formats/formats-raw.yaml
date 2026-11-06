@@ -105,7 +105,7 @@ columns:
   param: '.5g'
   error: '.5g'         # a residual: `g` goes scientific where it has to, so
                        # a good fit and an exact fit do not both print zero
-  gini_p: '.5g'
+  gini: '.5g'
   area: '.5g'
 
   # --- grid sizing (bs_window_df) and the grid probe (sharpen_df)

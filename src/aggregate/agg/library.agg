@@ -265,7 +265,7 @@ grossnet
 # Distortions (risk measures)
 # PHDistortion and DualDistortion come first: MinimumDistortion refers to
 # them by name, and builtin references resolve by sequential load.
-# Chosen to have equal gini_p coefficients equal to 0.2 using
+# Chosen to have equal gini coefficients equal to 0.2 using
 #    from aggregate.spectral import consistent_distortions
 #    d = consistent_distortions(0.2)   # dict keyed ccoc, ph, wang, dual, tvar
 # ----------------------------------------------------------------------

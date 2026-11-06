@@ -3336,13 +3336,13 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
 
         A P&L is **evaluated, not priced**: you ask which distortion drives the
         risk-adjusted margin to zero, the breakeven stress the position
-        survives. The breakeven ``gini_p`` is the single family-agnostic
+        survives. The breakeven ``gini`` is the single family-agnostic
         acceptability index (Cherny & Madan).
 
         Every **margin row of the ledger** is evaluated, not just the grand
         result, so a tower reads as a story: the gross deal, each reinsurance
         layer as a position in its own right, and the running net after each
-        purchase. Reading a ``gini_p`` column down the ``net through ...`` rows
+        purchase. Reading a ``gini`` column down the ``net through ...`` rows
         is watching what buying cover does to the deal.
 
         A ceded layer is evaluated **from the seller's side** (:meth:`_row_role`
@@ -3351,7 +3351,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         column says which rows those are: ``buy`` for a cession, ``sell`` for a
         book written, ``net`` for a running net or the grand result, which net
         the two against each other. That is what makes the panel a buy decision:
-        a layer whose ``gini_p`` sits **above** the ``net`` row immediately over
+        a layer whose ``gini`` sits **above** the ``net`` row immediately over
         it is priced above the holder's own acceptability, so buying it lowers
         the net, and one below it raises the net.
 
@@ -3373,7 +3373,7 @@ class PnL(HelpMixin, LabeledMixin, ProgramMixin):
         EvaluationResult
             Carrying ``evaluation_df``, the panel: tidy (long) form,
             ``MultiIndex`` rows ``(Step, distortion)`` and columns ``role`` /
-            ``param_name`` / ``param`` / ``gini_p`` / ``error`` / ``status``.
+            ``param_name`` / ``param`` / ``gini`` / ``error`` / ``status``.
             ``.unstack('distortion')`` on it gives the wide comparison view.
             ``premium`` on the result is ``None``: every ledger row carries
             its own consideration and no single number stands for them.

@@ -178,7 +178,7 @@ def test_price_stand_alone_arg_checks(peg):
 
 def test_distortion_df_schema(peg):
     """distortion_df is the per-distortion receipt: index 'distortion', columns
-    param_name/param/gini_p/area/error, in canonical order."""
+    param_name/param/gini/area/error, in canonical order."""
     port, _ = peg
     p = BASELINE['meta']['p_calibration']
     coc = BASELINE['meta']['coc_calibration']
@@ -186,13 +186,13 @@ def test_distortion_df_schema(peg):
 
     assert ddf.index.name == 'distortion'
     assert list(ddf.index) == ['ccoc', 'ph', 'wang', 'dual', 'tvar']
-    assert list(ddf.columns) == ['param_name', 'param', 'error', 'gini_p', 'area']
+    assert list(ddf.columns) == ['param_name', 'param', 'error', 'gini', 'area']
     assert ddf['param_name'].to_dict() == {
         'ccoc': 'r', 'ph': 'a', 'wang': 'lam', 'dual': 'b', 'tvar': 'p'}
-    # area == (gini_p + 1)/2 == int g, exactly (definitional)
-    assert np.allclose(ddf['area'], (ddf['gini_p'] + 1) / 2, rtol=0, atol=1e-12)
-    # the verified identity: tvar's raw param IS its gini_p (TVaR-equiv level)
-    assert np.isclose(ddf.loc['tvar', 'param'], ddf.loc['tvar', 'gini_p'], rtol=1e-9)
+    # area == (gini + 1)/2 == int g, exactly (definitional)
+    assert np.allclose(ddf['area'], (ddf['gini'] + 1) / 2, rtol=0, atol=1e-12)
+    # the verified identity: tvar's raw param IS its gini (TVaR-equiv level)
+    assert np.isclose(ddf.loc['tvar', 'param'], ddf.loc['tvar', 'gini'], rtol=1e-9)
     # premium miss is small
     assert (ddf['error'].abs() < 1e-4).all()
 
@@ -218,11 +218,11 @@ def test_calibration_df_self_contained(peg):
         'L', 'M', 'P', 'Q', 'a', 'LR', 'PQ', 'ROE']
 
 
-def test_distortion_gini_p_attribute(peg):
-    """Distortion exposes gini_p (renamed from standard_shape)."""
+def test_distortion_gini_attribute(peg):
+    """Distortion exposes gini (renamed from standard_shape)."""
     port, _ = peg
     port.calibrate_distortions(coc=BASELINE['meta']['coc_calibration'],
                                p=BASELINE['meta']['p_calibration'])
     for dist in port.distortions.values():
-        assert hasattr(dist, 'gini_p')
+        assert hasattr(dist, 'gini')
         assert not hasattr(dist, 'standard_shape')

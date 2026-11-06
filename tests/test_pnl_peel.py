@@ -353,8 +353,8 @@ def test_stitched_peel_evaluates_its_nets_and_flags_underpriced_layers():
             'margin']
     assert (ev.loc[nets, 'role'] == 'net').all()
     assert (ev.loc[nets + ['Gross result'], 'status'] == 'ok').all()
-    # buying cover this cheap improves the deal: gini_p rises down the nets
-    gini = ev.unstack('distortion')['gini_p']
+    # buying cover this cheap improves the deal: gini rises down the nets
+    gini = ev.unstack('distortion')['gini']
     for fam in ('ph', 'wang', 'dual', 'tvar'):
         assert (gini.loc['Gross result', fam]
                 < gini.loc['net through occ 300 xs 200', fam]

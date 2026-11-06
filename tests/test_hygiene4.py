@@ -109,7 +109,7 @@ PORT_INFO_LABELS = [
 DIST_INFO_LABELS = [
     'distortion object name', 'kind', 'kind name', 'shape', 'shape name',
     'other params', 'weights mean', 'weights max', 'interior atoms',
-    'gini_p', 'area', 'id',
+    'gini', 'area', 'id',
 ]
 
 
@@ -164,9 +164,9 @@ def test_distortion_info_values():
     assert 'shape                    0.6' in info
     assert 'shape name               a' in info
     assert 'other params             none' in info
-    # multi-knot kinds: knots in other params, and gini_p is the weighted level
+    # multi-knot kinds: knots in other params, and gini is the weighted level
     w = Distortion('wtdtvar', ps=[.5, .9, .99], wts=[.3, .4, .3])
-    assert 'gini_p                   0.807' in w.info
+    assert 'gini                     0.807' in w.info
     assert 'ps=[0.5, 0.9, 0.99]' in w.info
 
 

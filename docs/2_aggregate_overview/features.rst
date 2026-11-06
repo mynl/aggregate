@@ -67,7 +67,7 @@ appendix but not exampled.
    "the pentagon octet; one canonical pricing readout", "a31", "Pricing & the pentagon", "``book``"
    "legible ``Underwriter`` loading; ``to_agg``", "a32", "Underwriter & persistence", "``uw``"
    "``price_stand_alone`` restored", "a33", "Pricing & the pentagon", "``book``"
-   "``distortion_df`` / ``calibration_df``; ``gini_p`` rename", "a34", "Pricing & the pentagon", "``book``"
+   "``distortion_df`` / ``calibration_df``; ``gini`` rename", "a34", "Pricing & the pentagon", "``book``"
    "empty ``Underwriter()`` default; ``to_agg`` modes & dependency order", "a35", "Underwriter & persistence", "``uw``"
    "``AllocationBounds``", "a36", "Pricing & allocation bounds", "``book``"
    "``PricingBounds``; the Gini lens", "a37", "Pricing & allocation bounds", "``book``"
@@ -2070,13 +2070,13 @@ target:
 .. ipython:: python
 
     book.calibrate_distortions(coc=0.10, p=0.995)
-    qd(book.distortion_df)     # param, error, gini_p, area per distortion
+    qd(book.distortion_df)     # param, error, gini, area per distortion
 
 .. ipython:: python
 
     qd(book.calibration_df)    # the target once: coc, p, F(a) + the octet
 
-**Breaking vs 0.30.1:** ``Distortion.standard_shape`` is renamed ``gini_p``
+**Breaking vs 0.30.1:** ``Distortion.standard_shape`` is renamed ``gini``
 (:math:`= 2\int g - 1`); ``Portfolio.dists`` is renamed ``distortions``; pricing
 methods take explicit ``p=`` *or* ``a=`` (the implicit "p greater than 1 means an
 asset level" convention is gone).
@@ -2692,7 +2692,7 @@ margin negated:
 
     qd(tower.evaluate())
 
-Read the ``gini_p`` column down the steps. The gross book sits at 0.681; the
+Read the ``gini`` column down the steps. The gross book sits at 0.681; the
 layer, read from the seller's side, at 0.731; and the running net after buying it
 at 0.681. A layer priced **above** the holder's own acceptability lowers the net
 when bought, one below it raises the net, and the sheet now says which. The

@@ -1221,14 +1221,14 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
 
         Keys may include ``'mean'``, ``'var'``, ``'std'``, ``'cv'``,
         ``'skew'``, ``'p_equiv'``. Missing keys show as ``NaN`` in the
-        closed-form column, and :attr:`gini_p` integrates ``g`` when
+        closed-form column, and :attr:`gini` integrates ``g`` when
         ``'p_equiv'`` is missing. The combinators ``minimum`` and ``mixture``
         return ``{}``.
         """
         return {}
 
     @property
-    def gini_p(self):
+    def gini(self):
         r"""The Gini index :math:`2\int_0^1 g(s)\,ds - 1`, for every family.
 
         Returns
@@ -1735,10 +1735,10 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         else:
             shape_text = INFO_NA
         mu0, mu1, interior = self._kusuoka_summary()
-        # area = integral of g = (gini_p + 1) / 2.
-        gini_text = f'{self.gini_p:.4g}' if not np.isnan(self.gini_p) else INFO_NA
-        area_text = (f'{(self.gini_p + 1) / 2:.4g}'
-                     if not np.isnan(self.gini_p) else INFO_NA)
+        # area = integral of g = (gini + 1) / 2.
+        gini_text = f'{self.gini:.4g}' if not np.isnan(self.gini) else INFO_NA
+        area_text = (f'{(self.gini + 1) / 2:.4g}'
+                     if not np.isnan(self.gini) else INFO_NA)
         rows = [
             ('distortion object name', self.name),
             ('kind', kind),
@@ -1751,7 +1751,7 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
             ('weights mean', f'{mu0:.4g}'),
             ('weights max', f'{mu1:.4g}'),
             ('interior atoms', bool(interior)),
-            ('gini_p', gini_text),
+            ('gini', gini_text),
             ('area', area_text),
             ('id', self.id()),
         ]

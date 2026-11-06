@@ -15,7 +15,7 @@ flowchart TD
     cal(["calibrate_distortions"])
 
     caldf["calibration_df<br/>one row, shared by all families:<br/>coc, p, F(a), then L M P Q a LR PQ ROE"]
-    distdf["distortion_df<br/>one row per family:<br/>param_name, param, error, gini_p, area"]
+    distdf["distortion_df<br/>one row per family:<br/>param_name, param, error, gini, area"]
     dists[("distortions<br/>the fitted objects, by name")]
 
     dens --> cal
@@ -37,7 +37,7 @@ flowchart TD
     class caldf,distdf,dists cVw;
 ```
 
-`distortion_df` carries `gini_p`, the normalized shape that makes families with incomparable raw parameters comparable, so a Wang shape and a PH shape can be read on one scale.
+`distortion_df` carries `gini`, the normalized shape that makes families with incomparable raw parameters comparable, so a Wang shape and a PH shape can be read on one scale.
 
 A distortion does not have to be calibrated. You can declare one in DecL and hand it straight to `apply_distortion`, skipping this diagram entirely.
 

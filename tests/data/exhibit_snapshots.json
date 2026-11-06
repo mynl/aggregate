@@ -44492,7 +44492,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -44549,7 +44549,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -44582,7 +44582,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -44718,7 +44718,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -44775,7 +44775,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -44808,7 +44808,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -44941,7 +44941,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -44998,7 +44998,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -45031,7 +45031,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -45164,7 +45164,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -45221,7 +45221,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -45254,7 +45254,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -45390,7 +45390,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -45447,7 +45447,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -45480,7 +45480,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -45616,7 +45616,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -45673,7 +45673,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -45706,7 +45706,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -45839,7 +45839,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -45896,7 +45896,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -45929,7 +45929,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -46062,7 +46062,7 @@
      ]
     }
    ],
-   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini_p normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
+   "caption": "One row per distortion family, each fitted to the same premium target: the family's own natural parameter, how far the fitted premium missed the target, and the two comparable readings of the shape. gini normalizes across families (it is the TVaR equivalent level), so it is the column to read down when asking which families agree; area is the same fact restated as the integral of g.",
    "columns": [
     {
      "align": "l",
@@ -46119,7 +46119,7 @@
      },
      "key": "c4",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -46152,7 +46152,7 @@
       "text": "error"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "area"
@@ -46193,7 +46193,7 @@
      ]
     }
    ],
-   "caption": "The breakeven stress as one number per position and family: gini_p, the family agnostic acceptability index, measured with assets of 17 behind it. The consideration is 12.00. Read down a column to follow the walk (a layer whose figure sits above the net row over it is priced above the holder's own acceptability, and buying it lowers the net) and across a row to see whether the families agree. A blank cell is one of two opposite situations, a position unacceptable at any stress or one that cannot lose; the raw view's status column says which, beside each family's fitted parameter. Cherny and Madan (2009) is the reference.",
+   "caption": "The breakeven stress as one number per position and family: gini, the family agnostic acceptability index, measured with assets of 17 behind it. The consideration is 12.00. Read down a column to follow the walk (a layer whose figure sits above the net row over it is priced above the holder's own acceptability, and buying it lowers the net) and across a row to see whether the families agree. A blank cell is one of two opposite situations, a position unacceptable at any stress or one that cannot lose; the raw view's status column says which, beside each family's fitted parameter. Cherny and Madan (2009) is the reference.",
    "columns": [
     {
      "align": "l",
@@ -46481,7 +46481,7 @@
      },
      "key": "c5",
      "name": [
-      "gini_p"
+      "gini"
      ],
      "raw": true
     },
@@ -46526,7 +46526,7 @@
       "text": "param"
      },
      {
-      "text": "gini_p"
+      "text": "gini"
      },
      {
       "text": "error"

@@ -3601,10 +3601,10 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             (also stored on ``self.distortion_df``): one row per distortion in
             ``[ccoc, ph, wang, dual, tvar]``, index named ``distortion`` (an
             ordered categorical, canonical sort), columns
-            ``[param_name, param, error, gini_p, area]``. ``param`` is the raw
+            ``[param_name, param, error, gini, area]``. ``param`` is the raw
             shape (``param_name`` says what it is per family); ``error`` is the
-            premium miss; ``gini_p`` is the comparable normalised shape
-            ``= 2∫g−1 = p_equiv`` (TVaR-equivalent level); ``area = (gini_p+1)/2
+            premium miss; ``gini`` is the comparable normalised shape
+            ``= 2∫g−1 = p_equiv`` (TVaR-equivalent level); ``area = (gini+1)/2
             = ∫g``. The result also carries ``calibration_df``, the
             ``distortions``, the inputs, and the lazily computed allocation of
             the target across units (``pricing_df``).
@@ -3689,7 +3689,7 @@ class Portfolio(HelpMixin, LabeledMixin, ProgramMixin):
             Carrying ``evaluation_df``, the panel: tidy (long) form,
             ``MultiIndex`` rows ``(Step, distortion)``, one ``Step`` per
             evaluated unit, and columns ``role`` / ``param_name`` / ``param`` /
-            ``gini_p`` / ``error`` / ``status``. ``role`` is always ``'sell'``:
+            ``gini`` / ``error`` / ``status``. ``role`` is always ``'sell'``:
             every unit is an obligation written. With a ``reins_view`` each
             ``Step`` is suffixed by it, so panels for several views concatenate
             without collapsing.

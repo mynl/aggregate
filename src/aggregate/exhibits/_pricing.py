@@ -91,7 +91,7 @@ register_simple_exhibit(
     caption='One row per distortion family, each fitted to the same premium '
             'target: the family\'s own natural parameter, how far the fitted '
             'premium missed the target, and the two comparable readings of '
-            'the shape. gini_p normalizes across families (it is the '
+            'the shape. gini normalizes across families (it is the '
             'TVaR equivalent level), so it is the column to read down when '
             'asking which families agree; area is the same fact restated as '
             'the integral of g.')
@@ -427,10 +427,10 @@ def _evaluate_insurer(result, blocks):
     """The acceptability panel pivoted to one number per position and family.
 
     The business reading is the comparison, and the tidy panel is a poor
-    comparison: ``gini_p`` repeats down a long column while the working
+    comparison: ``gini`` repeats down a long column while the working
     columns (the fitted parameter, the solver error, the status word) stand
     between every pair a reader wants side by side. INSURER therefore serves
-    ``evaluation_df['gini_p'].unstack('distortion')``, positions down and
+    ``evaluation_df['gini'].unstack('distortion')``, positions down and
     families across, the same move the allocation leaf's stat slices make.
     The panel itself, parameters and status included, is the RAW view.
 
@@ -446,7 +446,7 @@ def _evaluate_insurer(result, blocks):
     column is what tells them apart.
     """
     _name, frame, kw = blocks[0]
-    pivot = frame['gini_p'].unstack('distortion')
+    pivot = frame['gini'].unstack('distortion')
     pivot = pivot.reindex(
         index=frame.index.get_level_values('Step').unique(),
         columns=list(result.names))
@@ -457,7 +457,7 @@ def _evaluate_insurer(result, blocks):
                else f' The consideration is {result.premium:,.2f}.')
     caption = (
         f'The breakeven stress as one number per position and family: '
-        f'gini_p, the family agnostic acceptability index, {anchor}.'
+        f'gini, the family agnostic acceptability index, {anchor}.'
         f'{premium} Read down a column to follow the walk (a layer whose '
         f'figure sits above the net row over it is priced above the '
         f'holder\'s own acceptability, and buying it lowers the net) and '
@@ -466,5 +466,5 @@ def _evaluate_insurer(result, blocks):
         f'stress or one that cannot lose; the raw view\'s status column '
         f'says which, beside each family\'s fitted parameter. Cherny and '
         f'Madan (2009) is the reference.')
-    return [('gini_p', pivot,
+    return [('gini', pivot,
              dict(kw, float_format='.5g', caption=caption))]

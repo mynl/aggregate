@@ -21,7 +21,7 @@ whose target is a zero-argument ``register()`` performing the registry calls and
     def register():
         register_simple_exhibit('relativity', 'Relativity', 'relativity_df', [PnL])
         return [PluginLeaf(name='relativity', kind='exhibit', label='Relativity',
-                           hint='gini_p across peel steps and distortion families',
+                           hint='gini across peel steps and distortion families',
                            why='needs an extended P&L')]
 
 For the experiment that is not a package yet, ``AGGREGATE_PLUGINS`` names importable modules instead, comma separated, each supplying its own ``register``. Both routes are the same loader::

@@ -1956,9 +1956,9 @@ def test_the_two_leaves_answer_differently_on_one_cession(objects):
 
 
 def test_pricing_evaluate_serves_the_panel(objects):
-    """RAW is the tidy panel whole; INSURER pivots it to gini_p alone.
+    """RAW is the tidy panel whole; INSURER pivots it to gini alone.
 
-    The pivot is ``evaluation_df['gini_p'].unstack('distortion')``: positions
+    The pivot is ``evaluation_df['gini'].unstack('distortion')``: positions
     down, the evaluated families across in reporting order, one uniform
     format. The parameters, errors and the status word stay on RAW, which the
     insurer caption points at.
@@ -1971,13 +1971,13 @@ def test_pricing_evaluate_serves_the_panel(objects):
 
     name, pivot, kw = exhibit_frames(
         result, 'pricing.evaluate', Perspective.INSURER)[0]
-    assert name == 'gini_p'
+    assert name == 'gini'
     assert list(pivot.columns) == list(result.names)
     panel = result.evaluation_df
     for step in pivot.index:
         for family in pivot.columns:
             assert pivot.loc[step, family] == pytest.approx(
-                panel.loc[(step, family), 'gini_p'])
+                panel.loc[(step, family), 'gini'])
     assert kw['float_format'] == '.5g'
     # the insurer caption states the anchor, the premium, and what a blank
     # cell means, which is the thing readers get wrong
@@ -1991,7 +1991,7 @@ def test_pricing_evaluate_insurer_pivot_keeps_walk_order(objects):
 
     A walk's steps are the ledger's own order, the gross deal before the
     layer before the running net, and alphabetizing them would shuffle the
-    story a gini_p column is read down. The pivot reindexes the rows back to
+    story a gini column is read down. The pivot reindexes the rows back to
     the panel's appearance order, and the families likewise narrow to the
     evaluated set rather than every category the dtype knows.
     """

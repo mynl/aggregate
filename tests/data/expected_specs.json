@@ -6949,7 +6949,7 @@
     "spec": {
       "name": "EV.Peel",
       "peel": "top-down",
-      "note": "tower: gini_p rises down the running nets as cover is bought",
+      "note": "tower: gini rises down the running nets as cover is bought",
       "hints": "",
       "exp_premium": 1000.0,
       "exp_lr": 0.7,

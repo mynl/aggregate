@@ -154,41 +154,58 @@ def test_ccoc_static_is_keyword_only():
     ('minimum', lambda: Distortion.minimum([Distortion('ph', 0.5), Distortion('tvar', 0.5)])),
     ('mixture', lambda: Distortion.mixture([Distortion('ph', 0.5), Distortion('tvar', 0.5)], [0.5, 0.5])),
 ])
-def test_gini_p_is_twice_the_area_above_the_diagonal(name, make):
-    """Every family's ``gini_p`` is finite and agrees with an integral of ``g``."""
+def test_gini_is_twice_the_area_above_the_diagonal(name, make):
+    """Every family's ``gini`` is finite and agrees with an integral of ``g``."""
     d = make()
     area = quad(lambda s: float(d.g(np.float64(s))), 0, 1, limit=500)[0]
-    assert d.gini_p == pytest.approx(2 * area - 1, abs=1e-8), name
+    assert d.gini == pytest.approx(2 * area - 1, abs=1e-8), name
 
 
 @pytest.mark.parametrize('coc', [-0.2, -0.5, -0.9])
-def test_gini_p_of_a_ccoc_with_a_negative_return(coc):
+def test_gini_of_a_ccoc_with_a_negative_return(coc):
     """A premium below expected loss calibrates ``ccoc`` to ``r < 0``.
 
     ``g`` is then not a distortion, and the moment formula gives a negative
-    variance, whose root must not reach ``gini_p`` as a complex number.
+    variance, whose root must not reach ``gini`` as a complex number.
     """
     d = Distortion('ccoc', r=coc)
-    assert d.gini_p == pytest.approx(coc / (1 + coc))
+    assert d.gini == pytest.approx(coc / (1 + coc))
     assert d.summary_df is not None and d.stats_df is not None
 
 
-def test_calibrating_below_expected_loss_reports_gini_p():
+def test_calibrating_below_expected_loss_reports_gini():
     book = build('agg GP.Below 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson')
     result = book.calibrate_distortions(coc=-0.5, p=0.99)
-    assert result.distortion_df.loc['ccoc', 'gini_p'] == pytest.approx(-1)
+    assert result.distortion_df.loc['ccoc', 'gini'] == pytest.approx(-1)
 
 
-def test_gini_p_follows_a_recalibrated_shape():
+def test_gini_follows_a_recalibrated_shape():
     d = Distortion('ph', 0.5)
     d.shape = 0.25
-    assert d.gini_p == pytest.approx(0.6)
+    assert d.gini == pytest.approx(0.6)
 
 
-def test_gini_p_of_a_mixture_is_linear():
+def test_gini_of_a_mixture_is_linear():
     a, b = Distortion('ph', 0.5), Distortion('tvar', 0.5)
     mix = Distortion.mixture([a, b], [0.25, 0.75])
-    assert mix.gini_p == pytest.approx(0.25 * a.gini_p + 0.75 * b.gini_p, abs=1e-8)
+    assert mix.gini == pytest.approx(0.25 * a.gini + 0.75 * b.gini, abs=1e-8)
+
+
+def test_gini_replaces_gini_p_with_no_alias():
+    """``gini_p`` was renamed ``gini`` at 2.1.0a2, as property and as column.
+
+    This test is the one place the old name is written: it pins its absence.
+    """
+    d = Distortion('ph', 0.5)
+    assert d.gini == pytest.approx(1 / 3)
+    assert not hasattr(d, 'gini_p')
+    book = build('agg GP.Rename 250 claims 1000 xs 0 sev lognorm 100 cv 1.5 poisson')
+    result = book.calibrate_distortions(coc=0.1, p=0.99)
+    assert 'gini' in result.distortion_df.columns
+    assert 'gini_p' not in result.distortion_df.columns
+    evaluation = book.evaluate(P=float(book.est_m) * 1.2, p=0.99).evaluation_df
+    assert 'gini' in evaluation.columns
+    assert 'gini_p' not in evaluation.columns
 
 
 def test_ccoc_direct_subclass():

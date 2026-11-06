@@ -406,7 +406,7 @@ def test_aggregate_evaluate_returns_a_result():
     assert result.reins_view is None
     assert result._source is a
     assert list(result.evaluation_df.columns) == [
-        'role', 'param_name', 'param', 'gini_p', 'error', 'status']
+        'role', 'param_name', 'param', 'gini', 'error', 'status']
 
 
 def test_portfolio_evaluate_carries_one_premium_only_for_one_position():

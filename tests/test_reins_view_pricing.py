@@ -247,8 +247,8 @@ def test_evaluate_views_concatenate(occ):
 
 def test_evaluate_gross_is_less_acceptable_than_net(occ):
     """Same premium, more loss: the gross position survives less stress."""
-    net = occ.evaluate(6000, reins_view='net').evaluation_df['gini_p']
-    gross = occ.evaluate(6000, reins_view='gross').evaluation_df['gini_p']
+    net = occ.evaluate(6000, reins_view='net').evaluation_df['gini']
+    gross = occ.evaluate(6000, reins_view='gross').evaluation_df['gini']
     assert (gross.to_numpy() < net.to_numpy()).all()
 
 

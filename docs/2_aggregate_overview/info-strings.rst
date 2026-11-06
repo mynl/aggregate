@@ -315,8 +315,8 @@ weights max                  Kusuoka measure atom at ``p=1``, the max or ess-sup
                              component weight
 interior atoms               boolean: does the Kusuoka measure have any atom in
                              the open interval (0, 1)
-gini_p                       :math:`2\int g - 1`, every kind
-area                         :math:`\int g = (\mathrm{gini\_p} + 1) / 2`, every kind
+gini                         :math:`2\int g - 1`, every kind
+area                         :math:`\int g = (\mathrm{gini} + 1) / 2`, every kind
 id                           ``self.id()``, an 8-hex machine-independent hash of
                              the structural fields
 ===========================  =======================================================  =========================

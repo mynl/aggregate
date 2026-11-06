@@ -1007,7 +1007,7 @@ pricing_evaluate = _make_exhibit_function(
 
     Registered on :class:`~aggregate.results.EvaluationResult`. RAW is the
     tidy panel whole, parameters, errors and status included; INSURER pivots
-    it to the comparison, ``gini_p`` alone with positions down and families
+    it to the comparison, ``gini`` alone with positions down and families
     across (``[Perspective-May-Restructure]``).
 
     Parameters

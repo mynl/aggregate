@@ -8564,7 +8564,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
         Pricing asks what the obligation is worth; evaluation asks how much
         stress the position you hold survives. Solves, per distortion family,
         for the shape at which the risk-adjusted margin reaches 0. The
-        breakeven ``gini_p`` is the family-agnostic acceptability index of
+        breakeven ``gini`` is the family-agnostic acceptability index of
         Cherny and Madan.
 
         Parameters
@@ -8601,7 +8601,7 @@ class Aggregate(HelpMixin, LabeledMixin, ProgramMixin):
             Carrying ``evaluation_df``, the panel: tidy (long) form,
             ``MultiIndex`` rows ``(Step, distortion)`` with ``Step`` this
             aggregate's name, and columns ``role`` / ``param_name`` /
-            ``param`` / ``gini_p`` / ``error`` / ``status``. ``role`` is
+            ``param`` / ``gini`` / ``error`` / ``status``. ``role`` is
             always ``'sell'`` here: an aggregate is an obligation written, so
             the position is held the way it is booked. The same shape
             :meth:`PnL.evaluate` and :meth:`Portfolio.evaluate` return, so

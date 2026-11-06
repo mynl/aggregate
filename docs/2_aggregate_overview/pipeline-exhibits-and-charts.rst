@@ -195,7 +195,7 @@ What is published
      - EvaluationResult
      - 1: ``evaluation_df``
      - always
-     - caption only, the business reading of ``gini_p`` and of ``status``
+     - caption only, the business reading of ``gini`` and of ``status``
    * - ``ruin``
      - Eventual ruin
      - RuinResult

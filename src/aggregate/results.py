@@ -196,7 +196,7 @@ class CalibrationResult(SourcedMixin):
         The calibrated distortion objects, keyed by family name.
     distortion_df : pandas.DataFrame
         The per family receipt: ``param_name``, ``param``, ``error``,
-        ``gini_p``, ``area``, indexed by family.
+        ``gini``, ``area``, indexed by family.
     calibration_df : pandas.DataFrame
         The shared one-row target: ``coc``, ``p``, ``F(a)`` then the canonical
         pentagon octet.
@@ -412,7 +412,7 @@ class EvaluationResult(SourcedMixin):
     ----------
     evaluation_df : pandas.DataFrame
         The panel: ``(Step, distortion)`` rows, columns ``role`` /
-        ``param_name`` / ``param`` / ``gini_p`` / ``error`` / ``status``.
+        ``param_name`` / ``param`` / ``gini`` / ``error`` / ``status``.
         Named to match :attr:`PnL.evaluation_df`, the frame the waterfall
         exhibit already publishes under that name.
     premium : float or None

@@ -296,9 +296,9 @@ def test_portfolio_evaluate_total_and_unit_profile():
         ['PU1', 'PU2']
     assert (profile.role == 'sell').all()      # every unit is written, not bought
     for fam in ('ph', 'wang', 'dual', 'tvar'):
-        assert (total.loc[fam, 'gini_p']
-                > profile.loc[('PU1', fam), 'gini_p']
-                > profile.loc[('PU2', fam), 'gini_p'])
+        assert (total.loc[fam, 'gini']
+                > profile.loc[('PU1', fam), 'gini']
+                > profile.loc[('PU2', fam), 'gini'])
     with pytest.raises(ValueError, match='scalar P is ambiguous'):
         port.evaluate(900.0, unit=['PU1', 'PU2'])
 

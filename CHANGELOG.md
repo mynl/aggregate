@@ -20,9 +20,13 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a3 - 2026-11-06
+
+**[Tsallis-Distortion] A new distortion family, `tsallis`, the Beta(alpha, 1) mixture of TVaRs, with `g(u) = (alpha u - u^alpha)/(alpha - 1)` and `u(1 - log u)` at `alpha = 1`.** Build it as `Distortion('tsallis', alpha=3)`, `Distortion.tsallis(3)`, or `distortion D tsallis 3` in DecL. Its Gini index is `1/(alpha + 1)` in closed form, `alpha = 2` is `dual(2)`, and its `calibrate` solves in the Gini index by a bracketed root. It is outside the default lists: `available_distortions()` and the default calibration set stay the five standard families, and `calibrate_distortions(..., names=['tsallis'])` calibrates it. `available_distortions(pricing=True, strict=False)` and `DISTORTION_ORDER`, which orders every pricing frame, place it between `wang` and `dual`. No existing number moves.
+
 ## 2.1.0a2 - 2026-11-06
 
-**[Gini-Rename] `Distortion.gini_p` is renamed `gini`, with no alias.** The property, the `gini_p` column of `distortion_df` and of every `evaluation_df`, the `gini_p` block of the evaluate exhibit and its captions, the `formats-*.yaml` keys and the row of `Distortion.info` all read `gini`, and `gini_p` raises `AttributeError`. This breaks the stable `Distortion` surface inside a minor series, deliberately and with no deprecation period, because nothing outside the author's own work reads the name yet. Code that reads `gini_p` changes to `gini`; no number moves.
+**[Gini-Rename] `Distortion.gini_p` is renamed `gini`, with no alias.** The property, the `gini_p` column of `distortion_df` and of every `evaluation_df`, the `gini_p` block of the evaluate exhibit and its captions, the `formats-*.yaml` keys and the row of `Distortion.info` are all named `gini`, and `gini_p` raises `AttributeError`. This breaks the stable `Distortion` surface inside a minor series, deliberately and with no deprecation period, because nothing outside the author's own work reads the name yet. Code that reads `gini_p` changes to `gini`; no number moves.
 
 ## 2.1.0a1 - 2026-11-06
 

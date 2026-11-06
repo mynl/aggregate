@@ -1419,6 +1419,27 @@
       "hints": ""
     }
   },
+  "distortion W.tts": {
+    "kind": "distortion",
+    "name": "W.tts",
+    "spec": {
+      "name": "tsallis",
+      "alpha": 3.0,
+      "note": "",
+      "hints": ""
+    }
+  },
+  "distortion W.ttsh": {
+    "kind": "distortion",
+    "name": "W.ttsh",
+    "spec": {
+      "name": "tsallis",
+      "alpha": 0.5,
+      "label": "T",
+      "note": "",
+      "hints": ""
+    }
+  },
   "agg RR.Occ": {
     "kind": "agg",
     "name": "RR.Occ",

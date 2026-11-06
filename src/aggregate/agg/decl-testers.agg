@@ -233,6 +233,10 @@ dist W.tpw       power 0.01 1.0 2;
 dist W.tbe       beta 0.5 2;
 # An `as` clause declares the label; `name` stays the family (tests/test_decl_labels.py).
 dist W.tas as "My PH" ph 0.7
+
+# The Tsallis family, the Beta(alpha, 1) mixture of TVaRs (tests/test_distortion_tsallis.py).
+distortion W.tts tsallis 3;
+distortion W.ttsh as "T" tsallis 0.5;
 # dist W.tMIN      minimum dist.W.tcc dist.W.tdu                            # MinimumDistortion of two
 # dist W.tMIX      mixture dist.W.tcc dist.W.tdu wts [0.6 0.4]              # explicit weights
 # dist W.tMIX3     mixture dist.W.tcc dist.W.tdu dist.W.tph                 # uniform default weights (3 children)

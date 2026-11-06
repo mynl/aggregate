@@ -67,7 +67,7 @@ def _short_hash(s):
 # ``CategoricalDtype`` to keep ``distortion_df`` / pricing exhibits sorted
 # in this order without ad-hoc reordering.
 DISTORTION_ORDER = [
-    'ccoc', 'ph', 'wang', 'dual', 'tvar', 'wtdtvar',
+    'ccoc', 'ph', 'wang', 'tsallis', 'dual', 'tvar', 'wtdtvar',
     'lep', 'ly', 'clin', 'tt', 'cll', 'bitvar', 'blend',
 ]
 DISTORTION_DTYPE = pd.CategoricalDtype(categories=DISTORTION_ORDER, ordered=True)
@@ -604,6 +604,13 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
     ``calibrate_distortions(..., names=)`` to calibrate it. ``clin``,
     ``lep`` and ``ly`` are excluded by their
     ``has_mass_default`` flag and ``cll`` by its ``strict_pricing`` flag.
+
+    **The Tsallis family.** ``tsallis``, the Beta(alpha, 1) mixture of TVaRs,
+    is a production family with one shape parameter and no mass, declared
+    between ``wang`` and ``dual``. Its ``strict_pricing`` flag is False, so it
+    too is absent from the default list and the default calibration set;
+    ``calibrate_distortions(..., names=)`` calibrates it. See
+    :class:`TsallisDistortion`.
     """
 
     # registry of subclasses keyed by ``kind``; populated by
@@ -962,8 +969,9 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
               ``dual``, ``tvar``, equal to
               ``_pricing.DEFAULT_CALIBRATION_DISTORTIONS``.
             * ``available_distortions(pricing=True, strict=False)``: those
-              five, then ``bitvar``, ``wtdtvar`` and the research families
-              ``cll``, ``clin``, ``lep``, ``ly``.
+              five with ``tsallis`` between ``wang`` and ``dual``, then
+              ``bitvar``, ``wtdtvar`` and the research families ``cll``,
+              ``clin``, ``lep``, ``ly``.
             * ``available_distortions(pricing=False)``: every documented
               kind, the source of the DecL distortion words in
               ``decl_words``.
@@ -1837,6 +1845,11 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         return Distortion('dual', b=b)
 
     @staticmethod
+    def tsallis(alpha):
+        """Construct a Tsallis distortion of order ``alpha``, the Beta(alpha, 1) mixture of TVaRs."""
+        return Distortion('tsallis', alpha=alpha)
+
+    @staticmethod
     def bitvar(p0, p1, w=0.5):
         """
         Construct a BiTVaR with :math:`p_0 < p_1` and weight ``w`` on ``p_1``.
@@ -2154,9 +2167,9 @@ class Distortion(HelpMixin, LabeledMixin, ProgramMixin):
         Calibrate the shape parameter so the distorted integral matches
         ``premium_target`` on the supplied survival vector ``S``.
 
-        The pricing-distortion subclasses (``ph``, ``wang``, ``dual``,
-        ``tvar``, ``ccoc``, ``ly``, ``clin``, ``lep``, ``cll``) implement
-        this; the base raises ``NotImplementedError``. After convergence
+        The pricing-distortion subclasses (``ph``, ``wang``, ``tsallis``,
+        ``dual``, ``tvar``, ``ccoc``, ``ly``, ``clin``, ``lep``, ``cll``)
+        implement this; the base raises ``NotImplementedError``. After convergence
         the method mutates ``self.shape`` (and audit fields ``error``,
         ``premium_target``, ``assets``) and re-runs ``_build`` so any
         cached state derived from ``shape`` is refreshed.
@@ -2653,6 +2666,262 @@ class WangDistortion(Distortion):
         # integrable singularities at p=0 and p=1, so we let the base
         # numerical density + renormalization handle it.
         return []
+
+
+class TsallisDistortion(Distortion):
+    r"""Tsallis distortion, the Beta(alpha, 1) mixture of TVaRs.
+
+    :math:`g_\alpha(u) = (\alpha u - u^\alpha)/(\alpha - 1)` for
+    :math:`\alpha > 0`, with :math:`g_1(u) = u(1 - \log u)` the limit at
+    :math:`\alpha = 1`. The natural parameter is ``alpha``:
+    ``Distortion('tsallis', 3)`` and ``Distortion('tsallis', alpha=3)`` are
+    equivalent, and the DecL form is ``distortion D tsallis 3``.
+
+    Notes
+    -----
+    **Construction.** Mix the TVaR distortions :math:`\min(u/s, 1)` over the
+    tail probability :math:`s` with the Beta(alpha, 1) density
+    :math:`\alpha s^{\alpha-1}`; on the TVaR level :math:`p = 1 - s` that is
+    Beta(1, alpha), density :math:`\alpha(1-p)^{\alpha-1}`, which is
+    :meth:`_kusuoka_density`. The integral is :math:`g_\alpha`. The Kusuoka
+    measure has no atoms, so the family puts no weight on the mean or the
+    maximum alone and ``g`` has no mass at 0.
+
+    **Closed forms.** :math:`g_\alpha'(u) = \alpha(1 - u^{\alpha-1})/(\alpha-1)`
+    and :math:`g_\alpha''(u) = -\alpha u^{\alpha-2}`. The slope at 0 is
+    :math:`\alpha/(\alpha-1)` for :math:`\alpha > 1` and infinite for
+    :math:`\alpha \le 1`; the slope at 1 is 0. :math:`\int_0^1 g_\alpha =
+    (\alpha+2)/(2(\alpha+1))`, so the Gini index is :math:`1/(\alpha+1)` and
+    the member with Gini :math:`G` is :math:`\alpha = 1/G - 1`. The law
+    :math:`D_g` with distribution function :math:`g` has raw moments
+    :math:`\mathsf P X^k = \alpha/((k+1)(k+\alpha))`.
+
+    **Entropy.** Since :math:`g_\alpha(S) = S + (S - S^\alpha)/(\alpha - 1)`,
+
+    .. math::
+
+        \rho_{g_\alpha}(X) = \mathsf P X + \xi_\alpha(X),\qquad
+        \xi_\alpha(X) = \int \frac{S(x) - S(x)^\alpha}{\alpha - 1}\,dx,
+
+    the mean plus the cumulative residual Tsallis entropy of order
+    :math:`\alpha`, which is the reason for the name. At :math:`\alpha = 1`
+    the loading is the cumulative residual entropy
+    :math:`-\int S\log S\,dx`.
+
+    **Range.** :math:`\alpha \to 0` is the maximum and :math:`\alpha \to
+    \infty` the mean. :math:`\alpha = 2` is ``dual(2)``, the Gini mean
+    difference premium, and :math:`\alpha = 1/2` is :math:`2\sqrt u - u`.
+    Every member is submultiplicative, and the interval condition holds
+    exactly for :math:`0 < \alpha \le 2`.
+
+    **Numerics.** With :math:`\beta = \alpha - 1` and :math:`L = \log u`,
+    :math:`g_\alpha(u) = u - t/\beta` where
+    :math:`t = u^\alpha - u = u\,\mathrm{expm1}(\beta L)`. The ``expm1`` form
+    has no cancellation as :math:`\alpha \to 1`, gives
+    :math:`u\alpha/(\alpha-1)` when :math:`u^\alpha` underflows at large
+    :math:`\alpha`, and tends to 1 for :math:`u > 0` as :math:`\alpha \to 0`.
+    See :meth:`_g_alpha` for the one branch where it overflows.
+    """
+    kind = 'tsallis'
+    med_name = 'Tsallis'
+    long_name = 'Tsallis (Beta(alpha, 1) mixture of TVaRs)'
+    documented = True
+    pricing_ok = True
+    # a production family outside the default lists: calibrated only when
+    # asked for by name or through the extended set
+    strict_pricing = False
+    param_name = 'alpha'
+    # Gini 1/4
+    _calibration_init_shape = 3.0
+
+    def _label_default(self):
+        return f'Tsallis({self.shape:.3g})'
+
+    @property
+    def alpha(self):
+        """Natural alias for ``self.shape``."""
+        return self.shape
+
+    @alpha.setter
+    def alpha(self, value):
+        self.shape = value
+        self._build()
+
+    def _build(self):
+        a = self.shape
+        if a is None or not np.isfinite(a) or a <= 0:
+            raise ValueError(
+                f'TsallisDistortion: alpha must be finite and positive, got {a!r}')
+
+    @staticmethod
+    def _g_alpha(u, alpha):
+        r"""The Tsallis distortion of order ``alpha`` at ``u``, in stable form.
+
+        Parameters
+        ----------
+        u : float or ndarray
+            Points of ``[0, 1]``; values outside are clipped to it.
+        alpha : float
+            Order, positive.
+
+        Returns
+        -------
+        float or ndarray
+            :math:`g_\alpha(u)`, the shape of ``u``.
+
+        Notes
+        -----
+        Shared by :meth:`g` and :meth:`calibrate`, which evaluates it at trial
+        orders without building a distortion. The form is
+        :math:`u - t/\beta` with :math:`t = u^\alpha - u`. For
+        :math:`\alpha < 1` the exponent :math:`\beta L` is positive and
+        ``expm1`` overflows once it passes about 709, at a tiny ``u`` and an
+        ``alpha`` near 0; a survival function in a calibration reaches such
+        values. There :math:`u^\alpha` exceeds ``u`` by a factor above
+        :math:`e^{700}`, so :math:`t = e^{\alpha L} - u` has no cancellation and
+        is used instead. The exponent is clipped first so the unused branch
+        does not overflow. ``u = 0`` is set to 0 explicitly, since ``log 0``
+        makes both forms ``0 * inf``.
+        """
+        u = np.clip(np.asarray(u, dtype=float), 0.0, 1.0)
+        pos = u > 0
+        # log 0 is computed on the zero entries and then discarded
+        with np.errstate(divide='ignore'):
+            L = np.where(pos, np.log(np.where(pos, u, 1.0)), 0.0)
+        beta = alpha - 1.0
+        if beta == 0.0:
+            out = u * (1.0 - L)
+        else:
+            bL = beta * L
+            t = np.where(bL > 700.0, np.exp(alpha * L) - u,
+                         u * np.expm1(np.minimum(bL, 700.0)))
+            out = u - t / beta
+        return np.where(pos, out, 0.0)[()]
+
+    def g(self, x):
+        return self._g_alpha(x, self.shape)
+
+    def g_prime(self, x):
+        r"""Slope :math:`-\alpha\,\mathrm{expm1}(\beta L)/\beta`, closed form.
+
+        Notes
+        -----
+        At ``u = 0`` the slope is :math:`\alpha/(\alpha - 1)` for
+        :math:`\alpha > 1` and ``inf`` otherwise, set explicitly. For
+        :math:`\alpha < 1` and a tiny ``u`` the slope exceeds the largest
+        float, and ``inf`` is the correct float answer, so the overflow is
+        not reported. :math:`\alpha = 1` is :math:`-\log u`.
+        """
+        u = np.clip(np.asarray(x, dtype=float), 0.0, 1.0)
+        a = float(self.shape)
+        beta = a - 1.0
+        pos = u > 0
+        with np.errstate(divide='ignore'):
+            L = np.where(pos, np.log(np.where(pos, u, 1.0)), 0.0)
+        at_zero = a / beta if beta > 0 else np.inf
+        if beta == 0.0:
+            out = -L
+        else:
+            with np.errstate(over='ignore'):
+                out = -a * np.expm1(beta * L) / beta
+        return np.where(pos, out, at_zero)[()]
+
+    def g_inv(self, y):
+        r"""Inverse of ``g``, in closed form at ``alpha`` 2 and 1/2.
+
+        Notes
+        -----
+        :math:`\alpha = 2`: :math:`1 - \sqrt{1 - y} = y/(1 + \sqrt{1 - y})`,
+        written the second way to avoid cancellation at small ``y``;
+        :math:`\alpha = 1/2` is its square. Otherwise ``g`` is continuous and
+        strictly increasing, and the inverse is a vectorized bisection on
+        :math:`\log u \in [-708, 0]`, 64 halvings, a relative precision in
+        ``u`` of about 4e-17. Bisection on ``u`` itself has an absolute
+        precision, about 9e-19 after 60 halvings, which for a small
+        ``alpha`` misses a root near 1e-13 by a relative 1e-5. A ``y`` below
+        ``g(e^{-708})`` returns 0.
+        """
+        y = np.clip(np.asarray(y, dtype=float), 0.0, 1.0)
+        a = float(self.shape)
+        if a == 2.0 or a == 0.5:
+            r = y / (1.0 + np.sqrt(1.0 - y))
+            return (r if a == 2.0 else r * r)[()]
+        lo = np.full(y.shape, -708.0)
+        hi = np.zeros(y.shape)
+        for _ in range(64):
+            mid = 0.5 * (lo + hi)
+            below = self._g_alpha(np.exp(mid), a) < y
+            lo = np.where(below, mid, lo)
+            hi = np.where(below, hi, mid)
+        u = np.exp(0.5 * (lo + hi))
+        floor = self._g_alpha(np.exp(-708.0), a)
+        out = np.where(y <= floor, 0.0, np.where(y >= 1.0, 1.0, u))
+        return out[()]
+
+    def calibrate(self, S, dx, premium_target, *, ess_sup=0.0,
+                  assets=0.0, el=None, **kwargs):
+        r"""Bracketed solve of :math:`\int g_\alpha(S)\,dx = P` in the Gini index.
+
+        Notes
+        -----
+        The unknown is :math:`\theta = 1/(\alpha + 1)`, the Gini index, on
+        :math:`(10^{-9}, 1 - 10^{-9})`. The premium increases in
+        :math:`\theta`, from the expected loss as :math:`\theta \to 0` to
+        :math:`\int \mathbf 1\{S > 0\}\,dx` as :math:`\theta \to 1`, so
+        ``brentq`` on that bracket always converges and needs no derivative.
+        Newton in :math:`\alpha`, as the other families use, has a derivative
+        that is singular at :math:`\alpha = 1`. A target outside the bracket
+        is a failed calibration as for the other families: the shape at the
+        nearer end, its residual recorded, and the usual warning logged by
+        :meth:`_finalize_calibration`.
+        """
+        S = np.asarray(S, dtype=float)
+
+        def f(theta):
+            return self._quad(self._g_alpha(S, 1.0 / theta - 1.0), dx) - premium_target
+
+        lo, hi = 1e-9, 1.0 - 1e-9
+        f_lo, f_hi = f(lo), f(hi)
+        if f_lo >= 0:
+            theta, fx = lo, f_lo
+        elif f_hi <= 0:
+            theta, fx = hi, f_hi
+        else:
+            theta = brentq(f, lo, hi, xtol=1e-14)
+            fx = f(theta)
+        self._finalize_calibration(1.0 / theta - 1.0, fx, premium_target, assets)
+        return self
+
+    def _describe_closed_form(self):
+        r"""Closed-form moments of ``D_g`` for the Tsallis family.
+
+        ``E[X^k] = alpha / ((k + 1)(k + alpha))`` from the tail integral
+        :math:`\int_0^1 k x^{k-1}(1 - g_\alpha(x))\,dx`, valid at
+        ``alpha = 1`` too. ``p_equiv``, the Gini index, is ``1/(alpha + 1)``.
+        """
+        a = float(self.shape)
+        m1 = a / (2.0 * (1.0 + a))
+        m2 = a / (3.0 * (2.0 + a))
+        m3 = a / (4.0 * (3.0 + a))
+        var = m2 - m1 * m1
+        std = _root_of_variance(var)
+        cv = std / m1 if m1 > 0 else np.nan
+        m3_central = m3 - 3.0 * m1 * m2 + 2.0 * m1 ** 3
+        skew = m3_central / std ** 3 if std > 0 else np.nan
+        return {'mean': m1, 'var': var, 'std': std, 'cv': cv,
+                'skew': skew, 'p_equiv': 1.0 / (a + 1.0),
+                'loading': 1.0 / (2.0 * (a + 1.0))}
+
+    def _kusuoka_atoms(self):
+        # Beta(1, alpha) on p is continuous: no atoms
+        return []
+
+    def _kusuoka_density(self, p):
+        a = float(self.shape)
+        p = np.asarray(p, dtype=float)
+        with np.errstate(invalid='ignore', divide='ignore'):
+            out = a * np.power(1.0 - p, a - 1.0)
+        return np.where(np.isfinite(out) & (out > 0), out, 0.0)
 
 
 class DualDistortion(Distortion):

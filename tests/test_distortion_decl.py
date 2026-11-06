@@ -23,6 +23,7 @@ from aggregate.spectral import Distortion
     [
         ("ph", [0.5], {"name": "ph", "a": 0.5}),
         ("wang", [0.3], {"name": "wang", "lam": 0.3}),
+        ("tsallis", [3], {"name": "tsallis", "alpha": 3}),
         ("dual", [2.5], {"name": "dual", "b": 2.5}),
         ("tvar", [0.99], {"name": "tvar", "p": 0.99}),
         ("ccoc", [0.25], {"name": "ccoc", "r": 0.25}),   # r, not the discount d
@@ -67,6 +68,7 @@ def test_decl_spec_rejects_unknown_kind():
     [
         ("distortion D ph 0.5", "PHDistortion"),
         ("distortion D ccoc .25", "CCoCDistortion"),
+        ("distortion D tsallis 3", "TsallisDistortion"),
         ("distortion D dual 2.5", "DualDistortion"),
         ("distortion D tvar 0.99", "TVaRDistortion"),
         ("distortion D bitvar 0.9 0.99 0.5", "BiTVaRDistortion"),

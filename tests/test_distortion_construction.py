@@ -141,6 +141,7 @@ def test_ccoc_static_is_keyword_only():
     ('ccoc', lambda: Distortion('ccoc', r=0.1)),
     ('ph', lambda: Distortion('ph', 0.5)),
     ('wang', lambda: Distortion('wang', 0.5)),
+    ('tsallis', lambda: Distortion('tsallis', 3.0)),
     ('dual', lambda: Distortion('dual', 2.0)),
     ('tvar', lambda: Distortion('tvar', 0.5)),
     ('bitvar', lambda: Distortion('bitvar', p0=0.5, p1=0.9, w1=0.4)),

@@ -17,6 +17,7 @@ build on.
 .. autosummary::
 
    Distortion
+   TsallisDistortion
    approx_ccoc
    choquet_weights
    ChoquetWeights
@@ -36,6 +37,11 @@ Research distortion families
 ----------------------------
 
 ``cll`` (capped loglinear), ``clin`` (capped linear), ``lep`` (leverage equivalent pricing) and ``ly`` (linear yield) are research families. They are built by the same :class:`Distortion` class and called the same way as the production families, ``Distortion('cll', b=0.9)`` in Python and ``distortion D cll 0.9`` in DecL. They are absent from the default :meth:`Distortion.available_distortions` list and from the default calibration set, both of which are ``ccoc``, ``ph``, ``wang``, ``dual`` and ``tvar``. ``available_distortions(pricing=True, strict=False)`` and ``available_distortions(pricing=False)`` include them, and ``calibrate_distortions(..., names=['cll'])`` calibrates one.
+
+The Tsallis distortion family
+-----------------------------
+
+``tsallis`` is the Beta(:math:`\alpha`, 1) mixture of TVaRs, :math:`g_\alpha(u) = (\alpha u - u^\alpha)/(\alpha - 1)` with :math:`g_1(u) = u(1 - \log u)`, built as ``Distortion('tsallis', alpha=3)`` in Python and ``distortion D tsallis 3`` in DecL. Its Gini index is :math:`1/(\alpha+1)`, it runs from the maximum at :math:`\alpha \to 0` to the mean at :math:`\alpha \to \infty`, and :math:`\alpha = 2` is ``dual(2)``. Its distorted expectation is the mean plus the cumulative residual Tsallis entropy of order :math:`\alpha`. It is a production family with one parameter and no mass, listed between ``wang`` and ``dual`` in ``available_distortions(pricing=True, strict=False)``, and like the research families it is absent from the default list and the default calibration set: ``calibrate_distortions(..., names=['tsallis'])`` calibrates it. See :class:`TsallisDistortion`.
 
 Spectral functions
 ------------------

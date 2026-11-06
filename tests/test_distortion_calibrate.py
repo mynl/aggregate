@@ -35,9 +35,10 @@ def _achieved_premium(d, S, bs):
 
 # --- the 5 strict_pricing kinds with no r0 / no mass ------------------------
 
-@pytest.mark.parametrize('kind', ['ph', 'wang', 'dual', 'tvar', 'cll'])
+@pytest.mark.parametrize('kind', ['ph', 'wang', 'tsallis', 'dual', 'tvar', 'cll'])
 def test_calibrate_no_r0(synthetic_S, kind):
-    """ph/wang/dual/tvar/cll: Newton iteration hits the target premium."""
+    """ph/wang/dual/tvar/cll: Newton iteration hits the target premium;
+    tsallis: a bracketed solve in its Gini index does."""
     S = synthetic_S['S']
     bs = synthetic_S['bs']
     el = synthetic_S['el']
@@ -124,7 +125,7 @@ def test_base_calibrate_raises():
 def test_calibration_init_shape_present_for_pricing_kinds():
     """All migrated pricing kinds set ``_calibration_init_shape`` to a
     valid non-None starting shape."""
-    expected = {'ph', 'wang', 'dual', 'tvar', 'ccoc',
+    expected = {'ph', 'wang', 'tsallis', 'dual', 'tvar', 'ccoc',
                 'ly', 'clin', 'lep', 'cll'}
     for kind in expected:
         subclass = Distortion._registry[kind]

@@ -45,6 +45,7 @@ DISTORTION_EXAMPLES = {
     'lep': dict(r=0.1),
     'ly': dict(r=0.1),
     'ph': dict(shape=0.5),
+    'tsallis': dict(shape=3.0),
     'tvar': dict(shape=0.2),
     'wang': dict(shape=0.3),
     'wtdtvar': dict(ps=[0.5, 0.9], wts=[0.3, 0.7]),

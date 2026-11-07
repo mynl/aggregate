@@ -309,9 +309,17 @@ def test_mv_marginal_reproduces_standalone():
 
 
 def test_mv_explain_flags_clipped_book():
-    """A pinned (bs, log2) too small to cover clips the joint -> validation flags it."""
+    """A pinned (bs, log2) too small to cover clips the joint -> validation flags it.
+
+    The pin is 64 buckets of 32, 2,048 against supports reaching about 20,000
+    and 40,000. It was 64 buckets of 1, whose window lands thousands of buckets
+    from 0, so the transform reached 16384 x 32768 (4 GiB per array) and failed
+    to allocate under a parallel full-suite run ([Bivariate-Gate-Flake]). At
+    bs 32 the transform is 512 x 2048 and the case runs in a fraction of a
+    second, with the same deficit and the same verdict.
+    """
     mv = _mv('gumbel 0.4', 'mixed gamma .5')
-    mv.update(bs=(1.0, 1.0), log2=(6, 6))    # 64x64 grid pinned far below support
+    mv.update(bs=(32.0, 32.0), log2=(6, 6))  # 64 x 64 grid, far short of the support
     assert mv.deficit > 1e-5
     assert 'tail deficit' in mv._explain_oneline()
 

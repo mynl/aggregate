@@ -6,7 +6,7 @@
 
 The public surface has two tiers.
 
-**Stable.** `Aggregate`, `Portfolio`, `PnL`, `Severity`, `Frequency`, `Distortion`, `BivariateAggregate`, `Underwriter`, `build`, `qd`, and the DecL grammar in `decl.lark`. From 1.0 onward a documented name here keeps its meaning: a breaking change waits for a major release and is preceded by a deprecation period. Breaking changes recorded in the alpha entries below happened *before* that promise took effect, which is what the alpha series was for.
+**Stable.** `Aggregate`, `Portfolio`, `PnL`, `Severity`, `Frequency`, `Distortion`, `BivariateAggregate`, `Underwriter`, `build`, `qd`, and the DecL grammar in `decl.lark`. From 1.0 onward a documented name here keeps its meaning: a breaking change waits for a major release and is preceded by a deprecation period. Breaking changes recorded in the 1.0.0 alpha entries below (`1.0.0a1` to `1.0.0a401`) happened *before* that promise took effect, which is what the alpha series was for.
 
 **Provisional, in the sense of [PEP 411](https://peps.python.org/pep-0411/): `aggregate.charts` and `aggregate.exhibits`.** These two modules are **not part of the 1.0 API contract**. Their APIs may change in a *minor* release, with no deprecation period. That covers the chart IR schema and its document hash, the chart registry and the set of charts that exist, and on the exhibits side the exhibit names, block structure, captions, row flags and the `Perspective` vocabulary.
 

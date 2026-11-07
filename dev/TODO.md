@@ -247,8 +247,14 @@
   calls, each needing an author ruling.
 - Small hygiene, detailed in the archive: **[bs_describe-Wart]**,
   **[Colorizer-Style-Choice]**, **[Switcheroo-Sample-Regression]**,
-  **[Pedagogy-Migrations]**, **[Bivariate-Gate-Flake]**,
-  **[Plot-Severity-Outside-Window]**.
+  **[Pedagogy-Migrations]**, **[Plot-Severity-Outside-Window]**.
+  **[Bivariate-Gate-Flake]** done 2026-11-07, test fix committed after 2.1.0a7
+  and released in 2.1.0: the cause was memory,
+  not a warning. `test_mv_explain_flags_clipped_book` pinned 64 buckets of 1,
+  whose window lands thousands of buckets from 0, so the transform reached
+  16384 x 32768 and failed to allocate in a parallel run; it now pins bs 32.
+  Open question behind it: a pinned grid too small to cover is placed far up
+  the support (x from 5,568 and 15,008 at bs 32), losing the body.
 
 ## Ideas, not commitments
 

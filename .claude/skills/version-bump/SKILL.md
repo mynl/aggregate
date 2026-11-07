@@ -1,6 +1,6 @@
 ---
 name: version-bump
-description: Bump the aggregate 1.0.0a version and commit it as one coherent
+description: Bump the aggregate version to the next pre-release (2.1.0aN) and commit it as one coherent
   unit: the gate run, the __version__ line, the CHANGELOG section, dev/TODO.md, any
   regen the change implies, the plan moved to dev/done/ at its first bump, and a one-line
   commit message. Use when a plan-based change is finished, when asked to bump,
@@ -65,7 +65,10 @@ the change implies, and never splits them across commits:
 - `src/aggregate/__init__.py`, the `__version__ = "x.y.z"` literal, which is
   the **one** place the version is written since 1.2.1. `pyproject.toml` reads
   it (`dynamic = ["version"]`) and carries no version line. Read the current
-  value, do not assume it. No sync or reinstall follows a bump: running code
+  value, do not assume it. The next version is the next pre-release: 2.1.0a3
+  after 2.1.0a2, and X.(Y+1).0a1 for the first bump after the release X.Y.Z
+  (house rule, 2026-11-06). Cutting a release, which drops the `aN`, happens
+  only when the author asks. No sync or reinstall follows a bump: running code
   reports the live attribute, so an editable install is never stale.
 - `CHANGELOG.md`, a new `## <version>` section at the top of the entries, below
   the standing "API stability" preamble and above the previous entry.
@@ -111,17 +114,18 @@ Touch it only when that front-page material itself changes.
 ## 6. Commit, one line
 
 ```
-[Descriptive-Label] a306: terse summary of what landed
+[Descriptive-Label] 2.1.0a3: terse summary of what landed
 ```
 
 Subject only. **No body, no trailers, no `Co-Authored-By`.** The CHANGELOG
-section is the description; the one-liner is the index into it. Real examples
-from this history:
+section is the description; the one-liner is the index into it. Write the full
+version, never a bare `a3`: every series restarts at `a1`. Real examples from
+this history:
 
 ```
-[Ledger-Insurer-Abbreviated] a305: the insurer ledger narrows to EX, SD, CV and the adverse tail state
-[Cede-Contra-Expense] a304: ceding commission folds into E as contra expense and the C column goes
-[Session-Isolation] a302: one recipe base many users, Underwriter.fork() and preview() with RecipeNotFound
+[Library-Loss-Tables-And-Laws] 1.63.2: library.agg adds four loss-table entries and the NormalLaw and GammaLaw chfaggs
+[Deductible-Forms-Follow-Ups] 1.63.1: the layer pdf marks the point mass at the limit, conditional and unconditional
+[Release-Summary] 2.0.0: release notes for 1.11.1 to 1.63.2
 ```
 
 If the summary will not fit on one line, either the commit is too big or the

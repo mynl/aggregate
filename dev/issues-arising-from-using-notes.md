@@ -93,3 +93,7 @@ Then rebuild and reupload.
 
 * **`qd` of an `Aggregate` raises `Pandas4Warning`.** `utilities.py` line 577 calls `summary_df.fillna('')` on a float frame. Default filters hide it, so no page shows it, but a future pandas raises an error there.
 * **`Aggregate.program` doubles some spaces.** `build('agg Eg dfreq [1] 3 xs 0 dsev [0:4] !')` gives `program` equal to `agg Eg dfreq  [1]  3 xs 0 dsev  [0:4]  !`, with two spaces after `dfreq`, `[1]`, `dsev` and `[0:4]`. Cosmetic.
+
+**Found on the Tsallis page of Using aggregate, 2026-11-06, at 2.1.0a5.** One item, worked around on the page.
+
+* **`Distortion.id()` depends on the type of the shape.** `Distortion('tsallis', alpha=3).id()` is `2B0CD06B` and `Distortion('tsallis', alpha=3.0).id()` is `912DAE9A`, though the two are the same distortion; `build('distortion T tsallis 3')` parses to `3.0` and matches the second. Every family hashes its shape the same way, so `Distortion('ph', 1)` and `Distortion('ph', 1.0)` differ too. The page passes `3.0`.

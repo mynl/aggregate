@@ -347,11 +347,11 @@ These are standing rules — follow them without being re-asked:
   deferred to the end. Anything that does *not* bump the version (pure tidying,
   file moves, doc-only edits, work in progress) is left uncommitted for the
   author to handle.
-- **Version-bump commit messages are ONE LINE.** House format, unchanged from
-  existing history:
+- **Version-bump commit messages are ONE LINE.** House format, with the full
+  version, never a bare `a3` (house rule, 2026-11-06):
 
   ```
-  [Descriptive-Label] a149: terse summary of what landed
+  [Descriptive-Label] 2.1.0a3: terse summary of what landed
   ```
 
   Subject only — **no body, no trailers, no `Co-Authored-By`**. `CHANGELOG.md`

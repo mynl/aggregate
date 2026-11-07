@@ -116,6 +116,10 @@ At 30 points or targets, on seeded synthetic tables (5% atom and 5% Bernoulli ro
 - Tier 3 with the numerics gate, `UV_PROJECT_ENVIRONMENT=.venv uv run pytest -m 'slow or not slow' -W error::RuntimeWarning`: 11,709 passed, 3 skipped, 2 min 54 s.
 - Acceptance: `oep` on `EventLossTable.SecondaryUncertainty` at 0.1, 0.01 and 0.001 gives 16.531372, 190.864261 and 506.393554, achieved `oep` equal to `p`, annual return periods 10, 100 and 1,000 (asserted in `test_oep`).
 
+### Using pages
+
+- `D:/Projects/Using/aggregate/oep.qmd` gained the section "An event loss table" (the six-row table with and without `no2u`, and the grid quantile within half a bucket), and `elt.qmd` a paragraph and block on the exact severity functions (`sev.ppf(0.99)` 91.066484 against `q_sev(0.99)` 91.066406 at `bs` 1/256). Both rendered with `refresh.ps1 aggregate oep` and `elt`, every sentence checked against the output, and committed in that repository as `850e451`; not deployed.
+
 ### Findings left for the author
 
 - **`severity_error_analysis` on a grid that ends inside the support.** Its tail term integrates `s.sf` from the truncation point by `quad` in doublings and raises `ValueError: Questionable integral numeric convergence` when `quad`'s error estimate exceeds $10^{-8}$ absolute. On $10^5$ and $10^6$ beta-only rows with `bs` 1/16 and $2^{16}$ nodes it raised after 4.3 s and 37 s ($5.4\times10^{-5}$ and $1.7\times10^{-5}$), the time being `quad`'s scalar calls, each an eltq pass over every row. The default ELT grid passes the tail check and the integral is then negligible, so only a user-forced short grid meets it. An exact tail term exists, $\int_t^\infty S = D_1(t, t)/\Lambda$ from `tail_moments_arrays`, but it would be the ELT-specific branch this plan rules out.

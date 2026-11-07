@@ -267,7 +267,13 @@ def test_tail_report_reads_the_limit():
     ('1000 xs 50 franchise', '1,000 xs 50 franchise'),
     ('1000 xs 50 to 80 disappearing', '1,000 xs 50 to 80 disappearing'),
     ('inf xs 50 franchise', 'inf xs 50 franchise'),
-], ids=['ordinary', 'franchise', 'disappearing', 'unlimited-franchise'])
+    # [Support-Phrase-Rounding]: a small layer keeps its digits
+    ('1 xs 0.5', '1 xs 0.5'),
+    ('1 xs 0.5 franchise', '1 xs 0.5 franchise'),
+    ('1 xs 0.4 to 0.6 disappearing', '1 xs 0.4 to 0.6 disappearing'),
+    ('1000000 xs 12345.678', '1,000,000 xs 12,345.7'),
+], ids=['ordinary', 'franchise', 'disappearing', 'unlimited-franchise',
+        'small', 'small-franchise', 'small-disappearing', 'six-digits'])
 def test_layer_phrase_names_the_deductible_form(layers, phrase, capsys):
     """``[Deductible-Forms-Follow-Ups]``: the phrase shows the form in DecL syntax.
 
@@ -283,3 +289,14 @@ def test_layer_phrase_names_the_deductible_form(layers, phrase, capsys):
     # qd wraps at 72 characters, so compare with the line breaks folded
     one_liner = ' '.join(capsys.readouterr().out.split())
     assert f'; {phrase}. Updated with bucket size' in one_liner
+
+
+@pytest.mark.parametrize('x, text', [
+    (1000, '1,000'), (1234567, '1,234,567'), (0.5, '0.5'), (62.5, '62.5'),
+    (12345.678, '12,345.7'), (1 / 3, '0.333333'), (2.5e-7, '0.00000025'),
+    (123456789.5, '123,456,790'), (999999.5, '1,000,000'), (0, '0'),
+    (np.inf, 'inf'),
+])
+def test_fmt_layer_number(x, text):
+    """Whole numbers keep the separator, others six significant digits, fixed."""
+    assert S._fmt_layer_number(x) == text

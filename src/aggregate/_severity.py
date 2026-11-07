@@ -4250,39 +4250,286 @@ class SeverityCopy(Severity):
         self.fz = self.sev_name
 
 
-class _EltLaw:
-    """The frozen law of an ELT severity: its support, and refusals.
-
-    An ELT severity with secondary uncertainty is a rate-weighted mixture of
-    beta, two-point and atom laws with no distribution function worth
-    evaluating pointwise; eltq evaluates it on a grid. This object supplies
-    what the ``Severity`` machinery reads at construction and sizing, the
-    support :math:`[0, B]` with :math:`B` the largest event support, and makes
-    every pointwise method exist and raise, because the base constructor reads
-    them as attributes and a missing one would fail as an ``AttributeError``,
-    which ``Underwriter.build`` logs and swallows.
+def _check_elt_grid_supported(model, owner=''):
+    """Raise ``NotImplementedError`` when an ELT model cannot reach a grid.
 
     Parameters
     ----------
-    upper : float
-        :math:`B`, eltq's ``max_support``.
+    model : EltModel
+        The prepared table.
+    owner : str
+        Name of the aggregate, for the message.
+
+    Raises
+    ------
+    NotImplementedError
+        For a shared event (one event with rows for two or more units) under
+        the Burke rule (``[ELT-Burke-Total]``), naming the event and its
+        units. The default roll-up reaches a grid and never raises.
+    """
+    if model.shared_rule != 'burke':
+        return
+    event, units = model.shared_example()
+    prefix = f'{owner}: ' if owner else ''
+    raise NotImplementedError(
+        f'{prefix}event {event} has rows for units {", ".join(units)}, '
+        'and under the Burke total rule ([ELT-Burke-Total]) a shared event '
+        'with secondary uncertainty has model moments and no grid; the '
+        'default roll-up has one. build(..., update=False) gives the '
+        'theoretical statistics, and no2u on every elt clause gives the '
+        'mean-only model.')
+
+
+class _EltLaw:
+    """The frozen law of an ELT severity, exact and pointwise, from eltq.
+
+    The severity is :math:`\\nu / \\Lambda`, with
+    :math:`\\nu = \\sum_j \\lambda_j \\mathsf P(X_j \\in \\cdot)` the
+    rate-weighted mixture of the rows' beta, two-point and atom laws and
+    :math:`\\Lambda` the total rate. Every method evaluates that mixture
+    exactly through one-row eltq calls on ``model.columns()``, with
+    ``mean_is_loss_rate=False, variance_policy='bernoulli'`` as every other
+    eltq call in aggregate makes them. Nothing is computed or cached at
+    construction, and nothing on the default build path calls these methods:
+    the grid comes only from :meth:`SeverityElt.quantize`.
+
+    Parameters
+    ----------
+    model : EltModel
+        The prepared table; its columns, total rate :math:`\\Lambda`
+        (``moments.total_rate``), largest support :math:`B`
+        (``moments.max_support``) and severity moments are read on each call.
+
+    Notes
+    -----
+    The cost of ``sf``, ``cdf`` and ``pdf`` is of the order of the rows times
+    the distinct points; ``isf`` and ``ppf`` make about 50 such calls on the
+    unresolved points. At 30 points on a million rows, measured with eltq
+    2.15.0, the tail rate takes about 0.1 s and the density 0.04 s.
+
+    Each pointwise method refuses a shared table under the Burke rule
+    (``[ELT-Burke-Total]``), whose one-row tail would treat each unit row as
+    its own event. :meth:`support` works for every table, because a Burke
+    table still builds with model moments and its sizing reads the support.
     """
 
-    def __init__(self, upper):
-        self.upper = float(upper)
+    def __init__(self, model):
+        self.model = model
+
+    @property
+    def upper(self):
+        """:math:`B`, eltq's ``max_support``."""
+        return float(self.model.moments.max_support)
 
     def support(self):
         """``(0, B)``."""
         return 0.0, self.upper
 
-    def _refuse(self, *args, **kwargs):
-        raise NotImplementedError(
-            'An elt severity with secondary uncertainty has no pointwise '
-            'distribution function. Use the discretized severity after update '
-            '(sev_density_df), or SeverityElt.tail_measures for the tail rate '
-            'and moments above an edge.')
+    def _eltq(self):
+        """The eltq module, after the Burke check."""
+        _check_elt_grid_supported(self.model)
+        from ._loss_table import import_eltq
+        return import_eltq()
 
-    cdf = sf = pdf = ppf = isf = stats = _refuse
+    @staticmethod
+    def _shaped(out, shape):
+        """``out`` reshaped to ``shape``, a numpy scalar for a scalar input."""
+        out = out.reshape(shape)
+        return out[()] if out.ndim == 0 else out
+
+    def _rate_above(self, eltq, t):
+        """:math:`R(t)/\\Lambda` at distinct sorted edges ``0 <= t < B``."""
+        tm = eltq.tail_moments_arrays(
+            **self.model.columns(), edge=t,
+            mean_is_loss_rate=False, variance_policy='bernoulli')
+        return (np.asarray(tm.rate_above, dtype=float)
+                / float(self.model.moments.total_rate))
+
+    def sf(self, x):
+        """Survival function :math:`\\mathsf P(X > x) = R(x) / \\Lambda`.
+
+        Parameters
+        ----------
+        x : float or array_like
+            Losses.
+
+        Returns
+        -------
+        float or numpy.ndarray
+            1 for :math:`x < 0`, 0 for :math:`x \\ge B`, NaN for NaN, and
+            :math:`R(x)/\\Lambda` between, with :math:`R(t) = \\sum_j
+            \\lambda_j \\mathsf P(X_j > t)` from eltq's
+            ``tail_moments_arrays``, every row exact by its law. Only the
+            distinct values are sent to eltq.
+        """
+        eltq = self._eltq()
+        x = np.asarray(x, dtype=float)
+        flat = x.ravel()
+        out = np.where(flat < 0, 1.0, 0.0)
+        out[np.isnan(flat)] = np.nan
+        inside = (flat >= 0) & (flat < self.upper)
+        if inside.any():
+            t, inverse = np.unique(flat[inside], return_inverse=True)
+            out[inside] = self._rate_above(eltq, t)[inverse]
+        return self._shaped(out, x.shape)
+
+    def cdf(self, x):
+        """Distribution function :math:`\\mathsf P(X \\le x) = 1 -` :meth:`sf`.
+
+        Parameters
+        ----------
+        x : float or array_like
+            Losses.
+
+        Returns
+        -------
+        float or numpy.ndarray
+            Right continuous, because :math:`R` counts strict exceedances, so
+            the value at an atom includes the atom.
+
+        Notes
+        -----
+        The relative accuracy of a very small value is limited by the
+        subtraction from 1, as for any law reached through its survival
+        function.
+        """
+        return 1.0 - self.sf(x)
+
+    def isf(self, s):
+        """Inverse survival function: the smallest :math:`x` with
+        :math:`\\mathsf P(X > x) \\le s`.
+
+        Parameters
+        ----------
+        s : float or array_like
+            Exceedance probabilities.
+
+        Returns
+        -------
+        float or numpy.ndarray
+            :math:`B` for :math:`s \\le 0`, 0 for :math:`s \\ge` ``sf(0)``,
+            NaN for NaN, and the bisected loss between.
+
+        Notes
+        -----
+        One eltq call evaluates :meth:`sf` on a geometric ladder of 64 edges
+        from :math:`10^{-30} B` to :math:`B`, which brackets every target.
+        Vectorized bisection in :math:`\\log x` on the exact ``sf`` then runs
+        to :math:`10^{-15}` relative, about 50 calls on the unresolved points.
+        It keeps :math:`\\mathrm{sf}(lo) > s \\ge \\mathrm{sf}(hi)` and returns
+        ``hi``, so where an atom's step jumps the target it returns the
+        atom's loss and the read back ``sf`` is below :math:`s`, the
+        convention of a scipy severity with a limit. A target between
+        :math:`\\mathrm{sf}(10^{-30} B)` and ``sf(0)``, possible for a row
+        with a very small :math:`\\alpha`, returns :math:`10^{-30} B`.
+        """
+        eltq = self._eltq()
+        s = np.asarray(s, dtype=float)
+        flat = s.ravel()
+        upper = self.upper
+        out = np.full(flat.shape, np.nan)
+        out[flat <= 0] = upper
+        if upper > 0:
+            sf0 = float(self._rate_above(eltq, np.array([0.0]))[0])
+        else:
+            sf0 = 0.0
+        out[flat >= sf0] = 0.0
+        todo = (flat > 0) & (flat < sf0)
+        if todo.any():
+            target, inverse = np.unique(flat[todo], return_inverse=True)
+            ladder = upper * np.logspace(-30, 0, 64)
+            ladder[-1] = upper
+            # sf(B) = 0, so the last rung brackets every positive target
+            s_ladder = np.append(self._rate_above(eltq, ladder[:-1]), 0.0)
+            k = np.argmax(s_ladder[None, :] <= target[:, None], axis=1)
+            hi = ladder[k]
+            lo = np.where(k > 0, ladder[np.maximum(k - 1, 0)], 0.0)
+            active = k > 0
+            while active.any():
+                idx = np.flatnonzero(active)
+                l, h = lo[idx], hi[idx]
+                mid = l * np.sqrt(h / l)
+                done = (h <= l * (1 + 1e-15)) | (mid <= l) | (mid >= h)
+                active[idx[done]] = False
+                idx, mid = idx[~done], mid[~done]
+                if idx.size == 0:
+                    break
+                m, back = np.unique(mid, return_inverse=True)
+                above = self._rate_above(eltq, m)[back] > target[idx]
+                lo[idx[above]] = mid[above]
+                hi[idx[~above]] = mid[~above]
+            out[todo] = hi[inverse]
+        return self._shaped(out, s.shape)
+
+    def ppf(self, q):
+        """Quantile function, :meth:`isf` at :math:`1 - q`.
+
+        Parameters
+        ----------
+        q : float or array_like
+            Non-exceedance probabilities.
+
+        Returns
+        -------
+        float or numpy.ndarray
+        """
+        return self.isf(1.0 - np.asarray(q, dtype=float))
+
+    def pdf(self, x):
+        """Density of the continuous part, :math:`\\nu_c(x) / \\Lambda`.
+
+        Parameters
+        ----------
+        x : float or array_like
+            Losses.
+
+        Returns
+        -------
+        float or numpy.ndarray
+            eltq's ``density_arrays`` divided by :math:`\\Lambda`: the beta
+            rows' density, with atoms and the two atoms of a Bernoulli row
+            excluded, and :math:`+\\infty` at a pole where it overflows. 0
+            outside :math:`(0, B)`, NaN for NaN. Only the distinct values are
+            sent to eltq.
+        """
+        eltq = self._eltq()
+        x = np.asarray(x, dtype=float)
+        flat = x.ravel()
+        out = np.zeros(flat.shape)
+        out[np.isnan(flat)] = np.nan
+        inside = (flat > 0) & (flat < self.upper)
+        if inside.any():
+            u, inverse = np.unique(flat[inside], return_inverse=True)
+            dens = eltq.density_arrays(
+                **self.model.columns(), x=u,
+                mean_is_loss_rate=False, variance_policy='bernoulli')
+            out[inside] = (np.asarray(dens, dtype=float)[inverse]
+                           / float(self.model.moments.total_rate))
+        return self._shaped(out, x.shape)
+
+    def stats(self, moments='mv'):
+        """Mean, variance, skewness and kurtosis, in the scipy form.
+
+        Parameters
+        ----------
+        moments : str
+            Any of ``'m'``, ``'v'``, ``'s'``, ``'k'``, in the order wanted.
+
+        Returns
+        -------
+        float or tuple of float
+            From the model's raw severity moments :math:`C_r / \\Lambda`,
+            :math:`r \\le 3`; kurtosis is NaN. One letter returns a single
+            value, as scipy does.
+        """
+        self._eltq()
+        m1, m2, m3 = (float(v) for v in self.model.moments.severity_moments)
+        var = m2 - m1 * m1
+        skew = (third_central_moment(m1, m2, m3) / var ** 1.5 if var > 0
+                else np.nan)
+        values = dict(m=m1, v=var, s=skew, k=np.nan)
+        out = tuple(np.float64(values[c]) for c in moments)
+        return out[0] if len(out) == 1 else out
 
 
 class SeverityElt(Severity):
@@ -4292,6 +4539,14 @@ class SeverityElt(Severity):
     ``_loss_table.resolve`` passes as ``sev_name``. The moments are eltq's
     model moments, available before any grid exists; the severity reaches a
     grid only through :meth:`quantize`, never through ``sf``.
+
+    ``sf``, ``cdf``, ``isf``, ``ppf``, ``pdf`` and ``stats`` are exact, from
+    the frozen law ``fz`` (``_EltLaw``): ``sf`` from eltq's
+    ``tail_moments_arrays``, ``pdf`` from its ``density_arrays`` (atoms
+    excluded), the inverses by bisection on ``sf``, each at a cost of the
+    order of the rows times the points. Nothing on the build path calls
+    them; ``oep``, ``Aggregate.sev``, ``severity_error_analysis`` and the
+    approximation chart do.
 
     Notes
     -----
@@ -4305,8 +4560,8 @@ class SeverityElt(Severity):
     The support :math:`[0, B]` reaches every sizing and reporting consumer
     through ``fz.support()``; ``limit`` stays infinite on purpose, because a
     finite ``limit`` makes ``detachment`` finite and sends the moment and
-    attachment code into ``fz.sf``. ``support_atoms`` is ``None``: a beta
-    mixture sits on no lattice.
+    attachment code into ``fz.sf``, an eltq call per build. ``support_atoms``
+    is ``None``: a beta mixture sits on no lattice.
 
     A table with a shared event (one event with rows for two or more units)
     is modelled on its rolled rows, one per event
@@ -4318,7 +4573,7 @@ class SeverityElt(Severity):
 
     def _build(self):
         model = self.sev_name
-        self.fz = _EltLaw(model.moments.max_support)
+        self.fz = _EltLaw(model)
         self.sev1, self.sev2, self.sev3 = (
             float(v) for v in model.moments.severity_moments)
         self.long_name = 'elt'
@@ -4351,12 +4606,13 @@ class SeverityElt(Severity):
         return self.sev1, self.sev2, self.sev3
 
     def _compute_attachment_probs(self):
-        """No layer clause and no pointwise law: the histogram convention.
+        """No layer clause: the histogram convention, with no eltq call.
 
         The base method calls ``fz.sf(0)`` on every non-histogram severity
-        without a layer clause, which an ELT severity cannot answer. With no
-        layer clause (an ``elt`` body admits none) the base sets ``pattach =
-        1`` and ``pdetach = 0``; this sets the same values with no call.
+        without a layer clause, which for an ELT severity is an eltq call
+        over every row at construction. With no layer clause (an ``elt`` body
+        admits none) the base sets ``pattach = 1`` and ``pdetach = 0``; this
+        sets the same values with no call.
         """
         self.pattach = self.moment_pattach = 1
         self.pdetach = 0
@@ -4376,17 +4632,7 @@ class SeverityElt(Severity):
             under the Burke rule (``[ELT-Burke-Total]``), naming the event and
             its units. The default roll-up reaches a grid and never raises.
         """
-        if self.grid_supported:
-            return
-        event, units = self.sev_name.shared_example()
-        prefix = f'{owner}: ' if owner else ''
-        raise NotImplementedError(
-            f'{prefix}event {event} has rows for units {", ".join(units)}, '
-            'and under the Burke total rule ([ELT-Burke-Total]) a shared event '
-            'with secondary uncertainty has model moments and no grid; the '
-            'default roll-up has one. build(..., update=False) gives the '
-            'theoretical statistics, and no2u on every elt clause gives the '
-            'mean-only model.')
+        _check_elt_grid_supported(self.sev_name, owner)
 
     def tail_measures(self, edge, node=None):
         """eltq's tail measures of a one-row model at candidate edges.

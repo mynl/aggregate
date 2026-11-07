@@ -874,6 +874,11 @@ def oep(agg, p, *, freq=0):
     whole range of ``s``, the achieved ``oep`` column falls below the requested
     ``p``. That is reported rather than hidden.
 
+    **Event loss tables.** The severity of an ``elt`` aggregate with
+    secondary uncertainty is computed from eltq's exact tail rate, so its OEP
+    is that of the exact mixture of the rows' laws, and a row's atom shows as
+    an achieved ``oep`` below ``p``.
+
     References
     ----------
     Mildenhall, S. J., *Return Period Confusions Clarified*, 2026.

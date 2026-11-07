@@ -38,7 +38,10 @@
   `dev/done/plan-elt-reporting-punchup.md`, which defers a per-row law column
   and `Portfolio` narration). Pended: `[ELT-Burke-Total]`, its
   branch kept behind `_loss_table.SHARED_EVENT_RULE`, and `[ELT-Joint-Units]`
-  (`dev/note-joint-elt.md`).
+  (`dev/note-joint-elt.md`). `[ELT-Severity-Functions]` landed in 2.1.0a6
+  (`dev/done/plan-elt-severity-functions.md`): the severity's `sf`, `cdf`,
+  `isf`, `ppf`, `pdf` and `stats` are exact through eltq 2.15, so `oep` works
+  on a table with secondary uncertainty.
 
 ## Outside contributions
 

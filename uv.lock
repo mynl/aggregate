@@ -86,7 +86,7 @@ requires-dist = [
     { name = "bokeh", marker = "extra == 'viz'" },
     { name = "datashader", marker = "extra == 'viz'" },
     { name = "docutils", marker = "extra == 'dev'", specifier = ">=0.20,<0.22" },
-    { name = "eltq", marker = "extra == 'elt'", specifier = ">=2.13" },
+    { name = "eltq", marker = "extra == 'elt'", specifier = ">=2.15" },
     { name = "greater-tables", specifier = ">=8.1.0" },
     { name = "holoviews", marker = "extra == 'viz'" },
     { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6" },
@@ -629,16 +629,16 @@ wheels = [
 
 [[package]]
 name = "eltq"
-version = "2.14.0"
+version = "2.15.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "numpy" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/25/48/e5e979c178a59c9c6bd464a750e99d418129333f3eabb1ea73075c41b149/eltq-2.14.0.tar.gz", hash = "sha256:1f7a0b072fef1cabe8adf10d792cd3376da1d5ab3cf5b8f4f058fd75d18361e9", size = 278176, upload-time = "2026-10-27T22:56:14.735Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4a/6c/11fee88d258b4548783a985625baec8a63bd4a4b137dc4692408e92a56eb/eltq-2.15.0.tar.gz", hash = "sha256:5d04faebc9ffb936fc3f98b0e6dcb5d63b45a9a58c17ffb5fe0575eec5a67aa1", size = 284395, upload-time = "2026-11-07T09:05:17.998Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/7e/27/20dcc46d12ca368457618c1f78af392fb7cd87b6b05652bde5c55e411503/eltq-2.14.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:97fe15a9e85dbf287159bd072cc0d84f171047628434ba1d9e8af982247d9325", size = 981036, upload-time = "2026-10-27T22:56:09.903Z" },
-    { url = "https://files.pythonhosted.org/packages/10/35/9a4865febd1a8a4df978a7c50f6135ff3da35bb1a2f79b8c14b51f9a96c6/eltq-2.14.0-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:c248ec8ca9b4cf770742bbadc43c76d322433eb00e792af78c9b100357c55200", size = 1241304, upload-time = "2026-10-27T22:56:11.487Z" },
-    { url = "https://files.pythonhosted.org/packages/08/b7/870c63f038cba343498784827ad51dd49d3011813e02ef5a0a90733a764b/eltq-2.14.0-cp312-abi3-win_amd64.whl", hash = "sha256:23868f4817f08b97f39646bbec1580e97d6259d465bedff21c5fa24428b3941d", size = 1113026, upload-time = "2026-10-27T22:56:13.178Z" },
+    { url = "https://files.pythonhosted.org/packages/39/ba/a93c92b10164a0ac80d89315c70942aeda4aa05969881e27f17159a0b839/eltq-2.15.0-cp312-abi3-macosx_11_0_arm64.whl", hash = "sha256:3fcc0096cf47d07944430c58f85cadfb566f2dd0a496f9e0bf58b95e261e7bec", size = 991619, upload-time = "2026-11-07T09:05:12.449Z" },
+    { url = "https://files.pythonhosted.org/packages/00/db/685bff2c26c06366347e096e27ba4a2ad8e860619ab5f969477e99392d1c/eltq-2.15.0-cp312-abi3-manylinux_2_28_x86_64.whl", hash = "sha256:bc0e56246e7b7963258f1d69d23f66ff392db61a68c4aab09bc363de4da39ad0", size = 1256505, upload-time = "2026-11-07T09:05:14.679Z" },
+    { url = "https://files.pythonhosted.org/packages/07/1f/e5fe51c26e9e6cb54f8848d0d8c88f678e803103a7c45bc39cf190d16b83/eltq-2.15.0-cp312-abi3-win_amd64.whl", hash = "sha256:8296340b77134e795f9c4fedc397372e7739c73ea24f70778d73313e1e41463b", size = 1127272, upload-time = "2026-11-07T09:05:16.247Z" },
 ]
 
 [[package]]

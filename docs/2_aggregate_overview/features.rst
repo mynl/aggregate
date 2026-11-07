@@ -1691,6 +1691,11 @@ occurrence has no largest loss, and it raises rather than returning ``nan``. And
 Poisson frequency is required, with zero-modified Poisson refused: the thinning
 argument is what makes :math:`1 - e^{-\lambda S}` hold.
 
+Since 2.1.0a6 an event loss table with secondary uncertainty (an ``elt``
+clause without ``no2u``) works the same way: its severity functions are the
+exact mixture of the rows' laws, from eltq's tail rate and density, so ``oep``
+needs no grid.
+
 The approximation frames (a332 to a334, a343)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a6 - 2026-11-07
+
+**[ELT-Severity-Functions] `sf`, `cdf`, `isf`, `ppf`, `pdf` and `stats` of the severity of an event loss table with secondary uncertainty are exact**, computed from eltq's tail rate and density, where they raised `NotImplementedError`. So `oep`, `Aggregate.sev`, `severity_error_analysis` and `chart_approximation_tails` work on an `elt` aggregate without `no2u`: `oep` on `EventLossTable.SecondaryUncertainty` at 0.1, 0.01 and 0.001 gives 16.531, 190.864 and 506.394. Each call costs of the order of the rows times the points (30 points on a million rows: 0.1 s for `sf`, 2.4 s for `isf`), and building and updating call none of them. The `elt` extra and `ELTQ_MIN_VERSION` now require eltq 2.15.0, for `density_arrays`; sync with `uv sync --all-extras --inexact`.
+
 ## 2.1.0a5 - 2026-11-06
 
 **[Extended-Calibration-Set] `calibrate_distortions(..., extended=True)` calibrates the standard set with `tsallis` between `wang` and `dual`**, on `Aggregate`, `Portfolio` and `AggregateCHF`. `names` now defaults to `None`, which resolves to the standard five, and `names` given with `extended=True` raises `ValueError`. A call that passes neither is unchanged. The envelope chart of `Bounds` draws a calibrated `tsallis` as `Tsallis`.

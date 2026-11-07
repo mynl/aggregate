@@ -115,7 +115,7 @@ viz = [
 # import. A `uv sync` replaces a local eltq build with the published wheel, so
 # re-install a checkout after syncing to test an unreleased change.
 elt = [
-    "eltq>=2.13",
+    "eltq>=2.15",
 ]
 # Every user-facing extra in one shot. Self-referencing so the lists cannot
 # drift; deliberately excludes `dev` (docs build and test tooling).

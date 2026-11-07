@@ -58,9 +58,9 @@ MAX_EXAMPLES = 5
 ELT_FORMS = {3: 'ELT3', 4: 'ELT4', 6: 'ELT6'}
 YELT_FORMS = {2: 'YELT2', 3: 'YELT3'}
 
-#: The oldest eltq with every function the ELT6 path calls; 2.13.0 added
-#: ``multiunit_moments``.
-ELTQ_MIN_VERSION = (2, 13, 0)
+#: The oldest eltq with every function the ELT6 path calls; 2.15.0 added
+#: ``density_arrays``, the severity's ``pdf``.
+ELTQ_MIN_VERSION = (2, 15, 0)
 
 #: Relative tolerance on the shared-event moment integration, eltq's
 #: ``multiunit_moments`` ``rtol`` on ``C_2`` and ``C_3``, under the Burke rule.

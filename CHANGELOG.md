@@ -20,6 +20,12 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0 - 2026-11-07
+
+**Release 2.1.0, the first since 2.0.0, covers 2.1.0a1 to 2.1.0a7.** New: the `tsallis` distortion family, the Beta(alpha, 1) mixture of TVaRs with Gini index `1/(alpha + 1)`, built as `Distortion('tsallis', alpha=3)` or `distortion D tsallis 3` in DecL (2.1.0a3); `Distortion.from_gini(kind, gini)` for the one-parameter families (2.1.0a4); `calibrate_distortions(..., extended=True)`, which adds `tsallis` to the standard five (2.1.0a5); exact `sf`, `cdf`, `isf`, `ppf`, `pdf` and `stats` for the severity of an event loss table with secondary uncertainty, so `oep` and the severity diagnostics work on an `elt` aggregate without `no2u`, and the `elt` extra now requires eltq 2.15 (2.1.0a6). Fixed, and numbers move: `oep` on an aggregate with an `occurrence net of` or `occurrence ceded to` clause returns net or ceded points, where it returned gross ones (2.1.0a7); a DecL reference no longer overrides the label and tags of the statement that refers to it (2.1.0a1).
+
+**Breaking, inside a minor release.** `Distortion.gini_p` is renamed `gini`, with no alias: the property, the frame column, the exhibit block and the `formats-*.yaml` key. `gini_p` raises `AttributeError`, so code that reads it changes to `gini`; no number moves (2.1.0a2).
+
 ## 2.1.0a7 - 2026-11-07
 
 **[OEP-Occurrence-Program] `oep` on an aggregate with an `occurrence net of` or `occurrence ceded to` clause returns net or ceded points**, where it returned the gross points and ignored the program. The point is the program's net or ceded function of the gross point, and `S_sev` and the achieved `oep` are those of the net or ceded loss, so a layer placed at 100% (net) or the stretch below the attachment or above the top of a program (ceded) shows as an achieved `oep` below `p`. The aggregate still need not be updated. New helper `_reinsurance.flat_run_end`. Numbers move for any `oep` call on an aggregate with an occurrence program.

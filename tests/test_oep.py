@@ -336,3 +336,91 @@ def test_works_without_update():
         eager = build(program)
         assert float(oep(lazy, 0.01).loss.iloc[0]) == pytest.approx(
             float(oep(eager, 0.01).loss.iloc[0]), rel=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# occurrence reinsurance ([OEP-Occurrence-Program])
+# ---------------------------------------------------------------------------
+
+#: 1000 xs 1000 at 100% and 50% of 5000 xs 2000: the net loss is constant on
+#: [1000, 2000], the ceded loss below 1000 and above 7000; at p = 0.3 the
+#: gross point, 1440, is inside the first stretch.
+PROGRAM = '1000 xs 1000 and 50% po 5000 xs 2000'
+OCC_P = np.array([0.5, 0.3, 0.2, 0.1, 0.05, 0.01, 0.001])
+
+
+def _net(x):
+    x = np.asarray(x, dtype=float)
+    return np.select([x <= 1000, x <= 2000, x <= 7000],
+                     [x, 1000.0, 1000 + 0.5 * (x - 2000)], x - 3500)
+
+
+def _ceded(x):
+    return np.asarray(x, dtype=float) - _net(x)
+
+
+def _program_agg(kind, update=False):
+    return build(f'agg OEP:Occ 2 claims sev lognorm 1000 cv 2 '
+                 f'occurrence {kind} {PROGRAM} poisson', update=update)
+
+
+def _gross_agg():
+    return build('agg OEP:Gross 2 claims sev lognorm 1000 cv 2 poisson',
+                 update=False)
+
+
+@pytest.mark.parametrize('kind, g, run', [
+    ('net of', _net, lambda x: np.where((x >= 1000) & (x <= 2000), 2000.0, x)),
+    ('ceded to', _ceded, lambda x: np.where(x <= 1000, 1000.0,
+                                            np.where(x >= 7000, np.inf, x))),
+])
+def test_occurrence_program_maps_the_gross_points(kind, g, run):
+    """The PML is g of the gross PML, and the achieved oep is read at the end
+    of the stretch on which g is constant."""
+    gross = oep(_gross_agg(), OCC_P)
+    a = _program_agg(kind)
+    df = oep(a, OCC_P)
+    x = gross.loss.to_numpy()
+    np.testing.assert_allclose(df.loss, g(x), rtol=1e-12)
+    np.testing.assert_allclose(df.S_sev, a.sev.sf(run(x)), rtol=1e-12)
+    increasing = run(x) == x
+    assert increasing.any() and (~increasing).any()
+    np.testing.assert_allclose(df.oep[increasing], OCC_P[increasing], rtol=1e-12)
+    assert (df.oep[~increasing] < OCC_P[~increasing]).all()
+
+
+def test_ceded_points_below_and_above_the_program():
+    df = oep(_program_agg('ceded to'), [0.5, 0.001])
+    # below the attachment nothing is ceded, and a cession happens exactly
+    # when the gross loss passes 1000; above the top it is the full 3500
+    assert df.loss.iloc[0] == 0.0
+    assert df.loss.iloc[1] == pytest.approx(3500.0, rel=1e-15)
+    assert df.S_sev.iloc[1] == 0.0
+    assert np.isinf(df.annual_return_period.iloc[1])
+
+
+def test_unlimited_layer():
+    """At 100% of inf xs 5000 the net loss stops at 5000 and the ceded loss
+    never stops rising."""
+    net = oep(build('agg OEP:NetInf 2 claims sev lognorm 1000 cv 2 '
+                    'occurrence net of inf xs 5000 poisson', update=False), 0.001)
+    ceded = oep(build('agg OEP:CedInf 2 claims sev lognorm 1000 cv 2 '
+                      'occurrence ceded to inf xs 5000 poisson', update=False), 0.001)
+    gross = oep(_gross_agg(), 0.001)
+    assert net.loss.iloc[0] == 5000.0 and net.oep.iloc[0] == 0.0
+    assert ceded.loss.iloc[0] == pytest.approx(gross.loss.iloc[0] - 5000, rel=1e-12)
+    assert ceded.oep.iloc[0] == pytest.approx(0.001, rel=1e-12)
+
+
+@pytest.mark.parametrize('kind', ['net of', 'ceded to'])
+def test_occurrence_program_against_the_grid(kind):
+    """The updated object's net or ceded severity on the grid gives the same
+    points to within a bucket."""
+    a = _program_agg(kind, update=True)
+    df = oep(a, OCC_P)
+    sev = a.sev_density_df
+    achieved = -np.expm1(-a.n * sev.S_sev.to_numpy())
+    grid = np.array([sev.loss.to_numpy()[achieved <= q][0] for q in OCC_P])
+    assert np.all(np.abs(grid - df.loss.to_numpy()) <= a.bs)
+    lazy = oep(_program_agg(kind), OCC_P)
+    np.testing.assert_allclose(lazy.loss, df.loss, rtol=1e-14)

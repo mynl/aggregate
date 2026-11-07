@@ -1694,7 +1694,9 @@ argument is what makes :math:`1 - e^{-\lambda S}` hold.
 Since 2.1.0a6 an event loss table with secondary uncertainty (an ``elt``
 clause without ``no2u``) works the same way: its severity functions are the
 exact mixture of the rows' laws, from eltq's tail rate and density, so ``oep``
-needs no grid.
+needs no grid. Since 2.1.0a7 an aggregate with an ``occurrence net of`` or
+``occurrence ceded to`` clause gives net or ceded points: the program's net or
+ceded function is nondecreasing, so the PML is that function of the gross PML.
 
 The approximation frames (a332 to a334, a343)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

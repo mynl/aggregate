@@ -20,6 +20,10 @@ They are public and not underscore prefixed on purpose. Use them, and report wha
 
 ---
 
+## 2.1.0a7 - 2026-11-07
+
+**[OEP-Occurrence-Program] `oep` on an aggregate with an `occurrence net of` or `occurrence ceded to` clause returns net or ceded points**, where it returned the gross points and ignored the program. The point is the program's net or ceded function of the gross point, and `S_sev` and the achieved `oep` are those of the net or ceded loss, so a layer placed at 100% (net) or the stretch below the attachment or above the top of a program (ceded) shows as an achieved `oep` below `p`. The aggregate still need not be updated. New helper `_reinsurance.flat_run_end`. Numbers move for any `oep` call on an aggregate with an occurrence program.
+
 ## 2.1.0a6 - 2026-11-07
 
 **[ELT-Severity-Functions] `sf`, `cdf`, `isf`, `ppf`, `pdf` and `stats` of the severity of an event loss table with secondary uncertainty are exact**, computed from eltq's tail rate and density, where they raised `NotImplementedError`. So `oep`, `Aggregate.sev`, `severity_error_analysis` and `chart_approximation_tails` work on an `elt` aggregate without `no2u`: `oep` on `EventLossTable.SecondaryUncertainty` at 0.1, 0.01 and 0.001 gives 16.531, 190.864 and 506.394. Each call costs of the order of the rows times the points (30 points on a million rows: 0.1 s for `sf`, 2.4 s for `isf`), and building and updating call none of them. The `elt` extra and `ELTQ_MIN_VERSION` now require eltq 2.15.0, for `density_arrays`; sync with `uv sync --all-extras --inexact`.

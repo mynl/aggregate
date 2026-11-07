@@ -318,6 +318,31 @@ def test_oep_at_atoms(eltq):
     assert df['S_sev'].to_numpy()[0] == pytest.approx(0.075, rel=1e-13)
 
 
+def test_oep_net_of_an_occurrence_program(eltq):
+    """The six-row table under 25 xs 25, 50 xs 50 and 90% of 200 xs 100: the
+    net point is the program's net function of the gross point, and the grid
+    of the updated object agrees to within a bucket."""
+    program = 'occurrence net of 25 xs 25 and 50 xs 50 and 90% po 200 xs 100'
+    gross = build(_program('SF.Gross', SIX_ROWS), update=False)
+    net = _quiet_build(f"{_program('SF.Net', SIX_ROWS)} {program}")
+    p = np.array([1 / t for t in RETURN_PERIODS])
+    x = oep(gross, p)['loss'].to_numpy()
+    df = oep(net, p)
+    expected = np.select([x <= 25, x <= 100, x <= 300],
+                         [x, 25.0, 25 + 0.1 * (x - 100)], x - 255)
+    np.testing.assert_allclose(df['loss'], expected, rtol=1e-13)
+    np.testing.assert_allclose(oep(net, 0.01)['loss'], [34.0864], atol=5e-5)
+    # 1 in 25 lands in the stretch [25, 100] where the net loss is 25
+    flat = (x >= 25) & (x <= 100)
+    assert flat.any()
+    np.testing.assert_allclose(df['S_sev'][flat], gross.sev.sf(100.0), rtol=1e-13)
+    assert (df['oep'][flat] < p[flat]).all()
+    sev = net.sev_density_df
+    achieved = -np.expm1(-net.n * sev.S_sev.to_numpy())
+    grid = np.array([sev.loss.to_numpy()[achieved <= q][0] for q in p])
+    assert np.all(np.abs(grid - df['loss'].to_numpy()) <= net.bs)
+
+
 def test_callers(eltq):
     a = _quiet_build(_program('SF.Callers', SIX_ROWS))
     sev = a.sev

@@ -781,8 +781,8 @@ def oep(agg, p, *, freq=0):
     agg : Aggregate
         The aggregate supplying the severity and, unless ``freq`` overrides it,
         the expected claim count. Its frequency must be Poisson, and not zero
-        modified. Need not have been updated: only the input severity and the
-        claim count are read, never ``density_df``.
+        modified. Need not have been updated: only the input severity, the
+        claim count and any occurrence program are read, never ``density_df``.
     p : float or array_like of float
         Annual probability level(s), each in ``(0, 1)`` and strictly below the
         ceiling ``1 - exp(-lam)``. Typically small, 0.01 or less. Order is
@@ -800,9 +800,13 @@ def oep(agg, p, *, freq=0):
 
         ``loss``
             The occurrence PML ``x``, exact, not snapped to the ``bs`` grid.
+            On an aggregate with an occurrence program it is the net loss
+            under ``occurrence net of`` and the ceded loss under
+            ``occurrence ceded to``.
         ``S_sev``, ``F_sev``
             ``Pr(L > x)`` and the severity percentile ``Pr(L <= x)`` of that
-            loss, read back from ``loss``. ``F_sev`` is the level you would
+            loss, read back from ``loss``, with ``L`` the net or ceded loss of
+            an occurrence under an occurrence program. ``F_sev`` is the level you would
             hand to :meth:`Aggregate.q_sev`; ``S_sev`` is the usable handle far
             out in the tail, where ``F_sev`` rounds to 1.
         ``oep``
@@ -874,6 +878,23 @@ def oep(agg, p, *, freq=0):
     whole range of ``s``, the achieved ``oep`` column falls below the requested
     ``p``. That is reported rather than hidden.
 
+    **Occurrence reinsurance.** Under an ``occurrence net of`` or
+    ``occurrence ceded to`` clause the loss of an occurrence is :math:`g(X)`,
+    with :math:`g` the program's net or ceded function of the gross loss
+    :math:`X`. Shares are at most 100% and layers do not overlap, so
+    :math:`g` is nondecreasing, the largest net or ceded occurrence in a
+    year is :math:`g` of the largest gross one, and the PML is :math:`g`
+    applied to the gross PML. Where :math:`g` is constant, across a layer
+    placed at 100% for the net loss, or below the first attachment, across a
+    gap and above a finite program for the ceded loss, the view has an atom:
+    ``S_sev`` is the gross survival at the right end of that stretch (see
+    :func:`~aggregate._reinsurance.flat_run_end`), and the achieved ``oep``
+    falls below ``p`` as it does at a limit. The function :math:`g` is built
+    from the program's layers, so the aggregate still need not be updated.
+    Annual terms (an ``aggregate`` clause, ``aad``, ``agglimit``,
+    ``reinstatements``) do not enter: OEP is a statement about single
+    occurrences.
+
     **Event loss tables.** The severity of an ``elt`` aggregate with
     secondary uncertainty is computed from eltq's exact tail rate, so its OEP
     is that of the exact mixture of the rows' laws, and a row's atom shows as
@@ -931,9 +952,25 @@ def oep(agg, p, *, freq=0):
     # severity exceedance probability implied by p; log1p keeps small p exact
     s = -np.log1p(-p) / lam
     loss = np.asarray(agg.sev.isf(s), dtype=float)
-    # read S back from the loss rather than reusing s, so an atom or a gap in
-    # the severity support shows up as an achieved oep below the requested p
-    s_sev = np.asarray(agg.sev.sf(loss), dtype=float)
+    if agg.occ_reins is None:
+        # read S back from the loss rather than reusing s, so an atom or a gap
+        # in the severity support shows up as an achieved oep below p
+        s_sev = np.asarray(agg.sev.sf(loss), dtype=float)
+    else:
+        from ._reinsurance import flat_run_end, make_ceder_netter
+        views = {'net of': 'net', 'ceded to': 'ceded'}
+        if agg.occ_kind not in views:
+            raise ValueError(f'{agg.name}: unexpected kind of occurrence '
+                             f'reinsurance, {agg.occ_kind!r}.')
+        view = views[agg.occ_kind]
+        ceder, netter = make_ceder_netter(agg.occ_reins)
+        # the view's loss is nondecreasing in the gross loss, so the largest
+        # net or ceded occurrence is the image of the largest gross one, and
+        # it is exceeded exactly when the gross loss passes the end of the
+        # stretch on which the view is constant
+        s_sev = np.asarray(agg.sev.sf(flat_run_end(agg.occ_reins, view, loss)),
+                           dtype=float)
+        loss = np.asarray((netter if view == 'net' else ceder)(loss), dtype=float)
     achieved = -np.expm1(-lam * s_sev)
     with np.errstate(divide='ignore', invalid='ignore'):
         occ_rp = 1.0 / (lam * s_sev)

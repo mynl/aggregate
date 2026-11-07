@@ -214,6 +214,73 @@ def make_ceder_netter(reins_list, debug=False):
         return ceder, netter
 
 
+def flat_run_end(reins_list, view, x, tol=1e-9):
+    """Right end of the stretch on which the net or ceded loss is constant at ``x``.
+
+    Parameters
+    ----------
+    reins_list : list of (share, limit, attach)
+        The program, validated as :func:`make_ceder_netter` validates it.
+    view : {'net', 'ceded'}
+        Which function of the subject loss.
+    x : float or array_like
+        Subject (gross) losses, nonnegative.
+    tol : float
+        Tolerance for joining two stretches that touch.
+
+    Returns
+    -------
+    numpy.ndarray
+        For each ``x``, :math:`r = \\sup\\{u : g(u) \\le g(x)\\}` with
+        :math:`g` the net or ceded function: the right end of the stretch of
+        constant :math:`g` containing ``x``, ``inf`` when :math:`g` stays
+        constant to infinity, and ``x`` itself where :math:`g` increases.
+
+    Notes
+    -----
+    With shares at most 100% and layers that do not overlap, both functions
+    are nondecreasing and piecewise linear, so :math:`\\{g(X) > g(x)\\} =
+    \\{X > r\\}` and :math:`\\Pr(g(X) > g(x)) = S(r)`. The net function is
+    constant across a layer placed at 100%. The ceded function is constant
+    below the first attachment, across a gap or a zero share layer, and above
+    the top of a finite program. Stretches that touch, such as two contiguous
+    layers at 100%, are joined. The stretches are read from the layer tuples
+    rather than from the knots of :func:`make_ceder_netter`, whose stand-in
+    for infinity loses the net function's value at an unlimited layer.
+    """
+    if view not in ('net', 'ceded'):
+        raise ValueError(f"view must be 'net' or 'ceded', not {view!r}")
+    _validate_reins_layers(reins_list)
+    flat = []
+    top = 0.0
+    for share, limit, attach in reins_list:
+        end = attach + limit
+        if view == 'net' and share >= 1:
+            flat.append((attach, end))
+        elif view == 'ceded':
+            if attach > top:
+                flat.append((top, attach))
+            if share <= 0:
+                flat.append((attach, end))
+        top = end
+    if view == 'ceded':
+        if not reins_list:
+            flat.append((0.0, np.inf))
+        elif np.isfinite(top):
+            flat.append((top, np.inf))
+    runs = []
+    for lo, hi in sorted(flat):
+        if runs and lo <= runs[-1][1] + tol:
+            runs[-1][1] = max(runs[-1][1], hi)
+        else:
+            runs.append([lo, hi])
+    x = np.asarray(x, dtype=float)
+    r = x.copy()
+    for lo, hi in runs:
+        r = np.where((x >= lo) & (x <= hi), np.maximum(r, hi), r)
+    return r
+
+
 # ====================================================================
 # Apply engine: ceder/netter convolution onto the model grid
 # ====================================================================

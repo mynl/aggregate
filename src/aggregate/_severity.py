@@ -1248,6 +1248,11 @@ def make_layer_attachment_cdf(attachment, limit, pattach, conditional):
     before calling ``fzcdf``. Conditional: rescales by ``pattach`` after
     removing the truncated below-attachment mass. Unconditional: cdf(0) =
     1 - pattach (mass at zero from P(X <= attachment)); cdf(>= limit) = 1.
+
+    Both forms reach one *at* the limit, which carries the mass
+    ``S(attachment + limit)`` of an exhausted layer; the ground-up
+    ``fzcdf(attachment + limit)`` would leave that mass out
+    ([Deductible-Forms-Follow-Ups]).
     """
     def actual_decorator(fzcdf):
         if conditional:
@@ -1259,7 +1264,7 @@ def make_layer_attachment_cdf(attachment, limit, pattach, conditional):
             def wrapper(x):
                 return np.where(x < 0, 0,
                                 np.where(x == 0, 1 - pattach,
-                                         np.where(x > limit, 1,
+                                         np.where(x >= limit, 1,
                                                   fzcdf(x + attachment))))
         return wrapper
 
@@ -1272,7 +1277,9 @@ def make_layer_attachment_sf(attachment, limit, pattach, conditional):
     Notes
     -----
     Conditional: rescales by ``pattach``. Unconditional: sf(0) = pattach
-    (probability that any layer claim occurs at all); sf(>= limit) = 0.
+    (probability that any layer claim occurs at all); sf(>= limit) = 0,
+    since no payment exceeds the limit, as in
+    :func:`make_layer_attachment_cdf`.
     """
     def actual_decorator(fzsf):
         if conditional:
@@ -1284,27 +1291,22 @@ def make_layer_attachment_sf(attachment, limit, pattach, conditional):
             def wrapper(x):
                 return np.where(x < 0, 1,
                                 np.where(x == 0, pattach,
-                                         np.where(x > limit, 0,
+                                         np.where(x >= limit, 0,
                                                   fzsf(x + attachment))))
         return wrapper
 
     return actual_decorator
 
 
-def make_layer_attachment_pdf(attachment, limit, detachment, pattach, pdetach,
-                              conditional):
+def make_layer_attachment_pdf(attachment, limit, pattach, pdetach, conditional):
     """Decorator that wraps a PDF for the layered-loss transform.
 
     Parameters
     ----------
     attachment, limit : float
         The layer ``limit xs attachment``; the payment lives on ``[0, limit]``.
-    detachment : float
-        ``attachment + limit``, the ground-up loss at which the payment
-        reaches the limit. Not used by the wrapper, which works in payment
-        space; kept so the signature matches the other layer wrappers.
     pattach, pdetach : float
-        ``S(attachment)`` and ``S(detachment)`` of the ground-up law.
+        ``S(attachment)`` and ``S(attachment + limit)`` of the ground-up law.
     conditional : bool
         Whether the severity is conditional on a loss above the attachment.
 
@@ -2859,12 +2861,12 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
         of the layer parameters. Distributions whose support extends below
         zero (e.g. ``norm``) rely on this clamp.
 
-        Closure captures ``attachment``, ``limit``, ``detachment``,
+        Closure captures ``attachment``, ``limit``, ``retention_end``,
         ``pattach``, ``pdetach``, ``conditional`` at construction. Mutating
         any of those after ``__init__`` will produce stale results from the
         layered wrappers (though ``self.fz`` would still be self-consistent).
         """
-        a, l, d = self.attachment, self.limit, self.detachment
+        a, l = self.attachment, self.limit
         pa, pd = self.pattach, self.pdetach
         cond = self.conditional
         if np.isfinite(getattr(self, 'retention_end', np.inf)):
@@ -2881,7 +2883,7 @@ class Severity(HelpMixin, LabeledMixin, ProgramMixin, ss.rv_continuous):
             return
         self._layered_cdf = make_layer_attachment_cdf(a, l, pa, cond)(self.fz.cdf)
         self._layered_sf  = make_layer_attachment_sf (a, l, pa, cond)(self.fz.sf)   # noqa
-        self._layered_pdf = make_layer_attachment_pdf(a, l, d, pa, pd, cond)(self.fz.pdf)
+        self._layered_pdf = make_layer_attachment_pdf(a, l, pa, pd, cond)(self.fz.pdf)
         self._layered_isf = make_layer_attachment_isf(a, l, pa, pd, cond)(self.fz.isf)
         self._layered_ppf = make_layer_attachment_ppf(a, l, pa, pd, cond)(self.fz.ppf)
 
